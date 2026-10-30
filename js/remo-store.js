@@ -355,6 +355,87 @@ const RemoMediaDB = {
   }
 };
 
+/* ── 2B-2. High-Performance Mobile Client Image Compressor & Cloud Uploader ── */
+async function compressImageFileToDataUrl(fileOrBlob, maxDim = 1080, quality = 0.76) {
+  return new Promise((resolve) => {
+    if (!fileOrBlob) return resolve('');
+    if (typeof fileOrBlob === 'string' && fileOrBlob.startsWith('data:image')) {
+      return resolve(fileOrBlob);
+    }
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const img = new Image();
+      img.onload = () => {
+        let w = img.width;
+        let h = img.height;
+        if (w > maxDim || h > maxDim) {
+          if (w > h) {
+            h = Math.round((h * maxDim) / w);
+            w = maxDim;
+          } else {
+            w = Math.round((w * maxDim) / h);
+            h = maxDim;
+          }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+        const dataUrl = canvas.toDataURL('image/jpeg', quality);
+        resolve(dataUrl);
+      };
+      img.onerror = () => resolve(ev.target.result || '');
+      img.src = ev.target.result;
+    };
+    reader.onerror = () => resolve('');
+    reader.readAsDataURL(fileOrBlob);
+  });
+}
+
+async function uploadMediaToCloudOrDataUrl(blobOrFile, folder = 'posts') {
+  if (!blobOrFile) return '';
+  const isImage = (blobOrFile.type && blobOrFile.type.startsWith('image/')) || (typeof blobOrFile === 'string' && blobOrFile.startsWith('data:image'));
+  
+  if (isImage) {
+    // 1. Downscale & compress to high-res mobile-optimized JPEG dataUrl (~60-90KB)
+    const dataUrl = await compressImageFileToDataUrl(blobOrFile, 1080, 0.76);
+    
+    // 2. Upload to Firebase Storage if available
+    if (typeof firebase !== 'undefined' && firebase.storage) {
+      try {
+        const storage = firebase.storage();
+        const ref = storage.ref().child(`remo_${folder}/${Date.now()}_${Math.random().toString(36).slice(2, 7)}.jpg`);
+        const res = await fetch(dataUrl);
+        const b = await res.blob();
+        const snap = await ref.put(b, { contentType: 'image/jpeg' });
+        const downloadUrl = await snap.ref.getDownloadURL();
+        if (downloadUrl) return downloadUrl;
+      } catch (err) {
+        console.log('Firebase storage upload notice (using optimized dataUrl):', err.message);
+      }
+    }
+    return dataUrl;
+  }
+
+  // Videos or audio
+  if (typeof firebase !== 'undefined' && firebase.storage) {
+    try {
+      const storage = firebase.storage();
+      const ext = (blobOrFile.type && blobOrFile.type.includes('video')) ? 'mp4' : 'webm';
+      const ref = storage.ref().child(`remo_${folder}/${Date.now()}_${Math.random().toString(36).slice(2, 7)}.${ext}`);
+      const snap = await ref.put(blobOrFile);
+      const downloadUrl = await snap.ref.getDownloadURL();
+      if (downloadUrl) return downloadUrl;
+    } catch (e) {}
+  }
+  // Fallback to local IndexedDB for large videos
+  return RemoMediaDB.saveBlob(blobOrFile, folder);
+}
+
+window.compressImageFileToDataUrl = compressImageFileToDataUrl;
+window.uploadMediaToCloudOrDataUrl = uploadMediaToCloudOrDataUrl;
+
 /* ── 2C. Starter Templates for Live Interactive HTML / 3D Mini-App Posts ── */
 const REMO_HTML_TEMPLATES = {
   fireworks: `<!DOCTYPE html>

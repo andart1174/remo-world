@@ -579,30 +579,46 @@ function renderPostMediaStage(p, city, lang) {
   if (p.mediaType === 'carousel' && Array.isArray(p.mediaUrls) && p.mediaUrls.length > 1) {
     const idx = (_carouselState[p.id] || 0) % p.mediaUrls.length;
     const curKey = p.mediaUrls[idx];
-    const curUrl = RemoMediaDB.resolveSyncOrPlaceholder(curKey);
+    let curUrl = RemoMediaDB.resolveSyncOrPlaceholder(curKey);
+    if (!curUrl || curUrl.startsWith('idb://')) {
+      curUrl = (curKey && (curKey.startsWith('data:') || curKey.startsWith('http')))
+        ? curKey
+        : (p._cachedArt || generateCityPostVisualDataUrl(city.id, p.visualHeadline, p.visualSub));
+    }
     return `
-      <img src="${curUrl}" ${String(curKey).startsWith('idb://') ? `data-idb-src="${curKey}"` : ''} class="${flt}" alt="${getCityName(city, lang)}">
-      <button type="button" class="carousel-nav-btn prev" onclick="stepPostCarousel('${p.id}', -1, event)">‹</button>
-      <button type="button" class="carousel-nav-btn next" onclick="stepPostCarousel('${p.id}', 1, event)">›</button>
-      <div class="carousel-dots">
-        ${p.mediaUrls.map((_, i) => `<span class="carousel-dot ${i === idx ? 'active' : ''}"></span>`).join('')}
+      <div style="position:relative;width:100%;height:100%;touch-action:pan-y;" ontouchstart="initCarouselTouchSwipe(this, '${p.id}')">
+        <img src="${curUrl}" class="carousel-slide-img ${flt}" alt="${getCityName(city, lang)}" style="width:100%;height:100%;object-fit:cover;transition:opacity 0.2s ease;">
+        <button type="button" class="carousel-nav-btn prev" onclick="stepPostCarousel('${p.id}', -1, event)" title="Précédent">‹</button>
+        <button type="button" class="carousel-nav-btn next" onclick="stepPostCarousel('${p.id}', 1, event)" title="Suivant">›</button>
+        <div class="carousel-dots">
+          ${p.mediaUrls.map((_, i) => `<span class="carousel-dot ${i === idx ? 'active' : ''}" onclick="setPostCarouselIndex('${p.id}', ${i}, event)"></span>`).join('')}
+        </div>
+        <div class="carousel-count-pill" style="position:absolute;top:10px;right:10px;background:rgba(6,10,24,0.78);backdrop-filter:blur(6px);color:#fff;font-size:0.72rem;font-weight:900;padding:3px 9px;border-radius:99px;border:1px solid rgba(255,255,255,0.22);pointer-events:none;z-index:6;">
+          🎠 ${idx + 1}/${p.mediaUrls.length}
+        </div>
       </div>
     `;
   }
 
   // 5. SINGLE PHOTO OR PROCEDURAL CITY POSTER
-  let mediaSrc = p.mediaUrl || '';
+  let mediaSrc = p.mediaUrl || (Array.isArray(p.mediaUrls) && p.mediaUrls[0]) || '';
   let idbTag = '';
   if (mediaSrc && String(mediaSrc).startsWith('idb://')) {
     idbTag = `data-idb-src="${mediaSrc}"`;
-    mediaSrc = RemoMediaDB.resolveSyncOrPlaceholder(mediaSrc);
-  } else if (!mediaSrc) {
+    const resolved = RemoMediaDB.resolveSyncOrPlaceholder(mediaSrc);
+    if (resolved && !resolved.startsWith('idb://')) {
+      mediaSrc = resolved;
+    } else {
+      mediaSrc = '';
+    }
+  }
+  if (!mediaSrc || mediaSrc.startsWith('idb://')) {
     if (!p._cachedArt) {
       p._cachedArt = generateCityPostVisualDataUrl(city.id, p.visualHeadline, p.visualSub);
     }
     mediaSrc = p._cachedArt;
   }
-  return `<img src="${mediaSrc}" ${idbTag} class="${flt}" alt="${getCityName(city, lang)}">`;
+  return `<img src="${mediaSrc}" ${idbTag} class="${flt}" alt="${getCityName(city, lang)}" style="width:100%;height:100%;object-fit:cover;">`;
 }
 
 function renderViralGoalWidget(p, lang, isAdm) {
@@ -768,7 +784,7 @@ function renderSocialFeed(searchQuery = '') {
           <span class="city-tag" onclick="filterFeedByCityFromMap('${city.id}')">${cityTagLabel}</span>
         </div>
 
-        <div class="post-media-wrap" ondblclick="handleMediaDoubleTap(event, '${p.id}', this)">
+        <div class="post-media-wrap" id="post_media_${p.id}" ondblclick="handleMediaDoubleTap(event, '${p.id}', this)">
           <div class="post-badges-top">
             ${sealed ? `<span class="pbadge capsule">${t('capsule_locked_badge')}${xray ? ' · 👁️ X-RAY' : ''}</span>` : (p.wasTimeCapsule ? `<span class="pbadge unsealed">${t('capsule_unsealed_badge')}</span>` : '')}
             ${p.duetOf ? `<span class="pbadge duet">${t('post_duet_badge')}</span>` : ''}
@@ -1230,8 +1246,70 @@ function stepPostCarousel(postId, delta, ev) {
   if (!p || !Array.isArray(p.mediaUrls) || !p.mediaUrls.length) return;
   const len = p.mediaUrls.length;
   _carouselState[postId] = (((_carouselState[postId] || 0) + delta) % len + len) % len;
+  updateCarouselDom(postId, p);
+}
+
+function setPostCarouselIndex(postId, index, ev) {
+  if (ev) ev.stopPropagation();
+  const p = REMO_STORE.state.posts.find((x) => x.id === postId);
+  if (!p || !Array.isArray(p.mediaUrls) || !p.mediaUrls.length) return;
+  _carouselState[postId] = Math.max(0, Math.min(index, p.mediaUrls.length - 1));
+  updateCarouselDom(postId, p);
+}
+
+function updateCarouselDom(postId, p) {
+  const box = document.getElementById('post_media_' + postId);
+  const idx = _carouselState[postId] || 0;
+  const curKey = p.mediaUrls[idx];
+  let curUrl = RemoMediaDB.resolveSyncOrPlaceholder(curKey);
+  if (!curUrl || curUrl.startsWith('idb://')) {
+    curUrl = (curKey && (curKey.startsWith('data:') || curKey.startsWith('http'))) ? curKey : '';
+  }
+
+  if (box) {
+    const img = box.querySelector('img.carousel-slide-img');
+    if (img && curUrl) {
+      img.style.opacity = '0.35';
+      setTimeout(() => {
+        img.src = curUrl;
+        img.style.opacity = '1';
+      }, 50);
+    }
+    box.querySelectorAll('.carousel-dot').forEach((d, i) => {
+      d.classList.toggle('active', i === idx);
+    });
+    const pill = box.querySelector('.carousel-count-pill');
+    if (pill) pill.textContent = `🎠 ${idx + 1}/${p.mediaUrls.length}`;
+    return;
+  }
   renderSocialFeed();
 }
+
+function initCarouselTouchSwipe(el, postId) {
+  if (!el || el._hasSwipe) return;
+  el._hasSwipe = true;
+  let startX = 0;
+  let startY = 0;
+  el.addEventListener('touchstart', (e) => {
+    if (!e.touches || !e.touches[0]) return;
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+  }, { passive: true });
+  el.addEventListener('touchend', (e) => {
+    if (!e.changedTouches || !e.changedTouches[0]) return;
+    const dx = e.changedTouches[0].clientX - startX;
+    const dy = e.changedTouches[0].clientY - startY;
+    if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy) * 1.4) {
+      if (dx < 0) {
+        stepPostCarousel(postId, 1, e);
+      } else {
+        stepPostCarousel(postId, -1, e);
+      }
+    }
+  }, { passive: true });
+}
+window.initCarouselTouchSwipe = initCarouselTouchSwipe;
+window.setPostCarouselIndex = setPostCarouselIndex;
 
 function updateBeforeAfterSlider(rangeInput) {
   const box = rangeInput.closest('.ba-slider-box');
@@ -1364,8 +1442,7 @@ function openCreatePostModal(prefillTag = '') {
   pendingDuetParent = null;
   const duetBanner = document.getElementById('createDuetBanner');
   if (duetBanner) duetBanner.style.display = 'none';
-  const grid = document.getElementById('studioPhotosPreviewGrid');
-  if (grid) grid.innerHTML = '';
+  renderStudioPhotoThumbnails();
   const cmpWrap = document.getElementById('studioCompareWrap');
   if (cmpWrap) cmpWrap.style.display = 'none';
   const cmpChk = document.getElementById('studioCompareToggle');
@@ -1408,32 +1485,78 @@ function openCreatePostModal(prefillTag = '') {
 
 /* ── TAB 1: Photo Studio Handlers ── */
 function handleStudioPhotosSelect(ev) {
-  const files = Array.from(ev.target.files || []).slice(0, 4);
-  if (!files.length) return;
+  const newFiles = Array.from(ev.target.files || []);
+  if (!newFiles.length) return;
+  // Append new files up to 4 total!
+  const combined = [...pendingStudioPhotoBlobs, ...newFiles].slice(0, 4);
   pendingStudioPhotoPreviewUrls.forEach((u) => URL.revokeObjectURL(u));
-  pendingStudioPhotoBlobs = files;
-  pendingStudioPhotoPreviewUrls = files.map((f) => URL.createObjectURL(f));
+  pendingStudioPhotoBlobs = combined;
+  pendingStudioPhotoPreviewUrls = combined.map((f) => URL.createObjectURL(f));
+
+  if (ev.target) ev.target.value = '';
 
   const cmpWrap = document.getElementById('studioCompareWrap');
-  if (cmpWrap) cmpWrap.style.display = files.length === 2 ? 'flex' : 'none';
+  if (cmpWrap) cmpWrap.style.display = combined.length === 2 ? 'flex' : 'none';
 
   renderStudioPhotoThumbnails();
   const lang = REMO_I18N.getLang();
-  document.getElementById('createMediaPreviewStatus').textContent =
-    lang === 'fr'
-      ? `✓ ${files.length} photo(s) prête(s) en qualité HD !`
-      : `✓ ${files.length} HD photo(s) ready!`;
+  const statusEl = document.getElementById('createMediaPreviewStatus');
+  if (statusEl) {
+    statusEl.textContent = lang === 'fr'
+      ? (combined.length > 1
+          ? `🎠 ${combined.length} / 4 photos prêtes pour le Carrousel !`
+          : `✓ 1 photo prête en qualité HD !`)
+      : (combined.length > 1
+          ? `🎠 ${combined.length} / 4 photos ready for Carousel!`
+          : `✓ 1 HD photo ready!`);
+  }
 }
+
+function removeStudioPhotoThumbnail(idx) {
+  if (idx < 0 || idx >= pendingStudioPhotoBlobs.length) return;
+  pendingStudioPhotoBlobs.splice(idx, 1);
+  if (pendingStudioPhotoPreviewUrls[idx]) URL.revokeObjectURL(pendingStudioPhotoPreviewUrls[idx]);
+  pendingStudioPhotoPreviewUrls.splice(idx, 1);
+  
+  const cmpWrap = document.getElementById('studioCompareWrap');
+  if (cmpWrap) cmpWrap.style.display = pendingStudioPhotoBlobs.length === 2 ? 'flex' : 'none';
+
+  renderStudioPhotoThumbnails();
+  const lang = REMO_I18N.getLang();
+  const statusEl = document.getElementById('createMediaPreviewStatus');
+  if (statusEl) {
+    statusEl.textContent = lang === 'fr'
+      ? `${pendingStudioPhotoBlobs.length} photo(s) restante(s)`
+      : `${pendingStudioPhotoBlobs.length} photo(s) remaining`;
+  }
+}
+window.removeStudioPhotoThumbnail = removeStudioPhotoThumbnail;
 
 function renderStudioPhotoThumbnails() {
   const grid = document.getElementById('studioPhotosPreviewGrid');
   if (!grid) return;
-  grid.innerHTML = pendingStudioPhotoPreviewUrls.map((url, idx) => `
-    <div style="position:relative;aspect-ratio:1;border-radius:12px;overflow:hidden;border:1px solid var(--border-glow);">
+  const lang = REMO_I18N.getLang();
+
+  let html = pendingStudioPhotoPreviewUrls.map((url, idx) => `
+    <div style="position:relative;aspect-ratio:1;border-radius:12px;overflow:hidden;border:1px solid var(--border-glow);box-shadow:0 4px 14px rgba(0,0,0,0.5);">
       <img src="${url}" class="${pendingStudioPhotoFilter}" style="width:100%;height:100%;object-fit:cover;">
-      <span style="position:absolute;top:4px;left:4px;background:rgba(0,0,0,0.75);color:#fff;font-size:0.66rem;padding:2px 6px;border-radius:99px;font-weight:800;">#${idx + 1}</span>
+      <span style="position:absolute;top:4px;left:4px;background:rgba(0,0,0,0.85);color:#fbbf24;font-size:0.68rem;padding:2px 7px;border-radius:99px;font-weight:900;">#${idx + 1}</span>
+      <button type="button" onclick="removeStudioPhotoThumbnail(${idx})" title="Supprimer" style="position:absolute;top:4px;right:4px;background:rgba(239,68,68,0.9);color:#fff;border:none;border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:0.72rem;font-weight:bold;line-height:1;box-shadow:0 2px 6px rgba(0,0,0,0.6);">✕</button>
     </div>
   `).join('');
+
+  // If fewer than 4 photos, show an interactive "Ajouter photo +" card!
+  if (pendingStudioPhotoBlobs.length < 4) {
+    const nextNum = pendingStudioPhotoBlobs.length + 1;
+    html += `
+      <label style="position:relative;aspect-ratio:1;border-radius:12px;border:2px dashed rgba(251,191,36,0.65);background:rgba(251,191,36,0.06);display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;gap:6px;color:#fbbf24;transition:all 0.2s ease;">
+        <span style="font-size:1.6rem;line-height:1;">➕</span>
+        <span style="font-size:0.72rem;font-weight:800;text-align:center;padding:0 4px;">${lang === 'fr' ? `+ Photo #${nextNum}` : `+ Add #${nextNum}`}</span>
+        <input type="file" accept="image/*" multiple style="display:none;" onchange="handleStudioPhotosSelect(event)">
+      </label>
+    `;
+  }
+  grid.innerHTML = html;
 }
 
 function setStudioPhotoFilter(fltClass, btnEl) {
@@ -1665,14 +1788,16 @@ async function publishNewRemoPost() {
   if (activeCreateStudioTab === 'photo') {
     if (pendingStudioPhotoBlobs.length > 0) {
       for (const blob of pendingStudioPhotoBlobs) {
-        const key = await RemoMediaDB.saveBlob(blob, 'img');
-        mediaUrls.push(key);
+        const url = await uploadMediaToCloudOrDataUrl(blob, 'posts');
+        mediaUrls.push(url);
       }
       const wantBeforeAfter = pendingStudioPhotoBlobs.length === 2 && document.getElementById('studioCompareToggle')?.checked;
       if (wantBeforeAfter) {
         mediaType = 'before_after';
+        mediaUrl = mediaUrls[0];
       } else if (mediaUrls.length > 1) {
         mediaType = 'carousel';
+        mediaUrl = mediaUrls[0];
       } else {
         mediaType = 'image';
         mediaUrl = mediaUrls[0];
