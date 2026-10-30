@@ -2657,14 +2657,53 @@ const REMO_STORE = {
         console.warn('Firestore remo_direct_messages sync notice:', err.message);
       });
 
-      // 3. Ecosystem Live State (Posts, Scores, Settings, Bottles)
+      // 3. Sync & Watch ALL SOCIAL POSTS in Real Time across all devices (Individual Document Per Post)
+      this.fbDb.collection('remo_posts').orderBy('createdAt', 'desc').limit(60).onSnapshot((snap) => {
+        if (!snap) return;
+        let changed = false;
+        snap.forEach((doc) => {
+          const cloudPost = doc.data();
+          if (!cloudPost || !cloudPost.id) return;
+          const idx = this.state.posts.findIndex((x) => x.id === cloudPost.id);
+          if (idx >= 0) {
+            Object.assign(this.state.posts[idx], cloudPost);
+          } else {
+            this.state.posts.push(cloudPost);
+            changed = true;
+          }
+        });
+
+        if (changed) {
+          this.state.posts.sort((a, b) =>
+            (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) ||
+            (b.boosted ? 1 : 0) - (a.boosted ? 1 : 0) ||
+            (b.createdAt || 0) - (a.createdAt || 0)
+          );
+          this.save(false, 'cloud_posts_sync');
+          window.dispatchEvent(new CustomEvent('remo:stateupdate', { detail: { reason: 'cloud_posts' } }));
+          if (typeof renderSocialFeed === 'function' && (typeof currentRemoView === 'undefined' || currentRemoView === 'feed')) {
+            renderSocialFeed();
+          }
+        }
+      }, (err) => {
+        console.warn('Firestore remo_posts sync notice:', err.message);
+      });
+
+      // Seed initial posts to remo_posts if needed
+      setTimeout(() => {
+        if (this.fbDb && (this.isCurrentUserAdmin() || this.getCurrentUser())) {
+          (this.state.posts || []).slice(0, 15).forEach((p) => {
+            if (p.id) this.syncPostToCloud(p);
+          });
+        }
+      }, 3000);
+
+      // 4. Ecosystem Live State (City Scores, Settings & World Bottles - lightweight)
       const docRef = this.fbDb.collection('remo_ecosystem').doc('live_state');
       
-      // Initial fetch & seed if missing
       docRef.get().then((snap) => {
         if (!snap.exists) {
           docRef.set({
-            posts: (this.state.posts || []).slice(0, 50),
             cityScores: this.state.cityScores || {},
             settings: this.state.settings || {},
             bottles: (this.state.bottles || []).slice(0, 30),
@@ -2672,8 +2711,7 @@ const REMO_STORE = {
           }).catch((err) => console.log('Firestore seed status:', err.message));
         } else {
           const data = snap.data();
-          if (data && Array.isArray(data.posts) && data.posts.length > 0) {
-            this.state.posts = data.posts;
+          if (data) {
             if (data.cityScores) this.state.cityScores = Object.assign(this.state.cityScores || {}, data.cityScores);
             if (data.bottles) this.state.bottles = data.bottles;
             this.save(false, 'cloud_sync');
@@ -2682,12 +2720,11 @@ const REMO_STORE = {
         }
       }).catch((err) => console.log('Firestore read status:', err.message));
 
-      // Realtime listener across all devices
+      // Realtime listener for scores & bottles
       docRef.onSnapshot((snap) => {
         if (!snap || !snap.exists || snap.metadata?.hasPendingWrites) return;
         const data = snap.data();
-        if (data && Array.isArray(data.posts)) {
-          this.state.posts = data.posts;
+        if (data) {
           if (data.cityScores) this.state.cityScores = Object.assign(this.state.cityScores || {}, data.cityScores);
           if (data.bottles) this.state.bottles = data.bottles;
           this.save(false, 'cloud_live_update');
@@ -2699,6 +2736,23 @@ const REMO_STORE = {
     }
   },
 
+  syncPostToCloud(post) {
+    if (!this.fbDb || !post || !post.id) return;
+    try {
+      this.fbDb.collection('remo_posts').doc(post.id).set(post, { merge: true })
+        .catch((err) => console.warn('Firestore post sync notice:', err.message));
+    } catch (e) {
+      console.warn('syncPostToCloud exception:', e);
+    }
+  },
+
+  deletePostFromCloud(postId) {
+    if (!this.fbDb || !postId) return;
+    try {
+      this.fbDb.collection('remo_posts').doc(postId).delete().catch(() => {});
+    } catch (e) {}
+  },
+
   syncToFirestore(reason = 'update') {
     if (!this.fbDb) return;
     clearTimeout(this._fbSyncDebounce);
@@ -2706,7 +2760,6 @@ const REMO_STORE = {
       try {
         const docRef = this.fbDb.collection('remo_ecosystem').doc('live_state');
         docRef.set({
-          posts: (this.state.posts || []).slice(0, 50),
           cityScores: this.state.cityScores || {},
           settings: this.state.settings || {},
           bottles: (this.state.bottles || []).slice(0, 30),

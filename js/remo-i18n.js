@@ -34,7 +34,7 @@ const REMO_DICT = {
     nav_bounties: 'City Bounties 🪙',
     nav_exchange: 'City Stock Market',
     nav_chat: 'City Live Chat',
-    nav_messages: 'Messages & Calls',
+    nav_messages: 'Direct Messages',
     nav_wheel: 'Lucky Wheel',
     nav_leaderboard: 'World City Cup',
     nav_saved: 'Saved Moments',
@@ -309,7 +309,7 @@ const REMO_DICT = {
 
     // Chat, DMs & WebRTC Calls
     chat_rooms_title: '💬 World & City Live Chat Rooms',
-    dm_title: '✉️ Direct Messages & HD Calls',
+    dm_title: '✉️ Direct Messages',
     call_audio_btn: '📞 Voice Call',
     call_video_btn: '📹 HD Video Call',
     call_incoming: 'Incoming REMO Call...',
@@ -477,7 +477,7 @@ const REMO_DICT = {
     nav_bounties: 'Missions Villes 🪙',
     nav_exchange: 'Bourse des Villes',
     nav_chat: 'Salons Chat Live',
-    nav_messages: 'Messages & Appels',
+    nav_messages: 'Messages Privés',
     nav_wheel: 'Roue de la Chance',
     nav_leaderboard: 'Coupe des Villes',
     nav_saved: 'Moments Sauvés',
@@ -752,7 +752,7 @@ const REMO_DICT = {
 
     // Chat, DMs & WebRTC Calls
     chat_rooms_title: '💬 Salons de Discussion en Direct par Ville',
-    dm_title: '✉️ Messages Privés & Appels HD',
+    dm_title: '✉️ Messages Privés',
     call_audio_btn: '📞 Appel Vocal',
     call_video_btn: '📹 Appel Vidéo HD',
     call_incoming: 'Appel REMO Entrant...',

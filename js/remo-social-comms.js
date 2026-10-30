@@ -1943,6 +1943,7 @@ async function publishNewRemoPost() {
   const reward = baseReward * surgeMult;
   const cityPts = (pendingPostGpsVerified ? 45 : 25) * surgeMult;
   REMO_STORE.addCoins(u.uid, reward, cityPts);
+  REMO_STORE.syncPostToCloud(newPost);
   REMO_STORE.save(true, 'new_post');
   closeCreatePostModal();
   spawnRemoCoinsFX(wxStatus.isSurge ? 16 : 10);
@@ -2290,7 +2291,8 @@ function renderDirectMessagesView() {
   box.innerHTML = dms.map((d) => {
     const isMine = d.fromUid === me.uid;
     const dual = d.text ? REMO_TRANSLATOR.makeBilingualPair(d.text) : null;
-    const vUrl = d.voiceUrl ? RemoMediaDB.resolveSyncOrPlaceholder(d.voiceUrl) : '';
+    const isInlineAudio = d.voiceUrl && (String(d.voiceUrl).startsWith('data:') || String(d.voiceUrl).startsWith('http') || String(d.voiceUrl).startsWith('blob:'));
+    const vUrl = isInlineAudio ? d.voiceUrl : (d.voiceUrl ? RemoMediaDB.resolveSyncOrPlaceholder(d.voiceUrl) : '');
     const vIdb = d.voiceUrl && String(d.voiceUrl).startsWith('idb://') ? `data-idb-src="${d.voiceUrl}"` : '';
     const offerCity = d.cardOffer ? getCityById(d.cardOffer.cityId) : null;
 
@@ -2306,7 +2308,7 @@ function renderDirectMessagesView() {
             🇬🇧 ${escapeHtmlStr(dual.en)}<br>🇫🇷 ${escapeHtmlStr(dual.fr)}
           </div>
         ` : ''}
-        ${d.voiceUrl ? `<audio src="${vUrl}" ${vIdb} controls style="width:100%;height:30px;margin-top:6px;"></audio>` : ''}
+        ${vUrl || vIdb ? `<audio src="${vUrl}" ${vIdb} controls preload="auto" style="width:100%;height:32px;margin-top:6px;outline:none;border-radius:8px;"></audio>` : ''}
 
         ${d.envelopeCoins > 0 ? `
           <div class="dm-envelope-card">
@@ -2379,20 +2381,33 @@ async function toggleDmVoiceNote() {
     window._dmRec.onstop = async () => {
       stream.getTracks().forEach((tr) => tr.stop());
       if (btn) btn.textContent = t('dm_btn_voice');
-      const vKey = await RemoMediaDB.saveBlob(new Blob(chunks, { type: 'audio/webm' }), 'dm_voice');
-      const newDm = {
-        id: 'dm_v_' + Date.now(),
-        fromUid: u.uid,
-        fromName: u.name,
-        toUid: activeDmPartnerUid || 'u_admin_founder',
-        text: lang === 'fr' ? '🎙️ Message vocal privé' : '🎙️ Private voice note',
-        voiceUrl: vKey,
-        ts: Date.now()
+      const audioBlob = new Blob(chunks, { type: chunks[0]?.type || 'audio/webm' });
+      const sendVoiceDm = (audioDataUrl) => {
+        const newDm = {
+          id: 'dm_v_' + Date.now(),
+          fromUid: u.uid,
+          fromName: u.name,
+          toUid: activeDmPartnerUid || 'u_admin_founder',
+          text: lang === 'fr' ? '🎙️ Message vocal privé' : '🎙️ Private voice note',
+          voiceUrl: audioDataUrl,
+          ts: Date.now()
+        };
+        REMO_STORE.state.directMessages.push(newDm);
+        REMO_STORE.save(true, 'dm_voice');
+        REMO_STORE.syncDmToCloud(newDm);
+        renderDirectMessagesView();
       };
-      REMO_STORE.state.directMessages.push(newDm);
-      REMO_STORE.save(true, 'dm_voice');
-      REMO_STORE.syncDmToCloud(newDm);
-      renderDirectMessagesView();
+
+      if (window.FileReader) {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          sendVoiceDm(reader.result);
+        };
+        reader.readAsDataURL(audioBlob);
+      } else {
+        const vKey = await RemoMediaDB.saveBlob(audioBlob, 'dm_voice');
+        sendVoiceDm(vKey);
+      }
     };
     window._dmRec.start();
     if (btn) btn.textContent = '⏹️ Stop (15s)';
@@ -2553,41 +2568,29 @@ function adminDeleteDmInline(msgId) {
   renderDirectMessagesView();
 }
 
-async function startWebRTCCall(withVideo = true) {
-  const lang = REMO_I18N.getLang();
-  const modal = document.getElementById('webrtcCallModal');
-  const localVid = document.getElementById('webrtcLocalVideo');
-  if (!modal) return;
-  modal.classList.add('open');
-  try {
-    localCallStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: withVideo });
-    if (localVid) {
-      localVid.srcObject = localCallStream;
-      localVid.play().catch(() => {});
-    }
-    rtcPeer = new RTCPeerConnection(REMO_RTC_CFG);
-    localCallStream.getTracks().forEach((tr) => rtcPeer.addTrack(tr, localCallStream));
-    RemoAudio.play('pack');
-    remoToast(lang === 'fr' ? '📞 Appel HD REMO connecté (P2P prêt) !' : '📞 REMO HD Call active (WebRTC P2P ready)!', 'coin');
-  } catch (e) {
-    remoToast(lang === 'fr' ? 'Caméra / Micro non disponibles.' : 'Camera / Microphone unavailable.');
-  }
+async function startWebRTCCall(withVideo = false) {
+  // Voice & Video Call feature cleanly deactivated as requested
+  remoToast(REMO_I18N.getLang() === 'fr' ? '💬 Messagerie privée instantanée 1-à-1 active !' : '💬 Instant 1-on-1 private messaging active!');
 }
 
 function endWebRTCCall() {
   if (localCallStream) {
-    localCallStream.getTracks().forEach((t) => t.stop());
+    try { localCallStream.getTracks().forEach((t) => t.stop()); } catch (e) {}
     localCallStream = null;
   }
   if (rtcPeer) {
-    rtcPeer.close();
+    try { rtcPeer.close(); } catch (e) {}
     rtcPeer = null;
   }
   document.getElementById('webrtcCallModal')?.classList.remove('open');
 }
 
 function openLiveStreamModal() {
-  startWebRTCCall(true);
+  if (typeof toggleRemoRadio === 'function') {
+    toggleRemoRadio();
+  } else {
+    remoToast(REMO_I18N.getLang() === 'fr' ? '📻 Fréquences Radio Monde activées !' : '📻 World Radio Frequencies activated!');
+  }
 }
 
 /* ── 6. UNIVERSAL AUTH MODAL (WITH TIKTOK / IG / FB BROWSER DETECTOR) ── */
@@ -2982,6 +2985,7 @@ function adminDeletePostInline(postId) {
   const lang = REMO_I18N.getLang();
   if (!confirm(lang === 'fr' ? '🗑️ Supprimer définitivement cette publication ?' : '🗑️ Permanently delete this post?')) return;
   REMO_STORE.state.posts = (REMO_STORE.state.posts || []).filter((p) => p.id !== postId);
+  REMO_STORE.deletePostFromCloud(postId);
   REMO_STORE.save(true, 'admin_delete_post');
   renderSocialFeed();
   remoToast(lang === 'fr' ? '🗑️ Publication supprimée par Admin.' : '🗑️ Post deleted by Admin.');
@@ -2992,6 +2996,7 @@ function adminPinPostInline(postId) {
   const p = (REMO_STORE.state.posts || []).find((x) => x.id === postId);
   if (!p) return;
   p.pinned = !p.pinned;
+  REMO_STORE.syncPostToCloud(p);
   REMO_STORE.save(true, 'admin_pin_post');
   renderSocialFeed();
   remoToast(p.pinned ? '📌 Pinned #1 Globally!' : '📌 Unpinned.');
@@ -4478,8 +4483,13 @@ function setRemoCoin3DAlloy(alloyId) {
   }
 }
 
-function setRemoCoin3DSerial(serial) {
-  const sStr = String(serial || '001').trim();
+function setRemoCoin3DSerial(serial, isSystem = false) {
+  const isAdmin = typeof REMO_STORE !== 'undefined' && REMO_STORE.isCurrentUserAdmin();
+  if (!isAdmin && !isSystem) {
+    // Only Admin (andart1174@gmail.com) is authorized to modify REMO Coin serial numbers
+    return;
+  }
+  const sStr = String(serial || '0001').trim();
   const clean = sStr.startsWith('#') ? sStr.slice(1) : sStr;
   const path = document.getElementById('coin3DSerialTextPath');
   if (path) {
@@ -4497,11 +4507,23 @@ function openRemoCoin3DModal(forcedSerial, forcedAlloy) {
 
   const serials = (REMO_STORE.state && REMO_STORE.state.serializedCoins) || [];
   const foundCoin = forcedSerial ? serials.find((c) => c.serial === forcedSerial) : (serials.length ? serials[0] : null);
-  const latestSerial = forcedSerial || (foundCoin ? foundCoin.serial : '001');
+  const latestSerial = forcedSerial || (foundCoin ? foundCoin.serial : '0001');
   const targetAlloy = forcedAlloy || (foundCoin ? foundCoin.alloy : 'genesis') || 'genesis';
 
-  setRemoCoin3DSerial(latestSerial);
+  setRemoCoin3DSerial(latestSerial, true);
   setRemoCoin3DAlloy(targetAlloy);
+
+  const inp = document.getElementById('coin3DSerialInp');
+  const isAdmin = typeof REMO_STORE !== 'undefined' && REMO_STORE.isCurrentUserAdmin();
+  if (inp) {
+    inp.readOnly = !isAdmin;
+    inp.style.pointerEvents = isAdmin ? 'auto' : 'none';
+    inp.style.cursor = isAdmin ? 'text' : 'not-allowed';
+    inp.style.opacity = isAdmin ? '1' : '0.9';
+    inp.title = isAdmin
+      ? 'Éditer le Serial (Admin Privilège)'
+      : 'Numéro de série certifié 100% Vérifié (Réservé Admin)';
+  }
 
   modal.classList.add('open');
   initRemoCoin3DStage();

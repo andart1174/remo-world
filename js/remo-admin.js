@@ -1174,6 +1174,9 @@ function adminToggleBoostPost(pid) {
 
 function adminDeletePost(pid) {
   REMO_STORE.state.posts = REMO_STORE.state.posts.filter((x) => x.id !== pid);
+  if (typeof REMO_STORE.deletePostFromCloud === 'function') {
+    REMO_STORE.deletePostFromCloud(pid);
+  }
   REMO_STORE.save(true, 'post_del');
   refreshAllAdminPanels();
   admToast('🗑️ Post permanently deleted!');

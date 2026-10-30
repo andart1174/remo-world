@@ -86,7 +86,7 @@
             <span class="nav-ic">💬</span> <span data-i18n="nav_chat">City Live Chat</span>
           </button>
           <button class="nav-btn" data-nav-view="messages" onclick="switchRemoView('messages')">
-            <span class="nav-ic">💌</span> <span data-i18n="nav_messages">Messages &amp; Calls</span>
+            <span class="nav-ic">💌</span> <span data-i18n="nav_messages">Messages</span>
           </button>
           <button class="nav-btn" data-nav-view="bottles" onclick="switchRemoView('bottles')">
             <span class="nav-ic">🍾</span> <span data-i18n="nav_bottles">City Bottle</span>
@@ -347,7 +347,7 @@
         <div class="glass-box">
           <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
             <div>
-              <h2 style="font-family:'Orbitron',sans-serif;font-size:1.12rem;" data-i18n="dm_title">💌 Private 1-on-1 Messenger &amp; HD Calls</h2>
+              <h2 style="font-family:'Orbitron',sans-serif;font-size:1.12rem;" data-i18n="dm_title">💌 Private 1-on-1 Messenger</h2>
               <div style="font-size:0.75rem;color:var(--muted);margin-top:2px;" data-i18n="dm_contacts_hdr">👥 Select Citizen for 1-on-1 Private Chat:</div>
             </div>
             <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
@@ -355,8 +355,6 @@
                 <input type="checkbox" id="dmAutoTranslateChk" checked onchange="renderDirectMessagesView()">
                 <span data-i18n="dm_autotrans_lbl">🌐 Live EN ⇄ FR</span>
               </label>
-              <button class="btn-cyber" onclick="startWebRTCCall(false)" data-i18n="call_audio_btn">📞 Voice Call</button>
-              <button class="btn-cyber btn-gold" onclick="startWebRTCCall(true)" data-i18n="call_video_btn">📹 HD Video Call</button>
             </div>
           </div>
 
@@ -869,19 +867,6 @@
     </div>
   </div>
 
-  <!-- 📹 WebRTC HD Voice/Video Call & Live Broadcast Modal -->
-  <div class="remo-modal-backdrop" id="webrtcCallModal">
-    <div class="remo-modal" style="text-align:center;">
-      <div class="modal-hdr">
-        <b style="color:#10b981;">🔴 REMO HD WebRTC Stream</b>
-        <button class="modal-close" onclick="endWebRTCCall()">✕</button>
-      </div>
-      <video id="webrtcLocalVideo" autoplay muted playsinline style="width:100%;border-radius:16px;background:#000;max-height:360px;"></video>
-      <div style="margin-top:14px;">
-        <button class="btn-cyber" style="background:#f43f5e;" onclick="endWebRTCCall()" data-i18n="call_end">End Call</button>
-      </div>
-    </div>
-  </div>
 
   <!-- 🔐 Universal Citizen Auth Modal (Google + Email + TikTok/IG IAB Detector) -->
   <div class="remo-modal-backdrop" id="authModal" onclick="if(event.target===this)this.classList.remove('open')">
@@ -1228,9 +1213,9 @@
       <!-- Live Interactive Serial Number Inscriber -->
       <div style="display:inline-flex;align-items:center;gap:8px;background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.35);border-radius:20px;padding:4px 14px;margin-bottom:8px;">
         <span style="font-size:0.75rem;font-weight:800;color:#fbbf24;">SERIAL №</span>
-        <input type="text" id="coin3DSerialInp" value="001" oninput="setRemoCoin3DSerial(this.value)" placeholder="001"
-               style="width:70px;text-align:center;background:rgba(0,0,0,0.6);border:1px solid #fbbf24;color:#fde047;font-family:'Orbitron',monospace;font-weight:900;border-radius:6px;padding:2px 4px;font-size:0.82rem;outline:none;"
-               title="Type any serial to live-engrave it on the spinning coin!">
+        <input type="text" id="coin3DSerialInp" value="0001" readonly oninput="setRemoCoin3DSerial(this.value)" placeholder="0001"
+               style="width:70px;text-align:center;background:rgba(0,0,0,0.6);border:1px solid #fbbf24;color:#fde047;font-family:'Orbitron',monospace;font-weight:900;border-radius:6px;padding:2px 4px;font-size:0.82rem;outline:none;pointer-events:none;cursor:not-allowed;"
+               title="Numéro de série certifié 100% Vérifié (Réservé Admin)">
         <span style="font-size:0.75rem;font-weight:800;color:#38bdf8;">• 100% VERIFIED</span>
       </div>
 

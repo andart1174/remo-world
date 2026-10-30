@@ -12,3 +12,4 @@ $RECYCLE.BIN/
 *.sln
 *.sw?
 .DS_Store
+scratch/
