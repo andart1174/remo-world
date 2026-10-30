@@ -33,6 +33,9 @@ function unlockAdminOffice(ev) {
   const inp = document.getElementById('admPinInput')?.value.trim();
   const masterPin = REMO_STORE.state.settings.adminPin || '2026';
   if (inp === masterPin) {
+    if (!REMO_STORE.isCurrentUserAdmin()) {
+      REMO_STORE.ensureGuestOrCitizen('REMO Founder', 'andart1174@gmail.com', 'montreal', true);
+    }
     REMO_STORE.setAdminUnlocked(true);
     checkAdminSession();
     RemoAudio.play('fanfare');

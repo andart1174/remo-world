@@ -1842,7 +1842,17 @@ const REMO_STORE = {
     });
   },
 
+  isCurrentUserAdmin() {
+    const u = this.getCurrentUser();
+    if (!u) return false;
+    const adminEmail = (this.state && this.state.settings && this.state.settings.adminEmail) || 'andart1174@gmail.com';
+    const emailMatch = Boolean(u.email && u.email.toLowerCase().trim() === adminEmail.toLowerCase().trim());
+    const roleMatch = Boolean(u.role === 'admin' && u.email && u.email.toLowerCase().trim() === adminEmail.toLowerCase().trim());
+    return emailMatch || roleMatch;
+  },
+
   isAdminUnlocked() {
+    if (!this.isCurrentUserAdmin()) return false;
     return localStorage.getItem(this.ADMIN_MODE_KEY) === '1' || sessionStorage.getItem('remo_admin_unlocked') === '1';
   },
 
@@ -2029,6 +2039,11 @@ const REMO_STORE = {
       this.mintCardForUser(u.uid, homeCity || 'montreal', 'Rare', false);
     }
     localStorage.setItem(this.USER_KEY, u.uid);
+    const adminEmail = (this.state && this.state.settings && this.state.settings.adminEmail) || 'andart1174@gmail.com';
+    if (u && u.email && u.email.toLowerCase().trim() === adminEmail.toLowerCase().trim()) {
+      u.role = 'admin';
+      this.setAdminUnlocked(true);
+    }
     // Auto-apply pending URL Referral Code (?ref=...) if present!
     const pendingRef = localStorage.getItem('remo_pending_ref');
     if (pendingRef && !u.referredBy) {
@@ -2041,6 +2056,7 @@ const REMO_STORE = {
 
   signOut() {
     localStorage.removeItem(this.USER_KEY);
+    this.setAdminUnlocked(false);
     if (this.fbAuth) this.fbAuth.signOut().catch(() => {});
     window.dispatchEvent(new CustomEvent('remo:stateupdate', { detail: { reason: 'auth' } }));
   },

@@ -89,11 +89,35 @@ function syncHeaderAndSidebars() {
   const hhEl = document.getElementById('hdrHappyHourBadge');
   if (hhEl) hhEl.style.display = st.settings.happyHour2x ? 'inline-flex' : 'none';
 
-  // Admin God-Mode Header Pill
+  // Admin God-Mode Header Pill & Navigation Links (Strictly visible ONLY for andart1174@gmail.com)
+  const isAdmUser = REMO_STORE.isCurrentUserAdmin();
+  const isAdmUnlocked = REMO_STORE.isAdminUnlocked();
+
   const admBtn = document.getElementById('hdrAdminGodBtn');
   if (admBtn) {
-    admBtn.classList.toggle('active', isAdm);
-    admBtn.textContent = isAdm ? t('btn_admin_mode_on') : t('btn_admin_mode_off');
+    admBtn.style.display = isAdmUser ? 'inline-flex' : 'none';
+    admBtn.classList.toggle('active', isAdmUnlocked);
+    admBtn.textContent = isAdmUnlocked ? t('btn_admin_mode_on') : t('btn_admin_mode_off');
+  }
+
+  const admOfficeHdr = document.getElementById('hdrAdminOfficeLink');
+  if (admOfficeHdr) {
+    admOfficeHdr.style.display = isAdmUser ? 'inline-flex' : 'none';
+  }
+
+  const sideAdm = document.getElementById('sidebarAdminBox');
+  if (sideAdm) {
+    sideAdm.style.display = isAdmUser ? 'block' : 'none';
+  }
+
+  const mbHubAdmGod = document.getElementById('mbHubAdminGodBtn');
+  if (mbHubAdmGod) {
+    mbHubAdmGod.style.display = isAdmUser ? 'inline-flex' : 'none';
+  }
+
+  const mbHubAdmOffice = document.getElementById('mbHubAdminOfficeBtn');
+  if (mbHubAdmOffice) {
+    mbHubAdmOffice.style.display = isAdmUser ? 'inline-flex' : 'none';
   }
 
   // Global Megaphone Broadcast Banner
@@ -2455,18 +2479,40 @@ function openInExternalBrowser() {
 function submitUniversalAuth(ev) {
   if (ev) ev.preventDefault();
   const name = document.getElementById('authNameInp')?.value.trim() || 'REMO Pioneer';
-  const email = document.getElementById('authEmailInp')?.value.trim() || 'citizen@remo.world';
+  const email = (document.getElementById('authEmailInp')?.value || '').trim();
   const cityId = document.getElementById('authHomeCitySelect')?.value || 'montreal';
+  const lang = REMO_I18N.getLang();
+
+  const adminEmail = (REMO_STORE.state?.settings?.adminEmail || 'andart1174@gmail.com').toLowerCase();
+  const isTargetingAdmin = email.toLowerCase() === adminEmail;
+
+  if (isTargetingAdmin) {
+    const pin = prompt(
+      lang === 'fr'
+        ? '🔐 Compte Fondateur & Administrateur (andart1174@gmail.com)\nEntrez le code PIN Admin (défaut : 2026) :'
+        : '🔐 Founder & Admin Account (andart1174@gmail.com)\nEnter Admin Master PIN (default: 2026):'
+    );
+    const masterPin = REMO_STORE.state?.settings?.adminPin || '2026';
+    if (!pin || pin.trim() !== masterPin) {
+      remoToast(lang === 'fr' ? '❌ Code PIN Admin incorrect ! Connexion refusée.' : '❌ Invalid Admin PIN! Access denied.');
+      return;
+    }
+  }
 
   const u = REMO_STORE.ensureGuestOrCitizen(name, email, cityId);
+  if (isTargetingAdmin) {
+    REMO_STORE.setAdminUnlocked(true);
+  }
   document.getElementById('authModal')?.classList.remove('open');
   spawnRemoCoinsFX(10);
   syncHeaderAndSidebars();
   renderSocialFeed();
   remoToast(
-    REMO_I18N.getLang() === 'fr'
-      ? `🎉 Bienvenue ${u.name} ! Passeport #${u.passportNum} activé !`
-      : `🎉 Welcome ${u.name}! Passport #${u.passportNum} unlocked!`,
+    isTargetingAdmin
+      ? (lang === 'fr' ? `👑 Bienvenue Fondateur Andrei ! Mode Admin activé.` : `👑 Welcome Founder Andrei! Admin mode active.`)
+      : (lang === 'fr'
+          ? `🎉 Bienvenue ${u.name} ! Passeport #${u.passportNum} activé !`
+          : `🎉 Welcome ${u.name}! Passport #${u.passportNum} unlocked!`),
     'fanfare'
   );
 }
@@ -2477,9 +2523,15 @@ function quickGoogleSignInSim() {
     REMO_STORE.fbAuth.signInWithPopup(provider).then((res) => {
       const fbU = res.user;
       const cityId = document.getElementById('authHomeCitySelect')?.value || 'montreal';
-      REMO_STORE.ensureGuestOrCitizen(fbU.displayName || 'Citizen', fbU.email, cityId);
+      const adminEmail = (REMO_STORE.state?.settings?.adminEmail || 'andart1174@gmail.com').toLowerCase();
+      const isAdminEmail = (fbU.email || '').toLowerCase() === adminEmail;
+      REMO_STORE.ensureGuestOrCitizen(fbU.displayName || (isAdminEmail ? 'REMO Founder' : 'Citizen'), fbU.email, cityId, isAdminEmail);
+      if (isAdminEmail) {
+        REMO_STORE.setAdminUnlocked(true);
+      }
       document.getElementById('authModal')?.classList.remove('open');
       syncHeaderAndSidebars();
+      renderSocialFeed();
     }).catch((err) => remoToast(err.message));
     return;
   }
@@ -2488,6 +2540,7 @@ function quickGoogleSignInSim() {
   document.getElementById('authModal')?.classList.remove('open');
   spawnRemoCoinsFX(10);
   syncHeaderAndSidebars();
+  renderSocialFeed();
   remoToast(`🌐 ${u.name} (#${u.passportNum})`, 'fanfare');
 }
 
@@ -2510,24 +2563,6 @@ document.addEventListener('DOMContentLoaded', () => {
   updateFlashDropCountdownUI();
   setInterval(updateFlashDropCountdownUI, 1000);
 
-  // Touch & Drag Horizontal Scroll for Category Chips, Stories & Teleport Bar
-  const swipeRows = document.querySelectorAll('.filter-row, .stories-bar, .city-teleport-bar');
-  swipeRows.forEach((row) => {
-    let startX = 0, scrollStart = 0, isTouching = false;
-    row.addEventListener('touchstart', (e) => {
-      if (e.touches && e.touches[0]) {
-        isTouching = true;
-        startX = e.touches[0].pageX;
-        scrollStart = row.scrollLeft;
-      }
-    }, { passive: true });
-    row.addEventListener('touchmove', (e) => {
-      if (!isTouching || !e.touches || !e.touches[0]) return;
-      const currentX = e.touches[0].pageX;
-      row.scrollLeft = scrollStart + (startX - currentX);
-    }, { passive: true });
-    row.addEventListener('touchend', () => { isTouching = false; }, { passive: true });
-  });
 
   // Check URL parameters (?view=arena, ?city=chisinau, ?verify=...)
   const params = new URLSearchParams(window.location.search);
@@ -2600,6 +2635,13 @@ function openAdminQuickModal(preselectUid = '') {
   const ctrlBox = document.getElementById('admQuickControlsBox');
   if (!modal) return;
 
+  const isAdmUser = REMO_STORE.isCurrentUserAdmin();
+  if (!isAdmUser) {
+    const lang = REMO_I18N.getLang();
+    remoToast(lang === 'fr' ? '🔒 Accès réservé au compte Fondateur (andart1174@gmail.com).' : '🔒 Access restricted to Founder account (andart1174@gmail.com).');
+    return;
+  }
+
   const isAdm = REMO_STORE.isAdminUnlocked();
   if (pinBox) pinBox.style.display = isAdm ? 'none' : 'block';
   if (ctrlBox) ctrlBox.style.display = isAdm ? 'flex' : 'none';
@@ -2644,9 +2686,13 @@ function unlockAdminGodModeInline() {
     remoToast(lang === 'fr' ? '❌ Code PIN Admin incorrect !' : '❌ Invalid Admin PIN!');
     return;
   }
+  if (!REMO_STORE.isCurrentUserAdmin()) {
+    REMO_STORE.ensureGuestOrCitizen('REMO Founder', 'andart1174@gmail.com', 'montreal', true);
+  }
   REMO_STORE.setAdminUnlocked(true);
   RemoAudio.play('fanfare');
   remoToast(lang === 'fr' ? '👑 Mode Admin activé sur tout REMO !' : '👑 Admin God-Mode unlocked across REMO!', 'fanfare');
+  syncHeaderAndSidebars();
   openAdminQuickModal();
   renderSocialFeed();
 }

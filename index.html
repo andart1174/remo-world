@@ -62,8 +62,8 @@
       <button class="btn-cyber btn-gold hide-mobile" onclick="switchRemoView('cards')" data-i18n="btn_daily_pack">🎁 Daily Pack</button>
       <button class="btn-cyber hide-mobile" onclick="openCreatePostModal()" data-i18n="btn_create_post">+ Post Moment</button>
       <button class="btn-ghost" id="hdrAuthBtn" onclick="openAuthModal()" data-i18n="btn_sign_in">Sign In</button>
-      <button class="admin-god-pill" id="hdrAdminGodBtn" onclick="openAdminQuickModal()">👑 Admin</button>
-      <a href="admin.html" class="btn-ghost hide-mobile" style="border-color:rgba(251,191,36,0.5);color:#fbbf24;" data-i18n="btn_admin_office">🛡️ Admin Office</a>
+      <button class="admin-god-pill" id="hdrAdminGodBtn" onclick="openAdminQuickModal()" style="display:none;">👑 Admin</button>
+      <a href="admin.html" class="btn-ghost hide-mobile" id="hdrAdminOfficeLink" style="display:none;border-color:rgba(251,191,36,0.5);color:#fbbf24;" data-i18n="btn_admin_office">🛡️ Admin Office</a>
     </div>
   </header>
 
@@ -132,7 +132,7 @@
         </nav>
       </div>
 
-      <div class="glass-box" style="border-color:rgba(251,191,36,0.35);">
+      <div class="glass-box" id="sidebarAdminBox" style="display:none;border-color:rgba(251,191,36,0.35);">
         <div style="font-weight:800;font-size:0.84rem;color:#fbbf24;margin-bottom:8px;">🛡️ Executive Control</div>
         <a href="admin.html" class="btn-cyber btn-gold" style="width:100%;justify-content:center;" data-i18n="btn_admin_office">🛡️ Admin Office</a>
       </div>
@@ -566,8 +566,8 @@
         <button class="btn-ghost" onclick="switchRemoView('messages')">💌 <span data-i18n="nav_messages">Messenger</span></button>
         <button class="btn-ghost" onclick="switchRemoView('bottles')" style="border-color:#38bdf8;color:#7dd3fc;">🍾 <span data-i18n="nav_bottles">City Bottle</span></button>
         <button class="btn-ghost" onclick="switchRemoView('wheel')">🎡 <span data-i18n="nav_wheel">Lucky Spin</span></button>
-        <button class="btn-ghost" onclick="document.getElementById('mobileHubModal').classList.remove('open');openAdminQuickModal();">👑 Admin God-Mode</button>
-        <a href="admin.html" class="btn-cyber btn-gold" style="justify-content:center;">🛡️ Admin Office</a>
+        <button class="btn-ghost" id="mbHubAdminGodBtn" style="display:none;" onclick="document.getElementById('mobileHubModal').classList.remove('open');openAdminQuickModal();">👑 Admin God-Mode</button>
+        <a href="admin.html" id="mbHubAdminOfficeBtn" class="btn-cyber btn-gold" style="display:none;justify-content:center;">🛡️ Admin Office</a>
       </div>
       <div style="display:flex;gap:6px;">
         <input type="text" id="mbPromoInput" class="remo-input" style="padding:8px 11px;text-transform:uppercase;" data-i18n-placeholder="promo_redeem_ph" placeholder="REMO2026">
