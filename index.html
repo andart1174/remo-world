@@ -1,0 +1,1263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>REMO 🌐 World Cities Social Network &amp; 4D Collectible Cards</title>
+  <meta name="description" content="REMO — Real Moments & World Cities Social Network. Explore live city maps, battle in City Wars, collect 3D/4D City Cards, and earn REMO Coins.">
+  <meta name="theme-color" content="#6366f1">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href="manifest.json">
+
+  <!-- Leaflet Open-Source Map CSS & JS (Zero API Key Needed) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- Optional Firebase v9 Compat SDK (Auto-activates when configured in Admin Office) -->
+  <script defer src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script defer src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script defer src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+  <link rel="stylesheet" href="css/remo-core.css">
+</head>
+<body>
+
+  <!-- 📢 Live Global Megaphone Banner (Controlled from Admin Office) -->
+  <div class="remo-megaphone" id="remoMegaphoneBar">
+    <span id="remoMegaphoneText">🌐 Welcome to REMO!</span>
+  </div>
+
+  <!-- 🌐 Sticky Top Header -->
+  <header class="remo-header">
+    <div class="brand-wrap" onclick="switchRemoView('feed')">
+      <div class="brand-orb">🌐</div>
+      <div>
+        <span class="brand-name">REMO</span>
+        <span class="brand-sub" data-i18n="app_tagline">Real Moments • World Cities</span>
+      </div>
+    </div>
+
+    <div class="header-search">
+      <span class="header-search-ic">🔍</span>
+      <input type="text" data-i18n-placeholder="search_placeholder" placeholder="Search cities, creators, #hashtags..." oninput="renderSocialFeed(this.value)">
+    </div>
+
+    <div class="header-right">
+      <!-- Strict EN | FR Language Switch -->
+      <div class="lang-switch">
+        <button class="remo-lang-pill active" data-lang="en" onclick="REMO_I18N.setLang('en')">EN</button>
+        <button class="remo-lang-pill" data-lang="fr" onclick="REMO_I18N.setLang('fr')">FR</button>
+      </div>
+
+      <span class="happy-hour-pill" id="hdrHappyHourBadge" style="display:none;" data-i18n="happy_hour_badge">⚡ 2X REWARDS HAPPY HOUR</span>
+
+      <button class="btn-ghost hide-mobile" id="btnRadioToggle" onclick="toggleHeaderRadio()">📻 Radio</button>
+
+      <div class="coin-pill" onclick="openRemoCoin3DModal()" title="REMO Sovereign 3D Coin">
+        <span>🪙</span>
+        <span id="hdrCoinsVal">0</span>
+      </div>
+
+      <button class="btn-cyber btn-gold hide-mobile" onclick="switchRemoView('cards')" data-i18n="btn_daily_pack">🎁 Daily Pack</button>
+      <button class="btn-cyber hide-mobile" onclick="openCreatePostModal()" data-i18n="btn_create_post">+ Post Moment</button>
+      <button class="btn-ghost" id="hdrAuthBtn" onclick="openAuthModal()" data-i18n="btn_sign_in">Sign In</button>
+      <button class="admin-god-pill" id="hdrAdminGodBtn" onclick="openAdminQuickModal()">👑 Admin</button>
+      <a href="admin.html" class="btn-ghost hide-mobile" style="border-color:rgba(251,191,36,0.5);color:#fbbf24;" data-i18n="btn_admin_office">🛡️ Admin Office</a>
+    </div>
+  </header>
+
+  <!-- 🖥️ Desktop 3-Column Cyber Dashboard / 📱 Mobile Full-Screen Stage -->
+  <main class="remo-shell">
+
+    <!-- ══ LEFT SIDEBAR (Desktop) ══ -->
+    <aside class="left-rail">
+      <div class="glass-box" id="leftHomeCityBox"></div>
+
+      <div class="glass-box">
+        <nav class="nav-list">
+          <!-- 1. World & Social -->
+          <div class="nav-section-title" data-i18n="nav_sec_social">🌍 Social World</div>
+          <button class="nav-btn active" data-nav-view="feed" onclick="switchRemoView('feed')">
+            <span class="nav-ic">🏠</span> <span data-i18n="nav_feed">World Feed</span>
+          </button>
+          <button class="nav-btn" data-nav-view="chat" onclick="switchRemoView('chat')">
+            <span class="nav-ic">💬</span> <span data-i18n="nav_chat">City Live Chat</span>
+          </button>
+          <button class="nav-btn" data-nav-view="messages" onclick="switchRemoView('messages')">
+            <span class="nav-ic">💌</span> <span data-i18n="nav_messages">Messages &amp; Calls</span>
+          </button>
+          <button class="nav-btn" data-nav-view="bottles" onclick="switchRemoView('bottles')">
+            <span class="nav-ic">🍾</span> <span data-i18n="nav_bottles">City Bottle</span>
+          </button>
+
+          <!-- 2. Exploration -->
+          <div class="nav-section-title" data-i18n="nav_sec_explore">🗺️ Exploration</div>
+          <button class="nav-btn" data-nav-view="radar" onclick="switchRemoView('radar')">
+            <span class="nav-ic">🗺️</span> <span data-i18n="nav_radar">REMO Radar™ Map</span>
+          </button>
+          <button class="nav-btn" data-nav-view="bounties" onclick="switchRemoView('bounties')">
+            <span class="nav-ic">🎯</span> <span data-i18n="nav_bounties">City Bounties 🪙</span>
+          </button>
+
+          <!-- 3. Treasury & Cards -->
+          <div class="nav-section-title" data-i18n="nav_sec_treasury">🪙 Treasury &amp; Cards</div>
+          <button class="nav-btn" data-nav-view="cards" onclick="switchRemoView('cards')">
+            <span class="nav-ic">🎴</span> <span data-i18n="nav_cards">My City Cards</span>
+          </button>
+          <button class="nav-btn" onclick="openRemoCoin3DModal()" style="border-color:rgba(251,191,36,0.3);background:rgba(251,191,36,0.08);">
+            <span class="nav-ic">🪙</span> <span style="color:#fbbf24;font-weight:900;" data-i18n="nav_3d_coin">3D Sovereign Coin</span>
+          </button>
+          <button class="nav-btn" data-nav-view="passport" onclick="switchRemoView('passport')">
+            <span class="nav-ic">🛂</span> <span data-i18n="nav_passport">3D Visa Passport</span>
+          </button>
+          <button class="nav-btn" data-nav-view="shop" onclick="switchRemoView('shop')">
+            <span class="nav-ic">🛍️</span> <span data-i18n="nav_shop">VIP Boutique 🛍️</span>
+          </button>
+          <button class="nav-btn" data-nav-view="auctions" onclick="switchRemoView('auctions')">
+            <span class="nav-ic">🔨</span> <span data-i18n="nav_auctions">Auction House</span>
+          </button>
+
+          <!-- 4. Arena & Events -->
+          <div class="nav-section-title" data-i18n="nav_sec_arena">⚔️ Arena &amp; Events</div>
+          <button class="nav-btn" data-nav-view="arena" onclick="switchRemoView('arena')">
+            <span class="nav-ic">⚔️</span> <span data-i18n="nav_arena">City Wars &amp; PvP</span>
+          </button>
+          <button class="nav-btn" data-nav-view="wheel" onclick="switchRemoView('wheel')">
+            <span class="nav-ic">🎡</span> <span data-i18n="nav_wheel">Lucky Wheel</span>
+          </button>
+          <button class="nav-btn" data-nav-view="exchange" onclick="switchRemoView('exchange')">
+            <span class="nav-ic">📈</span> <span data-i18n="nav_exchange">City Stock Market</span>
+          </button>
+        </nav>
+      </div>
+
+      <div class="glass-box" style="border-color:rgba(251,191,36,0.35);">
+        <div style="font-weight:800;font-size:0.84rem;color:#fbbf24;margin-bottom:8px;">🛡️ Executive Control</div>
+        <a href="admin.html" class="btn-cyber btn-gold" style="width:100%;justify-content:center;" data-i18n="btn_admin_office">🛡️ Admin Office</a>
+      </div>
+    </aside>
+
+    <!-- ══ CENTER STAGE (All Interactive Views) ══ -->
+    <section class="center-stage">
+
+      <!-- 1. WORLD SOCIAL FEED (2-Col Holo Grid on PC / Full-Screen TikTok Snap on Mobile) -->
+      <div class="remo-view active" id="view-feed">
+        <div class="feed-top-widgets">
+          <div class="glass-box stories-bar" id="storiesBarEl"></div>
+          <div class="weather-ticker-bar" id="worldWeatherTickerBar"></div>
+          <div class="flash-banner" id="flashDropBannerEl" style="display:none;"></div>
+          <div class="pulse-banner" id="dailyPulseBox"></div>
+
+          <div class="filter-row" id="feedModeChips">
+            <button class="fchip active" onclick="setFeedMode('all', this)" data-i18n="filter_all">🌍 All World</button>
+            <button class="fchip" onclick="setFeedMode('duets', this)" data-i18n="filter_duets">🎭 City Duets</button>
+            <button class="fchip" onclick="setFeedMode('capsules', this)" data-i18n="filter_capsules">⏳ Time-Capsules</button>
+            <button class="fchip" onclick="setFeedMode('html', this)" data-i18n="filter_html">💻 HTML &amp; Mini-Apps</button>
+            <button class="fchip" onclick="setFeedMode('videos', this)" data-i18n="filter_videos">🎬 60s Videos</button>
+            <button class="fchip" onclick="setFeedMode('photos', this)" data-i18n="filter_photos">📷 Photos</button>
+            <button class="fchip" onclick="setFeedMode('my_city', this)" data-i18n="filter_my_city">📍 My Home City</button>
+            <button class="fchip" onclick="setFeedMode('trending', this)" data-i18n="filter_trending">🔥 Viral</button>
+            <button class="fchip" onclick="setFeedMode('cards', this)" data-i18n="filter_cards">🎴 Card Flex</button>
+            <button class="fchip" onclick="setFeedMode('voice', this)" data-i18n="filter_voice">🎙️ Spark Voice</button>
+            <button class="fchip" onclick="setFeedMode('saved', this)">🔖 <span data-i18n="nav_saved">Saved</span></button>
+          </div>
+
+          <div class="filter-row hide-mobile" id="feedVibeChips">
+            <button class="fchip active" onclick="setFeedVibe('all', this)" data-i18n="vibe_all">✨ All Vibes</button>
+            <button class="fchip" onclick="setFeedVibe('energy', this)" data-i18n="vibe_energy">⚡ High Energy</button>
+            <button class="fchip" onclick="setFeedVibe('chill', this)" data-i18n="vibe_chill">🌙 Night Chill</button>
+            <button class="fchip" onclick="setFeedVibe('culture', this)" data-i18n="vibe_culture">🎭 Culture &amp; Art</button>
+            <button class="fchip" onclick="setFeedVibe('food', this)" data-i18n="vibe_food">🍽️ Street Food</button>
+          </div>
+        </div>
+
+        <div class="posts-grid" id="remoPostsGrid"></div>
+      </div>
+
+      <!-- 2. REMO EARTH™ LIVE RADAR MAP -->
+      <div class="remo-view" id="view-radar">
+        <div class="glass-box" style="margin-bottom:14px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+            <div>
+              <h2 style="font-family:'Orbitron',sans-serif;font-size:1.18rem;" data-i18n="radar_title">🗺️ REMO EARTH™ — Live World Cities Radar</h2>
+              <p style="font-size:0.82rem;color:var(--muted);margin-top:3px;" data-i18n="radar_subtitle"></p>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <button class="btn-cyber btn-gold" onclick="openBuryGeoVaultModal()" data-i18n="radar_bury_vault_btn">💎 + Bury Geo-Vault</button>
+              <button class="btn-cyber" style="background:linear-gradient(135deg,#06b6d4,#3b82f6);" onclick="locateNearestGeoVault()" data-i18n="radar_vaults_btn">💎 Geo-Vaults (<span id="radarVaultsBadge">6</span>)</button>
+              <button class="btn-cyber" style="background:linear-gradient(135deg,#10b981,#059669);" onclick="openAddUserCityModal()" data-i18n="add_city_btn">🌍 + Add Missing City (+75 🪙)</button>
+              <button class="btn-ghost" onclick="locateMeOnRadar()" data-i18n="radar_near_me">📍 Near Me (GPS)</button>
+              <button class="btn-cyber btn-gold" onclick="verifyPhysicalGpsVisa()" data-i18n="radar_verify_city">🛂 Stamp GPS City Visa</button>
+              <button class="btn-ghost" onclick="window._dropPinMode=true;remoToast(REMO_I18N.getLang()==='fr'?'Cliquez n’importe où sur la carte !':'Click anywhere on the map!');" data-i18n="radar_drop_pin">📌 Drop Live Pin</button>
+            </div>
+          </div>
+
+          <div class="city-teleport-bar" id="radarTeleportBar"></div>
+
+          <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;" id="radarLayerChips">
+            <button class="fchip active" onclick="setRadarTileStyle('dark', this)" data-i18n="radar_layer_dark">🌑 Cyber Dark</button>
+            <button class="fchip" onclick="setRadarTileStyle('street', this)" data-i18n="radar_layer_street">🗺️ Street HD</button>
+            <button class="fchip" onclick="setRadarTileStyle('sat', this)" data-i18n="radar_layer_sat">🛰️ Satellite Hybrid</button>
+            <button class="fchip" onclick="setRadarTileStyle('topo', this)" data-i18n="radar_layer_topo">🏔️ Relief Topo</button>
+          </div>
+
+          <div id="remoLeafletMap" class="remo-map-cyber-dark"></div>
+        </div>
+      </div>
+
+      <!-- 3. CITY WARS & 3D CARD PVP BATTLE ARENA -->
+      <div class="remo-view" id="view-arena">
+        <div class="glass-box" style="margin-bottom:16px;">
+          <h2 style="font-family:'Orbitron',sans-serif;font-size:1.18rem;margin-bottom:14px;" data-i18n="arena_title">⚔️ City Wars &amp; 3D Card PvP Battle Arena</h2>
+          <div id="arenaWarsList"></div>
+        </div>
+
+        <div class="glass-box">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px;">
+            <h3 style="font-family:'Orbitron',sans-serif;color:#fbbf24;" data-i18n="arena_tab_pvp">🎴 3D Card PvP Duel (3 Rounds)</h3>
+            <button class="btn-ghost" onclick="sharePvPChallengeLink()" data-i18n="pvp_share_challenge">📲 Send WhatsApp / Link Duel Challenge</button>
+          </div>
+
+          <div class="form-field">
+            <label data-i18n="pvp_select_card">Choose Your Champion City Card:</label>
+            <select id="pvpUserCardSelect" class="remo-input" onchange="updatePvPCardPreviews()"></select>
+          </div>
+
+          <div style="display:flex;justify-content:center;align-items:center;gap:22px;flex-wrap:wrap;margin:16px 0;">
+            <canvas id="pvpMyCardCanvas" style="width:210px;height:auto;border-radius:14px;box-shadow:0 12px 30px rgba(0,0,0,0.7);"></canvas>
+            <div style="font-family:'Orbitron',sans-serif;font-size:1.8rem;font-weight:900;color:#fbbf24;">VS</div>
+            <canvas id="pvpOppCardCanvas" style="width:210px;height:auto;border-radius:14px;box-shadow:0 12px 30px rgba(0,0,0,0.7);"></canvas>
+          </div>
+
+          <button class="btn-cyber btn-gold" style="width:100%;justify-content:center;padding:12px;font-size:0.95rem;" onclick="runCardPvPBattle()" data-i18n="pvp_start_btn">
+            ⚔️ Fight 3-Round Battle (+35 🪙)
+          </button>
+
+          <div id="pvpBattleLog" style="margin-top:14px;"></div>
+        </div>
+      </div>
+
+      <!-- 4. MY CITY CARDS VAULT & DAILY PACK OPENING -->
+      <div class="remo-view" id="view-cards">
+        <!-- Royal Sovereign Trophy & Vault Showcase Pedestal -->
+        <div class="glass-box trophy-pedestal-card" style="background:linear-gradient(135deg,rgba(15,23,42,0.95),rgba(30,27,75,0.85));border-color:rgba(251,191,36,0.45);padding:20px;margin-bottom:16px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:16px;">
+            <!-- Left: Citizen Coin Mini-Showcase -->
+            <div style="display:flex;align-items:center;gap:16px;cursor:pointer;" onclick="openRemoCoin3DModal()" role="button" title="Inspect Sovereign 3D Coin">
+              <div class="trophy-coin-glow" style="position:relative;width:80px;height:80px;">
+                <img src="img/remo_coin_front.png" style="width:80px;height:80px;border-radius:50%;display:block;box-shadow:0 8px 25px rgba(251,191,36,0.5);animation:spinSlow 20s linear infinite;" alt="REMO Coin">
+              </div>
+              <div>
+                <div style="font-size:0.7rem;font-weight:900;color:#38bdf8;letter-spacing:1.5px;text-transform:uppercase;">SOVEREIGN CITIZEN CURRENCY</div>
+                <div style="font-family:'Orbitron',sans-serif;font-size:1.1rem;font-weight:900;color:#fbbf24;margin:2px 0;">REMO Sovereign Coin</div>
+                <div style="display:flex;align-items:center;gap:6px;font-size:0.75rem;">
+                  <span style="background:rgba(251,191,36,0.18);border:1px solid #fbbf24;color:#fde047;padding:2px 8px;border-radius:99px;font-weight:900;" id="vaultCoinSerialTag">#0001</span>
+                  <span style="color:#38bdf8;font-weight:800;">🔍 View in 3D ↗</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Right: Quick Collection Stats -->
+            <div style="display:flex;gap:12px;flex-wrap:wrap;">
+              <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:8px 14px;text-align:center;min-width:85px;">
+                <div style="font-size:1.15rem;font-weight:900;color:#fbbf24;" id="vaultTotalCardsCount">0</div>
+                <div style="font-size:0.65rem;color:var(--muted);font-weight:700;">CARDS OWNED</div>
+              </div>
+              <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:8px 14px;text-align:center;min-width:85px;">
+                <div style="font-size:1.15rem;font-weight:900;color:#38bdf8;" id="vaultVisasCount">0</div>
+                <div style="font-size:0.65rem;color:var(--muted);font-weight:700;">VISAS STAMPED</div>
+              </div>
+              <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:8px 14px;text-align:center;min-width:85px;">
+                <div style="font-size:1.15rem;font-weight:900;color:#34d399;" id="vaultTotalWorthCount">0</div>
+                <div style="font-size:0.65rem;color:var(--muted);font-weight:700;">WALLET COINS</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Divider -->
+          <div style="height:1px;background:linear-gradient(90deg,transparent,rgba(251,191,36,0.3),transparent);margin:16px 0;"></div>
+
+          <!-- Daily Pack Buttons -->
+          <div style="display:flex;justify-content:center;gap:12px;flex-wrap:wrap;">
+            <button class="btn-cyber btn-gold" id="btnOpenDailyPack" onclick="triggerCityPackOpening(false)" data-i18n="pack_open_btn">🎁 Open Free Daily City Pack</button>
+            <button class="btn-cyber" onclick="triggerCityPackOpening(true)" data-i18n="pack_buy_extra">⚡ Buy Mystery City Pack (150 🪙)</button>
+          </div>
+        </div>
+
+        <div class="vault-cards-grid" id="vaultCardsGrid"></div>
+      </div>
+
+      <!-- 5. 3D HOLOGRAPHIC PASSPORT & VISA ALBUM -->
+      <div class="remo-view" id="view-passport">
+        <div id="passportContentBox"></div>
+      </div>
+
+      <!-- 6. LIVE AUCTION HOUSE -->
+      <div class="remo-view" id="view-auctions">
+        <div class="glass-box">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px;">
+            <h2 style="font-family:'Orbitron',sans-serif;font-size:1.15rem;color:#fbbf24;" data-i18n="auction_title">🔨 REMO Live City Card Auction House</h2>
+            <button class="btn-cyber" onclick="switchRemoView('cards')" data-i18n="auction_create_btn">+ List Card for Auction</button>
+          </div>
+          <div class="vault-cards-grid" id="auctionsListGrid"></div>
+        </div>
+      </div>
+
+      <!-- 7. CITY LIVE CHAT ROOMS + #7 WALKIE-TALKIE PUSH-TO-TALK RADIO -->
+      <div class="remo-view" id="view-chat">
+        <div class="glass-box">
+          <h2 style="font-family:'Orbitron',sans-serif;font-size:1.12rem;margin-bottom:10px;" data-i18n="chat_rooms_title">💬 World &amp; City Live Chat Rooms</h2>
+          <div class="filter-row" id="chatCityTabs"></div>
+
+          <!-- #7 Push-to-Talk Walkie-Talkie Frequency Console -->
+          <div class="walkie-talkie-bar">
+            <div style="display:flex;align-items:center;gap:10px;">
+              <div class="wt-wave-bars" id="wtLiveWaveBars"><span></span><span></span><span></span><span></span></div>
+              <div>
+                <div style="font-size:0.7rem;font-weight:900;color:#38bdf8;letter-spacing:0.6px;" data-i18n="wt_bar_title">📻 LIVE CITY WALKIE-TALKIE FREQUENCY</div>
+                <div id="wtStatusSub" style="font-size:0.75rem;color:#cbd5e1;font-weight:700;">CH-01 · Ready</div>
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+              <label style="display:flex;align-items:center;gap:5px;font-size:0.74rem;font-weight:800;color:#a7f3d0;cursor:pointer;">
+                <input type="checkbox" id="wtAutoScannerChk" checked>
+                <span data-i18n="wt_scanner_lbl">🔊 Auto-Play Radio</span>
+              </label>
+              <button type="button" class="wt-ptt-btn" id="btnCityWalkieTalkie"
+                onpointerdown="startCityWalkieTalkie(event)"
+                onpointerup="stopCityWalkieTalkie(event)"
+                onpointercancel="stopCityWalkieTalkie(event)">
+                <span id="wtBtnLabel" data-i18n="wt_hold_btn">🎙️ HOLD OR TAP TO TALK (15s)</span>
+              </button>
+            </div>
+          </div>
+
+          <div id="chatRoomMessages" style="height:330px;overflow-y:auto;padding:10px;background:rgba(0,0,0,0.28);border-radius:14px;margin:10px 0;"></div>
+          <div style="display:flex;gap:8px;">
+            <input type="text" id="chatRoomInput" class="remo-input" placeholder="Message..." onkeydown="if(event.key==='Enter')sendCityChatMessage()">
+            <button class="btn-cyber" onclick="sendCityChatMessage()" data-i18n="btn_send">Send</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 8. #5 1-ON-1 PRIVATE MESSENGER 2.0, EN ⇄ FR AUTO-TRANSLATE, COIN ENVELOPES, 4D CARD TRADES & HD CALLS -->
+      <div class="remo-view" id="view-messages">
+        <div class="glass-box">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
+            <div>
+              <h2 style="font-family:'Orbitron',sans-serif;font-size:1.12rem;" data-i18n="dm_title">💌 Private 1-on-1 Messenger &amp; HD Calls</h2>
+              <div style="font-size:0.75rem;color:var(--muted);margin-top:2px;" data-i18n="dm_contacts_hdr">👥 Select Citizen for 1-on-1 Private Chat:</div>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+              <label style="display:inline-flex;align-items:center;gap:5px;font-size:0.75rem;font-weight:800;color:#38bdf8;cursor:pointer;background:rgba(56,189,248,0.1);padding:5px 10px;border-radius:99px;border:1px solid rgba(56,189,248,0.35);">
+                <input type="checkbox" id="dmAutoTranslateChk" checked onchange="renderDirectMessagesView()">
+                <span data-i18n="dm_autotrans_lbl">🌐 Live EN ⇄ FR</span>
+              </label>
+              <button class="btn-cyber" onclick="startWebRTCCall(false)" data-i18n="call_audio_btn">📞 Voice Call</button>
+              <button class="btn-cyber btn-gold" onclick="startWebRTCCall(true)" data-i18n="call_video_btn">📹 HD Video Call</button>
+            </div>
+          </div>
+
+          <!-- Scrollable 1-on-1 Citizen Contacts Bar -->
+          <div class="dm-contacts-strip" id="dmContactsBar"></div>
+
+          <!-- Private Conversation Thread -->
+          <div id="dmListContainer" style="height:310px;overflow-y:auto;padding:12px;background:rgba(0,0,0,0.32);border-radius:14px;margin-bottom:10px;"></div>
+
+          <!-- Interactive DM Rich Power-Bar (Voice DM + Gift Coins Envelope + 4D Card Trade + Admin Royal Envelope) -->
+          <div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:8px;">
+            <button type="button" class="btn-ghost" id="btnDmVoiceRec" style="font-size:0.76rem;padding:6px 11px;border-color:#38bdf8;color:#7dd3fc;" onclick="toggleDmVoiceNote()" data-i18n="dm_btn_voice">🎙️ Voice DM</button>
+            <button type="button" class="btn-ghost" style="font-size:0.76rem;padding:6px 11px;border-color:#fbbf24;color:#fde047;" onclick="sendDmCoinEnvelopePrompt(false)" data-i18n="dm_btn_envelope">🧧 Gift Coins</button>
+            <button type="button" class="btn-ghost" style="font-size:0.76rem;padding:6px 11px;border-color:#10b981;color:#6ee7b7;" onclick="sendDmCardTradePrompt()" data-i18n="dm_btn_card_trade">🔄 Trade 4D Card</button>
+            <button type="button" class="btn-ghost" id="btnDmAdminEnvelope" style="display:none;font-size:0.76rem;padding:6px 11px;border-color:#ec4899;color:#fbcfe8;" onclick="sendDmCoinEnvelopePrompt(true)" data-i18n="dm_adm_royal_env">👑 Royal Envelope</button>
+          </div>
+
+          <div style="display:flex;gap:8px;">
+            <input type="text" id="dmInputBox" class="remo-input" placeholder="Write private message..." onkeydown="if(event.key==='Enter')sendDirectMessage()">
+            <button class="btn-cyber" onclick="sendDirectMessage()" data-i18n="btn_send">Send</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 8B. #8 DIGITAL MESSAGE IN A BOTTLE ACROSS WORLD CITIES™ -->
+      <div class="remo-view" id="view-bottles">
+        <div class="glass-box">
+          <div class="bottle-ocean-hero">
+            <h2 style="font-family:'Orbitron',sans-serif;font-size:1.14rem;color:#38bdf8;margin-bottom:5px;" data-i18n="bottles_title">🍾 World City Message in a Bottle™</h2>
+            <p style="font-size:0.82rem;color:#cbd5e1;margin-bottom:12px;" data-i18n="bottles_sub"></p>
+
+            <textarea id="bottleMsgInput" rows="2" class="remo-input" style="margin-bottom:9px;" data-i18n-placeholder="bottle_input_ph" placeholder="Write a greeting, secret, or question for a stranger in another city..."></textarea>
+
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+              <select id="bottleGiftCoinsSel" class="remo-input" style="width:auto;min-width:165px;">
+                <option value="0">🍾 Free Bottle (+0 🪙 gift)</option>
+                <option value="15">🪙 Attach +15 🪙 Gift</option>
+                <option value="50">💎 Attach +50 🪙 Gift</option>
+                <option value="100">👑 Attach +100 🪙 Gift</option>
+              </select>
+              <button type="button" class="btn-cyber" onclick="launchWorldCityBottle(false)" data-i18n="bottle_launch_btn">🍾 Launch to Random City (+10 🪙)</button>
+              <button type="button" class="btn-cyber btn-gold" onclick="catchRandomWorldBottle()" data-i18n="bottle_catch_btn">🌊 Catch a Floating Bottle</button>
+              <button type="button" class="btn-ghost" id="btnAdminGoldenBottle" style="display:none;border-color:#fbbf24;color:#fde047;" onclick="launchWorldCityBottle(true)" data-i18n="bottle_adm_gold_btn">👑 Launch Golden Founder Bottle</button>
+            </div>
+          </div>
+
+          <div id="bottlesListContainer"></div>
+        </div>
+      </div>
+
+      <!-- 9. DAILY 4D CASINO LUCKY SPIN WHEEL -->
+      <div class="remo-view" id="view-wheel">
+        <div class="glass-box" style="text-align:center;padding:24px;background:radial-gradient(circle at top,#17133d,#070b19);">
+          <h2 style="font-family:'Orbitron',sans-serif;color:#fbbf24;margin-bottom:6px;" data-i18n="wheel_title">🎡 Daily REMO Lucky Spin</h2>
+          <p style="font-size:0.83rem;color:#cbd5e1;margin-bottom:18px;" data-i18n="wheel_sub">Spin the 8-Slice 4D Casino Wheel to win up to +500 🪙 Jackpot or Mythic 4D City Cards!</p>
+
+          <!-- 4D Casino Wheel Stage with 12 o'clock Golden Ruby Pointer -->
+          <div style="position:relative;width:min(88vw,370px);height:min(88vw,370px);margin:0 auto 20px;">
+            <div id="wheelPointerPin" style="position:absolute;top:-16px;left:50%;transform:translateX(-50%);z-index:12;filter:drop-shadow(0 6px 12px rgba(0,0,0,0.85));transition:transform 0.08s;">
+              <svg width="44" height="48" viewBox="0 0 44 48">
+                <polygon points="22,46 4,8 40,8" fill="#fbbf24" stroke="#ffffff" stroke-width="2.5"/>
+                <circle cx="22" cy="14" r="7" fill="#f43f5e" stroke="#fff" stroke-width="2"/>
+              </svg>
+            </div>
+            <canvas id="remoWheelCanvas" width="620" height="620" onclick="spinLuckyWheel(false)" style="width:100%;height:100%;border-radius:50%;cursor:pointer;box-shadow:0 0 45px rgba(251,191,36,0.45),0 14px 36px rgba(0,0,0,0.8);"></canvas>
+          </div>
+
+          <div id="wheelWinBanner" style="display:none;max-width:460px;margin:0 auto 16px;padding:12px 16px;border-radius:14px;background:linear-gradient(135deg,rgba(251,191,36,0.22),rgba(236,72,153,0.22));border:1.5px solid #fbbf24;font-weight:900;font-size:1rem;color:#fde047;"></div>
+
+          <div style="display:flex;justify-content:center;gap:12px;flex-wrap:wrap;margin-bottom:18px;">
+            <button class="btn-cyber btn-gold" id="btnWheelFreeSpin" style="padding:12px 22px;font-size:0.92rem;" onclick="spinLuckyWheel(false)" data-i18n="wheel_spin_btn">SPIN NOW (FREE DAILY)</button>
+            <button class="btn-ghost" style="border-color:#38bdf8;color:#7dd3fc;padding:12px 18px;" onclick="spinLuckyWheel(true)" data-i18n="wheel_extra_btn">Spin Again (50 🪙)</button>
+          </div>
+
+          <!-- Recent Winners & Prize Table -->
+          <div style="max-width:540px;margin:0 auto;text-align:left;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:14px;padding:12px 14px;">
+            <div style="font-size:0.78rem;font-weight:900;color:#38bdf8;margin-bottom:8px;" data-i18n="wheel_history_hdr">🏆 Recent Jackpot &amp; Card Winners</div>
+            <div id="wheelHistoryBox" style="display:flex;flex-direction:column;gap:6px;font-size:0.8rem;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 10. REMO CITY BOUNTIES™ (Paid Creator Missions) -->
+      <div class="remo-view" id="view-bounties">
+        <div class="glass-box">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px;">
+            <div>
+              <h2 style="font-family:'Orbitron',sans-serif;font-size:1.15rem;color:#fbbf24;" data-i18n="bounties_title">🎯 REMO City Bounties™ — Paid Creator Missions</h2>
+              <p style="font-size:0.82rem;color:var(--muted);margin-top:3px;" data-i18n="bounties_subtitle"></p>
+            </div>
+            <button class="btn-cyber btn-gold" onclick="openCreateBountyPrompt()" data-i18n="bounty_create_btn">+ Post New Paid Bounty</button>
+          </div>
+          <div id="bountiesListContainer"></div>
+        </div>
+      </div>
+
+      <!-- 11. WORLD CITY STOCK EXCHANGE™ (Invest in Cities $KIV / $MTL / $PAR...) -->
+      <div class="remo-view" id="view-exchange">
+        <div class="glass-box">
+          <h2 style="font-family:'Orbitron',sans-serif;font-size:1.15rem;color:#10b981;" data-i18n="exchange_title">📈 REMO World City Stock Exchange™</h2>
+          <p style="font-size:0.82rem;color:var(--muted);margin:4px 0 12px;" data-i18n="exchange_subtitle"></p>
+          <div class="stock-grid" id="cityExchangeGrid"></div>
+        </div>
+      </div>
+
+      <!-- 12. REMO VIP BOUTIQUE (Animated Neon Frames, Royal Titles & Real-World Founder Perks) -->
+      <div class="remo-view" id="view-shop">
+        <div class="glass-box">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
+            <div>
+              <h2 style="font-family:'Orbitron',sans-serif;font-size:1.15rem;color:#f472b6;" data-i18n="shop_title">🛍️ REMO VIP Boutique</h2>
+              <p style="font-size:0.82rem;color:var(--muted);margin-top:3px;" data-i18n="shop_subtitle"></p>
+            </div>
+            <button class="btn-cyber btn-gold" id="btnShopAdminAdd" style="display:none;" onclick="adminCreateVipShopItemPrompt()" data-i18n="shop_admin_add_btn">➕ Add VIP Item / Voucher</button>
+          </div>
+          <div class="filter-row" id="shopCategoryChips">
+            <button class="fchip active" onclick="filterVipShop('all', this)" data-i18n="shop_cat_all">✨ All Items</button>
+            <button class="fchip" onclick="filterVipShop('frame', this)" data-i18n="shop_cat_frames">🔥 Neon Avatar Frames</button>
+            <button class="fchip" onclick="filterVipShop('title', this)" data-i18n="shop_cat_titles">👑 Royal Titles</button>
+            <button class="fchip" onclick="filterVipShop('perk', this)" data-i18n="shop_cat_perks">🎟️ Real Perks &amp; Vouchers</button>
+          </div>
+          <div class="shop-grid" id="vipShopGrid"></div>
+        </div>
+
+        <div class="glass-box" id="vipOrdersSection" style="margin-top:14px;display:none;">
+          <h3 style="font-family:'Orbitron',sans-serif;font-size:0.95rem;color:#fbbf24;margin-bottom:10px;" data-i18n="shop_orders_hdr">🎟️ VIP Voucher Redemptions &amp; Fulfillment</h3>
+          <div id="vipOrdersList"></div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ══ RIGHT SIDEBAR (Desktop) ══ -->
+    <aside class="right-rail">
+      <div class="glass-box" style="border-color:rgba(244,114,182,0.45);background:linear-gradient(135deg,rgba(15,23,42,0.9),rgba(49,16,68,0.65));">
+        <div style="font-weight:900;font-size:0.84rem;color:#f472b6;margin-bottom:6px;">🪪 Viral Citizen ID (+100 🪙)</div>
+        <div style="display:flex;gap:6px;">
+          <button class="btn-cyber" style="flex:1;justify-content:center;padding:7px 8px;font-size:0.74rem;" onclick="switchRemoView('passport')">🪪 My ID &amp; QR</button>
+          <button class="btn-ghost" style="flex:1;justify-content:center;padding:7px 8px;font-size:0.74rem;border-color:#f472b6;color:#fbcfe8;" onclick="switchRemoView('shop')">🛍️ VIP Shop</button>
+        </div>
+      </div>
+      <div class="glass-box">
+        <div style="font-family:'Orbitron',sans-serif;font-weight:900;font-size:0.9rem;color:#fbbf24;margin-bottom:4px;" data-i18n="cup_title">🏆 World City Cup</div>
+        <div style="font-size:0.74rem;color:var(--muted);margin-bottom:10px;" data-i18n="cup_subtitle"></div>
+        <div id="rightCityCupList"></div>
+      </div>
+
+      <div class="glass-box">
+        <div style="font-weight:900;font-size:0.86rem;color:#f43f5e;margin-bottom:8px;" data-i18n="arena_tab_wars">🏙️ Live City Wars</div>
+        <div id="rightQuickWarBox"></div>
+      </div>
+
+      <div class="glass-box" style="border-color:rgba(16,185,129,0.4);">
+        <div style="font-weight:900;font-size:0.84rem;color:#34d399;margin-bottom:8px;" data-i18n="promo_redeem_title">🎟️ Redeem VIP Promo Code</div>
+        <div style="display:flex;gap:6px;">
+          <input type="text" id="rightPromoInput" class="remo-input" style="padding:7px 10px;font-size:0.78rem;text-transform:uppercase;" data-i18n-placeholder="promo_redeem_ph" placeholder="REMO2026">
+          <button class="btn-cyber" style="padding:7px 12px;" onclick="redeemPromoCodeInput('rightPromoInput')" data-i18n="promo_redeem_btn">Claim</button>
+        </div>
+      </div>
+
+      <div class="glass-box" style="text-align:center;">
+        <div style="font-weight:900;font-size:0.86rem;color:#38bdf8;margin-bottom:8px;">🎁 4D City Card Drop</div>
+        <button class="btn-cyber btn-gold" style="width:100%;justify-content:center;" onclick="switchRemoView('cards')" data-i18n="pack_open_btn">🎁 Open Free Daily City Pack</button>
+      </div>
+    </aside>
+
+  </main>
+
+  <!-- 📱 MOBILE 5-TAB BOTTOM BAR ("vtel") -->
+  <nav class="mobile-bottom-nav">
+    <button class="mb-tab active" data-nav-view="feed" onclick="switchRemoView('feed')">
+      <span class="mb-tab-ic">🏠</span>
+      <span data-i18n="mb_feed">Feed</span>
+    </button>
+    <button class="mb-tab" data-nav-view="radar" onclick="switchRemoView('radar')">
+      <span class="mb-tab-ic">🗺️</span>
+      <span data-i18n="mb_radar">Radar</span>
+    </button>
+    <button class="mb-plus-btn" onclick="openCreatePostModal()">+</button>
+    <button class="mb-tab" data-nav-view="cards" onclick="switchRemoView('cards')">
+      <span class="mb-tab-ic">🎴</span>
+      <span data-i18n="mb_cards">Cards</span>
+    </button>
+    <button class="mb-tab" onclick="document.getElementById('mobileHubModal').classList.add('open')">
+      <span class="mb-tab-ic">✨</span>
+      <span data-i18n="mb_hub">Hub</span>
+    </button>
+  </nav>
+
+  <!-- ══ MODALS & BOTTOM SHEETS ══ -->
+
+  <!-- ✨ Mobile Hub Drawer -->
+  <div class="remo-modal-backdrop" id="mobileHubModal" onclick="if(event.target===this)this.classList.remove('open')">
+    <div class="remo-modal">
+      <div class="modal-hdr">
+        <b style="font-family:'Orbitron',sans-serif;color:#fbbf24;">✨ REMO Hub</b>
+        <button class="modal-close" onclick="document.getElementById('mobileHubModal').classList.remove('open')">✕</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+        <button class="btn-ghost" onclick="switchRemoView('shop')" style="border-color:#f472b6;color:#fbcfe8;">🛍️ <span data-i18n="nav_shop">VIP Boutique</span></button>
+        <button class="btn-ghost" onclick="switchRemoView('passport')" style="border-color:#38bdf8;color:#bae6fd;">🪪 ID &amp; +100 🪙</button>
+        <button class="btn-ghost" onclick="document.getElementById('mobileHubModal').classList.remove('open');openAddUserCityModal();" style="border-color:#10b981;color:#6ee7b7;grid-column:1/-1;">🌍 <span data-i18n="add_city_btn">+ Add Missing City (+75 🪙)</span></button>
+        <button class="btn-ghost" onclick="switchRemoView('bounties')">🎯 <span data-i18n="nav_bounties">Bounties 🪙</span></button>
+        <button class="btn-ghost" onclick="switchRemoView('exchange')">📈 <span data-i18n="nav_exchange">City Market</span></button>
+        <button class="btn-ghost" onclick="switchRemoView('arena')">⚔️ <span data-i18n="nav_arena">City Wars &amp; PvP</span></button>
+        <button class="btn-ghost" onclick="switchRemoView('auctions')">🔨 <span data-i18n="nav_auctions">Auctions</span></button>
+        <button class="btn-ghost" onclick="switchRemoView('chat')">💬 <span data-i18n="nav_chat">Live Chat</span></button>
+        <button class="btn-ghost" onclick="switchRemoView('messages')">💌 <span data-i18n="nav_messages">Messenger</span></button>
+        <button class="btn-ghost" onclick="switchRemoView('bottles')" style="border-color:#38bdf8;color:#7dd3fc;">🍾 <span data-i18n="nav_bottles">City Bottle</span></button>
+        <button class="btn-ghost" onclick="switchRemoView('wheel')">🎡 <span data-i18n="nav_wheel">Lucky Spin</span></button>
+        <button class="btn-ghost" onclick="document.getElementById('mobileHubModal').classList.remove('open');openAdminQuickModal();">👑 Admin God-Mode</button>
+        <a href="admin.html" class="btn-cyber btn-gold" style="justify-content:center;">🛡️ Admin Office</a>
+      </div>
+      <div style="display:flex;gap:6px;">
+        <input type="text" id="mbPromoInput" class="remo-input" style="padding:8px 11px;text-transform:uppercase;" data-i18n-placeholder="promo_redeem_ph" placeholder="REMO2026">
+        <button class="btn-cyber" onclick="redeemPromoCodeInput('mbPromoInput')" data-i18n="promo_redeem_btn">Claim</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ➕ Multi-Format Creator Studio Modal (Photo / 60s Video / Live HTML Code / Viral Power-Ups) -->
+  <div class="remo-modal-backdrop" id="createModal" onclick="if(event.target===this)closeCreatePostModal()">
+    <div class="remo-modal" style="max-width:650px;">
+      <div class="modal-hdr">
+        <b style="font-family:'Orbitron',sans-serif;font-size:0.94rem;color:#fbbf24;" data-i18n="create_title">✨ REMO Creator Studio</b>
+        <button class="modal-close" onclick="closeCreatePostModal()">✕</button>
+      </div>
+
+      <!-- Remix Attribution Pill (Shown when Remixing an HTML post) -->
+      <div id="createRemixBanner" style="display:none;background:rgba(16,185,129,0.14);border:1px solid #10b981;border-radius:12px;padding:8px 12px;margin-bottom:12px;font-size:0.78rem;color:#6ee7b7;font-weight:700;"></div>
+
+      <!-- #1 City Duet Split-Screen Banner -->
+      <div id="createDuetBanner" style="display:none;align-items:center;justify-content:space-between;gap:8px;background:linear-gradient(135deg,rgba(6,182,212,0.18),rgba(236,72,153,0.18));border:1px solid #38bdf8;border-radius:12px;padding:8px 12px;margin-bottom:12px;font-size:0.78rem;color:#e0f2fe;font-weight:800;">
+        <span id="createDuetBannerText"></span>
+        <button type="button" class="adm-pbtn danger" onclick="cancelPendingCityDuet()">✕</button>
+      </div>
+
+      <!-- 4 Studio Mode Tabs -->
+      <div class="studio-tabs">
+        <button type="button" class="studio-tab-btn active" data-studio-tab="photo" onclick="switchCreateStudioTab('photo')" data-i18n="create_tab_photo">📷 Photo Studio</button>
+        <button type="button" class="studio-tab-btn" data-studio-tab="video" onclick="switchCreateStudioTab('video')" data-i18n="create_tab_video">🎬 Video (Max 60s)</button>
+        <button type="button" class="studio-tab-btn" data-studio-tab="html" onclick="switchCreateStudioTab('html')" data-i18n="create_tab_html">💻 Live HTML Code</button>
+        <button type="button" class="studio-tab-btn" data-studio-tab="art" onclick="switchCreateStudioTab('art')" data-i18n="create_tab_art">🏙️ City Poster</button>
+      </div>
+
+      <!-- City & Vibe Row -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div class="form-field">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <label data-i18n="create_select_city">Select City</label>
+            <button type="button" onclick="openAddUserCityModal()" style="background:none;border:none;color:#34d399;font-size:0.72rem;font-weight:900;cursor:pointer;">🌍 + Add My City</button>
+          </div>
+          <select id="createCitySelect" class="remo-input"></select>
+        </div>
+        <div class="form-field">
+          <label data-i18n="create_select_vibe">Select Vibe</label>
+          <select id="createVibeSelect" class="remo-input">
+            <option value="energy">⚡ High Energy</option>
+            <option value="culture">🎭 Culture &amp; Art</option>
+            <option value="chill">🌙 Night Chill</option>
+            <option value="food">🍽️ Gastronomy</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- TAB 1: PHOTO STUDIO (Multi-Photo Carousel + Cyber Filters + Before/After Slider) -->
+      <div class="studio-pane active" id="studioPane-photo">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+          <label class="btn-cyber" style="cursor:pointer;flex:1;justify-content:center;">
+            <span data-i18n="create_upload_photos">📷 Upload 1–4 Photos</span>
+            <input type="file" id="createPhotosInput" accept="image/*" multiple style="display:none;" onchange="handleStudioPhotosSelect(event)">
+          </label>
+        </div>
+        <div class="form-field" style="margin-bottom:10px;">
+          <label data-i18n="create_filter_label">🎨 Instant Visual Filter</label>
+          <div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;" id="studioPhotoFilterChips">
+            <button type="button" class="fchip active" onclick="setStudioPhotoFilter('flt-none', this)">✨ Original</button>
+            <button type="button" class="fchip" onclick="setStudioPhotoFilter('flt-neon', this)">🌆 Cyber Neon</button>
+            <button type="button" class="fchip" onclick="setStudioPhotoFilter('flt-gold', this)">🌅 Golden Hour</button>
+            <button type="button" class="fchip" onclick="setStudioPhotoFilter('flt-matrix', this)">🟢 Tokyo Matrix</button>
+            <button type="button" class="fchip" onclick="setStudioPhotoFilter('flt-arctic', this)">❄️ Arctic Crystal</button>
+            <button type="button" class="fchip" onclick="setStudioPhotoFilter('flt-noir', this)">🎞️ Noir</button>
+          </div>
+        </div>
+        <label id="studioCompareWrap" style="display:none;align-items:center;gap:8px;font-size:0.79rem;color:#fbbf24;font-weight:700;margin-bottom:10px;cursor:pointer;">
+          <input type="checkbox" id="studioCompareToggle">
+          <span data-i18n="create_compare_toggle">🔀 Enable Interactive Before / After Slider</span>
+        </label>
+        <div id="studioPhotosPreviewGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(95px,1fr));gap:8px;margin-bottom:10px;"></div>
+      </div>
+
+      <!-- TAB 2: 60S VIDEO STUDIO (Strict <= 60s File Upload + Live Camera 60s Recorder) -->
+      <div class="studio-pane" id="studioPane-video">
+        <p style="font-size:0.76rem;color:#38bdf8;margin-bottom:10px;" data-i18n="create_video_limit_hint">⚡ Strict 60-second viral format — fast, punchy &amp; stored in HD Vault.</p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+          <label class="btn-cyber" style="cursor:pointer;justify-content:center;">
+            <span data-i18n="create_upload_video60">🎬 Upload Video (Max 60s)</span>
+            <input type="file" id="createVideo60Input" accept="video/*" style="display:none;" onchange="handleStudioVideo60File(event)">
+          </label>
+          <button type="button" class="btn-ghost" id="btnRecordCam60" style="justify-content:center;border-color:#f43f5e;color:#fda4af;" onclick="toggleLiveCam60Recording()" data-i18n="create_record_cam60">📹 Record Live 60s Video</button>
+        </div>
+        <div id="video60TimerRow" style="display:none;margin-bottom:10px;">
+          <div style="display:flex;justify-content:space-between;font-size:0.76rem;font-weight:800;color:#fbbf24;">
+            <span id="video60StatusLbl">🔴 REC</span>
+            <span id="video60ClockLbl">00:00 / 01:00</span>
+          </div>
+          <div class="video60-progress-bar"><div class="video60-progress-fill" id="video60ProgFill"></div></div>
+        </div>
+        <video id="studioVideo60Preview" controls playsinline muted style="display:none;width:100%;max-height:240px;border-radius:14px;background:#000;margin-bottom:10px;"></video>
+      </div>
+
+      <!-- TAB 3: LIVE HTML / CSS / JS INTERACTIVE CODE STUDIO -->
+      <div class="studio-pane" id="studioPane-html">
+        <p style="font-size:0.76rem;color:#cbd5e1;margin-bottom:8px;" data-i18n="create_html_hint">💻 Write or paste HTML/CSS/JS, upload an .html file, or pick a 1-click starter template:</p>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
+          <button type="button" class="fchip" onclick="loadStudioHtmlTemplate('fireworks')" data-i18n="create_tpl_fireworks">🎆 3D City Fireworks</button>
+          <button type="button" class="fchip" onclick="loadStudioHtmlTemplate('racer')" data-i18n="create_tpl_racer">🏎️ Neon Mini-Game</button>
+          <button type="button" class="fchip" onclick="loadStudioHtmlTemplate('globe')" data-i18n="create_tpl_globe">🌀 4D Matrix Synth</button>
+          <button type="button" class="fchip" onclick="loadStudioHtmlTemplate('beatpad')" data-i18n="create_tpl_beatpad">🎹 Cyber Beat Pad</button>
+          <label class="fchip" style="border-color:#fbbf24;color:#fbbf24;cursor:pointer;">
+            <span data-i18n="create_html_upload_file">📂 Upload .html File</span>
+            <input type="file" accept=".html,.htm,text/html" style="display:none;" onchange="handleStudioHtmlFileUpload(event)">
+          </label>
+        </div>
+        <!-- 5 Distinct City Arcade Game Genres -->
+        <div style="background:rgba(56,189,248,0.08);border:1px solid rgba(56,189,248,0.35);border-radius:12px;padding:8px 10px;margin-bottom:8px;">
+          <div style="font-size:0.73rem;font-weight:900;color:#38bdf8;margin-bottom:6px;" data-i18n="game_genre_lbl">🎮 Choose City Arcade Game Genre:</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            <button type="button" class="fchip" onclick="copilotGenerateCityHtmlGame('defense')">🏙️ Skyline Laser Defense</button>
+            <button type="button" class="fchip" onclick="copilotGenerateCityHtmlGame('stacker')">🏗️ 4D Tower Builder</button>
+            <button type="button" class="fchip" onclick="copilotGenerateCityHtmlGame('drone')">🛸 Cyber Drone Flier</button>
+            <button type="button" class="fchip" onclick="copilotGenerateCityHtmlGame('metro')">🚇 3D Neon Street Dash</button>
+            <button type="button" class="fchip" onclick="copilotGenerateCityHtmlGame('rhythm')">🎹 City Rhythm Piano</button>
+          </div>
+        </div>
+        <textarea id="createHtmlCodeArea" class="code-editor-area" spellcheck="false" placeholder="<!DOCTYPE html>&#10;<html>...</html>"></textarea>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin:8px 0;">
+          <button type="button" class="btn-ghost" onclick="refreshStudioHtmlPreview()" data-i18n="create_html_preview_btn">▶️ Refresh Live Preview</button>
+          <span style="font-size:0.72rem;color:#10b981;">✓ Sandboxed Interactive Engine</span>
+        </div>
+        <iframe id="studioHtmlLivePreview" sandbox="allow-scripts" style="display:none;width:100%;height:200px;border:1px solid rgba(56,189,248,0.4);border-radius:14px;background:#040714;margin-bottom:10px;"></iframe>
+      </div>
+
+      <!-- TAB 4: PROCEDURAL CITY POSTER -->
+      <div class="studio-pane" id="studioPane-art">
+        <div class="form-field">
+          <input type="text" id="createArtHeadlineInp" class="remo-input" placeholder="Poster Headline (e.g. CHIȘINĂU NIGHT PULSE)">
+        </div>
+      </div>
+
+      <!-- #10 REMO Viral Co-Pilot & Instant EN ⇄ FR Bilingual Engine -->
+      <div class="copilot-box">
+        <div style="font-size:0.76rem;font-weight:900;color:#e879f9;" data-i18n="copilot_title">🪄 REMO Viral Co-Pilot &amp; Instant EN ⇄ FR Studio</div>
+        <div class="copilot-row">
+          <button type="button" class="copilot-btn" onclick="copilotGenerateViralIdea()" data-i18n="copilot_btn_idea">💡 Viral Idea</button>
+          <button type="button" class="copilot-btn" onclick="copilotUpgradeHypeHook()" data-i18n="copilot_btn_hook">🔥 Hype Hook</button>
+          <button type="button" class="copilot-btn" onclick="copilotAutoTranslateStudio()" data-i18n="copilot_btn_translate">🌐 Auto EN ⇄ FR</button>
+          <button type="button" class="copilot-btn" onclick="copilotGenerateCityHtmlGame()" data-i18n="copilot_btn_html">🎮 City HTML Game</button>
+        </div>
+      </div>
+
+      <!-- Caption -->
+      <div class="form-field" style="margin-top:4px;margin-bottom:8px;">
+        <textarea id="createCaptionInp" rows="2" class="remo-input" data-i18n-placeholder="create_caption_ph" placeholder="What is happening in your city right now?"></textarea>
+      </div>
+
+      <!-- Editable Dual EN + FR Bilingual Preview Drawer -->
+      <div id="bilingualCaptionDrawer" style="display:none;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+        <div>
+          <label style="font-size:0.7rem;font-weight:800;color:#38bdf8;">🇬🇧 English Version</label>
+          <textarea id="createCaptionEnBox" rows="2" class="remo-input" style="font-size:0.78rem;padding:7px 9px;"></textarea>
+        </div>
+        <div>
+          <label style="font-size:0.7rem;font-weight:800;color:#fbbf24;">🇫🇷 Version Française</label>
+          <textarea id="createCaptionFrBox" rows="2" class="remo-input" style="font-size:0.78rem;padding:7px 9px;"></textarea>
+        </div>
+      </div>
+
+      <!-- GENIUS VIRAL POWER-UPS (Live Poll + VIP Secret Capsule + Spark Voice + GPS) -->
+      <div style="background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:14px;padding:10px 12px;margin-bottom:12px;display:flex;flex-direction:column;gap:8px;">
+        <label style="display:flex;align-items:center;gap:8px;font-size:0.8rem;font-weight:800;color:#a5b4fc;cursor:pointer;">
+          <input type="checkbox" id="createPollToggle" onchange="document.getElementById('createPollFields').style.display=this.checked?'grid':'none'">
+          <span data-i18n="create_poll_toggle">📊 Add Interactive Live Poll (+5 🪙 per vote)</span>
+        </label>
+        <div id="createPollFields" style="display:none;grid-template-columns:1fr 1fr;gap:7px;">
+          <input type="text" id="createPollQuestion" class="remo-input" style="grid-column:1/-1;" data-i18n-placeholder="create_poll_q_ph" placeholder="Ask a question...">
+          <input type="text" id="createPollOpt1" class="remo-input" data-i18n-placeholder="create_poll_opt1_ph" placeholder="Option 1">
+          <input type="text" id="createPollOpt2" class="remo-input" data-i18n-placeholder="create_poll_opt2_ph" placeholder="Option 2">
+          <input type="text" id="createPollOpt3" class="remo-input" style="grid-column:1/-1;" data-i18n-placeholder="create_poll_opt3_ph" placeholder="Option 3 (optional)">
+        </div>
+
+        <label style="display:flex;align-items:center;gap:8px;font-size:0.8rem;font-weight:800;color:#fbbf24;cursor:pointer;">
+          <input type="checkbox" id="createSecretToggle" onchange="document.getElementById('createSecretFields').style.display=this.checked?'block':'none'">
+          <span data-i18n="create_secret_toggle">🔐 Attach VIP Secret Capsule (Free for Home City or 15 🪙)</span>
+        </label>
+        <div id="createSecretFields" style="display:none;">
+          <textarea id="createSecretTextInp" rows="2" class="remo-input" data-i18n-placeholder="create_secret_ph" placeholder="Secret tip, VIP coordinates, or bonus code..."></textarea>
+        </div>
+
+        <label style="display:flex;align-items:center;gap:8px;font-size:0.8rem;font-weight:800;color:#fda4af;cursor:pointer;">
+          <input type="checkbox" id="createViralGoalToggle" onchange="document.getElementById('createViralGoalFields').style.display=this.checked?'grid':'none'">
+          <span data-i18n="viral_goal_toggle">🔥 Add Viral Like-Goal Vault (Unlocks secret when post hits X Likes)</span>
+        </label>
+        <div id="createViralGoalFields" style="display:none;grid-template-columns:110px 1fr;gap:7px;">
+          <input type="number" id="createViralTargetLikes" class="remo-input" min="2" max="5000" value="5" placeholder="Likes">
+          <input type="text" id="createViralSecretText" class="remo-input" placeholder="Secret reward / link / code unlocked at goal...">
+        </div>
+
+        <label style="display:flex;align-items:center;gap:8px;font-size:0.8rem;font-weight:800;color:#e879f9;cursor:pointer;">
+          <input type="checkbox" id="createTimeCapsuleToggle" onchange="document.getElementById('createTimeCapsuleFields').style.display=this.checked?'grid':'none'">
+          <span data-i18n="capsule_toggle_lbl">⏳ Seal as Live Time-Capsule Mystery Post (Countdown Vault)</span>
+        </label>
+        <div id="createTimeCapsuleFields" style="display:none;grid-template-columns:155px 1fr;gap:7px;">
+          <select id="createCapsuleMinutesSel" class="remo-input">
+            <option value="1">⏱️ 1 Min (Live Demo)</option>
+            <option value="3">⏱️ 3 Minutes</option>
+            <option value="15">⏱️ 15 Minutes</option>
+            <option value="60">⏱️ 1 Hour</option>
+            <option value="1440">⏱️ 24 Hours</option>
+          </select>
+          <input type="text" id="createCapsuleTeaserInp" class="remo-input" data-i18n-placeholder="capsule_teaser_ph" placeholder="Mystery teaser shown before countdown reaches 00:00:00...">
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px;">
+        <button type="button" class="btn-ghost" id="btnSparkVoice" style="justify-content:center;" onclick="toggleSparkVoiceRecord()" data-i18n="create_spark_voice">🎙️ Spark Voice 30s</button>
+        <button type="button" class="btn-ghost" style="justify-content:center;" onclick="checkGpsForNewPost()" data-i18n="create_verify_gps">🧭 Verify GPS</button>
+        <button type="button" class="btn-ghost" style="justify-content:center;border-color:#ec4899;color:#f472b6;" onclick="record1ClickCityVideoReel()" data-i18n="create_reel_studio">🎬 9:16 Reel</button>
+      </div>
+
+      <div id="createMediaPreviewStatus" style="font-size:0.78rem;color:#10b981;margin-bottom:10px;font-weight:700;"></div>
+      <button class="btn-cyber btn-gold" style="width:100%;justify-content:center;padding:13px;font-size:0.92rem;" onclick="publishNewRemoPost()" data-i18n="create_publish">🚀 Publish to REMO (+15 🪙)</button>
+    </div>
+  </div>
+
+  <!-- ⛶ Fullscreen Interactive HTML Arcade Modal -->
+  <div class="remo-modal-backdrop" id="htmlFullscreenModal" onclick="if(event.target===this)closeHtmlFullscreenModal()">
+    <div class="remo-modal" style="max-width:94vw;width:1060px;height:86dvh;display:flex;flex-direction:column;padding:14px;">
+      <div class="modal-hdr" style="margin-bottom:10px;">
+        <b id="htmlFsTitle" style="font-family:'Orbitron',sans-serif;color:#38bdf8;">💻 REMO LIVE HTML ARCADE</b>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <button class="btn-cyber" id="htmlFsRemixBtn">🪄 Remix (+10 🪙)</button>
+          <button class="modal-close" onclick="closeHtmlFullscreenModal()">✕</button>
+        </div>
+      </div>
+      <iframe id="htmlFsIframe" sandbox="allow-scripts" style="flex:1;width:100%;border:1px solid rgba(56,189,248,0.4);border-radius:16px;background:#040714;"></iframe>
+    </div>
+  </div>
+
+  <!-- 🎴 3D City Card Flip & Story Inspector Modal -->
+  <div class="remo-modal-backdrop" id="cardInspectModal" onclick="if(event.target===this)this.classList.remove('open')">
+    <div class="remo-modal" style="text-align:center;">
+      <div class="modal-hdr">
+        <b style="font-family:'Orbitron',sans-serif;color:#fbbf24;">🎴 4D HOLOGRAPHIC CITY CARD</b>
+        <button class="modal-close" onclick="document.getElementById('cardInspectModal').classList.remove('open')">✕</button>
+      </div>
+      <div class="card-3d-stage" style="margin:10px 0 18px;">
+        <div class="card-flipper" id="inspectCardFlipper" onclick="this.classList.toggle('flipped')">
+          <div class="card-face front"><canvas id="inspectFrontCv"></canvas></div>
+          <div class="card-face back"><canvas id="inspectBackCv"></canvas></div>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:center;gap:8px;flex-wrap:wrap;">
+        <button class="btn-ghost" onclick="document.getElementById('inspectCardFlipper').classList.toggle('flipped')" data-i18n="card_flip_btn">🔄 Flip Front / Back</button>
+        <button class="btn-cyber btn-gold" onclick="exportInspectedCardStory()" data-i18n="pack_record_tiktok">🎥 Export 9:16 Story</button>
+        <button class="btn-ghost" onclick="showInspectedCardTradeQR()" data-i18n="card_trade_qr">🔄 Trade QR</button>
+        <button class="btn-ghost" onclick="listInspectedCardInAuction()" data-i18n="card_list_auction">🔨 Auction</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 💬 #3 Super-Comments 2.0 Modal (Voice Replies, 4D Card-Flex & Golden SuperChat Tips) -->
+  <div class="remo-modal-backdrop" id="commentsModal" onclick="if(event.target===this)this.classList.remove('open')">
+    <div class="remo-modal" style="max-width:560px;">
+      <div class="modal-hdr">
+        <b data-i18n="act_comment">Comments</b>
+        <button class="modal-close" onclick="document.getElementById('commentsModal').classList.remove('open')">✕</button>
+      </div>
+      <div id="commentsModalList" style="max-height:310px;overflow-y:auto;margin-bottom:12px;"></div>
+
+      <!-- Super-Comment Power Options Row -->
+      <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:7px;margin-bottom:8px;">
+        <select id="commentSuperTipSel" class="remo-input" style="font-size:0.76rem;padding:7px 9px;">
+          <option value="0" data-i18n="cmt_super_free">💬 Free Reply</option>
+          <option value="10">💎 Super +10 🪙 (Gold Pin)</option>
+          <option value="50">👑 Super +50 🪙 (VIP Pin)</option>
+          <option value="100">🚀 Super +100 🪙 (Mega Pin)</option>
+        </select>
+        <select id="commentCardFlexSelect" class="remo-input" style="font-size:0.76rem;padding:7px 9px;"></select>
+        <button type="button" class="btn-ghost" id="btnCommentVoice" style="font-size:0.75rem;padding:7px 11px;border-color:#38bdf8;color:#7dd3fc;" onclick="toggleCommentVoiceRecord()" data-i18n="cmt_voice_btn">🎙️ 15s Voice</button>
+      </div>
+      <div id="commentVoiceReadyStatus" style="font-size:0.74rem;color:#10b981;font-weight:800;margin-bottom:6px;"></div>
+
+      <div style="display:flex;gap:8px;">
+        <input type="text" id="commentInputBox" class="remo-input" data-i18n-placeholder="comments_placeholder" onkeydown="if(event.key==='Enter')submitPostComment()">
+        <button class="btn-cyber" onclick="submitPostComment()" data-i18n="btn_send">Send</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 📖 Story Viewer Modal -->
+  <div class="remo-modal-backdrop" id="storyViewerModal" onclick="if(event.target===this)this.classList.remove('open')">
+    <div class="remo-modal">
+      <div class="modal-hdr">
+        <b>📖 REMO 24h Story</b>
+        <button class="modal-close" onclick="document.getElementById('storyViewerModal').classList.remove('open')">✕</button>
+      </div>
+      <div id="storyViewerBody"></div>
+    </div>
+  </div>
+
+  <!-- 📹 WebRTC HD Voice/Video Call & Live Broadcast Modal -->
+  <div class="remo-modal-backdrop" id="webrtcCallModal">
+    <div class="remo-modal" style="text-align:center;">
+      <div class="modal-hdr">
+        <b style="color:#10b981;">🔴 REMO HD WebRTC Stream</b>
+        <button class="modal-close" onclick="endWebRTCCall()">✕</button>
+      </div>
+      <video id="webrtcLocalVideo" autoplay muted playsinline style="width:100%;border-radius:16px;background:#000;max-height:360px;"></video>
+      <div style="margin-top:14px;">
+        <button class="btn-cyber" style="background:#f43f5e;" onclick="endWebRTCCall()" data-i18n="call_end">End Call</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 🔐 Universal Citizen Auth Modal (Google + Email + TikTok/IG IAB Detector) -->
+  <div class="remo-modal-backdrop" id="authModal" onclick="if(event.target===this)this.classList.remove('open')">
+    <div class="remo-modal">
+      <div class="modal-hdr">
+        <b style="font-family:'Orbitron',sans-serif;color:#fbbf24;" data-i18n="auth_welcome">Welcome to REMO 🌐</b>
+        <button class="modal-close" onclick="document.getElementById('authModal').classList.remove('open')">✕</button>
+      </div>
+      <p style="font-size:0.83rem;color:var(--muted);margin-bottom:14px;" data-i18n="auth_sub"></p>
+
+      <div id="authIabWarningBox" style="display:none;background:rgba(251,191,36,0.12);border:1px solid #fbbf24;border-radius:12px;padding:10px;margin-bottom:12px;font-size:0.78rem;color:#fde047;">
+        <div data-i18n="auth_iab_warning"></div>
+        <button type="button" class="btn-cyber" style="margin-top:8px;width:100%;justify-content:center;" onclick="openInExternalBrowser()" data-i18n="auth_open_browser"></button>
+      </div>
+
+      <button type="button" class="btn-ghost" style="width:100%;justify-content:center;padding:11px;margin-bottom:12px;background:#fff;color:#0f172a;font-weight:800;" onclick="quickGoogleSignInSim()">
+        🌐 <span data-i18n="auth_google">Continue with Google</span>
+      </button>
+
+      <form onsubmit="submitUniversalAuth(event)">
+        <div class="form-field">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <label data-i18n="auth_home_city">Your Home City</label>
+            <button type="button" onclick="openAddUserCityModal()" style="background:none;border:none;color:#34d399;font-size:0.74rem;font-weight:900;cursor:pointer;">🌍 + Add Missing City</button>
+          </div>
+          <select id="authHomeCitySelect" class="remo-input"></select>
+        </div>
+        <div class="form-field">
+          <input type="text" id="authNameInp" class="remo-input" data-i18n-placeholder="auth_name_ph" placeholder="Your Creator Name" required>
+        </div>
+        <div class="form-field">
+          <input type="email" id="authEmailInp" class="remo-input" data-i18n-placeholder="auth_email_ph" placeholder="Email address" required>
+        </div>
+        <button type="submit" class="btn-cyber btn-gold" style="width:100%;justify-content:center;padding:12px;" data-i18n="auth_submit_register">
+          Create Citizen Account (+150 🪙)
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- 👑 Live Admin Quick-Command & Custom Coin Transfer Modal -->
+  <div class="remo-modal-backdrop" id="adminQuickModal" onclick="if(event.target===this)this.classList.remove('open')">
+    <div class="remo-modal" style="max-width:600px;border-color:#fbbf24;">
+      <div class="modal-hdr">
+        <b style="font-family:'Orbitron',sans-serif;color:#fbbf24;" data-i18n="adm_quick_title">👑 Founder &amp; Admin Live Command Bar</b>
+        <button class="modal-close" onclick="document.getElementById('adminQuickModal').classList.remove('open')">✕</button>
+      </div>
+
+      <!-- PIN Gate inside index.html -->
+      <div id="admQuickPinBox" style="display:none;text-align:center;padding:12px 0;">
+        <p style="font-size:0.84rem;color:var(--muted);margin-bottom:12px;" data-i18n="adm_unlock_sub"></p>
+        <div style="display:flex;gap:8px;max-width:340px;margin:0 auto;">
+          <input type="password" id="admQuickPinInput" class="remo-input" style="text-align:center;font-weight:900;letter-spacing:3px;" value="2026" placeholder="PIN (2026)" onkeydown="if(event.key==='Enter')unlockAdminGodModeInline()">
+          <button class="btn-cyber btn-gold" onclick="unlockAdminGodModeInline()">🔓 Unlock</button>
+        </div>
+      </div>
+
+      <!-- Unlocked Admin Superpowers -->
+      <div id="admQuickControlsBox" style="display:none;flex-direction:column;gap:14px;">
+        <!-- 1. Direct Custom Coin Transfer to ANY Citizen -->
+        <div style="background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.4);border-radius:16px;padding:14px;">
+          <div style="font-weight:900;font-size:0.86rem;color:#fbbf24;margin-bottom:10px;" data-i18n="adm_transfer_hdr">🪙 Send / Set REMO Coins to Any Citizen</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+            <select id="admTransferUserSel" class="remo-input"></select>
+            <select id="admTransferModeSel" class="remo-input">
+              <option value="add">➕ Add / Gift Coins (+)</option>
+              <option value="sub">➖ Deduct / Fine Coins (-)</option>
+              <option value="set">🎯 Set Exact Balance (=)</option>
+            </select>
+          </div>
+          <div style="display:grid;grid-template-columns:140px 1fr;gap:8px;margin-bottom:8px;">
+            <input type="number" id="admTransferAmtInp" class="remo-input" value="500" min="1" max="10000000" placeholder="Coins">
+            <input type="text" id="admTransferNoteInp" class="remo-input" placeholder="Optional Founder message (e.g. Bravo for your post!)">
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="btn-cyber btn-gold" style="flex:1;justify-content:center;" onclick="executeInlineAdminCoinTransfer()" data-i18n="adm_transfer_btn">⚡ Execute Coin Transfer</button>
+            <button class="btn-ghost" onclick="quickCreateNewCitizenByAdmin()">👤+ New Citizen</button>
+          </div>
+        </div>
+
+        <!-- 2. Global Live Triggers (2X Happy Hour, Coin Rain, City Weather Surge) -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          <button class="btn-cyber" id="btnToggleHappyHour" style="justify-content:center;background:linear-gradient(135deg,#10b981,#059669);" onclick="toggleHappyHour2xInline()">⚡ Toggle 2X Happy Hour</button>
+          <button class="btn-cyber btn-gold" style="justify-content:center;" onclick="triggerInlineCoinRain()">🌧️ Global Coin Rain</button>
+        </div>
+
+        <!-- 2B. City 2X Weather Surge Trigger -->
+        <div style="background:rgba(168,85,247,0.09);border:1px solid rgba(168,85,247,0.38);border-radius:16px;padding:12px;">
+          <div style="font-weight:900;font-size:0.84rem;color:#e879f9;margin-bottom:8px;" data-i18n="adm_weather_hdr">⛈️ City 2X Weather Surge Trigger (Storm / Snow Bonus)</div>
+          <div style="display:grid;grid-template-columns:1fr auto;gap:8px;">
+            <select id="admSurgeCitySelect" class="remo-input"></select>
+            <button class="btn-cyber" style="background:linear-gradient(135deg,#7c3aed,#ec4899);" onclick="toggleAdminCitySurgeInline()" data-i18n="adm_weather_btn">⚡ Toggle 2X City Surge</button>
+          </div>
+        </div>
+
+        <!-- 3. Instant Promo Gift Code Generator -->
+        <div style="background:rgba(56,189,248,0.07);border:1px solid rgba(56,189,248,0.35);border-radius:16px;padding:12px;">
+          <div style="font-weight:900;font-size:0.84rem;color:#38bdf8;margin-bottom:8px;" data-i18n="adm_promo_hdr">🎟️ Create Redeemable Promo / Gift Code</div>
+          <div style="display:grid;grid-template-columns:1fr 110px 1fr;gap:7px;margin-bottom:8px;">
+            <input type="text" id="admNewPromoCode" class="remo-input" style="text-transform:uppercase;" placeholder="VIP500">
+            <input type="number" id="admNewPromoCoins" class="remo-input" value="500" placeholder="Coins">
+            <select id="admNewPromoCityCard" class="remo-input"></select>
+          </div>
+          <button class="btn-cyber" style="width:100%;justify-content:center;" onclick="createPromoCodeInline()" data-i18n="adm_promo_btn">🎟️ Generate Code</button>
+        </div>
+
+        <!-- 4. Footer Links -->
+        <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;padding-top:6px;border-top:1px solid var(--border);">
+          <a href="admin.html" class="btn-cyber btn-gold">🛡️ Full Admin Office &amp; 300 DPI Card Studio</a>
+          <button class="btn-ghost" style="border-color:#f43f5e;color:#fda4af;" onclick="lockAdminGodModeInline()">🔒 Lock Admin Mode</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 🌍 Found / Add Missing World City Modal (+75 🪙 & Card #0001) -->
+  <div class="remo-modal-backdrop" id="addCityModal" onclick="if(event.target===this)this.classList.remove('open')">
+    <div class="remo-modal" style="max-width:540px;border-color:#10b981;">
+      <div class="modal-hdr">
+        <b style="font-family:'Orbitron',sans-serif;color:#34d399;font-size:0.92rem;" data-i18n="add_city_modal_title">🌍 Found Your City on REMO (+75 🪙 &amp; Card #0001)</b>
+        <button class="modal-close" onclick="document.getElementById('addCityModal').classList.remove('open')">✕</button>
+      </div>
+      <p style="font-size:0.81rem;color:#cbd5e1;margin-bottom:12px;" data-i18n="add_city_modal_sub"></p>
+
+      <form onsubmit="submitUserNewCity(event)">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <div class="form-field">
+            <label data-i18n="add_city_name_lbl">City or Town Name</label>
+            <input type="text" id="usrCityNameInp" class="remo-input" placeholder="e.g. Bălți, Iași, Québec, Lyon..." required oninput="autoGuessCityCoordinates(this.value)">
+          </div>
+          <div class="form-field">
+            <label data-i18n="add_city_country_lbl">Country</label>
+            <input type="text" id="usrCityCountryInp" class="remo-input" placeholder="e.g. Moldova, Canada, France..." required>
+          </div>
+        </div>
+
+        <div class="form-field" style="margin-bottom:10px;">
+          <label data-i18n="add_city_flag_lbl">Country Flag Emoji</label>
+          <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+            <input type="text" id="usrCityFlagInp" class="remo-input" style="width:76px;text-align:center;font-size:1.25rem;" value="🌍" maxlength="6">
+            <div style="display:flex;gap:4px;flex-wrap:wrap;">
+              <button type="button" class="fchip" onclick="document.getElementById('usrCityFlagInp').value='🇲🇩'">🇲🇩</button>
+              <button type="button" class="fchip" onclick="document.getElementById('usrCityFlagInp').value='🇷🇴'">🇷🇴</button>
+              <button type="button" class="fchip" onclick="document.getElementById('usrCityFlagInp').value='🇨🇦'">🇨🇦</button>
+              <button type="button" class="fchip" onclick="document.getElementById('usrCityFlagInp').value='🇫🇷'">🇫🇷</button>
+              <button type="button" class="fchip" onclick="document.getElementById('usrCityFlagInp').value='🇺🇸'">🇺🇸</button>
+              <button type="button" class="fchip" onclick="document.getElementById('usrCityFlagInp').value='🇬🇧'">🇬🇧</button>
+              <button type="button" class="fchip" onclick="document.getElementById('usrCityFlagInp').value='🇮🇹'">🇮🇹</button>
+              <button type="button" class="fchip" onclick="document.getElementById('usrCityFlagInp').value='🇪🇸'">🇪🇸</button>
+              <button type="button" class="fchip" onclick="document.getElementById('usrCityFlagInp').value='🇩🇪'">🇩🇪</button>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr 78px;gap:8px;align-items:end;margin-bottom:12px;">
+          <div class="form-field" style="margin-bottom:0;">
+            <label>GPS Latitude</label>
+            <input type="number" step="0.0001" id="usrCityLatInp" class="remo-input" value="47.0105">
+          </div>
+          <div class="form-field" style="margin-bottom:0;">
+            <label>GPS Longitude</label>
+            <input type="number" step="0.0001" id="usrCityLngInp" class="remo-input" value="28.8638">
+          </div>
+          <div class="form-field" style="margin-bottom:0;">
+            <label>Aura</label>
+            <input type="color" id="usrCityColorInp" class="remo-input" value="#38bdf8" style="height:41px;padding:3px;">
+          </div>
+        </div>
+
+        <button type="button" class="btn-ghost" style="width:100%;justify-content:center;margin-bottom:12px;border-color:#38bdf8;color:#7dd3fc;" onclick="detectGpsForNewCity()" data-i18n="add_city_gps_btn">📍 Auto-Detect My Live GPS</button>
+
+        <button type="submit" class="btn-cyber btn-gold" style="width:100%;justify-content:center;padding:12px;font-size:0.92rem;" data-i18n="add_city_submit_btn">🚀 Found City &amp; Mint Card #0001 (+75 🪙)</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- 💎 1. AR Geo-Vault Inspector & GPS Unlock Modal -->
+  <div class="remo-modal-backdrop" id="geoVaultInspectModal" onclick="if(event.target===this)this.classList.remove('open')">
+    <div class="remo-modal" style="max-width:540px;border-color:#06b6d4;">
+      <div class="modal-hdr">
+        <b style="font-family:'Orbitron',sans-serif;color:#38bdf8;font-size:0.95rem;" data-i18n="vault_modal_title">💎 World City Geo-Vault — AR Treasure Hunt</b>
+        <button class="modal-close" onclick="document.getElementById('geoVaultInspectModal').classList.remove('open')">✕</button>
+      </div>
+
+      <!-- Holographic Geo-Vault Hero Box -->
+      <div style="background:radial-gradient(circle at 50% 25%,rgba(6,182,212,0.18),rgba(15,23,42,0.85));border:1px solid rgba(56,189,248,0.4);border-radius:18px;padding:16px;text-align:center;margin-bottom:12px;">
+        <div style="font-size:2.8rem;filter:drop-shadow(0 0 20px #06b6d4);margin-bottom:6px;">💎</div>
+        <h3 id="gvInspectTitle" style="font-family:'Orbitron',sans-serif;font-size:1.15rem;color:#fde047;margin-bottom:4px;"></h3>
+        <div style="display:flex;justify-content:center;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px;">
+          <span class="fchip" id="gvInspectCity" style="border-color:#38bdf8;color:#e0f2fe;font-weight:800;"></span>
+          <span class="fchip" id="gvInspectRarity" style="border-color:#fbbf24;color:#fbbf24;font-weight:900;"></span>
+        </div>
+        <div style="font-size:0.75rem;color:var(--muted);">
+          <span data-i18n="vault_inspect_sponsor">Hidden By</span>: <b id="gvInspectSponsor" style="color:#cbd5e1;"></b>
+        </div>
+      </div>
+
+      <!-- Rewards Grid -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
+        <div style="background:rgba(251,191,36,0.1);border:1px solid rgba(251,191,36,0.35);border-radius:12px;padding:9px;text-align:center;">
+          <div style="font-size:0.7rem;font-weight:800;color:#fbbf24;text-transform:uppercase;" data-i18n="vault_inspect_coins">Reward Bounty</div>
+          <div id="gvInspectCoins" style="font-family:'Orbitron',sans-serif;font-size:1.2rem;font-weight:900;color:#fde047;margin-top:2px;"></div>
+        </div>
+        <div style="background:rgba(56,189,248,0.1);border:1px solid rgba(56,189,248,0.35);border-radius:12px;padding:9px;text-align:center;">
+          <div style="font-size:0.7rem;font-weight:800;color:#38bdf8;text-transform:uppercase;" data-i18n="vault_inspect_card">4D City Card Drop</div>
+          <div style="font-size:0.88rem;font-weight:900;color:#bae6fd;margin-top:4px;">🎴 Verified Card</div>
+        </div>
+      </div>
+
+      <!-- Secret Clue / Riddle Box -->
+      <div style="background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:14px;padding:12px;margin-bottom:12px;">
+        <div style="font-size:0.75rem;font-weight:900;color:#38bdf8;margin-bottom:5px;" data-i18n="vault_clue_label">Secret Riddle or Landmark Clue</div>
+        <div id="gvInspectClue" style="font-size:0.84rem;color:#cbd5e1;font-style:italic;line-height:1.4;"></div>
+      </div>
+
+      <!-- Live GPS Distance / Proximity Bar -->
+      <div id="gvInspectProximityBox" style="background:rgba(0,0,0,0.35);border:1px solid var(--border);border-radius:14px;padding:10px 12px;margin-bottom:14px;"></div>
+
+      <!-- Action Buttons -->
+      <div id="gvInspectActionsBox"></div>
+    </div>
+  </div>
+
+  <!-- 💎 2. Bury a Secret Geo-Vault Modal -->
+  <div class="remo-modal-backdrop" id="buryGeoVaultModal" onclick="if(event.target===this)this.classList.remove('open')">
+    <div class="remo-modal" style="max-width:540px;border-color:#fbbf24;">
+      <div class="modal-hdr">
+        <b style="font-family:'Orbitron',sans-serif;color:#fbbf24;font-size:0.95rem;" data-i18n="vault_bury_modal_title">💎 Bury a Secret Geo-Vault in Your City</b>
+        <button class="modal-close" onclick="document.getElementById('buryGeoVaultModal').classList.remove('open')">✕</button>
+      </div>
+      <p style="font-size:0.81rem;color:var(--muted);margin-bottom:12px;" data-i18n="vault_bury_modal_sub"></p>
+
+      <form onsubmit="submitBuryGeoVault(event)">
+        <div class="form-field">
+          <label data-i18n="create_select_city">Select City</label>
+          <select id="buryVaultCitySelect" class="remo-input"></select>
+        </div>
+
+        <div class="form-field">
+          <label data-i18n="vault_landmark_name">Landmark / Secret Spot Name</label>
+          <input type="text" id="buryVaultTitleInp" class="remo-input" placeholder="e.g. Arc de Triomphe Sunset Vault" required>
+        </div>
+
+        <div class="form-field">
+          <label data-i18n="vault_clue_label">Secret Riddle or Landmark Clue</label>
+          <textarea id="buryVaultHintInp" rows="2" class="remo-input" data-i18n-placeholder="vault_clue_ph" placeholder="e.g. Look behind the ancient monument fountain under the arch..." required></textarea>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+          <div class="form-field" style="margin-bottom:0;">
+            <label data-i18n="vault_coins_reward">Reward Bounty (🪙)</label>
+            <select id="buryVaultCoinsSel" class="remo-input">
+              <option value="150">🪙 150 Coins (Standard)</option>
+              <option value="250" selected>💎 250 Coins (Rare)</option>
+              <option value="500">👑 500 Coins (Mythic Jackpot)</option>
+            </select>
+          </div>
+          <div class="form-field" style="margin-bottom:0;">
+            <label data-i18n="vault_radius_label">Unlock Radius (Meters)</label>
+            <select id="buryVaultRadiusSel" class="remo-input">
+              <option value="200">🎯 200m (Strict Pinpoint)</option>
+              <option value="350" selected>📍 350m (Standard Landmark)</option>
+              <option value="600">🌐 600m (Wide District)</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+          <div class="form-field" style="margin-bottom:0;">
+            <label>GPS Latitude</label>
+            <input type="number" step="0.0001" id="buryVaultLatInp" class="remo-input" value="45.5017" required>
+          </div>
+          <div class="form-field" style="margin-bottom:0;">
+            <label>GPS Longitude</label>
+            <input type="number" step="0.0001" id="buryVaultLngInp" class="remo-input" value="-73.5673" required>
+          </div>
+        </div>
+
+        <button type="button" class="btn-ghost" style="width:100%;justify-content:center;margin-bottom:12px;border-color:#38bdf8;color:#7dd3fc;" onclick="detectGpsForBuryVault()" data-i18n="vault_auto_gps">📍 Use My Live GPS Coordinates</button>
+
+        <button type="submit" class="btn-cyber btn-gold" style="width:100%;justify-content:center;padding:12px;font-size:0.92rem;" data-i18n="vault_bury_submit">🚀 Bury Geo-Vault (+150 🪙 Creator XP)</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- 🪙 Official Sovereign REMO 3D Coin Interactive Showcase Modal -->
+  <div class="remo-modal-backdrop" id="remoCoin3DModal" onclick="if(event.target===this)closeRemoCoin3DModal()">
+    <div class="remo-modal" style="max-width:540px;border-color:#fbbf24;text-align:center;">
+      <div class="modal-hdr">
+        <b style="font-family:'Orbitron',sans-serif;color:#fbbf24;font-size:0.96rem;" data-i18n="coin_modal_title">REMO Sovereign 3D Coin</b>
+        <button class="modal-close" onclick="closeRemoCoin3DModal()">✕</button>
+      </div>
+
+      <p style="font-size:0.82rem;color:var(--muted);margin-bottom:8px;" data-i18n="coin_modal_sub">Official Sovereign Currency of REMO World Cities Network • Est. 2026</p>
+
+      <!-- 3D Interactive Rotating Coin Stage -->
+      <div class="coin-3d-stage" id="coin3DStage">
+        <div class="coin-3d-disc" id="coin3DDisc">
+          <div class="coin-3d-layer l1"></div>
+          <div class="coin-3d-layer l2"></div>
+          <div class="coin-3d-layer l3"></div>
+          <div class="coin-3d-layer l4"></div>
+          <div class="coin-3d-layer l5"></div>
+          <div class="coin-3d-face front"></div>
+          <div class="coin-3d-face back">
+            <svg class="coin-serial-svg" viewBox="0 0 1024 1024" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;">
+              <defs>
+                <path id="coinSerialArc" d="M 87,587 A 432 432 0 0 0 937,587" fill="none" />
+                <linearGradient id="goldRelief" x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" stop-color="#fffbeb" />
+                  <stop offset="25%" stop-color="#fef08a" />
+                  <stop offset="60%" stop-color="#eab308" />
+                  <stop offset="90%" stop-color="#ca8a04" />
+                  <stop offset="100%" stop-color="#854d0e" />
+                </linearGradient>
+                <filter id="goldEmboss" x="-10%" y="-10%" width="120%" height="120%">
+                  <feDropShadow dx="1" dy="2" stdDeviation="1.5" flood-color="#0a0501" flood-opacity="0.95" />
+                  <feDropShadow dx="-1" dy="-1" stdDeviation="0.8" flood-color="#fffdf0" flood-opacity="0.75" />
+                </filter>
+              </defs>
+              <text font-family="'Times New Roman', Georgia, serif" font-weight="900" font-size="44" letter-spacing="2px"
+                    fill="url(#goldRelief)" stroke="#78350f" stroke-width="1.2" stroke-linejoin="round"
+                    filter="url(#goldEmboss)">
+                <textPath href="#coinSerialArc" id="coin3DSerialTextPath" startOffset="50%" text-anchor="middle">
+                  SERIAL № 001 • 100% VERIFIED
+                </textPath>
+              </text>
+            </svg>
+          </div>
+        </div>
+      </div>
+
+      <!-- Drag & Rotate Helper Hint -->
+      <div style="font-size:0.75rem;font-weight:700;color:#38bdf8;margin-bottom:8px;" data-i18n="coin_rotate_hint">
+        👆 Drag with finger or mouse to spin 360° in 3D
+      </div>
+
+      <!-- Live Interactive Serial Number Inscriber -->
+      <div style="display:inline-flex;align-items:center;gap:8px;background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.35);border-radius:20px;padding:4px 14px;margin-bottom:8px;">
+        <span style="font-size:0.75rem;font-weight:800;color:#fbbf24;">SERIAL №</span>
+        <input type="text" id="coin3DSerialInp" value="001" oninput="setRemoCoin3DSerial(this.value)" placeholder="001"
+               style="width:70px;text-align:center;background:rgba(0,0,0,0.6);border:1px solid #fbbf24;color:#fde047;font-family:'Orbitron',monospace;font-weight:900;border-radius:6px;padding:2px 4px;font-size:0.82rem;outline:none;"
+               title="Type any serial to live-engrave it on the spinning coin!">
+        <span style="font-size:0.75rem;font-weight:800;color:#38bdf8;">• 100% VERIFIED</span>
+      </div>
+
+      <!-- 4 Metal Alloys & Rarity Grade Switcher Pills -->
+      <div class="coin-alloy-pill-row">
+        <button type="button" class="coin-alloy-pill active" id="coinAlloyBtn_genesis" onclick="setRemoCoin3DAlloy('genesis')" title="Genesis Proof 24K Gold &amp; Titanium (#0001–#0100)">🌟 Genesis 24K</button>
+        <button type="button" class="coin-alloy-pill" id="coinAlloyBtn_platinum" onclick="setRemoCoin3DAlloy('platinum')" title="Royal Platinum &amp; Sapphire (Ambassador VIP)">💎 Platinum</button>
+        <button type="button" class="coin-alloy-pill" id="coinAlloyBtn_obsidian" onclick="setRemoCoin3DAlloy('obsidian')" title="Cyber Obsidian &amp; Emerald Neon (Night Rare)">⚡ Obsidian</button>
+        <button type="button" class="coin-alloy-pill" id="coinAlloyBtn_urban" onclick="setRemoCoin3DAlloy('urban')" title="Urban Sovereign Brass &amp; Steel (Active Cities)">🪙 Urban Brass</button>
+      </div>
+
+      <!-- Action Buttons Row -->
+      <div style="display:flex;justify-content:center;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+        <button type="button" class="btn-cyber btn-gold" onclick="flipRemoCoin3D()" data-i18n="coin_flip_btn">🔄 Flip Obverse / Reverse</button>
+        <button type="button" class="btn-ghost" style="border-color:#fbbf24;color:#fde047;" onclick="ringRemoCoinChime()" data-i18n="coin_chime_btn">🔔 Ring Golden Chime</button>
+        <button type="button" class="btn-ghost" onclick="closeRemoCoin3DModal();switchRemoView('wheel');">🎡 Lucky Wheel</button>
+      </div>
+
+      <div style="background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:14px;padding:10px;display:flex;justify-content:space-around;font-size:0.78rem;font-weight:800;">
+        <span style="color:#38bdf8;"><span data-i18n="coin_front_label">Obverse Face · Holographic World Map</span></span>
+        <span style="color:var(--muted);">•</span>
+        <span style="color:#fbbf24;"><span data-i18n="coin_back_label">Reverse Face · Spatial Compass № 001</span></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div class="remo-toast-box" id="remoToastBox"></div>
+
+  <!-- REMO Modular Engines -->
+  <script src="js/remo-i18n.js"></script>
+  <script src="js/remo-cities-data.js"></script>
+  <script src="js/remo-store.js"></script>
+  <script src="js/remo-card-engine.js"></script>
+  <script src="js/remo-radar-arena.js"></script>
+  <script src="js/remo-social-comms.js"></script>
+</body>
+</html>

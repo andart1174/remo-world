@@ -1,0 +1,382 @@
+/* ════════════════════════════════════════════════════════════════════
+   🛡️ REMO — Admin Executive Office & City Card Studio Stylesheet
+   100% Responsive on Desktop ("ordi") and Mobile ("vtel")
+   ════════════════════════════════════════════════════════════════════ */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Outfit:wght@600;700;800;900&family=Orbitron:wght@700;900&display=swap');
+
+:root {
+  --bg: #050814;
+  --panel: #0c1224;
+  --panel2: #111a33;
+  --border: rgba(255, 255, 255, 0.1);
+  --border-gold: rgba(251, 191, 36, 0.45);
+  --accent: #6366f1;
+  --cyan: #38bdf8;
+  --gold: #fbbf24;
+  --emerald: #10b981;
+  --rose: #f43f5e;
+  --text: #f8fafc;
+  --muted: #94a3b8;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: radial-gradient(circle at top right, #161d3f 0%, var(--bg) 60%);
+  color: var(--text);
+  font-family: 'Outfit', 'Inter', system-ui, sans-serif;
+  min-height: 100dvh;
+  overflow-x: hidden;
+}
+
+button, input, select, textarea { font-family: inherit; color: inherit; }
+
+/* ── Admin Lock Screen ── */
+.adm-lock-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  background: radial-gradient(circle at center, #131c3d 0%, #040610 75%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.adm-lock-card {
+  background: rgba(12, 18, 36, 0.95);
+  border: 1px solid var(--border-gold);
+  border-radius: 26px;
+  padding: 32px 28px;
+  width: 100%;
+  max-width: 430px;
+  text-align: center;
+  box-shadow: 0 25px 70px rgba(0, 0, 0, 0.85), 0 0 40px rgba(251, 191, 36, 0.16);
+}
+
+/* ── Executive Top Bar ── */
+.adm-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 90;
+  background: rgba(8, 12, 26, 0.92);
+  backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--border-gold);
+  padding: 12px 22px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.adm-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.adm-seal {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: #050814;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.35rem;
+  font-weight: 900;
+  box-shadow: 0 0 18px rgba(245, 158, 11, 0.45);
+}
+
+.adm-title {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 1.12rem;
+  font-weight: 900;
+  color: var(--gold);
+  letter-spacing: 1px;
+}
+
+.adm-sub { font-size: 0.74rem; color: var(--muted); }
+
+.adm-top-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* ── Main Layout: Left Command Nav + Workspace ── */
+.adm-layout {
+  max-width: 1660px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 245px minmax(0, 1fr);
+  gap: 20px;
+  padding: 20px;
+  align-items: start;
+}
+
+.adm-sidebar {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  position: sticky;
+  top: 86px;
+}
+
+.adm-tab-btn {
+  width: 100%;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 13px;
+  padding: 11px 14px;
+  text-align: left;
+  font-size: 0.86rem;
+  font-weight: 800;
+  color: #cbd5e1;
+  cursor: pointer;
+  transition: all 0.18s;
+}
+
+.adm-tab-btn:hover { background: rgba(255, 255, 255, 0.05); color: #fff; }
+.adm-tab-btn.active {
+  background: linear-gradient(90deg, rgba(245, 158, 11, 0.22), rgba(99, 102, 241, 0.16));
+  border-color: var(--border-gold);
+  color: var(--gold);
+}
+
+.adm-panel { display: none; }
+.adm-panel.active { display: block; animation: admFade 0.2s ease; }
+
+@keyframes admFade {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Executive Stat Cards & Panels ── */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+.kpi-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 18px;
+}
+
+.kpi-val {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 1.65rem;
+  font-weight: 900;
+  color: #fff;
+  margin: 6px 0 2px;
+}
+
+.kpi-lbl { font-size: 0.76rem; color: var(--muted); font-weight: 700; text-transform: uppercase; }
+
+.exec-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 20px;
+  margin-bottom: 18px;
+}
+
+.exec-card h3 {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.98rem;
+  color: var(--gold);
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ── City Card Studio Split Grid ── */
+.card-studio-grid {
+  display: grid;
+  grid-template-columns: 390px minmax(0, 1fr);
+  gap: 22px;
+  align-items: start;
+}
+
+.studio-controls {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+}
+
+.studio-preview {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+}
+
+.dual-canvas-row {
+  display: flex;
+  gap: 26px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.canvas-holder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.canvas-frame {
+  width: 310px;
+  height: 434px;
+  border-radius: 18px;
+  overflow: hidden;
+  box-shadow: 0 18px 45px rgba(0, 0, 0, 0.8), 0 0 28px rgba(251, 191, 36, 0.28);
+  transition: transform 0.25s ease;
+  background: #000;
+}
+
+.canvas-frame:hover { transform: translateY(-4px) scale(1.015); }
+.canvas-frame canvas { width: 100%; height: 100%; display: block; }
+
+/* ── Form Controls & Buttons ── */
+.adm-row-2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.adm-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.adm-field label {
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.adm-inp {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 9px 12px;
+  font-size: 0.85rem;
+  outline: none;
+}
+
+.adm-inp:focus { border-color: var(--gold); }
+
+.check-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.check-pill {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.76rem;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+  padding: 7px 10px;
+  border-radius: 9px;
+  cursor: pointer;
+}
+
+.adm-btn {
+  border: none;
+  border-radius: 11px;
+  padding: 10px 16px;
+  font-weight: 800;
+  font-size: 0.82rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  transition: all 0.18s;
+  text-decoration: none;
+}
+
+.adm-btn.gold { background: linear-gradient(135deg, #f59e0b, #d97706); color: #050814; }
+.adm-btn.indigo { background: linear-gradient(135deg, #6366f1, #4f46e5); color: #fff; }
+.adm-btn.emerald { background: linear-gradient(135deg, #10b981, #059669); color: #fff; }
+.adm-btn.rose { background: linear-gradient(135deg, #f43f5e, #e11d48); color: #fff; }
+.adm-btn.outline { background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border); color: var(--text); }
+
+.adm-btn:hover { transform: translateY(-1px); filter: brightness(1.07); }
+
+.adm-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.84rem;
+}
+
+.adm-table th, .adm-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+}
+
+.adm-table th { color: var(--muted); font-size: 0.74rem; text-transform: uppercase; }
+
+/* ── Mobile Responsive Admin Office ("vtel" <= 960px) ── */
+@media (max-width: 960px) {
+  .adm-layout {
+    grid-template-columns: 1fr;
+    padding: 12px;
+  }
+
+  .adm-sidebar {
+    position: static;
+    flex-direction: row;
+    overflow-x: auto;
+    padding: 8px;
+    border-radius: 14px;
+  }
+
+  .adm-tab-btn {
+    width: auto;
+    white-space: nowrap;
+    padding: 9px 13px;
+    font-size: 0.78rem;
+  }
+
+  .card-studio-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .canvas-frame {
+    width: 268px;
+    height: 375px;
+  }
+
+  .adm-row-2 {
+    grid-template-columns: 1fr;
+  }
+}

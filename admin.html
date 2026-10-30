@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>REMO 🛡️ Admin Executive Office &amp; World City Card Factory</title>
+  <link rel="stylesheet" href="css/remo-admin.css">
+</head>
+<body>
+
+  <!-- 🔒 ADMIN EXECUTIVE PIN LOCK GATE (Default PIN: 2026) -->
+  <div class="adm-lock-screen" id="admLockScreen">
+    <div class="adm-lock-card">
+      <div style="font-size:3rem;margin-bottom:10px;">🛡️</div>
+      <h2 style="font-family:'Orbitron',sans-serif;color:#fbbf24;margin-bottom:8px;" data-i18n="adm_unlock_title">Admin Executive Access</h2>
+      <p style="font-size:0.84rem;color:var(--muted);margin-bottom:18px;" data-i18n="adm_unlock_sub"></p>
+      <form onsubmit="unlockAdminOffice(event)" style="display:flex;flex-direction:column;gap:12px;">
+        <input type="password" id="admPinInput" class="adm-inp" style="text-align:center;font-size:1.1rem;font-weight:800;letter-spacing:4px;" data-i18n-placeholder="adm_pin_ph" placeholder="PIN (Default: 2026)" value="2026" required>
+        <button type="submit" class="adm-btn gold" style="padding:12px;font-size:0.92rem;" data-i18n="adm_unlock_btn">Unlock Command Center</button>
+      </form>
+      <div style="margin-top:16px;">
+        <a href="index.html" style="color:#38bdf8;font-size:0.82rem;text-decoration:none;" data-i18n="adm_back_network">🌐 Open REMO Social Network</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- 🏛️ TOP EXECUTIVE COMMAND BAR -->
+  <header class="adm-topbar">
+    <div class="adm-brand">
+      <div class="adm-seal">🛡️</div>
+      <div>
+        <div class="adm-title" data-i18n="adm_title">REMO ADMIN EXECUTIVE OFFICE</div>
+        <div class="adm-sub" data-i18n="adm_subtitle">Master Control Center • City Card Minting Factory • Network Governance</div>
+      </div>
+    </div>
+
+    <div class="adm-top-actions">
+      <div style="display:inline-flex;background:rgba(255,255,255,0.06);border:1px solid var(--border);border-radius:99px;padding:2px;">
+        <button class="adm-btn outline remo-lang-pill active" style="border:none;border-radius:99px;padding:5px 11px;" data-lang="en" onclick="REMO_I18N.setLang('en')">EN</button>
+        <button class="adm-btn outline remo-lang-pill" style="border:none;border-radius:99px;padding:5px 11px;" data-lang="fr" onclick="REMO_I18N.setLang('fr')">FR</button>
+      </div>
+
+      <a href="index.html" target="_blank" class="adm-btn indigo" data-i18n="adm_back_network">🌐 Open REMO Social Network</a>
+      <button class="adm-btn outline" onclick="lockAdminOffice()" data-i18n="adm_lock_btn">🔒 Lock Office</button>
+    </div>
+  </header>
+
+  <!-- 🧭 EXECUTIVE LAYOUT -->
+  <div class="adm-layout">
+
+    <!-- Left Command Sidebar (Horizontal Scroll on Mobile) -->
+    <aside class="adm-sidebar">
+      <button class="adm-tab-btn active" data-adm-tab="overview" onclick="switchAdminTab('overview')" data-i18n="adm_tab_overview">📊 Overview &amp; Live</button>
+      <button class="adm-tab-btn" data-adm-tab="cards" onclick="switchAdminTab('cards')" data-i18n="adm_tab_cards">🎴 City Card Studio</button>
+      <button class="adm-tab-btn" data-adm-tab="cities" onclick="switchAdminTab('cities')" data-i18n="adm_tab_cities">🌍 Cities &amp; Radar</button>
+      <button class="adm-tab-btn" data-adm-tab="wars" onclick="switchAdminTab('wars')" data-i18n="adm_tab_wars">⚔️ Wars &amp; Pulse</button>
+      <button class="adm-tab-btn" data-adm-tab="economy" onclick="switchAdminTab('economy')" data-i18n="adm_tab_economy">🪙 Bank &amp; Auctions</button>
+      <button class="adm-tab-btn" data-adm-tab="moderation" onclick="switchAdminTab('moderation')" data-i18n="adm_tab_moderation">🛡️ Users &amp; Posts</button>
+      <button class="adm-tab-btn" data-adm-tab="cloud" onclick="switchAdminTab('cloud')" data-i18n="adm_tab_cloud">☁️ Firebase &amp; Settings</button>
+    </aside>
+
+    <!-- Main Executive Workspace -->
+    <main>
+
+      <!-- ══ TAB 1: OVERVIEW, TELEMETRY & GLOBAL MEGAPHONE ══ -->
+      <section class="adm-panel active" id="adm-panel-overview">
+        <div class="kpi-grid">
+          <div class="kpi-card"><div class="kpi-lbl" data-i18n="adm_kpi_users">Citizens</div><div class="kpi-val" id="kpiUsers">0</div></div>
+          <div class="kpi-card"><div class="kpi-lbl" data-i18n="adm_kpi_posts">Moments Posted</div><div class="kpi-val" id="kpiPosts">0</div></div>
+          <div class="kpi-card"><div class="kpi-lbl" data-i18n="adm_kpi_cards">4D City Cards Minted</div><div class="kpi-val" id="kpiCards">0</div></div>
+          <div class="kpi-card"><div class="kpi-lbl" data-i18n="adm_kpi_coins">Coins Circulation</div><div class="kpi-val" id="kpiCoins" style="color:#fbbf24;">0</div></div>
+          <div class="kpi-card"><div class="kpi-lbl" data-i18n="adm_kpi_topcity">#1 Leading City</div><div class="kpi-val" id="kpiTopCity" style="font-size:1.25rem;color:#38bdf8;">—</div></div>
+          <div class="kpi-card"><div class="kpi-lbl" data-i18n="adm_kpi_cloud">Backend Sync</div><div class="kpi-val" id="kpiCloudMode" style="font-size:1.05rem;color:#10b981;">—</div></div>
+        </div>
+
+        <div class="exec-card">
+          <h3 data-i18n="adm_mega_title">📢 Global Live Megaphone Broadcast (EN &amp; FR)</h3>
+          <div class="adm-row-2" style="margin-bottom:12px;">
+            <div class="adm-field">
+              <label>English Banner Text (EN)</label>
+              <input type="text" id="admMegaEn" class="adm-inp">
+            </div>
+            <div class="adm-field">
+              <label>French Banner Text (FR)</label>
+              <input type="text" id="admMegaFr" class="adm-inp">
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+            <label class="check-pill">
+              <input type="checkbox" id="admMegaActive" checked> <span data-i18n="adm_mega_show">Show Live Banner on REMO Top Bar</span>
+            </label>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;">
+              <button class="adm-btn gold" onclick="saveAdminMegaphone()" data-i18n="adm_mega_btn">📢 Broadcast Live Now</button>
+              <button class="adm-btn emerald" onclick="triggerGlobalCoinRainAdmin()" data-i18n="adm_rain_btn">🌧️ Global Coin Rain Stimulus</button>
+              <button class="adm-btn outline" id="admBtnHappyHour" style="border-color:#fbbf24;color:#fbbf24;" onclick="adminToggleHappyHour2x()">⚡ 2X Happy Hour</button>
+              <button class="adm-btn indigo" onclick="switchAdminTab('cards')" data-i18n="adm_open_factory">🎴 Open City Card Factory</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ══ TAB 2: MASTER CITY CARD STUDIO & 300 DPI MINTING FACTORY ══ -->
+      <section class="adm-panel" id="adm-panel-cards">
+        <div class="card-studio-grid">
+
+          <!-- Left Card Designer Controls -->
+          <div class="studio-controls">
+            <h3 style="font-family:'Orbitron',sans-serif;color:#fbbf24;font-size:0.98rem;" data-i18n="adm_studio_hdr">🎴 City Card Designer (300 DPI)</h3>
+
+            <div class="adm-field">
+              <label data-i18n="adm_select_city">Select World City</label>
+              <select id="stCitySelect" class="adm-inp" onchange="onStudioCityChange()"></select>
+            </div>
+
+            <div class="adm-row-2">
+              <div class="adm-field">
+                <label>Card Title Override</label>
+                <input type="text" id="stCardTitle" class="adm-inp" oninput="renderAdminCardStudio()">
+              </div>
+              <div class="adm-field">
+                <label>Edition Subtitle</label>
+                <input type="text" id="stCardSubtitle" class="adm-inp" placeholder="OFFICIAL WORLD CITY EDITION" oninput="renderAdminCardStudio()">
+              </div>
+            </div>
+
+            <div class="adm-row-2">
+              <div class="adm-field">
+                <label>Serial Number</label>
+                <input type="text" id="stSerial" class="adm-inp" value="0001" oninput="renderAdminCardStudio()">
+              </div>
+              <div class="adm-field">
+                <label>Max Edition Supply</label>
+                <input type="number" id="stMaxSupply" class="adm-inp" value="1000" oninput="renderAdminCardStudio()">
+              </div>
+            </div>
+
+            <div class="adm-row-2">
+              <div class="adm-field">
+                <label>Collector Rarity</label>
+                <select id="stRarity" class="adm-inp" onchange="renderAdminCardStudio()">
+                  <option value="Founder 1-of-1">Founder 1-of-1</option>
+                  <option value="Mythic 4D" selected>Mythic 4D</option>
+                  <option value="Legendary Gold">Legendary Gold</option>
+                  <option value="Epic">Epic</option>
+                  <option value="Rare">Rare</option>
+                  <option value="Common">Common</option>
+                </select>
+              </div>
+              <div class="adm-field">
+                <label>4D Spatial Theme</label>
+                <select id="stThemeSelect" class="adm-inp" onchange="renderAdminCardStudio()"></select>
+              </div>
+            </div>
+
+            <div class="adm-row-2">
+              <div class="adm-field">
+                <label>REMO Coins Valuation</label>
+                <input type="number" id="stCoinVal" class="adm-inp" value="9400" oninput="renderAdminCardStudio()">
+              </div>
+              <div class="adm-field">
+                <label>Drop / Gift Target Citizen</label>
+                <select id="stRecipientUser" class="adm-inp"></select>
+              </div>
+            </div>
+
+            <!-- City Stats Sliders -->
+            <div class="adm-row-2">
+              <div class="adm-field">
+                <label>🎭 Culture (0-100)</label>
+                <input type="range" id="stStatCulture" min="40" max="100" value="94" oninput="renderAdminCardStudio()">
+              </div>
+              <div class="adm-field">
+                <label>⚡ Nightlife (0-100)</label>
+                <input type="range" id="stStatNight" min="40" max="100" value="90" oninput="renderAdminCardStudio()">
+              </div>
+              <div class="adm-field">
+                <label>🚀 Tech &amp; AI (0-100)</label>
+                <input type="range" id="stStatTech" min="40" max="100" value="92" oninput="renderAdminCardStudio()">
+              </div>
+              <div class="adm-field">
+                <label>🍽️ Gastronomy (0-100)</label>
+                <input type="range" id="stStatGastro" min="40" max="100" value="96" oninput="renderAdminCardStudio()">
+              </div>
+            </div>
+
+            <!-- Custom City Artwork Photo or Vector Landmark -->
+            <div class="adm-field">
+              <label>Custom City Photo (Leave empty for Neon Vector Landmark)</label>
+              <div style="display:flex;gap:8px;">
+                <input type="file" id="stPhotoInput" accept="image/*" class="adm-inp" onchange="handleStudioPhotoUpload(event)">
+                <button type="button" class="adm-btn outline" onclick="clearStudioPhoto()">✕</button>
+              </div>
+            </div>
+
+            <!-- Security & Grading Layers -->
+            <div class="check-grid">
+              <label class="check-pill"><input type="checkbox" id="stChkGuilloche" checked onchange="renderAdminCardStudio()"> Guilloche</label>
+              <label class="check-pill"><input type="checkbox" id="stChkMicro" checked onchange="renderAdminCardStudio()"> Microtext</label>
+              <label class="check-pill"><input type="checkbox" id="stChkNfc" checked onchange="renderAdminCardStudio()"> Gold NFC Chip</label>
+              <label class="check-pill"><input type="checkbox" id="stChkPsa" onchange="renderAdminCardStudio()"> Gem Mint 10 Slab</label>
+              <label class="check-pill"><input type="checkbox" id="stChkGoldStamp" checked onchange="renderAdminCardStudio()"> Serial Foil</label>
+              <label class="check-pill"><input type="checkbox" id="stChkSig" checked onchange="renderAdminCardStudio()"> Founder Seal</label>
+              <label class="check-pill" style="grid-column:1/-1;"><input type="checkbox" id="stChkGps" checked onchange="renderAdminCardStudio()"> 📍 Verified GPS Local Seal (+25% PvP Power)</label>
+            </div>
+
+            <div class="adm-field">
+              <label>🔴 Red Lens Hidden Promo Code (Back Face)</label>
+              <input type="text" id="stRedSecret" class="adm-inp" placeholder="e.g. REMOVIP2026" oninput="renderAdminCardStudio()">
+            </div>
+
+            <div class="adm-field">
+              <label>Custom Back Description (Optional)</label>
+              <input type="text" id="stCustomLore" class="adm-inp" placeholder="Auto-filled from City Lore EN/FR" oninput="renderAdminCardStudio()">
+            </div>
+          </div>
+
+          <!-- Right 300 DPI Live Front + Back Preview & Export Actions -->
+          <div class="studio-preview">
+            <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;width:100%;">
+              <button class="adm-btn gold" onclick="adminDropCardLiveToNetwork()" data-i18n="adm_drop_live">🚀 Drop Card LIVE to REMO Network</button>
+              <button class="adm-btn emerald" onclick="adminLaunchCardAuctionFromStudio()" data-i18n="adm_launch_auc">🔨 Launch Official Auction</button>
+            </div>
+
+            <div class="dual-canvas-row">
+              <div class="canvas-holder">
+                <div class="canvas-frame"><canvas id="admFrontCanvas"></canvas></div>
+                <span style="font-size:0.78rem;font-weight:800;color:#fbbf24;">FRONT · 750 × 1050 PX (300 DPI)</span>
+              </div>
+              <div class="canvas-holder">
+                <div class="canvas-frame"><canvas id="admBackCanvas"></canvas></div>
+                <span style="font-size:0.78rem;font-weight:800;color:#38bdf8;">BACK · QR + SHA-256 + RADAR</span>
+              </div>
+            </div>
+
+            <!-- Physical Print & Viral Social Exporters -->
+            <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;">
+              <button class="adm-btn indigo" onclick="adminExportPNG('front')">📥 PNG Front (300 DPI)</button>
+              <button class="adm-btn indigo" onclick="adminExportPNG('back')">📥 PNG Back (300 DPI)</button>
+              <button class="adm-btn outline" onclick="exportCityStory916(document.getElementById('admFrontCanvas'), buildCurrentStudioSpec())">📱 9:16 TikTok Story</button>
+              <button class="adm-btn outline" onclick="exportCityBattleVS16x9(document.getElementById('admFrontCanvas'), buildCurrentStudioSpec())">⚔️ 16:9 VS Battle Poster</button>
+              <button class="adm-btn gold" onclick="downloadCityCertificateA4(buildCurrentStudioSpec())">📜 A4 Certificate PNG</button>
+            </div>
+
+            <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;padding-top:10px;border-top:1px solid var(--border);width:100%;">
+              <button class="adm-btn outline" onclick="adminPrintCurrentSheet('front')">🖨️ Print 9x Sheet (Front)</button>
+              <button class="adm-btn outline" onclick="adminPrintCurrentSheet('back')">🖨️ Print 9x Duplex (Mirrored Back)</button>
+              <button class="adm-btn gold" onclick="adminPrintAllCitiesDeck('front')">📦 Print All Cities Deck (Front)</button>
+              <button class="adm-btn gold" onclick="adminPrintAllCitiesDeck('back')">📦 Print All Cities Deck (Mirrored Back)</button>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- ══ TAB 3: WORLD CITIES, CUP POINTS & 15-MIN FLASH DROPS ══ -->
+      <section class="adm-panel" id="adm-panel-cities">
+        <div class="exec-card">
+          <h3 data-i18n="adm_flash_hdr">⚡ Trigger 15-Minute Super Flash Drop on REMO Radar</h3>
+          <div class="adm-row-2" style="margin-bottom:12px;">
+            <div class="adm-field">
+              <label>Target City</label>
+              <select id="admFlashCitySelect" class="adm-inp"></select>
+            </div>
+            <div class="adm-field">
+              <label>Beacon Spot Name</label>
+              <input type="text" id="admFlashSpot" class="adm-inp" placeholder="e.g. Triumphal Arch Golden Drop">
+            </div>
+            <div class="adm-field">
+              <label>REMO Coins Reward</label>
+              <input type="number" id="admFlashCoins" class="adm-inp" value="300">
+            </div>
+            <div class="adm-field">
+              <label>Duration (Minutes)</label>
+              <input type="number" id="admFlashMins" class="adm-inp" value="15">
+            </div>
+          </div>
+          <button class="adm-btn gold" onclick="adminTriggerFlashDrop()">⚡ Activate Live Flash Drop Now</button>
+        </div>
+
+        <div class="exec-card" style="border-color:rgba(6,182,212,0.45);">
+          <h3 style="color:#38bdf8;">💎 Drop Founder Geo-Vault on Radar Map</h3>
+          <div class="adm-row-2" style="margin-bottom:12px;">
+            <div class="adm-field">
+              <label>Target World City</label>
+              <select id="admVaultCitySelect" class="adm-inp"></select>
+            </div>
+            <div class="adm-field">
+              <label>Landmark Vault Title</label>
+              <input type="text" id="admVaultTitle" class="adm-inp" placeholder="e.g. Royal Palace Secret AR Vault">
+            </div>
+            <div class="adm-field">
+              <label>Secret Clue / Riddle</label>
+              <input type="text" id="admVaultClue" class="adm-inp" placeholder="e.g. Look beneath the royal golden gates...">
+            </div>
+            <div class="adm-field">
+              <label>Coin Bounty Reward</label>
+              <input type="number" id="admVaultCoins" class="adm-inp" value="500">
+            </div>
+          </div>
+          <button class="adm-btn indigo" onclick="adminDropFounderGeoVault()">💎 Deploy Live Founder Geo-Vault (+500 🪙 &amp; 4D Card)</button>
+        </div>
+
+        <div class="exec-card">
+          <h3 data-i18n="adm_add_city_hdr">➕ Add New World City to REMO</h3>
+          <form onsubmit="adminAddNewCity(event)">
+            <div class="adm-row-2" style="margin-bottom:12px;">
+              <div class="adm-field"><label>City Name (English)</label><input type="text" id="newCityNameEn" class="adm-inp" placeholder="e.g. Vienna" required></div>
+              <div class="adm-field"><label>City Name (French)</label><input type="text" id="newCityNameFr" class="adm-inp" placeholder="e.g. Vienne"></div>
+              <div class="adm-field"><label>3-Letter Code</label><input type="text" id="newCityCode" class="adm-inp" placeholder="VIE" maxlength="4"></div>
+              <div class="adm-field"><label>Flag / Emblem Emoji</label><input type="text" id="newCityFlag" class="adm-inp" value="🇦🇹"></div>
+              <div class="adm-field"><label>Country</label><input type="text" id="newCityCountry" class="adm-inp" placeholder="Austria"></div>
+              <div class="adm-field"><label>Theme Hex Color</label><input type="color" id="newCityColor" class="adm-inp" value="#fbbf24" style="height:40px;"></div>
+              <div class="adm-field"><label>GPS Latitude</label><input type="number" step="0.0001" id="newCityLat" class="adm-inp" value="48.2082"></div>
+              <div class="adm-field"><label>GPS Longitude</label><input type="number" step="0.0001" id="newCityLng" class="adm-inp" value="16.3738"></div>
+            </div>
+            <button type="submit" class="adm-btn emerald">➕ Add City to Ecosystem &amp; Card Factory</button>
+          </form>
+        </div>
+
+        <div class="exec-card" style="overflow-x:auto;">
+          <h3 data-i18n="adm_roster_hdr">🏆 World Cities Roster &amp; Cup Standings</h3>
+          <table class="adm-table">
+            <thead><tr><th>City</th><th>Country</th><th>GPS</th><th>Cup Points</th><th>Actions</th></tr></thead>
+            <tbody id="admCitiesTableBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ══ TAB 4: CITY WARS & DAILY CITY PULSE ══ -->
+      <section class="adm-panel" id="adm-panel-wars">
+        <div class="exec-card">
+          <h3 data-i18n="adm_war_hdr">⚔️ Launch New Live City War</h3>
+          <div class="adm-row-2" style="margin-bottom:12px;">
+            <div class="adm-field"><label>Battle Title (EN)</label><input type="text" id="admWarTitleEn" class="adm-inp" placeholder="Best Architecture & Nightlife"></div>
+            <div class="adm-field"><label>Battle Title (FR)</label><input type="text" id="admWarTitleFr" class="adm-inp" placeholder="Meilleure Architecture & Nuit"></div>
+            <div class="adm-field"><label>Team A City</label><select id="admWarCityA" class="adm-inp"></select></div>
+            <div class="adm-field"><label>Team B City</label><select id="admWarCityB" class="adm-inp"></select></div>
+          </div>
+          <button class="adm-btn gold" onclick="adminCreateCityWar()">⚔️ Start Live City War</button>
+        </div>
+
+        <div class="exec-card">
+          <h3>⚡ Active City Wars</h3>
+          <table class="adm-table"><tbody id="admActiveWarsTable"></tbody></table>
+        </div>
+
+        <div class="exec-card">
+          <h3>🔥 Daily City Pulse™ Challenge</h3>
+          <div class="adm-row-2" style="margin-bottom:12px;">
+            <div class="adm-field"><label>Hashtag</label><input type="text" id="admPulseTag" class="adm-inp"></div>
+            <div class="adm-field"><label>Reward (REMO Coins)</label><input type="number" id="admPulseReward" class="adm-inp"></div>
+            <div class="adm-field"><label>Challenge Prompt (EN)</label><input type="text" id="admPulseEn" class="adm-inp"></div>
+            <div class="adm-field"><label>Challenge Prompt (FR)</label><input type="text" id="admPulseFr" class="adm-inp"></div>
+          </div>
+          <button class="adm-btn indigo" onclick="adminSaveDailyPulse()">💾 Save Daily Pulse</button>
+        </div>
+      </section>
+
+      <!-- ══ TAB 5: CENTRAL BANK, ECONOMY, COIN TRANSFERS & PROMO CODES ══ -->
+      <section class="adm-panel" id="adm-panel-economy">
+        <div class="exec-card" style="border-color:rgba(251,191,36,0.5);">
+          <h3 data-i18n="adm_transfer_hdr">🪙 Send / Set REMO Coins to Any Citizen</h3>
+          <div class="adm-row-2" style="margin-bottom:12px;">
+            <div class="adm-field">
+              <label>Target Citizen</label>
+              <select id="admBankTargetUser" class="adm-inp"></select>
+            </div>
+            <div class="adm-field">
+              <label>Operation</label>
+              <select id="admBankTransferMode" class="adm-inp">
+                <option value="add">➕ Gift / Add REMO Coins (+)</option>
+                <option value="sub">➖ Deduct / Fine REMO Coins (-)</option>
+                <option value="set">🎯 Set Exact Wallet Balance (=)</option>
+              </select>
+            </div>
+            <div class="adm-field">
+              <label>Amount of REMO Coins (🪙)</label>
+              <input type="number" id="admBankAmount" class="adm-inp" value="1000" min="0" max="10000000">
+            </div>
+            <div class="adm-field">
+              <label>Official Founder Note (Sent to Citizen DM)</label>
+              <input type="text" id="admBankNote" class="adm-inp" placeholder="e.g. Special reward from REMO Founder!">
+            </div>
+          </div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;">
+            <button class="adm-btn gold" onclick="adminExecuteBankTransfer()" data-i18n="adm_transfer_btn">⚡ Execute Coin Transfer</button>
+            <button class="adm-btn emerald" onclick="adminCreateNewCitizenPrompt()">👤+ Create New Citizen Account</button>
+          </div>
+        </div>
+
+        <!-- 👑 Royal Sovereign Coin Serialization Bureau (Admin Exclusive) -->
+        <div class="exec-card" style="border-color:#fbbf24;background:linear-gradient(135deg,rgba(15,23,42,0.9),rgba(30,27,75,0.75));">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
+            <h3 style="color:#fbbf24;margin-bottom:0;" data-i18n="adm_mint_coin_hdr">👑 Royal Coin Serialization Bureau</h3>
+            <span style="font-size:0.75rem;background:rgba(251,191,36,0.18);border:1px solid #fbbf24;color:#fde047;padding:3px 10px;border-radius:99px;font-weight:900;">★ REMO CENTRAL TREASURY ★</span>
+          </div>
+
+          <div class="adm-field" style="margin-bottom:12px;">
+            <label style="display:flex;justify-content:space-between;align-items:center;" data-i18n="adm_mint_alloy_lbl">
+              <span>Metal Alloy &amp; Rarity Grade</span>
+              <span id="admMintAlloyDesc" style="color:#fbbf24;font-size:0.75rem;font-weight:700;">🌟 Founder Reserve #0001–#0100 · 24K Gold &amp; Titanium</span>
+            </label>
+            <select id="admMintAlloySelect" class="adm-inp" onchange="adminOnAlloySelectChange()" style="font-weight:800;letter-spacing:0.5px;">
+              <option value="genesis">🌟 Genesis Proof 24K Gold &amp; Titanium (#0001 – #0100)</option>
+              <option value="platinum">💎 Royal Platinum &amp; Sapphire (Ambassador VIP)</option>
+              <option value="obsidian">⚡ Cyber Obsidian &amp; Emerald Neon (Night Rare)</option>
+              <option value="urban">🪙 Urban Sovereign Brass &amp; Steel (Active Cities)</option>
+            </select>
+          </div>
+
+          <div class="adm-row-2" style="margin-bottom:12px;">
+            <div class="adm-field">
+              <label data-i18n="adm_mint_serial_lbl">Serial Number (e.g. 0001, 0002...)</label>
+              <input type="text" id="admMintSerialInp" class="adm-inp" placeholder="0001" style="font-weight:900;letter-spacing:2px;font-family:'Orbitron',monospace;">
+            </div>
+            <div class="adm-field">
+              <label data-i18n="adm_mint_coins_lbl">Attached REMO Coins (🪙)</label>
+              <input type="number" id="admMintCoinsInp" class="adm-inp" value="500" min="0">
+            </div>
+            <div class="adm-field">
+              <label data-i18n="adm_mint_user_lbl">Assign to Citizen (or Keep in Founder Vault)</label>
+              <select id="admMintTargetUser" class="adm-inp"></select>
+            </div>
+            <div class="adm-field">
+              <label>Founder Note / Dedication</label>
+              <input type="text" id="admMintNoteInp" class="adm-inp" placeholder="e.g. Official Sovereign Coin gifted by Founder!">
+            </div>
+          </div>
+
+          <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;">
+            <button class="adm-btn gold" onclick="adminExecuteMintSerializedCoin()" data-i18n="adm_mint_btn">⚡ Mint &amp; Grant Serialized Coin</button>
+            <button class="adm-btn outline" style="border-color:#38bdf8;color:#7dd3fc;" onclick="adminExportDuplexPrintCoin()" data-i18n="adm_mint_export_btn">🖨️ Export Print Duplex (300 DPI)</button>
+          </div>
+
+          <!-- Live Interactive Coin Engraving Visualizer -->
+          <div style="background:rgba(0,0,0,0.4);border:1px solid rgba(251,191,36,0.3);border-radius:14px;padding:16px;margin-bottom:20px;display:flex;align-items:center;justify-content:space-around;flex-wrap:wrap;gap:20px;">
+            <div style="text-align:center;">
+              <img id="admLivePreviewFront" src="img/remo_coin_front.png" style="width:130px;height:130px;border-radius:50%;box-shadow:0 6px 20px rgba(0,0,0,0.8);display:block;margin:0 auto 6px;transition:filter 0.3s ease;" alt="Front">
+              <span style="font-size:0.75rem;font-weight:800;color:#38bdf8;">OBVERSE (FRONT)</span>
+            </div>
+            
+            <div style="text-align:center;">
+              <div id="admLivePreviewBackWrap" style="position:relative;width:130px;height:130px;margin:0 auto 6px;transition:filter 0.3s ease;">
+                <svg viewBox="0 0 1024 1024" style="width:130px;height:130px;border-radius:50%;box-shadow:0 6px 20px rgba(0,0,0,0.8);display:block;">
+                  <defs>
+                    <path id="admPreviewArc" d="M 87,587 A 432 432 0 0 0 937,587" fill="none" />
+                    <linearGradient id="admPreviewGold" x1="0%" y1="0%" x2="0%" y2="100%">
+                      <stop offset="0%" stop-color="#fffbeb" />
+                      <stop offset="25%" stop-color="#fef08a" />
+                      <stop offset="60%" stop-color="#eab308" />
+                      <stop offset="90%" stop-color="#ca8a04" />
+                      <stop offset="100%" stop-color="#854d0e" />
+                    </linearGradient>
+                    <filter id="admPreviewEmboss" x="-10%" y="-10%" width="120%" height="120%">
+                      <feDropShadow dx="1" dy="2" stdDeviation="1.5" flood-color="#0a0501" flood-opacity="0.95" />
+                      <feDropShadow dx="-1" dy="-1" stdDeviation="0.8" flood-color="#fffdf0" flood-opacity="0.75" />
+                    </filter>
+                  </defs>
+                  <image href="img/remo_coin_back_base.png" width="1024" height="1024" />
+                  <text font-family="'Times New Roman', Georgia, serif" font-weight="900" font-size="44" letter-spacing="2px"
+                        fill="url(#admPreviewGold)" stroke="#78350f" stroke-width="1.2" stroke-linejoin="round"
+                        filter="url(#admPreviewEmboss)">
+                    <textPath href="#admPreviewArc" id="admLivePreviewTextPath" startOffset="50%" text-anchor="middle">
+                      SERIAL № 0001 • 100% VERIFIED
+                    </textPath>
+                  </text>
+                </svg>
+              </div>
+              <span style="font-size:0.75rem;font-weight:800;color:#fbbf24;">REVERSE (LIVE ENGRAVING)</span>
+            </div>
+
+            <div style="max-width:280px;font-size:0.78rem;color:#cbd5e1;line-height:1.4;">
+              <b style="color:#fbbf24;">⚡ Live Dynamic Minting Engraver</b><br>
+              Type any serial above — the reverse coin face immediately engraves the number along the titanium band!
+            </div>
+          </div>
+
+          <!-- Table of Minted Coins -->
+          <div style="font-size:0.82rem;font-weight:800;color:#38bdf8;margin-bottom:8px;" data-i18n="adm_mint_history_hdr">🏆 Official Coin Register &amp; Issued Serials</div>
+          <table class="adm-table">
+            <thead>
+              <tr>
+                <th>Serial</th>
+                <th>Alloy &amp; Grade</th>
+                <th>Value</th>
+                <th>Bearer / Owner</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="admMintedCoinsTableBody"></tbody>
+          </table>
+        </div>
+
+        <div class="exec-card">
+          <h3 data-i18n="adm_promo_hdr">🎟️ Create Redeemable Promo / Gift Code</h3>
+          <div class="adm-row-2" style="margin-bottom:12px;">
+            <div class="adm-field"><label>Promo Code (e.g. TIKTOK500)</label><input type="text" id="admPromoCodeInp" class="adm-inp" style="text-transform:uppercase;" placeholder="VIP2026"></div>
+            <div class="adm-field"><label>Coins Reward (🪙)</label><input type="number" id="admPromoCoinsInp" class="adm-inp" value="500"></div>
+            <div class="adm-field"><label>Bonus 4D City Card (Optional)</label><select id="admPromoCardCitySel" class="adm-inp"></select></div>
+            <div class="adm-field" style="justify-content:flex-end;"><button class="adm-btn indigo" onclick="adminCreatePromoCode()" data-i18n="adm_promo_btn">🎟️ Generate Code</button></div>
+          </div>
+          <table class="adm-table">
+            <thead><tr><th>Promo Code</th><th>Reward</th><th>Redeemed</th><th>Action</th></tr></thead>
+            <tbody id="admPromoCodesTable"></tbody>
+          </table>
+        </div>
+
+        <div class="exec-card">
+          <h3 data-i18n="adm_bank_hdr">🪙 REMO Central Bank — Reward &amp; Price Controls</h3>
+          <div class="adm-row-2" style="margin-bottom:12px;">
+            <div class="adm-field"><label>New Citizen Welcome Bonus (🪙)</label><input type="number" id="rwSignup" class="adm-inp"></div>
+            <div class="adm-field"><label>New Post Reward (🪙)</label><input type="number" id="rwPost" class="adm-inp"></div>
+            <div class="adm-field"><label>Daily Pulse Reward (🪙)</label><input type="number" id="rwPulse" class="adm-inp"></div>
+            <div class="adm-field"><label>City War Vote Reward (🪙)</label><input type="number" id="rwVote" class="adm-inp"></div>
+            <div class="adm-field"><label>PvP Card Battle Win Prize (🪙)</label><input type="number" id="rwPvp" class="adm-inp"></div>
+            <div class="adm-field"><label>Extra City Card Pack Price (🪙)</label><input type="number" id="rwPack" class="adm-inp"></div>
+            <div class="adm-field"><label>24h Post Boost Price (🪙)</label><input type="number" id="rwBoost" class="adm-inp"></div>
+            <div class="adm-field"><label>Mint Post-as-Card Price (🪙)</label><input type="number" id="rwMint" class="adm-inp"></div>
+            <div class="adm-field"><label>Friend Invite Referral Bonus (🪙 Each)</label><input type="number" id="rwReferral" class="adm-inp"></div>
+          </div>
+          <button class="adm-btn gold" onclick="adminSaveEconomyRates()">💾 Update Central Bank Rates</button>
+        </div>
+
+        <div class="exec-card" style="overflow-x:auto;border-color:rgba(244,114,182,0.45);">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
+            <h3>🛍️ REMO VIP Boutique Items &amp; Citizen Voucher Orders</h3>
+            <button class="adm-btn gold" onclick="adminAddVipStoreItemFromOffice()">➕ Add VIP Item / Real Voucher</button>
+          </div>
+          <table class="adm-table" style="margin-bottom:14px;">
+            <thead><tr><th>VIP Item</th><th>Category</th><th>Price</th><th>Action</th></tr></thead>
+            <tbody id="admVipShopTable"></tbody>
+          </table>
+          <h4 style="color:#fbbf24;margin-bottom:8px;">🎟️ Redeemed VIP Vouchers Queue</h4>
+          <table class="adm-table">
+            <thead><tr><th>Ticket Code</th><th>Citizen</th><th>Reward</th><th>Status</th></tr></thead>
+            <tbody id="admVipOrdersTable"></tbody>
+          </table>
+        </div>
+
+        <div class="exec-card" style="overflow-x:auto;">
+          <h3>🔨 Active Auctions in REMO</h3>
+          <table class="adm-table">
+            <thead><tr><th>Card</th><th>Seller</th><th>Current Bid</th><th>Action</th></tr></thead>
+            <tbody id="admAuctionsTable"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ══ TAB 6: CITIZENS & POSTS MODERATION ══ -->
+      <section class="adm-panel" id="adm-panel-moderation">
+        <div class="exec-card" style="overflow-x:auto;">
+          <h3 data-i18n="adm_users_hdr">👥 Citizens &amp; VIP Passports</h3>
+          <table class="adm-table">
+            <thead><tr><th>Citizen</th><th>Home City</th><th>Balance</th><th>Executive Actions</th></tr></thead>
+            <tbody id="admUsersTable"></tbody>
+          </table>
+        </div>
+
+        <div class="exec-card" style="overflow-x:auto;">
+          <h3 data-i18n="adm_posts_hdr">📸 Social Feed Moments Moderation</h3>
+          <table class="adm-table">
+            <thead><tr><th>Author</th><th>Moment</th><th>Stats</th><th>Moderation</th></tr></thead>
+            <tbody id="admPostsTable"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ══ TAB 7: FIREBASE CLOUD, DOMAIN & BACKUP ══ -->
+      <section class="adm-panel" id="adm-panel-cloud">
+        <div class="exec-card">
+          <h3 data-i18n="adm_fb_hdr">☁️ Connect Dedicated Firebase Cloud (When Ready)</h3>
+          <p style="font-size:0.82rem;color:var(--muted);margin-bottom:10px;">
+            REMO works immediately in Local Live Sync mode. Whenever you create your Firebase project, paste your Firebase Web Config JSON below to activate global cloud storage &amp; auth:
+          </p>
+          <textarea id="admFirebaseJson" rows="6" class="adm-inp" style="font-family:monospace;" placeholder='{"apiKey":"...","authDomain":"...","projectId":"remo-social","storageBucket":"...","appId":"..."}'></textarea>
+          <div style="margin-top:10px;">
+            <button class="adm-btn emerald" onclick="adminSaveFirebaseConfig()">☁️ Save &amp; Connect Firebase</button>
+          </div>
+        </div>
+
+        <div class="exec-card">
+          <h3>🌐 Custom Domain (for Card QR Codes) &amp; Master PIN</h3>
+          <div class="adm-row-2" style="margin-bottom:12px;">
+            <div class="adm-field">
+              <label>Official Domain URL (e.g. https://remo.world)</label>
+              <input type="text" id="admCustomDomain" class="adm-inp" placeholder="Auto-detects current URL if empty">
+            </div>
+            <div class="adm-field">
+              <label>Change Master Admin PIN</label>
+              <input type="password" id="admNewPin" class="adm-inp" placeholder="New 4+ digit PIN">
+            </div>
+          </div>
+          <button class="adm-btn gold" onclick="adminSaveSystemSettings()">💾 Save System Settings</button>
+        </div>
+
+        <div class="exec-card">
+          <h3>📦 Full Network Backup &amp; Restore</h3>
+          <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;">
+            <button class="adm-btn indigo" onclick="adminExportBackupJSON()">📥 Download Full REMO JSON Backup</button>
+            <label class="adm-btn outline" style="cursor:pointer;">
+              📤 Restore JSON Backup
+              <input type="file" accept=".json" style="display:none;" onchange="adminImportBackupJSON(event)">
+            </label>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- Admin Toast Notifications -->
+  <div id="admToastBox" style="position:fixed;bottom:20px;right:20px;z-index:600;"></div>
+
+  <!-- Shared REMO Core + Admin Controller -->
+  <script src="js/remo-i18n.js"></script>
+  <script src="js/remo-cities-data.js"></script>
+  <script src="js/remo-store.js"></script>
+  <script src="js/remo-card-engine.js"></script>
+  <script src="js/remo-admin.js"></script>
+</body>
+</html>
