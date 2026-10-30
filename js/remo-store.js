@@ -1938,6 +1938,9 @@ const REMO_STORE = {
     } catch (e) {
       console.warn('LocalStorage quota warning:', e);
     }
+    if (this.fbDb && reason !== 'cloud_sync' && reason !== 'cloud_live_update') {
+      this.syncToFirestore(reason);
+    }
     if (broadcast && REMO_LIVE_BUS) {
       REMO_LIVE_BUS.postMessage({ type: 'STATE_UPDATED', reason, payload, ts: Date.now() });
     }
@@ -2345,14 +2348,23 @@ const REMO_STORE = {
     return this.COIN_ALLOYS[alloyId] || this.COIN_ALLOYS.genesis;
   },
 
-  /* ── Optional Plug-and-Play Firebase Cloud Initialization ── */
+  /* ── Dedicated Firebase Cloud Infrastructure & Realtime Sync ── */
+  DEFAULT_FIREBASE_CONFIG: {
+    apiKey: "AIzaSyCEuOszFOEspkoj0vgfQxHrwhv65Pa1U1U",
+    authDomain: "remo-world.firebaseapp.com",
+    projectId: "remo-world",
+    storageBucket: "remo-world.firebasestorage.app",
+    messagingSenderId: "536603686704",
+    appId: "1:536603686704:web:1fddedb557b3a0cf963af5",
+    measurementId: "G-TBWJYSC60M"
+  },
+
   getFirebaseConfig() {
     try {
       const raw = localStorage.getItem(this.FB_KEY);
-      return raw ? JSON.parse(raw) : null;
-    } catch (e) {
-      return null;
-    }
+      if (raw) return JSON.parse(raw);
+    } catch (e) {}
+    return this.DEFAULT_FIREBASE_CONFIG;
   },
 
   saveFirebaseConfig(cfgObj) {
@@ -2374,14 +2386,83 @@ const REMO_STORE = {
       } else {
         this.fbApp = firebase.app();
       }
-      if (firebase.firestore) this.fbDb = firebase.firestore();
-      if (firebase.auth) this.fbAuth = firebase.auth();
+      if (firebase.firestore) {
+        this.fbDb = firebase.firestore();
+        this.startFirestoreSync();
+      }
+      if (firebase.auth) {
+        this.fbAuth = firebase.auth();
+      }
       console.log('%c☁️ REMO Firebase Cloud Connected: ' + cfg.projectId, 'color:#10b981;font-weight:bold;');
       return true;
     } catch (e) {
       console.warn('Firebase init deferred:', e.message);
       return false;
     }
+  },
+
+  startFirestoreSync() {
+    if (!this.fbDb || this._fbSyncStarted) return;
+    this._fbSyncStarted = true;
+    try {
+      const docRef = this.fbDb.collection('remo_ecosystem').doc('live_state');
+      
+      // Initial fetch & seed if missing
+      docRef.get().then((snap) => {
+        if (!snap.exists) {
+          docRef.set({
+            posts: (this.state.posts || []).slice(0, 50),
+            cityScores: this.state.cityScores || {},
+            settings: this.state.settings || {},
+            bottles: (this.state.bottles || []).slice(0, 30),
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+          }).catch((err) => console.log('Firestore seed status:', err.message));
+        } else {
+          const data = snap.data();
+          if (data && Array.isArray(data.posts) && data.posts.length > 0) {
+            this.state.posts = data.posts;
+            if (data.cityScores) this.state.cityScores = Object.assign(this.state.cityScores || {}, data.cityScores);
+            if (data.bottles) this.state.bottles = data.bottles;
+            this.save(false, 'cloud_sync');
+            window.dispatchEvent(new CustomEvent('remo:stateupdate', { detail: { reason: 'cloud_sync' } }));
+          }
+        }
+      }).catch((err) => console.log('Firestore read status:', err.message));
+
+      // Realtime listener across all devices
+      docRef.onSnapshot((snap) => {
+        if (!snap || !snap.exists || snap.metadata?.hasPendingWrites) return;
+        const data = snap.data();
+        if (data && Array.isArray(data.posts)) {
+          this.state.posts = data.posts;
+          if (data.cityScores) this.state.cityScores = Object.assign(this.state.cityScores || {}, data.cityScores);
+          if (data.bottles) this.state.bottles = data.bottles;
+          this.save(false, 'cloud_live_update');
+          window.dispatchEvent(new CustomEvent('remo:stateupdate', { detail: { reason: 'cloud_live_update' } }));
+        }
+      }, (err) => console.log('Firestore live watch status:', err.message));
+    } catch (e) {
+      console.warn('Firestore sync setup deferred:', e);
+    }
+  },
+
+  syncToFirestore(reason = 'update') {
+    if (!this.fbDb) return;
+    clearTimeout(this._fbSyncDebounce);
+    this._fbSyncDebounce = setTimeout(() => {
+      try {
+        const docRef = this.fbDb.collection('remo_ecosystem').doc('live_state');
+        docRef.set({
+          posts: (this.state.posts || []).slice(0, 50),
+          cityScores: this.state.cityScores || {},
+          settings: this.state.settings || {},
+          bottles: (this.state.bottles || []).slice(0, 30),
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        }, { merge: true }).catch((err) => {
+          console.log('Firestore background sync info:', err.message);
+        });
+      } catch (e) {}
+    }, 1200);
   }
 };
 
