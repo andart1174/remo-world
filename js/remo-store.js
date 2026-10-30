@@ -2392,6 +2392,17 @@ const REMO_STORE = {
       }
       if (firebase.auth) {
         this.fbAuth = firebase.auth();
+        this.fbAuth.onAuthStateChanged((fbU) => {
+          if (fbU) {
+            const adminEmail = (this.state?.settings?.adminEmail || 'andart1174@gmail.com').toLowerCase();
+            const isAdminEmail = (fbU.email || '').toLowerCase() === adminEmail;
+            this.ensureGuestOrCitizen(fbU.displayName || (isAdminEmail ? 'REMO Founder' : 'Citizen'), fbU.email, 'montreal', isAdminEmail);
+            if (isAdminEmail) {
+              this.setAdminUnlocked(true);
+            }
+            if (typeof syncHeaderAndSidebars === 'function') syncHeaderAndSidebars();
+          }
+        });
       }
       console.log('%c☁️ REMO Firebase Cloud Connected: ' + cfg.projectId, 'color:#10b981;font-weight:bold;');
       return true;

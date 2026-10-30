@@ -2520,6 +2520,8 @@ function submitUniversalAuth(ev) {
 function quickGoogleSignInSim() {
   if (REMO_STORE.fbAuth && typeof firebase !== 'undefined') {
     const provider = new firebase.auth.GoogleAuthProvider();
+    provider.addScope('email');
+    provider.addScope('profile');
     REMO_STORE.fbAuth.signInWithPopup(provider).then((res) => {
       const fbU = res.user;
       const cityId = document.getElementById('authHomeCitySelect')?.value || 'montreal';
@@ -2532,7 +2534,14 @@ function quickGoogleSignInSim() {
       document.getElementById('authModal')?.classList.remove('open');
       syncHeaderAndSidebars();
       renderSocialFeed();
-    }).catch((err) => remoToast(err.message));
+      remoToast(isAdminEmail ? '👑 Session Fondateur Admin activée !' : `🎉 Bienvenue ${fbU.displayName || 'Citizen'} !`, 'fanfare');
+    }).catch((err) => {
+      if (err.code === 'auth/popup-blocked' || err.code === 'auth/popup-closed-by-user') {
+        REMO_STORE.fbAuth.signInWithRedirect(provider).catch((e) => remoToast(e.message));
+        return;
+      }
+      remoToast(err.message);
+    });
     return;
   }
   const cityId = document.getElementById('authHomeCitySelect')?.value || 'montreal';
