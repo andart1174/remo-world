@@ -432,12 +432,18 @@ button, input, select, textarea {
 /* ── Filter Chips ── */
 .filter-row {
   display: flex;
+  flex-wrap: nowrap;
   gap: 8px;
   overflow-x: auto;
-  padding-bottom: 6px;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-x;
+  padding-bottom: 8px;
   margin-bottom: 8px;
   scrollbar-width: none;
   -ms-overflow-style: none;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .filter-row::-webkit-scrollbar {
@@ -448,15 +454,19 @@ button, input, select, textarea {
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 99px;
-  padding: 6px 14px;
-  font-size: 0.76rem;
+  padding: 7px 15px;
+  font-size: 0.78rem;
   font-weight: 700;
   color: #cbd5e1;
   cursor: pointer;
   white-space: nowrap;
+  flex: 0 0 auto;
   flex-shrink: 0;
   transition: all 0.18s;
   backdrop-filter: blur(8px);
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .fchip:hover {
@@ -1947,15 +1957,17 @@ button, input, select, textarea {
 
   .left-rail, .right-rail { display: none !important; }
 
-  /* Full-Viewport Vertical Snap Feed like TikTok */
+  /* Clean, Smooth Mobile Social Feed (Standard Card Flow) */
   #view-feed.active .posts-grid {
     display: flex;
     flex-direction: column;
-    gap: 0;
-    height: calc(100dvh - var(--header-h) - var(--mb-nav-h) - env(safe-area-inset-bottom, 0px));
-    overflow-y: scroll;
-    scroll-snap-type: y mandatory;
-    scrollbar-width: none;
+    gap: 16px;
+    height: auto;
+    overflow-y: visible;
+    padding: 6px 10px 50px;
+    scroll-snap-type: none;
+    width: 100%;
+    box-sizing: border-box;
   }
   #view-feed.active .posts-grid::-webkit-scrollbar { display: none; }
 
@@ -1967,57 +1979,45 @@ button, input, select, textarea {
   #view-feed.active .story-ring { width: 50px; height: 50px; }
   #view-feed.active .weather-ticker-bar { margin-bottom: 6px; padding: 5px 8px; }
   #view-feed.active .pulse-banner { display: none; }
-  #view-feed.active .time-capsule-vault { padding-bottom: 130px; }
+  #view-feed.active .time-capsule-vault { padding-bottom: 24px; }
   #view-feed.active .duet-city-pill { bottom: auto; top: 44px; }
 
   #view-feed.active .post-card {
-    min-height: calc(100dvh - var(--header-h) - var(--mb-nav-h) - env(safe-area-inset-bottom, 0px));
-    border-radius: 0;
-    border: none;
-    scroll-snap-align: start;
-    scroll-snap-stop: always;
-    justify-content: flex-end;
-    background: #000;
+    min-height: auto;
+    border-radius: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    background: rgba(15, 23, 42, 0.88);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    margin-bottom: 8px;
+    position: relative;
+    overflow: hidden;
+    scroll-snap-align: none;
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
   }
 
-  #view-feed.active .post-head,
+  #view-feed.active .post-head {
+    display: flex !important;
+    padding: 12px 14px;
+  }
+
   #view-feed.active .post-body {
-    display: none;
+    display: flex !important;
+    padding: 12px 14px 16px;
   }
 
   #view-feed.active .post-media-wrap {
-    position: absolute;
-    inset: 0;
-    aspect-ratio: auto;
-    height: 100%;
-  }
-
-  /* TikTok Bottom-Left Info Overlay */
-  #view-feed.active .tiktok-overlay-info {
-    display: flex;
-    flex-direction: column;
-    gap: 7px;
     position: relative;
-    z-index: 6;
-    padding: 18px 74px 20px 14px;
-    background: linear-gradient(0deg, rgba(3, 6, 15, 0.92) 0%, rgba(3, 6, 15, 0.52) 60%, transparent 100%);
-    pointer-events: none;
-  }
-  #view-feed.active .tiktok-overlay-info button,
-  #view-feed.active .tiktok-overlay-info audio,
-  #view-feed.active .tiktok-overlay-info .city-tag,
-  #view-feed.active .tiktok-overlay-info .hashtag,
-  #view-feed.active .tiktok-overlay-info .post-poll-card,
-  #view-feed.active .tiktok-overlay-info .secret-capsule-card {
-    pointer-events: auto;
-  }
-  #view-feed.active .html-post-toolbar {
-    top: 44px;
-    bottom: auto;
+    inset: auto;
+    width: 100%;
+    aspect-ratio: 4 / 5;
+    height: auto;
   }
 
-  /* TikTok Right Floating Action Rail */
+  #view-feed.active .tiktok-overlay-info,
   #view-feed.active .tiktok-rail {
+    display: none !important;
+  }
     display: flex;
     flex-direction: column;
     align-items: center;
