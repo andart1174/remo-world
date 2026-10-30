@@ -9,6 +9,10 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/png" sizes="32x32" href="img/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="64x64" href="img/favicon-64x64.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="img/apple-touch-icon.png">
+  <link rel="shortcut icon" href="favicon.ico">
 
   <!-- Leaflet Open-Source Map CSS & JS (Zero API Key Needed) -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
@@ -26,7 +30,9 @@
   <!-- 🌐 Sticky Top Header -->
   <header class="remo-header">
     <div class="brand-wrap" onclick="switchRemoView('feed')">
-      <div class="brand-orb">🌐</div>
+      <div class="brand-orb">
+        <img src="img/remo_brand_coin.png" alt="REMO" class="brand-coin-img">
+      </div>
       <div>
         <span class="brand-name">REMO</span>
         <span class="brand-sub" data-i18n="app_tagline">Real Moments • World Cities</span>

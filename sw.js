@@ -3,14 +3,21 @@
    Offline Shell Caching + Native Push & Incoming Call Notifications
    ════════════════════════════════════════════════════════════════════ */
 
-const CACHE_NAME = 'remo-pwa-v16';
+const CACHE_NAME = 'remo-pwa-v17';
 const CORE_ASSETS = [
   './',
   './index.html',
   './admin.html',
   './manifest.json',
+  './favicon.ico',
   './css/remo-core.css',
   './css/remo-admin.css',
+  './img/remo_icon_512.png',
+  './img/remo_icon_192.png',
+  './img/apple-touch-icon.png',
+  './img/remo_brand_coin.png',
+  './img/favicon-32x32.png',
+  './img/favicon-64x64.png',
   './img/remo_coin_front.png',
   './img/remo_coin_back_base.png',
   './img/remo_coin_back_001.png',
