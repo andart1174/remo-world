@@ -2510,6 +2510,25 @@ document.addEventListener('DOMContentLoaded', () => {
   updateFlashDropCountdownUI();
   setInterval(updateFlashDropCountdownUI, 1000);
 
+  // Touch & Drag Horizontal Scroll for Category Chips, Stories & Teleport Bar
+  const swipeRows = document.querySelectorAll('.filter-row, .stories-bar, .city-teleport-bar');
+  swipeRows.forEach((row) => {
+    let startX = 0, scrollStart = 0, isTouching = false;
+    row.addEventListener('touchstart', (e) => {
+      if (e.touches && e.touches[0]) {
+        isTouching = true;
+        startX = e.touches[0].pageX;
+        scrollStart = row.scrollLeft;
+      }
+    }, { passive: true });
+    row.addEventListener('touchmove', (e) => {
+      if (!isTouching || !e.touches || !e.touches[0]) return;
+      const currentX = e.touches[0].pageX;
+      row.scrollLeft = scrollStart + (startX - currentX);
+    }, { passive: true });
+    row.addEventListener('touchend', () => { isTouching = false; }, { passive: true });
+  });
+
   // Check URL parameters (?view=arena, ?city=chisinau, ?verify=...)
   const params = new URLSearchParams(window.location.search);
   if (params.get('city')) {

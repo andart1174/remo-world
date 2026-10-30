@@ -2018,47 +2018,6 @@ button, input, select, textarea {
   #view-feed.active .tiktok-rail {
     display: none !important;
   }
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 14px;
-    position: absolute;
-    right: 10px;
-    bottom: 22px;
-    z-index: 7;
-  }
-
-  .tk-btn {
-    background: rgba(10, 15, 32, 0.72);
-    backdrop-filter: blur(8px);
-    border: 1px solid rgba(255, 255, 255, 0.16);
-    width: 46px;
-    height: 46px;
-    border-radius: 50%;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.15rem;
-    color: #fff;
-    cursor: pointer;
-  }
-
-  .tk-cnt { font-size: 0.66rem; font-weight: 800; margin-top: 2px; }
-
-  .tk-disc {
-    width: 42px;
-    height: 42px;
-    border-radius: 50%;
-    border: 3px solid var(--gold);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    animation: spinDisc 5s linear infinite;
-    background: #0d1326;
-  }
-
-  @keyframes spinDisc { to { transform: rotate(360deg); } }
 
   /* Non-feed views padding on mobile */
   .remo-view:not(#view-feed) {
