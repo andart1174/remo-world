@@ -2012,13 +2012,13 @@ const REMO_STORE = {
     return { ok: true, inviter, claimer, bonus };
   },
 
-  ensureGuestOrCitizen(name, email, homeCity = 'montreal', isAdmin = false) {
+  ensureGuestOrCitizen(name, email, homeCity = 'montreal', isAdmin = false, fbUid = '') {
     let u = email ? this.state.users.find((x) => x.email.toLowerCase() === email.toLowerCase()) : null;
     if (!u) {
       const pNum = String(this.state.users.length + 1).padStart(4, '0');
       const bonus = this.state.settings.rewards.signupBonus || 150;
       u = {
-        uid: 'u_' + Date.now().toString(36),
+        uid: fbUid ? ('u_fb_' + fbUid) : ('u_' + Date.now().toString(36)),
         name: name || 'Citizen #' + pNum,
         email: email || `citizen${pNum}@remo.world`,
         role: isAdmin || (email && email.toLowerCase() === this.state.settings.adminEmail.toLowerCase()) ? 'admin' : 'citizen',
@@ -2040,6 +2040,10 @@ const REMO_STORE = {
       this.state.users.push(u);
       // Give starter Home City Card!
       this.mintCardForUser(u.uid, homeCity || 'montreal', 'Rare', false);
+    } else {
+      if (name && (!u.name || u.name.startsWith('Citizen #') || u.name === 'REMO Pioneer')) {
+        u.name = name;
+      }
     }
     localStorage.setItem(this.USER_KEY, u.uid);
     const adminEmail = (this.state && this.state.settings && this.state.settings.adminEmail) || 'andart1174@gmail.com';
@@ -2054,7 +2058,69 @@ const REMO_STORE = {
       localStorage.removeItem('remo_pending_ref');
     }
     this.save(true, 'auth');
+    this.syncUserToCloud(u);
     return u;
+  },
+
+  syncUserToCloud(user) {
+    if (!this.fbDb || !user || !user.uid) return;
+    try {
+      const cleanUser = {
+        uid: user.uid,
+        name: user.name || 'Citizen',
+        email: user.email || '',
+        role: user.role || 'citizen',
+        verified: Boolean(user.verified),
+        homeCity: user.homeCity || 'montreal',
+        passportNum: user.passportNum || '0000',
+        referralCode: user.referralCode || `REMO-${user.passportNum}`,
+        referralsCount: Number(user.referralsCount || 0),
+        referredBy: user.referredBy || '',
+        coins: Number(user.coins || 0),
+        lifetimeCoins: Number(user.lifetimeCoins || user.coins || 0),
+        streak: Number(user.streak || 1),
+        visas: Array.isArray(user.visas) ? user.visas : [user.homeCity || 'montreal'],
+        equippedFrame: user.equippedFrame || '',
+        equippedTitleId: user.equippedTitleId || '',
+        banned: Boolean(user.banned),
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      };
+      this.fbDb.collection('remo_users').doc(cleanUser.uid).set(cleanUser, { merge: true })
+        .catch((err) => {
+          console.warn('Firestore sync user notice:', err.message);
+        });
+    } catch (e) {
+      console.warn('syncUserToCloud error:', e);
+    }
+  },
+
+  deleteUserFromCloud(uid) {
+    if (!this.fbDb || !uid) return;
+    try {
+      this.fbDb.collection('remo_users').doc(uid).delete().catch(() => {});
+    } catch (e) {}
+  },
+
+  syncDmToCloud(dm) {
+    if (!this.fbDb || !dm || !dm.id) return;
+    try {
+      const cleanDm = {
+        id: dm.id,
+        fromUid: dm.fromUid,
+        fromName: dm.fromName || 'Citizen',
+        toUid: dm.toUid || 'u_admin_founder',
+        text: dm.text || '',
+        voiceUrl: dm.voiceUrl || '',
+        envelopeCoins: Number(dm.envelopeCoins || 0),
+        envelopeClaimed: Boolean(dm.envelopeClaimed),
+        cardOffer: dm.cardOffer || null,
+        ts: Number(dm.ts || Date.now())
+      };
+      this.fbDb.collection('remo_direct_messages').doc(dm.id).set(cleanDm, { merge: true })
+        .catch((err) => console.warn('Firestore sync DM notice:', err.message));
+    } catch (e) {
+      console.warn('syncDmToCloud error:', e);
+    }
   },
 
   signOut() {
@@ -2077,6 +2143,7 @@ const REMO_STORE = {
     }
     if (finalDelta > 0) RemoAudio.play('coin');
     this.save(true, 'coins');
+    this.syncUserToCloud(u);
     return true;
   },
 
@@ -2396,7 +2463,7 @@ const REMO_STORE = {
           if (fbU) {
             const adminEmail = (this.state?.settings?.adminEmail || 'andart1174@gmail.com').toLowerCase();
             const isAdminEmail = (fbU.email || '').toLowerCase() === adminEmail;
-            this.ensureGuestOrCitizen(fbU.displayName || (isAdminEmail ? 'REMO Founder' : 'Citizen'), fbU.email, 'montreal', isAdminEmail);
+            const u = this.ensureGuestOrCitizen(fbU.displayName || (isAdminEmail ? 'REMO Founder' : 'Citizen'), fbU.email, 'montreal', isAdminEmail, fbU.uid);
             if (isAdminEmail) {
               this.setAdminUnlocked(true);
             }
@@ -2416,6 +2483,100 @@ const REMO_STORE = {
     if (!this.fbDb || this._fbSyncStarted) return;
     this._fbSyncStarted = true;
     try {
+      // 1. Sync & Watch ALL USERS in Real Time across all devices
+      this.fbDb.collection('remo_users').onSnapshot((snap) => {
+        if (!snap) return;
+        let changed = false;
+        snap.forEach((doc) => {
+          const uData = doc.data();
+          if (!uData || !uData.uid) return;
+          const idx = this.state.users.findIndex((x) =>
+            x.uid === uData.uid ||
+            (x.email && uData.email && x.email.toLowerCase() === uData.email.toLowerCase())
+          );
+          if (idx >= 0) {
+            Object.assign(this.state.users[idx], uData);
+            changed = true;
+          } else {
+            this.state.users.push(uData);
+            changed = true;
+          }
+        });
+        if (changed) {
+          this.save(false, 'cloud_users_sync');
+          window.dispatchEvent(new CustomEvent('remo:stateupdate', { detail: { reason: 'cloud_users' } }));
+          if (typeof refreshAllAdminPanels === 'function') refreshAllAdminPanels();
+          if (typeof syncHeaderAndSidebars === 'function') syncHeaderAndSidebars();
+          if (typeof renderDirectMessagesView === 'function' && typeof currentRemoView !== 'undefined' && currentRemoView === 'messages') {
+            renderDirectMessagesView();
+          }
+        }
+      }, (err) => {
+        console.warn('Firestore remo_users sync notice:', err.message);
+      });
+
+      // Seed initial users if admin or active citizen
+      setTimeout(() => {
+        if (this.fbDb) {
+          (this.state.users || []).forEach((u) => {
+            if (u.uid && (u.email || u.name)) this.syncUserToCloud(u);
+          });
+        }
+      }, 1500);
+
+      // 2. Sync & Watch ALL DIRECT MESSAGES in Real Time
+      this.fbDb.collection('remo_direct_messages').orderBy('ts', 'desc').limit(150).onSnapshot((snap) => {
+        if (!snap) return;
+        let hasNew = false;
+        const curU = this.getCurrentUser();
+        const myUid = curU ? curU.uid : null;
+        const isAdm = this.isCurrentUserAdmin();
+
+        snap.docChanges().forEach((change) => {
+          const dm = change.doc.data();
+          if (!dm || !dm.id) return;
+
+          if (change.type === 'added') {
+            const exists = this.state.directMessages.some((x) => x.id === dm.id);
+            if (!exists) {
+              this.state.directMessages.push(dm);
+              hasNew = true;
+
+              // Incoming message alert & sound if addressed to me or Admin
+              const isForMe = (myUid && (dm.toUid === myUid || (isAdm && (dm.toUid === 'u_admin_founder' || !dm.toUid)))) && dm.fromUid !== myUid;
+              if (isForMe) {
+                try { RemoAudio.play('chime'); } catch (e) {}
+                if (typeof remoToast === 'function') {
+                  const preview = dm.text ? dm.text.slice(0, 45) : (dm.voiceUrl ? '🎤 Note Vocale' : '✉️ Message');
+                  remoToast(`💬 @${dm.fromName || 'Citizen'}: ${preview}`);
+                }
+              }
+            }
+          } else if (change.type === 'modified') {
+            const idx = this.state.directMessages.findIndex((x) => x.id === dm.id);
+            if (idx >= 0) {
+              this.state.directMessages[idx] = dm;
+              hasNew = true;
+            }
+          } else if (change.type === 'removed') {
+            this.state.directMessages = this.state.directMessages.filter((x) => x.id !== dm.id);
+            hasNew = true;
+          }
+        });
+
+        if (hasNew) {
+          this.save(false, 'cloud_dms');
+          window.dispatchEvent(new CustomEvent('remo:stateupdate', { detail: { reason: 'cloud_dms' } }));
+          if (typeof renderDirectMessagesView === 'function' && typeof currentRemoView !== 'undefined' && currentRemoView === 'messages') {
+            renderDirectMessagesView();
+          }
+          if (typeof refreshAllAdminPanels === 'function') refreshAllAdminPanels();
+        }
+      }, (err) => {
+        console.warn('Firestore remo_direct_messages sync notice:', err.message);
+      });
+
+      // 3. Ecosystem Live State (Posts, Scores, Settings, Bottles)
       const docRef = this.fbDb.collection('remo_ecosystem').doc('live_state');
       
       // Initial fetch & seed if missing

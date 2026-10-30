@@ -947,6 +947,14 @@ function adminRemoveAuction(aucId) {
 }
 
 /* ── 7. USERS, CITY MAYORS & POSTS EXECUTIVE MODERATION ── */
+function escapeHtmlStr(str = '') {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
 function renderAdminModerationPanel() {
   const lang = REMO_I18N.getLang();
   const uBody = document.getElementById('admUsersTable');
@@ -957,10 +965,11 @@ function renderAdminModerationPanel() {
       return `
         <tr style="${u.banned ? 'opacity:0.5;' : ''}">
           <td>
-            <b>${u.name}</b> ${u.verified ? '<span style="color:#38bdf8;">✓</span>' : ''}
+            <b>${escapeHtmlStr(u.name)}</b> ${u.verified ? '<span style="color:#38bdf8;">✓</span>' : ''}
             ${isMayor ? '<span style="background:#f59e0b;color:#000;padding:2px 6px;border-radius:99px;font-size:0.68rem;font-weight:900;">👑 MAYOR</span>' : ''}
             <span style="color:var(--muted);">#${u.passportNum}</span>
             <span style="color:#34d399;font-size:0.75rem;font-weight:800;"> · 🤝 ${u.referralsCount || 0} (${u.referralCode || 'REMO-' + u.passportNum})</span>
+            ${u.email ? `<br><small style="color:#94a3b8;font-size:0.72rem;">✉️ ${escapeHtmlStr(u.email)}</small>` : ''}
           </td>
           <td>${hc.flag} ${getCityName(hc, lang)}</td>
           <td><b style="color:#fbbf24;">🪙 ${(u.coins || 0).toLocaleString()}</b></td>
@@ -974,6 +983,28 @@ function renderAdminModerationPanel() {
         </tr>
       `;
     }).join('');
+  }
+
+  // Live Direct Messages table in Admin Executive Office
+  const dmBody = document.getElementById('admDirectMsgsTable');
+  if (dmBody) {
+    const dms = (REMO_STORE.state.directMessages || []).slice().sort((a, b) => (b.ts || 0) - (a.ts || 0)).slice(0, 30);
+    dmBody.innerHTML = dms.length ? dms.map((d) => {
+      const fromU = (REMO_STORE.state.users || []).find((x) => x.uid === d.fromUid) || { name: d.fromName || 'Citizen' };
+      const toU = (REMO_STORE.state.users || []).find((x) => x.uid === d.toUid) || { name: d.toUid === 'u_admin_founder' ? 'REMO Founder' : 'Citizen' };
+      const dateStr = d.ts ? new Date(d.ts).toLocaleTimeString() : '';
+      return `
+        <tr>
+          <td><b style="color:#7dd3fc;">@${escapeHtmlStr(fromU.name || d.fromName)}</b></td>
+          <td><b style="color:#fbbf24;">@${escapeHtmlStr(toU.name || d.toUid)}</b></td>
+          <td><span style="color:#f8fafc;">${d.text ? escapeHtmlStr(d.text) : (d.voiceUrl ? '🎤 Note Vocale' : (d.envelopeCoins ? '🧧 Enveloppe ' + d.envelopeCoins + '🪙' : '✉️ Message'))}</span></td>
+          <td style="color:var(--muted);font-size:0.75rem;">${dateStr}</td>
+          <td>
+            <button class="adm-btn rose" style="padding:4px 8px;" onclick="adminDeleteDmFromOffice('${d.id}')">🗑️</button>
+          </td>
+        </tr>
+      `;
+    }).join('') : `<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:14px;">Aucun message privé pour le moment.</td></tr>`;
   }
 
   const pBody = document.getElementById('admPostsTable');
@@ -1016,6 +1047,18 @@ function renderAdminModerationPanel() {
   }
 }
 
+function adminDeleteDmFromOffice(dmId) {
+  if (!confirm('Supprimer ce message privé ?')) return;
+  REMO_STORE.state.directMessages = (REMO_STORE.state.directMessages || []).filter((d) => d.id !== dmId);
+  REMO_STORE.save(true, 'dm_del');
+  if (REMO_STORE.fbDb) {
+    REMO_STORE.fbDb.collection('remo_direct_messages').doc(dmId).delete().catch(() => {});
+  }
+  renderAdminModerationPanel();
+  admToast('🗑️ Message privé supprimé !');
+}
+window.adminDeleteDmFromOffice = adminDeleteDmFromOffice;
+
 function adminCustomCoinPrompt(uid) {
   const lang = REMO_I18N.getLang();
   const u = (REMO_STORE.state.users || []).find((x) => x.uid === uid);
@@ -1035,12 +1078,15 @@ function adminCustomCoinPrompt(uid) {
     if (isNaN(n)) return;
     REMO_STORE.adminAdjustUserCoins(uid, n < 0 ? 'sub' : 'add', Math.abs(n), '👑 Admin Transfer');
   }
+  REMO_STORE.syncUserToCloud(u);
   refreshAllAdminPanels();
   admToast(`🪙 @${u.name}: ${u.coins.toLocaleString()} 🪙!`);
 }
 
 function adminGiftUserCoins(uid, amt) {
+  const u = (REMO_STORE.state.users || []).find((x) => x.uid === uid);
   REMO_STORE.adminAdjustUserCoins(uid, 'add', amt, '👑 Admin Gift');
+  if (u) REMO_STORE.syncUserToCloud(u);
   refreshAllAdminPanels();
   admToast(`+${amt} 🪙 sent!`);
 }
@@ -1055,21 +1101,28 @@ function adminToggleCityMayor(uid) {
     REMO_STORE.state.cityMayors[u.homeCity] = uid;
   }
   REMO_STORE.save(true, 'mayor_mod');
+  REMO_STORE.syncUserToCloud(u);
   renderAdminModerationPanel();
   admToast(`👑 Mayor status updated for @${u.name}!`);
 }
 
 function adminToggleVerifyUser(uid) {
   const u = REMO_STORE.state.users.find((x) => x.uid === uid);
-  if (u) u.verified = !u.verified;
-  REMO_STORE.save(true, 'user_mod');
+  if (u) {
+    u.verified = !u.verified;
+    REMO_STORE.save(true, 'user_mod');
+    REMO_STORE.syncUserToCloud(u);
+  }
   renderAdminModerationPanel();
 }
 
 function adminToggleBanUser(uid) {
   const u = REMO_STORE.state.users.find((x) => x.uid === uid);
-  if (u) u.banned = !u.banned;
-  REMO_STORE.save(true, 'user_ban');
+  if (u) {
+    u.banned = !u.banned;
+    REMO_STORE.save(true, 'user_ban');
+    REMO_STORE.syncUserToCloud(u);
+  }
   renderAdminModerationPanel();
 }
 
@@ -1078,6 +1131,7 @@ function adminDeleteCitizen(uid) {
   if (!confirm(lang === 'fr' ? 'Supprimer définitivement ce compte ?' : 'Permanently delete this citizen account?')) return;
   REMO_STORE.state.users = (REMO_STORE.state.users || []).filter((u) => u.uid !== uid);
   REMO_STORE.save(true, 'user_del');
+  REMO_STORE.deleteUserFromCloud(uid);
   refreshAllAdminPanels();
 }
 

@@ -562,6 +562,17 @@
         </div>
 
         <div class="exec-card" style="overflow-x:auto;">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
+            <h3 style="color:#38bdf8;">💬 Messagerie Privée en Direct (Citoyens ➔ Admin)</h3>
+            <span style="font-size:0.75rem;color:var(--muted);">Synchronisé en direct avec Firebase Cloud Firestore</span>
+          </div>
+          <table class="adm-table">
+            <thead><tr><th>De</th><th>Pour</th><th>Message</th><th>Heure</th><th>Action</th></tr></thead>
+            <tbody id="admDirectMsgsTable"></tbody>
+          </table>
+        </div>
+
+        <div class="exec-card" style="overflow-x:auto;">
           <h3 data-i18n="adm_posts_hdr">📸 Social Feed Moments Moderation</h3>
           <table class="adm-table">
             <thead><tr><th>Author</th><th>Moment</th><th>Stats</th><th>Moderation</th></tr></thead>

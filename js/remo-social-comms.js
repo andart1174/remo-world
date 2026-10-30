@@ -2220,17 +2220,19 @@ function sendDirectMessage() {
   const inp = document.getElementById('dmInputBox');
   if (!inp || !inp.value.trim()) return;
   const u = REMO_STORE.getCurrentUser() || REMO_STORE.ensureGuestOrCitizen('Citizen', '', 'montreal');
-  REMO_STORE.state.directMessages.push({
-    id: 'dm_' + Date.now(),
+  const newDm = {
+    id: 'dm_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
     fromUid: u.uid,
     fromName: u.name,
-    toUid: activeDmPartnerUid || 'u_elena_kiv',
+    toUid: activeDmPartnerUid || 'u_admin_founder',
     text: inp.value.trim(),
     ts: Date.now()
-  });
+  };
+  REMO_STORE.state.directMessages.push(newDm);
   inp.value = '';
   RemoAudio.play('click');
   REMO_STORE.save(true, 'dm');
+  REMO_STORE.syncDmToCloud(newDm);
   renderDirectMessagesView();
 }
 
@@ -2253,33 +2255,37 @@ async function toggleDmVoiceNote() {
       stream.getTracks().forEach((tr) => tr.stop());
       if (btn) btn.textContent = t('dm_btn_voice');
       const vKey = await RemoMediaDB.saveBlob(new Blob(chunks, { type: 'audio/webm' }), 'dm_voice');
-      REMO_STORE.state.directMessages.push({
+      const newDm = {
         id: 'dm_v_' + Date.now(),
         fromUid: u.uid,
         fromName: u.name,
-        toUid: activeDmPartnerUid || 'u_elena_kiv',
+        toUid: activeDmPartnerUid || 'u_admin_founder',
         text: lang === 'fr' ? '🎙️ Message vocal privé' : '🎙️ Private voice note',
         voiceUrl: vKey,
         ts: Date.now()
-      });
+      };
+      REMO_STORE.state.directMessages.push(newDm);
       REMO_STORE.save(true, 'dm_voice');
+      REMO_STORE.syncDmToCloud(newDm);
       renderDirectMessagesView();
     };
     window._dmRec.start();
     if (btn) btn.textContent = '⏹️ Stop (15s)';
     setTimeout(() => { if (window._dmRec && window._dmRec.state === 'recording') window._dmRec.stop(); }, 15000);
   } catch (e) {
-    REMO_STORE.state.directMessages.push({
+    const newDm = {
       id: 'dm_v_' + Date.now(),
       fromUid: u.uid,
       fromName: u.name,
-      toUid: activeDmPartnerUid || 'u_elena_kiv',
+      toUid: activeDmPartnerUid || 'u_admin_founder',
       text: lang === 'fr' ? '🎙️ Onde vocale privée' : '🎙️ Private cyber voice note',
       voiceUrl: RemoAudio.createSynthVoiceWavDataUrl(2.2),
       ts: Date.now()
-    });
+    };
+    REMO_STORE.state.directMessages.push(newDm);
     RemoAudio.play('roger');
     REMO_STORE.save(true, 'dm_voice');
+    REMO_STORE.syncDmToCloud(newDm);
     renderDirectMessagesView();
   }
 }
@@ -2302,11 +2308,11 @@ function sendDmCoinEnvelopePrompt(isRoyalAdmin = false) {
     return;
   }
 
-  REMO_STORE.state.directMessages.push({
+  const newDm = {
     id: 'dm_env_' + Date.now(),
     fromUid: u.uid,
     fromName: u.name,
-    toUid: activeDmPartnerUid || 'u_elena_kiv',
+    toUid: activeDmPartnerUid || 'u_admin_founder',
     text: isRoyalAdmin
       ? (lang === 'fr' ? '👑 Cadeau Officiel du Fondateur REMO !' : '👑 Official REMO Founder Gift!')
       : (lang === 'fr' ? '🧧 Voici une enveloppe cadeau pour toi !' : '🧧 Sent you a Golden Coin Envelope!'),
@@ -2314,8 +2320,10 @@ function sendDmCoinEnvelopePrompt(isRoyalAdmin = false) {
     envelopeClaimed: false,
     isRoyalAdmin: !!isRoyalAdmin,
     ts: Date.now()
-  });
+  };
+  REMO_STORE.state.directMessages.push(newDm);
   REMO_STORE.save(true, 'dm_envelope');
+  REMO_STORE.syncDmToCloud(newDm);
   syncHeaderAndSidebars();
   renderDirectMessagesView();
   remoToast(`🧧 +${amt} 🪙 Envelope sent!`, 'coin');
@@ -2329,6 +2337,7 @@ function claimDmCoinEnvelope(msgId) {
   d.envelopeClaimed = true;
   REMO_STORE.adminAdjustUserCoins(u.uid, 'add', d.envelopeCoins);
   REMO_STORE.save(true, 'dm_env_claim');
+  REMO_STORE.syncDmToCloud(d);
   spawnRemoCoinsFX(14);
   syncHeaderAndSidebars();
   renderDirectMessagesView();
@@ -2340,7 +2349,6 @@ function sendDmCardTradePrompt() {
   const u = REMO_STORE.getCurrentUser() || REMO_STORE.ensureGuestOrCitizen('Citizen', '', 'montreal');
   let myCards = (REMO_STORE.state.mintedCards || []).filter((mc) => mc.ownerUid === u.uid);
   if (myCards.length === 0) {
-    // Mint a starter card if citizen hasn't opened a pack yet so they can test trading right away!
     const starter = REMO_STORE.mintCardForUser(u.uid, u.homeCity || 'montreal', 'Mythic 4D', true);
     myCards = [starter];
   }
@@ -2357,11 +2365,11 @@ function sendDmCardTradePrompt() {
     '0'
   )) || 0);
 
-  REMO_STORE.state.directMessages.push({
+  const newDm = {
     id: 'dm_trd_' + Date.now(),
     fromUid: u.uid,
     fromName: u.name,
-    toUid: activeDmPartnerUid || 'u_elena_kiv',
+    toUid: activeDmPartnerUid || 'u_admin_founder',
     text: lang === 'fr' ? '🔄 Offre officielle de Carte 4D dans le chat :' : '🔄 Official 4D City Card offer in chat:',
     cardOffer: {
       cardId: chosen.id,
@@ -2371,8 +2379,10 @@ function sendDmCardTradePrompt() {
       accepted: false
     },
     ts: Date.now()
-  });
+  };
+  REMO_STORE.state.directMessages.push(newDm);
   REMO_STORE.save(true, 'dm_card_offer');
+  REMO_STORE.syncDmToCloud(newDm);
   renderDirectMessagesView();
   remoToast('🎴 4D Card Offer sent in chat!', 'coin');
 }
@@ -2400,6 +2410,7 @@ function acceptDmCardTradeOffer(msgId) {
   }
   d.cardOffer.accepted = true;
   REMO_STORE.save(true, 'dm_card_accepted');
+  REMO_STORE.syncDmToCloud(d);
   spawnRemoCoinsFX(12);
   syncHeaderAndSidebars();
   renderDirectMessagesView();
@@ -2407,9 +2418,13 @@ function acceptDmCardTradeOffer(msgId) {
 }
 
 function adminDeleteDmInline(msgId) {
-  if (!REMO_STORE.isAdminUnlocked()) return;
+  if (!confirm('Supprimer ce message privé ?')) return;
   REMO_STORE.state.directMessages = (REMO_STORE.state.directMessages || []).filter((d) => d.id !== msgId);
   REMO_STORE.save(true, 'dm_del');
+  if (REMO_STORE.fbDb) {
+    REMO_STORE.fbDb.collection('remo_direct_messages').doc(msgId).delete().catch(() => {});
+  }
+  renderDirectMessagesView();
   renderDirectMessagesView();
 }
 
