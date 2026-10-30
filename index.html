@@ -14,11 +14,6 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-  <!-- Optional Firebase v9 Compat SDK (Auto-activates when configured in Admin Office) -->
-  <script defer src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-  <script defer src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
-  <script defer src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-
   <link rel="stylesheet" href="css/remo-core.css">
 </head>
 <body>
@@ -568,6 +563,7 @@
         <button class="btn-ghost" onclick="switchRemoView('wheel')">🎡 <span data-i18n="nav_wheel">Lucky Spin</span></button>
         <button class="btn-ghost" id="mbHubAdminGodBtn" style="display:none;" onclick="document.getElementById('mobileHubModal').classList.remove('open');openAdminQuickModal();">👑 Admin God-Mode</button>
         <a href="admin.html" id="mbHubAdminOfficeBtn" class="btn-cyber btn-gold" style="display:none;justify-content:center;">🛡️ Admin Office</a>
+        <button class="btn-ghost" onclick="document.getElementById('mobileHubModal').classList.remove('open');userSignOutAction();" style="border-color:#f43f5e;color:#fda4af;grid-column:1/-1;">🚪 Déconnexion / Sign Out</button>
       </div>
       <div style="display:flex;gap:6px;">
         <input type="text" id="mbPromoInput" class="remo-input" style="padding:8px 11px;text-transform:uppercase;" data-i18n-placeholder="promo_redeem_ph" placeholder="REMO2026">
@@ -917,6 +913,12 @@
           Create Citizen Account (+150 🪙)
         </button>
       </form>
+
+      <div style="text-align:center;margin-top:14px;padding-top:10px;border-top:1px solid rgba(255,255,255,0.08);">
+        <button type="button" onclick="userSignOutAction();openAuthModal();" style="background:none;border:none;color:#f43f5e;font-size:0.78rem;font-weight:700;cursor:pointer;">
+          🚪 Déconnexion / Changer de compte
+        </button>
+      </div>
     </div>
   </div>
 
@@ -1251,6 +1253,11 @@
 
   <!-- Toast Container -->
   <div class="remo-toast-box" id="remoToastBox"></div>
+
+  <!-- Firebase v9 Compat SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 
   <!-- REMO Modular Engines -->
   <script src="js/remo-i18n.js"></script>

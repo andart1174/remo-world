@@ -1198,6 +1198,7 @@ function renderPassportView() {
         <button class="btn-cyber" onclick="copyMyReferralInviteLink()">${t('passport_copy_ref_btn')} (${refCode})</button>
         <button class="btn-ghost" style="border-color:#10b981;color:#34d399;" onclick="shareReferralOnWhatsApp()">${t('passport_wa_ref_btn')}</button>
         <button class="btn-ghost" onclick="exportPassportStory()">${t('passport_share_story')}</button>
+        <button class="btn-ghost" style="border-color:#f43f5e;color:#fda4af;" onclick="userSignOutAction()">🚪 ${lang === 'fr' ? 'Déconnexion' : 'Sign Out'}</button>
       </div>
 
       ${!u.referredBy ? `
