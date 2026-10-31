@@ -2409,3 +2409,91 @@ button, input, select, textarea {
   color: #fde047;
   box-shadow: 0 0 10px rgba(251, 191, 36, 0.35);
 }
+
+/* ── Desktop Horizontal Scroll Rails (Smooth Grab-to-Drag, Wheel & Neon Scrollbar) ── */
+.weather-ticker-bar,
+.filter-row,
+.dm-contacts-strip,
+.stories-bar,
+.city-teleport-bar,
+#shopCategoryChips,
+#radarLayerChips {
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+  scroll-behavior: smooth;
+}
+
+.weather-ticker-bar.is-dragging-scroll,
+.filter-row.is-dragging-scroll,
+.dm-contacts-strip.is-dragging-scroll,
+.stories-bar.is-dragging-scroll,
+.city-teleport-bar.is-dragging-scroll,
+#shopCategoryChips.is-dragging-scroll,
+#radarLayerChips.is-dragging-scroll {
+  cursor: grabbing !important;
+  scroll-behavior: auto !important;
+  user-select: none !important;
+}
+
+.weather-chip,
+.dm-contact-chip,
+.story-pill {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+@media (min-width: 769px) {
+  .weather-ticker-bar,
+  .filter-row,
+  .dm-contacts-strip,
+  .stories-bar,
+  .city-teleport-bar,
+  #shopCategoryChips,
+  #radarLayerChips {
+    scrollbar-width: thin !important;
+    scrollbar-color: rgba(56, 189, 248, 0.45) rgba(255, 255, 255, 0.04) !important;
+    padding-bottom: 6px;
+  }
+  .weather-ticker-bar::-webkit-scrollbar,
+  .filter-row::-webkit-scrollbar,
+  .dm-contacts-strip::-webkit-scrollbar,
+  .stories-bar::-webkit-scrollbar,
+  .city-teleport-bar::-webkit-scrollbar,
+  #shopCategoryChips::-webkit-scrollbar,
+  #radarLayerChips::-webkit-scrollbar {
+    display: block !important;
+    height: 5px !important;
+  }
+  .weather-ticker-bar::-webkit-scrollbar-track,
+  .filter-row::-webkit-scrollbar-track,
+  .dm-contacts-strip::-webkit-scrollbar-track,
+  .stories-bar::-webkit-scrollbar-track,
+  .city-teleport-bar::-webkit-scrollbar-track,
+  #shopCategoryChips::-webkit-scrollbar-track,
+  #radarLayerChips::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.04) !important;
+    border-radius: 99px;
+  }
+  .weather-ticker-bar::-webkit-scrollbar-thumb,
+  .filter-row::-webkit-scrollbar-thumb,
+  .dm-contacts-strip::-webkit-scrollbar-thumb,
+  .stories-bar::-webkit-scrollbar-thumb,
+  .city-teleport-bar::-webkit-scrollbar-thumb,
+  #shopCategoryChips::-webkit-scrollbar-thumb,
+  #radarLayerChips::-webkit-scrollbar-thumb {
+    background: rgba(56, 189, 248, 0.4) !important;
+    border-radius: 99px;
+    transition: background 0.2s, box-shadow 0.2s;
+  }
+  .weather-ticker-bar::-webkit-scrollbar-thumb:hover,
+  .filter-row::-webkit-scrollbar-thumb:hover,
+  .dm-contacts-strip::-webkit-scrollbar-thumb:hover,
+  .stories-bar::-webkit-scrollbar-thumb:hover,
+  .city-teleport-bar::-webkit-scrollbar-thumb:hover,
+  #shopCategoryChips::-webkit-scrollbar-thumb:hover,
+  #radarLayerChips::-webkit-scrollbar-thumb:hover {
+    background: #38bdf8 !important;
+    box-shadow: 0 0 10px rgba(56, 189, 248, 0.8) !important;
+  }
+}

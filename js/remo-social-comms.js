@@ -77,6 +77,10 @@ function switchRemoView(viewId) {
   else if (viewId === 'messages') renderDirectMessagesView();
   else if (viewId === 'bottles') renderWorldBottlesView();
   else if (viewId === 'wheel') renderWheelView();
+
+  if (typeof initDesktopHorizontalScrollRails === 'function') {
+    setTimeout(initDesktopHorizontalScrollRails, 40);
+  }
 }
 
 function syncHeaderAndSidebars() {
@@ -293,6 +297,9 @@ function renderWorldWeatherTicker() {
         </button>
       `;
     }).join('');
+  if (typeof initDesktopHorizontalScrollRails === 'function') {
+    setTimeout(initDesktopHorizontalScrollRails, 30);
+  }
 }
 
 let _lastWeatherMinute = -1;
@@ -2447,6 +2454,9 @@ function renderDirectMessagesView() {
 
   RemoMediaDB.hydrateDom(box);
   box.scrollTop = box.scrollHeight;
+  if (typeof initDesktopHorizontalScrollRails === 'function') {
+    setTimeout(initDesktopHorizontalScrollRails, 30);
+  }
 }
 
 function sendDirectMessage() {
@@ -2840,6 +2850,84 @@ function toggleHeaderRadio() {
   );
 }
 
+/* ── DESKTOP HORIZONTAL SCROLL & DRAG ENGINE ── */
+function makeHorizontalScrollable(el) {
+  if (!el || el._hScrollAttached) return;
+  el._hScrollAttached = true;
+
+  // 1. Mouse wheel horizontal scrolling (translates normal vertical mouse wheel to smooth horizontal scroll)
+  el.addEventListener('wheel', (e) => {
+    if (el.scrollWidth > el.clientWidth) {
+      if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+        e.preventDefault();
+        el.scrollLeft += e.deltaY * 0.95;
+      }
+    }
+  }, { passive: false });
+
+  // 2. Mouse Drag-to-Scroll (click and drag like on smartphone touch screen)
+  let isDown = false;
+  let startX = 0;
+  let scrollStart = 0;
+  let hasDragged = false;
+
+  el.addEventListener('mousedown', (e) => {
+    // Only primary left button
+    if (e.button !== 0) return;
+    isDown = true;
+    hasDragged = false;
+    startX = e.pageX;
+    scrollStart = el.scrollLeft;
+    el.classList.add('is-dragging-scroll');
+  });
+
+  window.addEventListener('mousemove', (e) => {
+    if (!isDown) return;
+    const diff = e.pageX - startX;
+    if (Math.abs(diff) > 4) {
+      hasDragged = true;
+      el.scrollLeft = scrollStart - diff;
+    }
+  });
+
+  window.addEventListener('mouseup', () => {
+    if (!isDown) return;
+    isDown = false;
+    el.classList.remove('is-dragging-scroll');
+    setTimeout(() => { hasDragged = false; }, 60);
+  });
+
+  // Suppress accidental button click if user was actively dragging
+  el.addEventListener('click', (e) => {
+    if (hasDragged) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
+  }, true);
+}
+
+function initDesktopHorizontalScrollRails() {
+  const selectors = [
+    '#worldWeatherTickerBar',
+    '#feedModeChips',
+    '#feedVibeChips',
+    '#storiesBarEl',
+    '#dmContactsBar',
+    '#radarTeleportBar',
+    '#radarLayerChips',
+    '#shopCategoryChips',
+    '.filter-row',
+    '.weather-ticker-bar',
+    '.dm-contacts-strip',
+    '.stories-bar',
+    '.city-teleport-bar'
+  ];
+  selectors.forEach((sel) => {
+    document.querySelectorAll(sel).forEach((el) => makeHorizontalScrollable(el));
+  });
+}
+window.initDesktopHorizontalScrollRails = initDesktopHorizontalScrollRails;
+
 /* ── 7. BOOTSTRAP & LIVE REAL-TIME LISTENERS ── */
 document.addEventListener('DOMContentLoaded', () => {
   REMO_I18N.applyDOM();
@@ -2847,6 +2935,9 @@ document.addEventListener('DOMContentLoaded', () => {
   renderSocialFeed();
   updateFlashDropCountdownUI();
   setInterval(updateFlashDropCountdownUI, 1000);
+  initDesktopHorizontalScrollRails();
+  setTimeout(initDesktopHorizontalScrollRails, 300);
+  setTimeout(initDesktopHorizontalScrollRails, 1200);
 
 
   // Check URL parameters (?view=arena, ?city=chisinau, ?verify=..., ?post=...)
@@ -3477,10 +3568,15 @@ window.executeInlineAdminCoinTransfer = executeInlineAdminCoinTransfer;
 /* ── 9. #8 REMO VIP BOUTIQUE (Animated Avatar Frames, Royal Titles & Real-World Perks) ── */
 let currentVipShopCategory = 'all';
 
-function filterVipShop(cat, chipEl) {
+function filterVipShop(cat = 'all', chipEl = null) {
   currentVipShopCategory = cat;
   document.querySelectorAll('#shopCategoryChips .fchip').forEach((b) => b.classList.remove('active'));
-  if (chipEl) chipEl.classList.add('active');
+  if (chipEl) {
+    chipEl.classList.add('active');
+  } else {
+    const match = document.querySelector(`#shopCategoryChips .fchip[onclick*="'${cat}'"]`);
+    if (match) match.classList.add('active');
+  }
   renderVipShopView();
 }
 
@@ -3488,82 +3584,125 @@ function renderVipShopView() {
   const grid = document.getElementById('vipShopGrid');
   if (!grid) return;
   const lang = REMO_I18N.getLang();
-  const u = REMO_STORE.getCurrentUser();
-  const isAdm = REMO_STORE.isAdminUnlocked();
 
-  const admAddBtn = document.getElementById('btnShopAdminAdd');
-  if (admAddBtn) admAddBtn.style.display = isAdm ? 'inline-flex' : 'none';
+  try {
+    const u = REMO_STORE.getCurrentUser();
+    const isAdm = REMO_STORE.isAdminUnlocked() || REMO_STORE.isCurrentUserAdmin();
 
-  let items = (REMO_STORE.state.vipShopItems || []).slice();
-  if (currentVipShopCategory !== 'all') {
-    items = items.filter((it) => it.category === currentVipShopCategory);
-  }
+    const admAddBtn = document.getElementById('btnShopAdminAdd');
+    if (admAddBtn) admAddBtn.style.display = isAdm ? 'inline-flex' : 'none';
 
-  grid.innerHTML = items.map((it) => {
-    const owned = u && Array.isArray(u.ownedShopItems) && u.ownedShopItems.includes(it.id);
-    const isEquipped = u && (u.equippedFrame === it.id || u.equippedTitleId === it.id);
-    const name = lang === 'fr' ? (it.name_fr || it.name_en) : (it.name_en || it.name_fr);
-    const desc = lang === 'fr' ? (it.desc_fr || it.desc_en) : (it.desc_en || it.desc_fr);
-
-    let previewHtml = `<div style="font-size:2.1rem;text-align:center;">${it.icon || '💎'}</div>`;
-    if (it.category === 'frame') {
-      const ch = u ? String(u.name[0]).toUpperCase() : 'R';
-      previewHtml = `<div style="display:flex;justify-content:center;padding:6px 0;"><div class="avatar-circle ${it.cssClass || 'av-frame-gold_fire'}" style="width:56px;height:56px;font-size:1.35rem;">${escapeHtmlStr(ch)}</div></div>`;
-    } else if (it.category === 'title') {
-      const bTxt = lang === 'fr' ? (it.badge_fr || it.name_fr) : (it.badge_en || it.name_en);
-      previewHtml = `<div style="text-align:center;padding:8px 0;"><span class="royal-title-pill" style="font-size:0.78rem;padding:5px 12px;">${escapeHtmlStr(bTxt)}</span></div>`;
+    // Auto-heal shop catalog if state was unpopulated or cleared
+    if (!Array.isArray(REMO_STORE.state.vipShopItems) || REMO_STORE.state.vipShopItems.length === 0) {
+      const defaults = (typeof getDefaultVipShopItems === 'function')
+        ? getDefaultVipShopItems()
+        : (typeof window.getDefaultVipShopItems === 'function'
+            ? window.getDefaultVipShopItems()
+            : (REMO_STORE.getDefaultVipShopItems ? REMO_STORE.getDefaultVipShopItems() : []));
+      if (defaults && defaults.length > 0) {
+        REMO_STORE.state.vipShopItems = defaults.slice();
+        REMO_STORE.save(false, 'shop_defaults_restored');
+      }
     }
 
-    let actionBtn = '';
-    if (it.category === 'perk') {
-      actionBtn = `<button class="btn-cyber btn-gold" style="width:100%;justify-content:center;" onclick="buyOrEquipVipItem('${it.id}')">${t('shop_redeem_perk_btn')} (${it.price} 🪙)</button>`;
-    } else if (!owned) {
-      actionBtn = `<button class="btn-cyber btn-gold" style="width:100%;justify-content:center;" onclick="buyOrEquipVipItem('${it.id}')">${t('shop_buy_btn')} · 🪙 ${it.price}</button>`;
-    } else if (isEquipped) {
-      actionBtn = `<button class="btn-ghost" style="width:100%;justify-content:center;border-color:#10b981;color:#34d399;" onclick="buyOrEquipVipItem('${it.id}')">${t('shop_equipped_btn')}</button>`;
-    } else {
-      actionBtn = `<button class="btn-cyber" style="width:100%;justify-content:center;" onclick="buyOrEquipVipItem('${it.id}')">${t('shop_equip_btn')}</button>`;
+    let items = (REMO_STORE.state.vipShopItems || []).slice();
+    if (currentVipShopCategory !== 'all') {
+      items = items.filter((it) => it.category === currentVipShopCategory);
     }
 
-    return `
-      <div class="shop-card">
-        <div>
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-            <span class="city-tag">${it.category.toUpperCase()}</span>
-            <div style="display:flex;align-items:center;gap:6px;">
-              <span style="color:#fbbf24;font-weight:900;font-size:0.86rem;">🪙 ${it.price}</span>
-              ${isAdm ? `<button class="adm-pbtn danger" onclick="adminDeleteVipShopItem('${it.id}')">🗑️</button>` : ''}
-            </div>
+    if (items.length === 0) {
+      grid.innerHTML = `
+        <div style="grid-column: 1 / -1; text-align: center; padding: 48px 20px; color: var(--muted); background: rgba(255,255,255,0.02); border-radius: 16px; border: 1px dashed var(--border);">
+          <div style="font-size: 2.4rem; margin-bottom: 10px;">🛍️</div>
+          <div style="font-size: 0.95rem; font-weight: 700; color: #f8fafc; margin-bottom: 6px;">
+            ${lang === 'fr' ? 'Aucun article dans cette catégorie pour le moment.' : 'No items in this category currently.'}
           </div>
-          ${previewHtml}
-          <div style="font-weight:900;font-size:0.94rem;color:#fff;margin-top:6px;">${escapeHtmlStr(name)}</div>
-          <div style="font-size:0.76rem;color:var(--muted);line-height:1.4;margin-top:4px;">${escapeHtmlStr(desc)}</div>
+          <button type="button" class="btn-cyber" style="margin-top: 10px;" onclick="filterVipShop('all')">
+            ${lang === 'fr' ? '✨ Voir tous les articles' : '✨ View all items'}
+          </button>
         </div>
-        <div>${actionBtn}</div>
-      </div>
-    `;
-  }).join('');
+      `;
+    } else {
+      grid.innerHTML = items.map((it) => {
+        const owned = Boolean(u && Array.isArray(u.ownedShopItems) && u.ownedShopItems.includes(it.id));
+        const isEquipped = Boolean(u && (u.equippedFrame === it.id || u.equippedTitleId === it.id));
+        const name = lang === 'fr' ? (it.name_fr || it.name_en || 'VIP Item') : (it.name_en || it.name_fr || 'VIP Item');
+        const desc = lang === 'fr' ? (it.desc_fr || it.desc_en || '') : (it.desc_en || it.desc_fr || '');
 
-  // Render VIP Voucher Orders (User sees own tickets; Admin sees ALL citizen vouchers to fulfill!)
-  const ordSec = document.getElementById('vipOrdersSection');
-  const ordList = document.getElementById('vipOrdersList');
-  const allOrders = REMO_STORE.state.vipOrders || [];
-  const visibleOrders = isAdm ? allOrders : (u ? allOrders.filter((o) => o.uid === u.uid) : []);
-  if (ordSec && ordList) {
-    ordSec.style.display = visibleOrders.length > 0 ? 'block' : 'none';
-    ordList.innerHTML = visibleOrders.map((o) => `
-      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;padding:10px 12px;border-radius:12px;background:rgba(255,255,255,0.04);border:1px solid var(--border);margin-bottom:8px;font-size:0.82rem;">
-        <div>
-          <b style="color:#fbbf24;">${escapeHtmlStr(o.ticketCode)}</b> · <b>@${escapeHtmlStr(o.userName)}</b> — ${escapeHtmlStr(o.itemName)}
+        let previewHtml = `<div style="font-size:2.1rem;text-align:center;">${it.icon || '💎'}</div>`;
+        if (it.category === 'frame') {
+          const rawName = (u && u.name) ? String(u.name).trim() : 'Citizen';
+          const ch = (rawName[0] || 'R').toUpperCase();
+          previewHtml = `<div style="display:flex;justify-content:center;padding:6px 0;"><div class="avatar-circle ${it.cssClass || 'av-frame-gold_fire'}" style="width:56px;height:56px;font-size:1.35rem;">${escapeHtmlStr(ch)}</div></div>`;
+        } else if (it.category === 'title') {
+          const bTxt = lang === 'fr' ? (it.badge_fr || it.name_fr || it.name_en) : (it.badge_en || it.name_en || it.name_fr);
+          previewHtml = `<div style="text-align:center;padding:8px 0;"><span class="royal-title-pill" style="font-size:0.78rem;padding:5px 12px;">${escapeHtmlStr(bTxt)}</span></div>`;
+        }
+
+        let actionBtn = '';
+        if (it.category === 'perk') {
+          actionBtn = `<button class="btn-cyber btn-gold" style="width:100%;justify-content:center;" onclick="buyOrEquipVipItem('${it.id}')">${t('shop_redeem_perk_btn')} (${it.price} 🪙)</button>`;
+        } else if (!owned) {
+          actionBtn = `<button class="btn-cyber btn-gold" style="width:100%;justify-content:center;" onclick="buyOrEquipVipItem('${it.id}')">${t('shop_buy_btn')} · 🪙 ${it.price}</button>`;
+        } else if (isEquipped) {
+          actionBtn = `<button class="btn-ghost" style="width:100%;justify-content:center;border-color:#10b981;color:#34d399;" onclick="buyOrEquipVipItem('${it.id}')">${t('shop_equipped_btn')}</button>`;
+        } else {
+          actionBtn = `<button class="btn-cyber" style="width:100%;justify-content:center;" onclick="buyOrEquipVipItem('${it.id}')">${t('shop_equip_btn')}</button>`;
+        }
+
+        return `
+          <div class="shop-card">
+            <div>
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                <span class="city-tag">${escapeHtmlStr((it.category || 'VIP').toUpperCase())}</span>
+                <div style="display:flex;align-items:center;gap:6px;">
+                  <span style="color:#fbbf24;font-weight:900;font-size:0.86rem;">🪙 ${it.price}</span>
+                  ${isAdm ? `<button class="adm-pbtn danger" onclick="adminDeleteVipShopItem('${it.id}')">🗑️</button>` : ''}
+                </div>
+              </div>
+              ${previewHtml}
+              <div style="font-weight:900;font-size:0.94rem;color:#fff;margin-top:6px;">${escapeHtmlStr(name)}</div>
+              <div style="font-size:0.76rem;color:var(--muted);line-height:1.4;margin-top:4px;">${escapeHtmlStr(desc)}</div>
+            </div>
+            <div>${actionBtn}</div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // Render VIP Voucher Orders (User sees own tickets; Admin sees ALL citizen vouchers to fulfill!)
+    const ordSec = document.getElementById('vipOrdersSection');
+    const ordList = document.getElementById('vipOrdersList');
+    const allOrders = REMO_STORE.state.vipOrders || [];
+    const visibleOrders = isAdm ? allOrders : (u ? allOrders.filter((o) => o.uid === u.uid) : []);
+    if (ordSec && ordList) {
+      ordSec.style.display = visibleOrders.length > 0 ? 'block' : 'none';
+      ordList.innerHTML = visibleOrders.map((o) => `
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;padding:10px 12px;border-radius:12px;background:rgba(255,255,255,0.04);border:1px solid var(--border);margin-bottom:8px;font-size:0.82rem;">
+          <div>
+            <b style="color:#fbbf24;">${escapeHtmlStr(o.ticketCode)}</b> · <b>@${escapeHtmlStr(o.userName)}</b> — ${escapeHtmlStr(o.itemName)}
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span style="color:${o.status === 'delivered' ? '#10b981' : '#38bdf8'};font-weight:900;">
+              ${o.status === 'delivered' ? '✓ DELIVERED' : '⏳ PENDING'}
+            </span>
+            ${isAdm && o.status !== 'delivered' ? `<button class="adm-pbtn gold" onclick="adminMarkVipOrderDelivered('${o.id}')">✓ Mark Delivered</button>` : ''}
+          </div>
         </div>
-        <div style="display:flex;align-items:center;gap:8px;">
-          <span style="color:${o.status === 'delivered' ? '#10b981' : '#38bdf8'};font-weight:900;">
-            ${o.status === 'delivered' ? '✓ DELIVERED' : '⏳ PENDING'}
-          </span>
-          ${isAdm && o.status !== 'delivered' ? `<button class="adm-pbtn gold" onclick="adminMarkVipOrderDelivered('${o.id}')">✓ Mark Delivered</button>` : ''}
+      `).join('');
+    }
+  } catch (err) {
+    console.error('renderVipShopView error:', err);
+    if (grid) {
+      grid.innerHTML = `
+        <div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: #f87171;">
+          <p>⚠️ ${lang === 'fr' ? 'Erreur lors du chargement de la Boutique VIP.' : 'Error loading VIP Boutique.'}</p>
+          <button type="button" class="btn-cyber" style="margin-top: 10px;" onclick="REMO_STORE.state.vipShopItems = window.getDefaultVipShopItems(); REMO_STORE.save(true); renderVipShopView();">
+            🔄 ${lang === 'fr' ? 'Réinitialiser la Boutique' : 'Reset Boutique'}
+          </button>
         </div>
-      </div>
-    `).join('');
+      `;
+    }
   }
 }
 

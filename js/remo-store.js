@@ -988,6 +988,8 @@ function createDefaultState() {
     bounties: getDefaultBounties(now),
     promoCodes: getDefaultPromoCodes(),
     geoVaults: getDefaultGeoVaults(now),
+    vipShopItems: getDefaultVipShopItems(),
+    vipOrders: [],
     serializedCoins: [
       { id: 'sc_0001', serial: '0001', coinsValue: 1000, ownerUid: 'u_admin_founder', ownerName: 'Founder Admin', mintedAt: now - 86400000, status: 'vault', note: 'Genesis Mint #0001' }
     ],
@@ -1894,6 +1896,12 @@ const REMO_STORE = {
             diskState.posts = memPosts;
           }
           this.state = diskState;
+          if (!Array.isArray(this.state.vipShopItems) || this.state.vipShopItems.length === 0) {
+            this.state.vipShopItems = getDefaultVipShopItems();
+          }
+          if (!Array.isArray(this.state.vipOrders)) {
+            this.state.vipOrders = [];
+          }
         }
       }
     } catch (e) {}
@@ -2785,6 +2793,9 @@ const REMO_STORE = {
     }, 1200);
   }
 };
+
+REMO_STORE.getDefaultVipShopItems = getDefaultVipShopItems;
+window.getDefaultVipShopItems = getDefaultVipShopItems;
 
 REMO_STORE.init();
 
