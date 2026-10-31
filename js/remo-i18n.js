@@ -401,6 +401,8 @@ const REMO_DICT = {
     // Urban Geo-Vaults (Real-World AR Treasure Hunts)
     radar_vaults_btn: '💎 Geo-Vaults',
     radar_bury_vault_btn: '💎 + Bury Geo-Vault',
+    vault_address_search_lbl: '🔍 Address / Street / Global Location:',
+    vault_btn_find_gps: '🔍 Find GPS',
     vault_modal_title: '💎 World City Geo-Vault — AR Treasure Hunt',
     vault_bury_modal_title: '💎 Bury a Secret Geo-Vault in Your City',
     vault_bury_modal_sub: 'Hide a secret treasure vault at an exact GPS landmark. Other citizens must travel there in real life to unlock it!',
@@ -844,6 +846,8 @@ const REMO_DICT = {
     // Urban Geo-Vaults (Real-World AR Treasure Hunts)
     radar_vaults_btn: '💎 Géo-Coffres',
     radar_bury_vault_btn: '💎 + Déposer un Géo-Coffre',
+    vault_address_search_lbl: '🔍 Adresse / Rue / Lieu dans le Monde :',
+    vault_btn_find_gps: '🔍 Trouver GPS',
     vault_modal_title: '💎 Géo-Coffre Urbain — Chasse aux Trésors AR',
     vault_bury_modal_title: '💎 Déposer un Géo-Coffre Secret dans votre Ville',
     vault_bury_modal_sub: 'Cachez un coffre au trésor secret à des coordonnées GPS précises. Les autres citoyens doivent s’y rendre dans le monde réel pour l’ouvrir !',

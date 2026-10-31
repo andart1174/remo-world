@@ -84,6 +84,10 @@ function initRemoRadarMap() {
       if (!window._dropPinMode) return;
       window._dropPinMode = false;
       const lang = REMO_I18N.getLang();
+      if (!REMO_STORE.isAdminUnlocked() && !REMO_STORE.isCurrentUserAdmin()) {
+        remoToast(lang === 'fr' ? 'La pose de balises est réservée à l’administrateur.' : 'Dropping pins is admin only.');
+        return;
+      }
       const title = prompt(lang === 'fr' ? 'Titre de votre balise live :' : 'Title for your live map pin:');
       if (!title) return;
       const nearest = findNearestRemoCity(ev.latlng.lat, ev.latlng.lng);
@@ -512,10 +516,29 @@ function locateNearestGeoVault() {
   remoToast(lang === 'fr' ? `💎 Téléportation vers : ${target.title_fr || target.title_en}` : `💎 Radar lock on: ${target.title_en}`);
 }
 
+function startAdminDropPin() {
+  const lang = REMO_I18N.getLang();
+  if (!REMO_STORE.isAdminUnlocked() && !REMO_STORE.isCurrentUserAdmin()) {
+    remoToast(lang === 'fr' ? 'La pose de balises est réservée à l’administrateur.' : 'Live pin dropping is admin only.');
+    return;
+  }
+  window._dropPinMode = true;
+  remoToast(lang === 'fr' ? '📍 Cliquez n’importe où sur la carte pour déposer la balise !' : '📍 Click anywhere on the map to drop the live pin!');
+}
+
 function openBuryGeoVaultModal() {
   const lang = REMO_I18N.getLang();
+  if (!REMO_STORE.isAdminUnlocked() && !REMO_STORE.isCurrentUserAdmin()) {
+    remoToast(lang === 'fr' ? 'La création de Géo-Coffres est réservée aux administrateurs.' : 'Geo-Vaults can only be placed by admins.');
+    return;
+  }
   const modal = document.getElementById('buryGeoVaultModal');
   if (!modal) return;
+
+  const addrInp = document.getElementById('buryVaultAddressInp');
+  if (addrInp) addrInp.value = '';
+  const addrFb = document.getElementById('buryVaultAddressFeedback');
+  if (addrFb) { addrFb.style.display = 'none'; addrFb.textContent = ''; }
 
   const sel = document.getElementById('buryVaultCitySelect');
   if (sel) {
@@ -532,6 +555,63 @@ function openBuryGeoVaultModal() {
   }
 
   modal.classList.add('open');
+}
+
+async function geocodeVaultAddress() {
+  const inp = document.getElementById('buryVaultAddressInp');
+  const fb = document.getElementById('buryVaultAddressFeedback');
+  const q = inp ? inp.value.trim() : '';
+  const lang = REMO_I18N.getLang();
+  if (!q) {
+    remoToast(lang === 'fr' ? 'Entrez d’abord une adresse ou une ville !' : 'Enter an address or city first!');
+    return;
+  }
+  if (fb) {
+    fb.style.display = 'block';
+    fb.style.color = '#38bdf8';
+    fb.textContent = lang === 'fr' ? '🔍 Recherche des coordonnées GPS...' : '🔍 Searching GPS coordinates...';
+  }
+  try {
+    const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=1`);
+    const data = await res.json();
+    if (data && data.length > 0) {
+      const item = data[0];
+      const lat = parseFloat(item.lat);
+      const lng = parseFloat(item.lon);
+      const latInp = document.getElementById('buryVaultLatInp');
+      const lngInp = document.getElementById('buryVaultLngInp');
+      if (latInp) latInp.value = lat.toFixed(4);
+      if (lngInp) lngInp.value = lng.toFixed(4);
+
+      const nearest = findNearestRemoCity(lat, lng);
+      const sel = document.getElementById('buryVaultCitySelect');
+      if (sel && nearest && nearest.city) {
+        sel.value = nearest.city.id;
+      }
+
+      const titleInp = document.getElementById('buryVaultTitleInp');
+      if (titleInp && !titleInp.value.trim()) {
+        const shortName = item.display_name.split(',')[0];
+        titleInp.value = shortName + ' Vault';
+      }
+
+      if (fb) {
+        fb.style.color = '#34d399';
+        fb.textContent = `✓ GPS trouvé : ${lat.toFixed(4)}, ${lng.toFixed(4)} (${item.display_name.slice(0, 50)}...)`;
+      }
+      remoToast(lang === 'fr' ? '✓ Coordonnées GPS trouvées automatiquement !' : '✓ GPS coordinates found automatically!', 'coin');
+    } else {
+      if (fb) {
+        fb.style.color = '#f87171';
+        fb.textContent = lang === 'fr' ? '⚠️ Aucune coordonnée trouvée pour cette adresse.' : '⚠️ No coordinates found for this address.';
+      }
+    }
+  } catch (err) {
+    if (fb) {
+      fb.style.color = '#f87171';
+      fb.textContent = lang === 'fr' ? 'Erreur lors de la recherche GPS.' : 'Error contacting geocoding service.';
+    }
+  }
 }
 
 function detectGpsForBuryVault() {
@@ -560,8 +640,13 @@ function detectGpsForBuryVault() {
 function submitBuryGeoVault(event) {
   event.preventDefault();
   const lang = REMO_I18N.getLang();
+  if (!REMO_STORE.isAdminUnlocked() && !REMO_STORE.isCurrentUserAdmin()) {
+    remoToast(lang === 'fr' ? 'La déposition de Géo-Coffres est réservée aux administrateurs.' : 'Geo-Vaults can only be placed by admins.');
+    return;
+  }
 
   const cityId = document.getElementById('buryVaultCitySelect')?.value || 'montreal';
+  const address = document.getElementById('buryVaultAddressInp')?.value.trim() || '';
   const title = document.getElementById('buryVaultTitleInp')?.value.trim() || 'Secret Landmark Vault';
   const hint = document.getElementById('buryVaultHintInp')?.value.trim() || 'Look around the landmark carefully...';
   const coinsReward = Number(document.getElementById('buryVaultCoinsSel')?.value) || 150;
@@ -571,6 +656,7 @@ function submitBuryGeoVault(event) {
 
   const res = REMO_STORE.buryNewGeoVault({
     cityId,
+    address,
     title_en: title,
     title_fr: title,
     hint_en: hint,
@@ -1377,16 +1463,30 @@ function renderAuctionsView() {
   const box = document.getElementById('auctionsListGrid');
   if (!box) return;
   const lang = REMO_I18N.getLang();
+  const u = REMO_STORE.getCurrentUser();
+  const isAdm = REMO_STORE.isAdminUnlocked() || REMO_STORE.isCurrentUserAdmin();
   const list = REMO_STORE.state.auctions || [];
+
+  if (list.length === 0) {
+    box.innerHTML = `
+      <div style="grid-column: 1 / -1; text-align: center; padding: 48px 20px; color: var(--muted); background: rgba(255,255,255,0.02); border-radius: 16px; border: 1px dashed var(--border);">
+        <div style="font-size: 2.4rem; margin-bottom: 8px;">🔨</div>
+        <div>${lang === 'fr' ? 'Aucune enchère en cours pour le moment.' : 'No active card auctions currently.'}</div>
+      </div>
+    `;
+    return;
+  }
 
   box.innerHTML = list.map((a, idx) => {
     const city = getCityById(a.cardSpec.cityId);
+    const canDelete = isAdm || (u && a.sellerName === u.name);
     return `
-      <div class="glass-box" style="display:flex;flex-direction:column;align-items:center;gap:10px;">
+      <div class="glass-box" style="display:flex;flex-direction:column;align-items:center;gap:10px;position:relative;">
+        ${canDelete ? `<button type="button" class="adm-pbtn danger" style="position:absolute;top:8px;right:8px;z-index:5;" onclick="adminDeleteAuction('${a.id}')" title="${lang === 'fr' ? 'Annuler l’enchère' : 'Cancel Auction'}">🗑️</button>` : ''}
         <canvas id="aucCv_${idx}" style="width:100%;max-width:210px;height:auto;border-radius:14px;"></canvas>
         <div style="font-weight:900;font-size:0.92rem;">${city.flag} ${getCityName(city, lang)} #${a.cardSpec.serial}</div>
-        <div style="font-size:0.78rem;color:var(--muted);">${lang === 'fr' ? 'Vendeur' : 'Seller'}: ${a.sellerName}</div>
-        <div style="font-size:0.9rem;color:#fbbf24;font-weight:900;">${t('auction_min_bid')} 🪙 ${a.currentBid} (${a.highestBidder})</div>
+        <div style="font-size:0.78rem;color:var(--muted);">${lang === 'fr' ? 'Vendeur' : 'Seller'}: ${typeof escapeHtmlStr === 'function' ? escapeHtmlStr(a.sellerName) : a.sellerName}</div>
+        <div style="font-size:0.9rem;color:#fbbf24;font-weight:900;">${t('auction_min_bid')} 🪙 ${a.currentBid} (${typeof escapeHtmlStr === 'function' ? escapeHtmlStr(a.highestBidder) : a.highestBidder})</div>
         <button class="btn-cyber btn-gold" style="width:100%;justify-content:center;" onclick="placeAuctionBid('${a.id}')">
           🔨 ${t('auction_bid_btn')} (+50 🪙)
         </button>
@@ -1398,6 +1498,21 @@ function renderAuctionsView() {
     const cv = document.getElementById(`aucCv_${idx}`);
     if (cv) renderCityCardFront(cv, a.cardSpec, lang);
   });
+}
+
+function adminDeleteAuction(aucId) {
+  const isAdm = REMO_STORE.isAdminUnlocked() || REMO_STORE.isCurrentUserAdmin();
+  const u = REMO_STORE.getCurrentUser();
+  const a = (REMO_STORE.state.auctions || []).find((x) => x.id === aucId);
+  if (!a) return;
+  if (!isAdm && (!u || a.sellerName !== u.name)) {
+    remoToast(REMO_I18N.getLang() === 'fr' ? 'Action non autorisée.' : 'Unauthorized.');
+    return;
+  }
+  REMO_STORE.state.auctions = (REMO_STORE.state.auctions || []).filter((x) => x.id !== aucId);
+  REMO_STORE.save(true, 'auction_delete');
+  renderAuctionsView();
+  remoToast(REMO_I18N.getLang() === 'fr' ? '🗑️ Enchère annulée et retirée !' : '🗑️ Auction cancelled and removed!');
 }
 
 function placeAuctionBid(aucId) {
@@ -1709,6 +1824,9 @@ window.changeUserHomeCity = changeUserHomeCity;
 window.exportPassportStory = exportPassportStory;
 window.renderAuctionsView = renderAuctionsView;
 window.placeAuctionBid = placeAuctionBid;
+window.adminDeleteAuction = adminDeleteAuction;
+window.startAdminDropPin = startAdminDropPin;
+window.geocodeVaultAddress = geocodeVaultAddress;
 window.renderWheelView = renderWheelView;
 window.drawLuckyWheelCanvas = drawLuckyWheelCanvas;
 window.spinLuckyWheel = spinLuckyWheel;

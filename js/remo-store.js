@@ -1892,8 +1892,27 @@ const REMO_STORE = {
                 diskState.posts.unshift(mp);
               }
             });
+            diskState.posts = diskState.posts.filter((p) =>
+              p && p.id &&
+              (!this.deletedPostIds || !this.deletedPostIds.has(p.id)) &&
+              !p.id.startsWith('demo') &&
+              !p.id.includes('demo')
+            );
           } else {
-            diskState.posts = memPosts;
+            diskState.posts = memPosts.filter((p) =>
+              p && p.id &&
+              (!this.deletedPostIds || !this.deletedPostIds.has(p.id)) &&
+              !p.id.startsWith('demo') &&
+              !p.id.includes('demo')
+            );
+          }
+          if (Array.isArray(diskState.users)) {
+            diskState.users = diskState.users.filter((u) =>
+              u && u.uid &&
+              (!this.deletedUserIds || !this.deletedUserIds.has(u.uid)) &&
+              !(u.email && /^citizen\d+@remo\.world$/i.test(u.email) && u.role !== 'admin') &&
+              !(u.name && u.name.startsWith('REMO Pioneer #'))
+            );
           }
           this.state = diskState;
           if (!Array.isArray(this.state.vipShopItems) || this.state.vipShopItems.length === 0) {
@@ -2314,20 +2333,18 @@ const REMO_STORE = {
 
   buryNewGeoVault(data) {
     if (!this.state) return null;
+    if (!this.isAdminUnlocked() && !this.isCurrentUserAdmin()) {
+      return { success: false, reason: 'admin_only' };
+    }
     this.state.geoVaults = this.state.geoVaults || [];
-    const u = this.getCurrentUser() || this.ensureGuestOrCitizen('Explorer', '', data.cityId || 'montreal');
+    const u = this.getCurrentUser() || this.ensureGuestOrCitizen('Admin Founder', '', data.cityId || 'montreal');
 
     const bountyCoins = Math.max(50, Number(data.coinsReward) || 150);
-    if (!this.isAdminUnlocked() && u.coins < bountyCoins) {
-      return { success: false, reason: 'insufficient_coins' };
-    }
-    if (!this.isAdminUnlocked()) {
-      u.coins = Math.max(0, u.coins - bountyCoins);
-    }
 
     const newVault = {
       id: 'vault_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
       cityId: data.cityId || u.homeCity || 'montreal',
+      address: data.address || '',
       title_en: data.title_en || data.title || 'Secret Landmark Vault',
       title_fr: data.title_fr || data.title_en || data.title || 'Coffre Secret Urbain',
       hint_en: data.hint_en || data.hint || 'Look closely around the landmark coordinates...',
@@ -2338,14 +2355,13 @@ const REMO_STORE = {
       coinsReward: bountyCoins,
       rarity: data.rarity || 'Mythic 4D',
       cardCityId: data.cardCityId || data.cityId,
-      sponsorName: u.name || 'Citizen Explorer',
+      sponsorName: u.name || 'REMO Admin',
       creatorUid: u.uid,
       unlockedBy: [],
       createdAt: Date.now()
     };
 
     this.state.geoVaults.unshift(newVault);
-    this.addCoins(u.uid, 50, 150);
     this.save(true, 'geovault_buried', newVault);
     return { success: true, vault: newVault };
   },
@@ -2546,7 +2562,7 @@ const REMO_STORE = {
           if (!uData || !uData.uid) return;
 
           // Delete any fake pioneer citizens or admin-deleted accounts from Firestore on the fly
-          const isFakeCitizen = (uData.email && /^citizen\d+@remo\.world$/i.test(uData.email) && uData.role !== 'admin');
+          const isFakeCitizen = (uData.name && uData.name.startsWith('REMO Pioneer #')) || (uData.email && /^citizen\d+@remo\.world$/i.test(uData.email) && uData.role !== 'admin');
           const isDeleted = (this.deletedUserIds && this.deletedUserIds.has(uData.uid));
           if (isFakeCitizen || isDeleted) {
             this.fbDb.collection('remo_users').doc(uData.uid).delete().catch(() => {});
@@ -2637,7 +2653,9 @@ const REMO_STORE = {
           const cp = doc.data();
           if (cp && cp.id) {
             // Discard and delete any demo posts or posts deleted by admin
-            if (cp.id === 'post_capsule_demo_1' || cp.id === 'post_duet_demo_1' || (this.deletedPostIds && this.deletedPostIds.has(cp.id))) {
+            const isDemo = cp.id === 'demo_1' || cp.id.startsWith('demo_') || cp.id.includes('demo') || cp.id === 'post_capsule_demo_1' || cp.id === 'post_duet_demo_1';
+            const isDeleted = (this.deletedPostIds && this.deletedPostIds.has(cp.id));
+            if (isDemo || isDeleted) {
               this.fbDb.collection('remo_posts').doc(cp.id).delete().catch(() => {});
               return;
             }
@@ -2685,7 +2703,7 @@ const REMO_STORE = {
         console.warn('Firestore remo_posts sync notice:', err.message);
       });
 
-      // 4. Ecosystem Live State (City Scores, Settings & World Bottles - lightweight)
+      // 4. Ecosystem Live State (City Scores, Settings, World Bottles, Auctions & GeoVaults)
       const docRef = this.fbDb.collection('remo_ecosystem').doc('live_state');
       
       docRef.get().then((snap) => {
@@ -2694,6 +2712,10 @@ const REMO_STORE = {
             cityScores: this.state.cityScores || {},
             settings: this.state.settings || {},
             bottles: (this.state.bottles || []).slice(0, 30),
+            auctions: (this.state.auctions || []).slice(0, 25),
+            geoVaults: (this.state.geoVaults || []).slice(0, 35),
+            deletedPostIds: [...(this.deletedPostIds || [])].slice(-100),
+            deletedUserIds: [...(this.deletedUserIds || [])].slice(-100),
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
           }).catch((err) => console.log('Firestore seed status:', err.message));
         } else {
@@ -2701,19 +2723,55 @@ const REMO_STORE = {
           if (data) {
             if (data.cityScores) this.state.cityScores = Object.assign(this.state.cityScores || {}, data.cityScores);
             if (data.bottles) this.state.bottles = data.bottles;
+            if (Array.isArray(data.auctions)) {
+              this.state.auctions = data.auctions;
+              if (typeof renderAuctionsView === 'function') renderAuctionsView();
+            }
+            if (Array.isArray(data.geoVaults)) {
+              this.state.geoVaults = data.geoVaults;
+              if (typeof refreshRadarMarkers === 'function') refreshRadarMarkers();
+            }
+            if (Array.isArray(data.deletedPostIds)) {
+              if (!this.deletedPostIds) this.deletedPostIds = new Set();
+              data.deletedPostIds.forEach((id) => this.deletedPostIds.add(id));
+              this.state.posts = (this.state.posts || []).filter((p) => !this.deletedPostIds.has(p.id));
+            }
+            if (Array.isArray(data.deletedUserIds)) {
+              if (!this.deletedUserIds) this.deletedUserIds = new Set();
+              data.deletedUserIds.forEach((id) => this.deletedUserIds.add(id));
+              this.state.users = (this.state.users || []).filter((u) => !this.deletedUserIds.has(u.uid));
+            }
             this.save(false, 'cloud_sync');
             window.dispatchEvent(new CustomEvent('remo:stateupdate', { detail: { reason: 'cloud_sync' } }));
           }
         }
       }).catch((err) => console.log('Firestore read status:', err.message));
 
-      // Realtime listener for scores & bottles
+      // Realtime listener for scores, bottles, auctions & geovaults
       docRef.onSnapshot((snap) => {
         if (!snap || !snap.exists || snap.metadata?.hasPendingWrites) return;
         const data = snap.data();
         if (data) {
           if (data.cityScores) this.state.cityScores = Object.assign(this.state.cityScores || {}, data.cityScores);
           if (data.bottles) this.state.bottles = data.bottles;
+          if (Array.isArray(data.auctions)) {
+            this.state.auctions = data.auctions;
+            if (typeof renderAuctionsView === 'function') renderAuctionsView();
+          }
+          if (Array.isArray(data.geoVaults)) {
+            this.state.geoVaults = data.geoVaults;
+            if (typeof refreshRadarMarkers === 'function') refreshRadarMarkers();
+          }
+          if (Array.isArray(data.deletedPostIds)) {
+            if (!this.deletedPostIds) this.deletedPostIds = new Set();
+            data.deletedPostIds.forEach((id) => this.deletedPostIds.add(id));
+            this.state.posts = (this.state.posts || []).filter((p) => !this.deletedPostIds.has(p.id));
+          }
+          if (Array.isArray(data.deletedUserIds)) {
+            if (!this.deletedUserIds) this.deletedUserIds = new Set();
+            data.deletedUserIds.forEach((id) => this.deletedUserIds.add(id));
+            this.state.users = (this.state.users || []).filter((u) => !this.deletedUserIds.has(u.uid));
+          }
           this.save(false, 'cloud_live_update');
           window.dispatchEvent(new CustomEvent('remo:stateupdate', { detail: { reason: 'cloud_live_update' } }));
         }
@@ -2785,6 +2843,10 @@ const REMO_STORE = {
           cityScores: this.state.cityScores || {},
           settings: this.state.settings || {},
           bottles: (this.state.bottles || []).slice(0, 30),
+          auctions: (this.state.auctions || []).slice(0, 25),
+          geoVaults: (this.state.geoVaults || []).slice(0, 35),
+          deletedPostIds: [...(this.deletedPostIds || [])].slice(-100),
+          deletedUserIds: [...(this.deletedUserIds || [])].slice(-100),
           updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         }, { merge: true }).catch((err) => {
           console.log('Firestore background sync info:', err.message);

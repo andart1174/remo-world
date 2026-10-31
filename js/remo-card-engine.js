@@ -506,7 +506,11 @@ function renderCityCardFront(canvas, spec = {}, langOverride) {
         spec._loadingPhoto = false;
         renderCityCardFront(canvas, spec, langOverride);
       };
-      im.onerror = () => { spec._loadingPhoto = false; };
+      im.onerror = () => {
+        spec._loadingPhoto = false;
+        spec._photoFailed = true;
+        renderCityCardFront(canvas, spec, langOverride);
+      };
       im.src = srcUrl;
     };
     if (String(spec.customPhotoDataUrl).startsWith('idb://') && window.RemoMediaDB) {
@@ -624,18 +628,35 @@ function renderCityCardFront(canvas, spec = {}, langOverride) {
   ctx.fill();
   ctx.clip();
 
-  if (spec._loadedPhotoImg) {
-    // Draw custom uploaded or post photo with cover fit
-    const img = spec._loadedPhotoImg;
-    const scale = Math.max(artW / img.width, artH / img.height);
-    const dw = img.width * scale, dh = img.height * scale;
-    ctx.drawImage(img, artX + (artW - dw) / 2, artY + (artH - dh) / 2, dw, dh);
-    const vig = ctx.createLinearGradient(0, artY + artH * 0.55, 0, artY + artH);
-    vig.addColorStop(0, 'transparent');
-    vig.addColorStop(1, 'rgba(4,6,16,0.88)');
-    ctx.fillStyle = vig;
-    ctx.fillRect(artX, artY, artW, artH);
-  } else {
+  let photoRendered = false;
+  const hasValidPhoto = Boolean(
+    spec._loadedPhotoImg &&
+    spec._loadedPhotoImg.width > 0 &&
+    spec._loadedPhotoImg.height > 0 &&
+    !spec._photoFailed
+  );
+
+  if (hasValidPhoto) {
+    try {
+      // Draw custom uploaded or post photo with cover fit
+      const img = spec._loadedPhotoImg;
+      const scale = Math.max(artW / img.width, artH / img.height);
+      const dw = img.width * scale, dh = img.height * scale;
+      if (isFinite(dw) && isFinite(dh) && dw > 0 && dh > 0) {
+        ctx.drawImage(img, artX + (artW - dw) / 2, artY + (artH - dh) / 2, dw, dh);
+        const vig = ctx.createLinearGradient(0, artY + artH * 0.55, 0, artY + artH);
+        vig.addColorStop(0, 'transparent');
+        vig.addColorStop(1, 'rgba(4,6,16,0.88)');
+        ctx.fillStyle = vig;
+        ctx.fillRect(artX, artY, artW, artH);
+        photoRendered = true;
+      }
+    } catch (e) {
+      photoRendered = false;
+    }
+  }
+
+  if (!photoRendered) {
     // Starfield + Cyber Grid + Pure-Canvas City Vector Landmark
     const sky = ctx.createLinearGradient(0, artY, 0, artY + artH);
     sky.addColorStop(0, '#050818');

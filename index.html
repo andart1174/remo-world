@@ -185,12 +185,12 @@
               <p style="font-size:0.82rem;color:var(--muted);margin-top:3px;" data-i18n="radar_subtitle"></p>
             </div>
             <div style="display:flex;gap:8px;flex-wrap:wrap;">
-              <button class="btn-cyber btn-gold" onclick="openBuryGeoVaultModal()" data-i18n="radar_bury_vault_btn">💎 + Bury Geo-Vault</button>
+              <button class="btn-cyber btn-gold" id="btnRadarBuryVault" style="display:none;" onclick="openBuryGeoVaultModal()" data-i18n="radar_bury_vault_btn">💎 + Bury Geo-Vault</button>
               <button class="btn-cyber" style="background:linear-gradient(135deg,#06b6d4,#3b82f6);" onclick="locateNearestGeoVault()" data-i18n="radar_vaults_btn">💎 Geo-Vaults (<span id="radarVaultsBadge">6</span>)</button>
               <button class="btn-cyber" style="background:linear-gradient(135deg,#10b981,#059669);" onclick="openAddUserCityModal()" data-i18n="add_city_btn">🌍 + Add Missing City (+75 🪙)</button>
               <button class="btn-ghost" onclick="locateMeOnRadar()" data-i18n="radar_near_me">📍 Near Me (GPS)</button>
               <button class="btn-cyber btn-gold" onclick="verifyPhysicalGpsVisa()" data-i18n="radar_verify_city">🛂 Stamp GPS City Visa</button>
-              <button class="btn-ghost" onclick="window._dropPinMode=true;remoToast(REMO_I18N.getLang()==='fr'?'Cliquez n’importe où sur la carte !':'Click anywhere on the map!');" data-i18n="radar_drop_pin">📌 Drop Live Pin</button>
+              <button class="btn-ghost" id="btnRadarDropPin" style="display:none;" onclick="startAdminDropPin()" data-i18n="radar_drop_pin">📌 Drop Live Pin</button>
             </div>
           </div>
 
@@ -1147,6 +1147,16 @@
               <option value="600">🌐 600m (Wide District)</option>
             </select>
           </div>
+        </div>
+
+        <!-- Address Search input: Admin can type any global address like "France, Paris, Rue de Rivoli" -->
+        <div class="form-field">
+          <label style="color:#38bdf8;font-weight:800;" data-i18n="vault_address_search_lbl">🔍 Adresse / Rue / Lieu dans le Monde :</label>
+          <div style="display:flex;gap:6px;">
+            <input type="text" id="buryVaultAddressInp" class="remo-input" placeholder="Ex: France, Paris, 10 Rue de la Paix" onkeydown="if(event.key==='Enter'){event.preventDefault();geocodeVaultAddress();}">
+            <button type="button" class="btn-cyber" style="white-space:nowrap;padding:0 14px;font-size:0.8rem;" onclick="geocodeVaultAddress()" data-i18n="vault_btn_find_gps">🔍 Trouver GPS</button>
+          </div>
+          <div id="buryVaultAddressFeedback" style="font-size:0.75rem;color:#34d399;margin-top:4px;display:none;"></div>
         </div>
 
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">

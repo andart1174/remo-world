@@ -124,6 +124,16 @@ function syncHeaderAndSidebars() {
     mbHubAdmOffice.style.display = isAdmUser ? 'inline-flex' : 'none';
   }
 
+  // Admin-Only Radar Controls (Déposer un Géo-Coffre & Placer une Balise Ici)
+  const buryVaultBtn = document.getElementById('btnRadarBuryVault');
+  if (buryVaultBtn) {
+    buryVaultBtn.style.display = (isAdmUser || isAdmUnlocked) ? 'inline-flex' : 'none';
+  }
+  const dropPinBtn = document.getElementById('btnRadarDropPin');
+  if (dropPinBtn) {
+    dropPinBtn.style.display = (isAdmUser || isAdmUnlocked) ? 'inline-flex' : 'none';
+  }
+
   // Global Megaphone Broadcast Banner
   const mega = document.getElementById('remoMegaphoneBar');
   if (mega) {
@@ -787,7 +797,12 @@ function renderSocialFeed(searchQuery = '') {
         : buildPostBilingualPair(p);
       const isDualOpen = !!(window._openTranslatedPosts && window._openTranslatedPosts[p.id]);
       const cityTagLabel = `${city.flag || '🌍'} ${getCityName(city, lang)} · ${wx.icon || '🌤️'} ${wx.tempC ?? 20}°${wx.isSurge ? ' ⚡2X' : ''}`;
-      const isPostOwner = Boolean(u && (u.uid === p.uid || (u.email && p.authorEmail && u.email.toLowerCase() === p.authorEmail.toLowerCase())));
+      const isPostOwner = Boolean(u && (
+        (p.uid && u.uid === p.uid) ||
+        (p.authorUid && u.uid === p.authorUid) ||
+        (u.email && p.authorEmail && u.email.toLowerCase() === p.authorEmail.toLowerCase()) ||
+        (u.name && p.authorName && u.name.trim().toLowerCase() === p.authorName.trim().toLowerCase())
+      ));
 
     return `
       <article id="post_card_${p.id}" class="post-card ${p.boosted || p.pinned || sealed ? 'boosted' : ''}" ${interactiveNoTilt ? '' : 'onmousemove="applyHoloTilt(event, this)" onmouseleave="resetHoloTilt(this)"'}>
@@ -860,9 +875,8 @@ function renderSocialFeed(searchQuery = '') {
             </div>
             <div class="post-actions-secondary">
               ${!hiddenByCapsule ? `<button class="pact-btn pact-pill" style="color:#f472b6;border-color:rgba(244,114,182,0.45);" onclick="startCityDuetFromPost('${p.id}')">${t('act_duet_city')}</button>` : ''}
-              ${!hiddenByCapsule && p.mediaType === 'html_app'
-                ? `<button class="pact-btn pact-pill" style="color:#38bdf8;border-color:rgba(56,189,248,0.4);" onclick="sharePostLink('${p.id}')">🔗 ${lang === 'fr' ? 'Partager' : 'Share'}</button>`
-                : `<button class="pact-btn pact-pill" onclick="mintPostAsCityCard('${p.id}')">🎴 ${t('act_mint_card')}</button>`}
+              ${!hiddenByCapsule ? `<button class="pact-btn pact-pill" style="color:#38bdf8;border-color:rgba(56,189,248,0.4);" onclick="sharePostLink('${p.id}')">🔗 ${lang === 'fr' ? 'Partager' : 'Share'}</button>` : ''}
+              <button class="pact-btn pact-pill" onclick="mintPostAsCityCard('${p.id}')">🎴 ${t('act_mint_card')}</button>
               <button class="pact-btn pact-pill" onclick="boostPost24h('${p.id}')" title="Boost">🚀</button>
               <button class="pact-btn pact-pill" onclick="saveBookmarkPost('${p.id}')" title="Bookmark">🔖</button>
             </div>
@@ -896,9 +910,9 @@ function renderSocialFeed(searchQuery = '') {
           <button class="tk-btn" onclick="openCommentsModal('${p.id}')">💬<span class="tk-cnt">${(p.comments || []).length}</span></button>
           <button class="tk-btn" onclick="tipPostAuthor('${p.id}')">🪙<span class="tk-cnt">${p.tipsTotal || 0}</span></button>
           <button class="tk-btn" onclick="startCityDuetFromPost('${p.id}')" title="City Duet">🎭</button>
+          <button class="tk-btn" onclick="sharePostLink('${p.id}')" title="${lang === 'fr' ? 'Partager' : 'Share'}">🔗</button>
           ${p.mediaType === 'html_app'
-            ? `<button class="tk-btn" onclick="openHtmlFullscreenModal('${p.id}')" title="Fullscreen">⛶</button>
-               <button class="tk-btn" onclick="sharePostLink('${p.id}')" title="${lang === 'fr' ? 'Partager' : 'Share'}">🔗</button>`
+            ? `<button class="tk-btn" onclick="openHtmlFullscreenModal('${p.id}')" title="Fullscreen">⛶</button>`
             : `<button class="tk-btn" onclick="mintPostAsCityCard('${p.id}')" title="Mint Card">🎴</button>
                <button class="tk-btn" onclick="switchRemoView('arena')" title="Duel">⚔️</button>`}
           <div class="tk-disc" onclick="toggleHeaderRadio()">🎵</div>
@@ -1246,8 +1260,6 @@ function sharePostLink(postId) {
 
   if (navigator.share) {
     navigator.share({
-      title: 'REMO World',
-      text: title ? `${title.slice(0, 85)}... Jouez et découvrez sur REMO !` : 'Découvrez cette publication sur REMO !',
       url: url
     }).then(() => {
       remoToast(lang === 'fr' ? '🔗 Lien partagé avec succès !' : '🔗 Link shared successfully!');
@@ -2858,9 +2870,10 @@ function makeHorizontalScrollable(el) {
   // 1. Mouse wheel horizontal scrolling (translates normal vertical mouse wheel to smooth horizontal scroll)
   el.addEventListener('wheel', (e) => {
     if (el.scrollWidth > el.clientWidth) {
-      if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+      const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+      if (delta !== 0) {
         e.preventDefault();
-        el.scrollLeft += e.deltaY * 0.95;
+        el.scrollLeft += delta * 1.15;
       }
     }
   }, { passive: false });
@@ -2871,17 +2884,18 @@ function makeHorizontalScrollable(el) {
   let scrollStart = 0;
   let hasDragged = false;
 
-  el.addEventListener('mousedown', (e) => {
-    // Only primary left button
+  el.addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'touch') return; // native touch handles it
     if (e.button !== 0) return;
     isDown = true;
     hasDragged = false;
     startX = e.pageX;
     scrollStart = el.scrollLeft;
     el.classList.add('is-dragging-scroll');
+    try { el.setPointerCapture(e.pointerId); } catch (_) {}
   });
 
-  window.addEventListener('mousemove', (e) => {
+  el.addEventListener('pointermove', (e) => {
     if (!isDown) return;
     const diff = e.pageX - startX;
     if (Math.abs(diff) > 4) {
@@ -2890,12 +2904,18 @@ function makeHorizontalScrollable(el) {
     }
   });
 
-  window.addEventListener('mouseup', () => {
+  const endDrag = (e) => {
     if (!isDown) return;
     isDown = false;
     el.classList.remove('is-dragging-scroll');
-    setTimeout(() => { hasDragged = false; }, 60);
-  });
+    if (e && e.pointerId) {
+      try { el.releasePointerCapture(e.pointerId); } catch (_) {}
+    }
+    setTimeout(() => { hasDragged = false; }, 80);
+  };
+
+  el.addEventListener('pointerup', endDrag);
+  el.addEventListener('pointercancel', endDrag);
 
   // Suppress accidental button click if user was actively dragging
   el.addEventListener('click', (e) => {
@@ -3592,22 +3612,27 @@ function renderVipShopView() {
     const admAddBtn = document.getElementById('btnShopAdminAdd');
     if (admAddBtn) admAddBtn.style.display = isAdm ? 'inline-flex' : 'none';
 
-    // Auto-heal shop catalog if state was unpopulated or cleared
-    if (!Array.isArray(REMO_STORE.state.vipShopItems) || REMO_STORE.state.vipShopItems.length === 0) {
-      const defaults = (typeof getDefaultVipShopItems === 'function')
-        ? getDefaultVipShopItems()
-        : (typeof window.getDefaultVipShopItems === 'function'
-            ? window.getDefaultVipShopItems()
-            : (REMO_STORE.getDefaultVipShopItems ? REMO_STORE.getDefaultVipShopItems() : []));
-      if (defaults && defaults.length > 0) {
-        REMO_STORE.state.vipShopItems = defaults.slice();
-        REMO_STORE.save(false, 'shop_defaults_restored');
-      }
+    // Retrieve default shop items safely
+    const defaults = (typeof getDefaultVipShopItems === 'function')
+      ? getDefaultVipShopItems()
+      : (typeof window.getDefaultVipShopItems === 'function'
+          ? window.getDefaultVipShopItems()
+          : (REMO_STORE && REMO_STORE.getDefaultVipShopItems ? REMO_STORE.getDefaultVipShopItems() : []));
+
+    // Auto-heal shop catalog if state was unpopulated, null, or cleared
+    let rawItems = Array.isArray(REMO_STORE.state.vipShopItems)
+      ? REMO_STORE.state.vipShopItems.filter((it) => it && typeof it === 'object' && it.id && it.category)
+      : [];
+
+    if (rawItems.length === 0 && defaults && defaults.length > 0) {
+      rawItems = defaults.slice();
+      REMO_STORE.state.vipShopItems = rawItems;
+      REMO_STORE.save(false, 'shop_defaults_restored');
     }
 
-    let items = (REMO_STORE.state.vipShopItems || []).slice();
-    if (currentVipShopCategory !== 'all') {
-      items = items.filter((it) => it.category === currentVipShopCategory);
+    let items = rawItems.slice();
+    if (currentVipShopCategory && currentVipShopCategory !== 'all') {
+      items = items.filter((it) => it && it.category === currentVipShopCategory);
     }
 
     if (items.length === 0) {
@@ -3624,8 +3649,9 @@ function renderVipShopView() {
       `;
     } else {
       grid.innerHTML = items.map((it) => {
+        if (!it) return '';
         const owned = Boolean(u && Array.isArray(u.ownedShopItems) && u.ownedShopItems.includes(it.id));
-        const isEquipped = Boolean(u && (u.equippedFrame === it.id || u.equippedTitleId === it.id));
+        const isEquipped = Boolean(u && ((u.equippedFrame && u.equippedFrame === it.id) || (u.equippedTitleId && u.equippedTitleId === it.id)));
         const name = lang === 'fr' ? (it.name_fr || it.name_en || 'VIP Item') : (it.name_en || it.name_fr || 'VIP Item');
         const desc = lang === 'fr' ? (it.desc_fr || it.desc_en || '') : (it.desc_en || it.desc_fr || '');
 
@@ -3636,7 +3662,7 @@ function renderVipShopView() {
           previewHtml = `<div style="display:flex;justify-content:center;padding:6px 0;"><div class="avatar-circle ${it.cssClass || 'av-frame-gold_fire'}" style="width:56px;height:56px;font-size:1.35rem;">${escapeHtmlStr(ch)}</div></div>`;
         } else if (it.category === 'title') {
           const bTxt = lang === 'fr' ? (it.badge_fr || it.name_fr || it.name_en) : (it.badge_en || it.name_en || it.name_fr);
-          previewHtml = `<div style="text-align:center;padding:8px 0;"><span class="royal-title-pill" style="font-size:0.78rem;padding:5px 12px;">${escapeHtmlStr(bTxt)}</span></div>`;
+          previewHtml = `<div style="text-align:center;padding:8px 0;"><span class="royal-title-pill" style="font-size:0.78rem;padding:5px 12px;">${escapeHtmlStr(bTxt || 'VIP')}</span></div>`;
         }
 
         let actionBtn = '';
@@ -3667,26 +3693,26 @@ function renderVipShopView() {
             <div>${actionBtn}</div>
           </div>
         `;
-      }).join('');
+      }).filter(Boolean).join('');
     }
 
     // Render VIP Voucher Orders (User sees own tickets; Admin sees ALL citizen vouchers to fulfill!)
     const ordSec = document.getElementById('vipOrdersSection');
     const ordList = document.getElementById('vipOrdersList');
-    const allOrders = REMO_STORE.state.vipOrders || [];
+    const allOrders = (Array.isArray(REMO_STORE.state.vipOrders) ? REMO_STORE.state.vipOrders : []).filter((o) => o && typeof o === 'object');
     const visibleOrders = isAdm ? allOrders : (u ? allOrders.filter((o) => o.uid === u.uid) : []);
     if (ordSec && ordList) {
       ordSec.style.display = visibleOrders.length > 0 ? 'block' : 'none';
       ordList.innerHTML = visibleOrders.map((o) => `
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;padding:10px 12px;border-radius:12px;background:rgba(255,255,255,0.04);border:1px solid var(--border);margin-bottom:8px;font-size:0.82rem;">
           <div>
-            <b style="color:#fbbf24;">${escapeHtmlStr(o.ticketCode)}</b> · <b>@${escapeHtmlStr(o.userName)}</b> — ${escapeHtmlStr(o.itemName)}
+            <b style="color:#fbbf24;">${escapeHtmlStr(o.ticketCode || 'VIP-CODE')}</b> · <b>@${escapeHtmlStr(o.userName || 'Citizen')}</b> — ${escapeHtmlStr(o.itemName || 'Perk')}
           </div>
           <div style="display:flex;align-items:center;gap:8px;">
             <span style="color:${o.status === 'delivered' ? '#10b981' : '#38bdf8'};font-weight:900;">
               ${o.status === 'delivered' ? '✓ DELIVERED' : '⏳ PENDING'}
             </span>
-            ${isAdm && o.status !== 'delivered' ? `<button class="adm-pbtn gold" onclick="adminMarkVipOrderDelivered('${o.id}')">✓ Mark Delivered</button>` : ''}
+            ${isAdm && o.status !== 'delivered' ? `<button class="adm-pbtn gold" onclick="adminMarkVipOrderDelivered('${escapeHtmlStr(o.id || '')}')">✓ Mark Delivered</button>` : ''}
           </div>
         </div>
       `).join('');
@@ -3697,10 +3723,14 @@ function renderVipShopView() {
       grid.innerHTML = `
         <div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: #f87171;">
           <p>⚠️ ${lang === 'fr' ? 'Erreur lors du chargement de la Boutique VIP.' : 'Error loading VIP Boutique.'}</p>
-          <button type="button" class="btn-cyber" style="margin-top: 10px;" onclick="REMO_STORE.state.vipShopItems = window.getDefaultVipShopItems(); REMO_STORE.save(true); renderVipShopView();">
+          <button type="button" class="btn-cyber" style="margin-top: 10px;" onclick="if(window.REMO_STORE){ REMO_STORE.state.vipShopItems = (window.getDefaultVipShopItems ? window.getDefaultVipShopItems() : []).slice(); REMO_STORE.save(true); renderVipShopView(); }">
             🔄 ${lang === 'fr' ? 'Réinitialiser la Boutique' : 'Reset Boutique'}
           </button>
         </div>
+      `;
+    }
+  }
+}
       `;
     }
   }
