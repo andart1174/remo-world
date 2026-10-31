@@ -1762,16 +1762,23 @@ const REMO_STORE = {
     }
     if (!this.state.settings) this.state = createDefaultState();
     // Strip out legacy built-in mock posts from previous builds
-    const legacyMockIds = new Set(['post_capsule_demo_1', 'post_duet_demo_1', 'post_html_fireworks', 'post_html_racer_kiv', 'post_1', 'post_2', 'post_3', 'post_4', 'post_duet_tokyo_paris', 'post_duet_mtl_chisinau', 'post_capsule_locked', 'post_duo_live_kiv_mtl']);
+    const legacyMockIds = new Set(['post_capsule_demo_1', 'post_duet_demo_1', 'post_html_fireworks', 'post_html_racer_kiv', 'post_1', 'post_2', 'post_3', 'post_4', 'post_duet_tokyo_paris', 'post_duet_mtl_chisinau', 'post_capsule_locked', 'post_duo_live_kiv_mtl', 'demo_1']);
     if (Array.isArray(this.state.posts)) {
-      this.state.posts = this.state.posts.filter((p) => p && p.id && !legacyMockIds.has(p.id) && (!this.deletedPostIds || !this.deletedPostIds.has(p.id)));
+      this.state.posts = this.state.posts.filter((p) =>
+        p && p.id &&
+        !legacyMockIds.has(p.id) &&
+        !p.id.startsWith('demo_') &&
+        !p.id.includes('demo') &&
+        (!this.deletedPostIds || !this.deletedPostIds.has(p.id))
+      );
     }
     // Strip out legacy fake citizen00XX accounts and deleted users from local state
     if (Array.isArray(this.state.users)) {
       this.state.users = this.state.users.filter((u) =>
         u && u.uid &&
         !this.deletedUserIds.has(u.uid) &&
-        !(u.email && /^citizen\d+@remo\.world$/i.test(u.email) && u.role !== 'admin')
+        !(u.email && /^citizen\d+@remo\.world$/i.test(u.email) && u.role !== 'admin') &&
+        !(u.name && u.name.startsWith('REMO Pioneer #'))
       );
     }
     upgradeEcosystemState(this.state);

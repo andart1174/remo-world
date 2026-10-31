@@ -1571,9 +1571,11 @@ button, input, select, textarea {
   border-radius: 14px;
   background: linear-gradient(90deg, rgba(15, 23, 42, 0.88), rgba(30, 27, 75, 0.72));
   border: 1px solid rgba(56, 189, 248, 0.25);
-  scrollbar-width: none;
 }
-.weather-ticker-bar::-webkit-scrollbar { display: none; }
+@media (max-width: 768px) {
+  .weather-ticker-bar { scrollbar-width: none; }
+  .weather-ticker-bar::-webkit-scrollbar { display: none; }
+}
 
 .weather-chip {
   flex-shrink: 0;
@@ -2410,35 +2412,24 @@ button, input, select, textarea {
   box-shadow: 0 0 10px rgba(251, 191, 36, 0.35);
 }
 
-/* ── Desktop Horizontal Scroll Rails (Smooth Grab-to-Drag, Wheel & Neon Scrollbar) ── */
+/* ── Desktop Horizontal Scroll Rails (Smooth Wheel & Neon Scrollbar) ── */
 .weather-ticker-bar,
 .filter-row,
 .dm-contacts-strip,
 .stories-bar,
 .city-teleport-bar,
-#shopCategoryChips,
-#radarLayerChips {
-  cursor: grab;
-  user-select: none;
-  -webkit-user-select: none;
+#shopCategoryChips {
   scroll-behavior: smooth;
 }
 
-.weather-ticker-bar.is-dragging-scroll,
-.filter-row.is-dragging-scroll,
-.dm-contacts-strip.is-dragging-scroll,
-.stories-bar.is-dragging-scroll,
-.city-teleport-bar.is-dragging-scroll,
-#shopCategoryChips.is-dragging-scroll,
-#radarLayerChips.is-dragging-scroll {
-  cursor: grabbing !important;
-  scroll-behavior: auto !important;
-  user-select: none !important;
-}
-
+.fchip,
 .weather-chip,
 .dm-contact-chip,
-.story-pill {
+.story-pill,
+#radarLayerChips .fchip,
+.city-teleport-bar .fchip {
+  cursor: pointer !important;
+  pointer-events: auto !important;
   user-select: none;
   -webkit-user-select: none;
 }

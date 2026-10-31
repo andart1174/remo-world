@@ -194,6 +194,9 @@ function renderRadarCityTeleportBar() {
       ${c.flag} ${getCityName(c, lang)}
     </button>
   `).join('');
+  if (typeof initDesktopHorizontalScrollRails === 'function') {
+    setTimeout(initDesktopHorizontalScrollRails, 20);
+  }
 }
 
 function teleportRadarCity(cityId) {
@@ -233,13 +236,17 @@ function refreshRadarMarkers() {
       `);
   });
 
-  // Event & Drop Pins
+  // Event & Drop Pins (Balises & Flash Drops)
+  const isAdm = REMO_STORE.isAdminUnlocked() || REMO_STORE.isCurrentUserAdmin();
   (REMO_STORE.state.radarPins || []).forEach((p) => {
     const claimedKey = 'remo_pin_claimed_' + p.id;
     const claimed = !!localStorage.getItem(claimedKey);
+    // Once claimed or taken, DISAPPEAR from the map!
+    if (claimed) return;
+
     const pinIcon = L.divIcon({
       className: 'remo-spot-pin',
-      html: `<div style="font-size:22px;filter:drop-shadow(0 0 8px #fbbf24);">${claimed ? '✅' : '💎'}</div>`,
+      html: `<div style="font-size:22px;filter:drop-shadow(0 0 8px #fbbf24);">💎</div>`,
       iconSize: [28, 28]
     });
     const ttl = lang === 'fr' ? (p.title_fr || p.title_en) : p.title_en;
@@ -249,11 +256,16 @@ function refreshRadarMarkers() {
         <div style="color:#0f172a;font-family:Outfit,sans-serif;min-width:190px;">
           <b>💎 ${ttl}</b><br>
           <span style="font-size:12px;color:#d97706;font-weight:700;">+${p.reward || 50} REMO Coins</span><br>
-          ${claimed
-            ? `<span style="color:#10b981;font-weight:700;font-size:12px;">✓ ${lang === 'fr' ? 'Déjà réclamé' : 'Claimed'}</span>`
-            : `<button onclick="claimRadarSpot('${p.id}', ${p.reward || 50})" style="margin-top:6px;background:#f59e0b;color:#000;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-weight:800;">
-                ${lang === 'fr' ? 'Réclamer Drop' : 'Claim Drop'}
-               </button>`}
+          <button onclick="claimRadarSpot('${p.id}', ${p.reward || 50})" style="margin-top:6px;background:#f59e0b;color:#000;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-weight:800;">
+            ${lang === 'fr' ? 'Réclamer Drop' : 'Claim Drop'}
+          </button>
+          ${isAdm ? `
+            <div style="margin-top:6px;">
+              <button onclick="adminDeleteRadarPin('${p.id}')" style="background:#ef4444;color:#fff;border:none;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:11px;font-weight:700;">
+                🗑️ ${lang === 'fr' ? 'Supprimer Balise (Admin)' : 'Delete Live Pin (Admin)'}
+              </button>
+            </div>
+          ` : ''}
         </div>
       `);
   });
@@ -261,23 +273,26 @@ function refreshRadarMarkers() {
   // Active 15-Minute Flash Super Drop
   const fd = REMO_STORE.state.settings.flashDrop;
   if (fd && fd.active && fd.expiresAt > Date.now()) {
-    const fdIcon = L.divIcon({
-      className: 'remo-flash-pin',
-      html: `<div style="background:linear-gradient(135deg,#f59e0b,#f43f5e);color:#fff;padding:5px 10px;border-radius:99px;font-weight:900;font-size:12px;box-shadow:0 0 20px #fbbf24;white-space:nowrap;">⚡ +${fd.coins} 🪙 FLASH</div>`,
-      iconSize: [110, 30]
-    });
-    const sName = lang === 'fr' ? (fd.spotName_fr || fd.spotName_en) : fd.spotName_en;
-    L.marker([fd.lat, fd.lng], { icon: fdIcon })
-      .addTo(remoMarkersLayer)
-      .bindPopup(`
-        <div style="color:#0f172a;font-family:Outfit,sans-serif;min-width:200px;">
-          <b>⚡ ${sName}</b><br>
-          <span style="color:#e11d48;font-weight:800;">+${fd.coins} REMO Coins!</span><br>
-          <button onclick="claimFlashSuperDrop()" style="margin-top:6px;background:#e11d48;color:#fff;border:none;border-radius:6px;padding:6px 12px;cursor:pointer;font-weight:800;">
-            ⚡ ${lang === 'fr' ? 'Réclamer Super Drop' : 'Claim Super Drop'}
-          </button>
-        </div>
-      `);
+    const claimKey = 'remo_flash_claimed_' + fd.expiresAt;
+    if (!localStorage.getItem(claimKey)) {
+      const fdIcon = L.divIcon({
+        className: 'remo-flash-pin',
+        html: `<div style="background:linear-gradient(135deg,#f59e0b,#f43f5e);color:#fff;padding:5px 10px;border-radius:99px;font-weight:900;font-size:12px;box-shadow:0 0 20px #fbbf24;white-space:nowrap;">⚡ +${fd.coins} 🪙 FLASH</div>`,
+        iconSize: [110, 30]
+      });
+      const sName = lang === 'fr' ? (fd.spotName_fr || fd.spotName_en) : fd.spotName_en;
+      L.marker([fd.lat, fd.lng], { icon: fdIcon })
+        .addTo(remoMarkersLayer)
+        .bindPopup(`
+          <div style="color:#0f172a;font-family:Outfit,sans-serif;min-width:200px;">
+            <b>⚡ ${sName}</b><br>
+            <span style="color:#e11d48;font-weight:800;">+${fd.coins} REMO Coins!</span><br>
+            <button onclick="claimFlashSuperDrop()" style="margin-top:6px;background:#e11d48;color:#fff;border:none;border-radius:6px;padding:6px 12px;cursor:pointer;font-weight:800;">
+              ⚡ ${lang === 'fr' ? 'Réclamer Super Drop' : 'Claim Super Drop'}
+            </button>
+          </div>
+        `);
+    }
   }
 
   // 💎 Render Real-World Urban Geo-Vaults on Radar Map
@@ -297,20 +312,22 @@ function renderRadarGeoVaultMarkers() {
   const u = REMO_STORE.getCurrentUser() || { uid: 'guest' };
   const vaults = (REMO_STORE.state && REMO_STORE.state.geoVaults) || [];
 
-  const badgeEl = document.getElementById('radarVaultsBadge');
-  if (badgeEl) badgeEl.textContent = vaults.length;
+  // Filter out any vault that this citizen has ALREADY unlocked/claimed so it disappears from the map!
+  const activeVaults = vaults.filter((v) => !Array.isArray(v.unlockedBy) || !v.unlockedBy.includes(u.uid));
 
-  vaults.forEach((v) => {
-    const isUnlocked = Array.isArray(v.unlockedBy) && v.unlockedBy.includes(u.uid);
+  const badgeEl = document.getElementById('radarVaultsBadge');
+  if (badgeEl) badgeEl.textContent = activeVaults.length;
+
+  activeVaults.forEach((v) => {
     const c = getCityById(v.cityId);
     const title = lang === 'fr' ? (v.title_fr || v.title_en) : v.title_en;
 
     const vaultIcon = L.divIcon({
       className: 'remo-geovault-pin-wrap',
       html: `
-        <div class="remo-geovault-marker ${isUnlocked ? 'unlocked' : ''}" title="${title}">
+        <div class="remo-geovault-marker" title="${title}">
           <div class="vault-ping-wave"></div>
-          <div class="vault-icon-core">${isUnlocked ? '🗝️' : '💎'}</div>
+          <div class="vault-icon-core">💎</div>
           <div class="vault-lbl-pill">${c ? c.flag : '🌍'} +${v.coinsReward}🪙</div>
         </div>
       `,
@@ -322,8 +339,8 @@ function renderRadarGeoVaultMarkers() {
       .addTo(remoMarkersLayer)
       .bindPopup(`
         <div style="color:#0f172a;font-family:Outfit,sans-serif;min-width:215px;text-align:center;">
-          <div style="font-size:11px;font-weight:900;color:${isUnlocked ? '#10b981' : '#6366f1'};text-transform:uppercase;letter-spacing:0.8px;">
-            ${isUnlocked ? (lang === 'fr' ? '🗝️ GÉO-COFFRE OUVERT' : '🗝️ UNLOCKED GEO-VAULT') : (lang === 'fr' ? '💎 GÉO-COFFRE URBAIN AR' : '💎 URBAN AR GEO-VAULT')}
+          <div style="font-size:11px;font-weight:900;color:#6366f1;text-transform:uppercase;letter-spacing:0.8px;">
+            ${lang === 'fr' ? '💎 GÉO-COFFRE URBAIN AR' : '💎 URBAN AR GEO-VAULT'}
           </div>
           <b style="font-size:13px;display:block;margin:4px 0;line-height:1.25;">${title}</b>
           <div style="font-size:12px;color:#d97706;font-weight:800;margin-bottom:6px;">
@@ -374,12 +391,20 @@ function openGeoVaultInspector(vaultId) {
 
   // Actions row
   const actionsBox = document.getElementById('gvInspectActionsBox');
+  const isAdmUser = REMO_STORE.isAdminUnlocked() || REMO_STORE.isCurrentUserAdmin();
+  const admDelBtn = isAdmUser ? `
+    <button class="btn-ghost" style="width:100%;justify-content:center;border-color:#ef4444;color:#f87171;padding:8px;font-size:0.8rem;margin-top:6px;" onclick="adminDeleteGeoVault('${v.id}')">
+      🗑️ ${lang === 'fr' ? 'Supprimer ce Géo-Coffre (Admin)' : 'Delete this Geo-Vault (Admin)'}
+    </button>
+  ` : '';
+
   if (actionsBox) {
     if (isUnlocked) {
       actionsBox.innerHTML = `
         <div style="background:rgba(16,185,129,0.15);border:1.5px solid #10b981;border-radius:14px;padding:12px;text-align:center;color:#6ee7b7;font-weight:900;font-size:0.92rem;">
           ✓ ${lang === 'fr' ? 'DÉVERROUILLÉ & ENREGISTRÉ DANS LE PASSEPORT' : 'UNLOCKED & CLAIMED IN PASSPORT'}
         </div>
+        ${admDelBtn}
       `;
     } else {
       actionsBox.innerHTML = `
@@ -390,6 +415,7 @@ function openGeoVaultInspector(vaultId) {
           <button class="btn-ghost" style="width:100%;justify-content:center;border-color:#38bdf8;color:#7dd3fc;padding:9px;font-size:0.8rem;" onclick="executeGeoVaultUnlock('${v.id}', true)">
             🧪 ${lang === 'fr' ? 'Tester l’Ouverture AR (Téléportation Démo)' : 'Test AR Unlock (Demo Teleport)'}
           </button>
+          ${admDelBtn}
         </div>
       `;
     }
@@ -1809,6 +1835,38 @@ window.runCardPvPBattle = runCardPvPBattle;
 window.sharePvPChallengeLink = sharePvPChallengeLink;
 window.renderVaultView = renderVaultView;
 window.triggerCityPackOpening = triggerCityPackOpening;
+function adminDeleteGeoVault(vaultId) {
+  if (!REMO_STORE.isAdminUnlocked() && !REMO_STORE.isCurrentUserAdmin()) return;
+  const lang = REMO_I18N.getLang();
+  if (!confirm(lang === 'fr' ? 'Supprimer définitivement ce Géo-Coffre ?' : 'Permanently delete this Geo-Vault?')) return;
+  REMO_STORE.state.geoVaults = (REMO_STORE.state.geoVaults || []).filter((x) => x.id !== vaultId);
+  REMO_STORE.save(true, 'vault_del');
+  closeGeoVaultInspectModal();
+  refreshRadarMarkers();
+  remoToast(lang === 'fr' ? '🗑️ Géo-Coffre supprimé !' : '🗑️ Geo-Vault deleted!');
+}
+
+function adminDeleteRadarPin(pinId) {
+  if (!REMO_STORE.isAdminUnlocked() && !REMO_STORE.isCurrentUserAdmin()) return;
+  const lang = REMO_I18N.getLang();
+  if (!confirm(lang === 'fr' ? 'Supprimer définitivement cette balise ?' : 'Permanently delete this live pin?')) return;
+  REMO_STORE.state.radarPins = (REMO_STORE.state.radarPins || []).filter((x) => x.id !== pinId);
+  REMO_STORE.save(true, 'pin_del');
+  refreshRadarMarkers();
+  remoToast(lang === 'fr' ? '🗑️ Balise supprimée !' : '🗑️ Live pin deleted!');
+}
+
+window.adminDeleteGeoVault = adminDeleteGeoVault;
+window.adminDeleteRadarPin = adminDeleteRadarPin;
+window.openBuryGeoVaultModal = openBuryGeoVaultModal;
+window.locateNearestGeoVault = locateNearestGeoVault;
+window.submitBuryGeoVault = submitBuryGeoVault;
+window.detectGpsForBuryVault = detectGpsForBuryVault;
+window.refreshRadarMarkers = refreshRadarMarkers;
+window.renderRadarCityTeleportBar = renderRadarCityTeleportBar;
+window.openGeoVaultInspector = openGeoVaultInspector;
+window.closeGeoVaultInspectModal = closeGeoVaultInspectModal;
+window.tryUnlockGeoVaultAR = tryUnlockGeoVaultAR;
 window.inspectCardById = inspectCardById;
 window.inspectCardModal = inspectCardModal;
 window.exportInspectedCardStory = exportInspectedCardStory;

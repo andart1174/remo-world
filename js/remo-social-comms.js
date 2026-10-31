@@ -2862,7 +2862,7 @@ function toggleHeaderRadio() {
   );
 }
 
-/* ── DESKTOP HORIZONTAL SCROLL & DRAG ENGINE ── */
+/* ── DESKTOP HORIZONTAL SCROLL ENGINE (Wheel Scroll & Drag Rail) ── */
 function makeHorizontalScrollable(el) {
   if (!el || el._hScrollAttached) return;
   el._hScrollAttached = true;
@@ -2878,52 +2878,47 @@ function makeHorizontalScrollable(el) {
     }
   }, { passive: false });
 
-  // 2. Mouse Drag-to-Scroll (click and drag like on smartphone touch screen)
+  // 2. Mouse Drag-to-Scroll: allows clicking & dragging horizontally on PC,
+  // while preserving native button clicks if user clicks without dragging (< 6px movement).
   let isDown = false;
   let startX = 0;
   let scrollStart = 0;
   let hasDragged = false;
 
-  el.addEventListener('pointerdown', (e) => {
-    if (e.pointerType === 'touch') return; // native touch handles it
+  el.addEventListener('mousedown', (e) => {
     if (e.button !== 0) return;
     isDown = true;
     hasDragged = false;
     startX = e.pageX;
     scrollStart = el.scrollLeft;
-    el.classList.add('is-dragging-scroll');
-    try { el.setPointerCapture(e.pointerId); } catch (_) {}
   });
 
-  el.addEventListener('pointermove', (e) => {
+  window.addEventListener('mousemove', (e) => {
     if (!isDown) return;
     const diff = e.pageX - startX;
-    if (Math.abs(diff) > 4) {
+    if (Math.abs(diff) > 6 || hasDragged) {
       hasDragged = true;
       el.scrollLeft = scrollStart - diff;
     }
   });
 
-  const endDrag = (e) => {
+  const onMouseUp = () => {
     if (!isDown) return;
     isDown = false;
-    el.classList.remove('is-dragging-scroll');
-    if (e && e.pointerId) {
-      try { el.releasePointerCapture(e.pointerId); } catch (_) {}
+    if (hasDragged) {
+      // User was actively dragging, suppress the accidental button click
+      const suppressClick = (ev) => {
+        ev.stopPropagation();
+        ev.preventDefault();
+        window.removeEventListener('click', suppressClick, true);
+      };
+      window.addEventListener('click', suppressClick, true);
+      setTimeout(() => window.removeEventListener('click', suppressClick, true), 80);
+      hasDragged = false;
     }
-    setTimeout(() => { hasDragged = false; }, 80);
   };
 
-  el.addEventListener('pointerup', endDrag);
-  el.addEventListener('pointercancel', endDrag);
-
-  // Suppress accidental button click if user was actively dragging
-  el.addEventListener('click', (e) => {
-    if (hasDragged) {
-      e.stopPropagation();
-      e.preventDefault();
-    }
-  }, true);
+  window.addEventListener('mouseup', onMouseUp);
 }
 
 function initDesktopHorizontalScrollRails() {
@@ -2934,7 +2929,6 @@ function initDesktopHorizontalScrollRails() {
     '#storiesBarEl',
     '#dmContactsBar',
     '#radarTeleportBar',
-    '#radarLayerChips',
     '#shopCategoryChips',
     '.filter-row',
     '.weather-ticker-bar',
