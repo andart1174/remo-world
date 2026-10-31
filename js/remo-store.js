@@ -2741,6 +2741,18 @@ const REMO_STORE = {
           }
         });
 
+        // Include default starter showcases (Montreal, Paris, Chisinau, HTML mini-games) unless deleted by admin
+        try {
+          const starters = (getShowcaseInteractivePosts(Date.now()) || []).filter(
+            (sp) => !this.deletedPostIds?.has(sp.id) && !cloudPostIds.has(sp.id)
+          );
+          starters.forEach((sp) => {
+            if (!merged.some((m) => m.id === sp.id)) {
+              merged.push(sp);
+            }
+          });
+        } catch (e) {}
+
         // Filter out any permanently deleted posts
         const activePosts = merged.filter((p) => p && p.id && !this.deletedPostIds?.has(p.id));
 

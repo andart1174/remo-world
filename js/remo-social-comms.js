@@ -753,32 +753,36 @@ function renderSocialFeed(searchQuery = '') {
   const EMOJIS = ['🔥', '⚡', '💎', '🤯', '👑'];
 
   grid.innerHTML = posts.map((p) => {
-    const city = getCityById(p.cityId);
-    const wx = REMO_WEATHER.getCityLiveStatus(city);
-    const sealed = isPostCapsuleSealed(p);
-    const xray = isAdminXrayOpen(p.id);
-    const hiddenByCapsule = sealed && !xray;
-    const teaserTxt = lang === 'fr'
-      ? (p.capsuleTeaser_fr || p.capsuleTeaser_en || 'Capsule mystère scellée...')
-      : (p.capsuleTeaser_en || p.capsuleTeaser_fr || 'Mystery capsule sealed...');
-    const rawCap = hiddenByCapsule
-      ? `🔒 ${teaserTxt}`
-      : (lang === 'fr' ? (p.caption_fr || p.caption_en) : (p.caption_en || p.caption_fr));
-    const formattedCap = escapeHtmlStr(rawCap || '').replace(/#([\w\u00C0-\u024F]+)/g, `<span class="hashtag" onclick="renderSocialFeed('#$1')">#$1</span>`);
-    const liked = u && (p.likes || []).includes(u.uid);
-    const interactiveNoTilt = hiddenByCapsule || p.mediaType === 'html_app' || p.mediaType === 'before_after';
-    const voiceResolved = p.voiceUrl ? RemoMediaDB.resolveSyncOrPlaceholder(p.voiceUrl) : '';
-    const voiceIdbAttr = p.voiceUrl && String(p.voiceUrl).startsWith('idb://') ? `data-idb-src="${p.voiceUrl}"` : '';
-    const rxMap = p.reactions || {};
-    const cityMayor = REMO_STORE.getCityMayor(p.cityId);
-    const isMayor = cityMayor && cityMayor.uid === p.uid;
-    const cosm = REMO_STORE.getUserCosmetics(p.uid);
-    const royalTitle = lang === 'fr' ? cosm.title_fr : cosm.title_en;
-    const dualPair = hiddenByCapsule
-      ? { en: `🔒 ${p.capsuleTeaser_en || teaserTxt}`, fr: `🔒 ${p.capsuleTeaser_fr || teaserTxt}` }
-      : buildPostBilingualPair(p);
-    const isDualOpen = !!(window._openTranslatedPosts && window._openTranslatedPosts[p.id]);
-    const cityTagLabel = `${city.flag} ${getCityName(city, lang)} · ${wx.icon} ${wx.tempC}°${wx.isSurge ? ' ⚡2X' : ''}`;
+    try {
+      if (!p || !p.id) return '';
+      const city = getCityById(p.cityId) || getCityById('montreal') || { id: 'montreal', name_en: 'Montreal', name_fr: 'Montréal', flag: '⚜️', code: 'MTL' };
+      const wx = (typeof REMO_WEATHER !== 'undefined' && REMO_WEATHER.getCityLiveStatus)
+        ? (REMO_WEATHER.getCityLiveStatus(city) || { icon: '🌤️', tempC: 20, isSurge: false, timeStr: '12:00' })
+        : { icon: '🌤️', tempC: 20, isSurge: false, timeStr: '12:00' };
+      const sealed = isPostCapsuleSealed(p);
+      const xray = isAdminXrayOpen(p.id);
+      const hiddenByCapsule = sealed && !xray;
+      const teaserTxt = lang === 'fr'
+        ? (p.capsuleTeaser_fr || p.capsuleTeaser_en || 'Capsule mystère scellée...')
+        : (p.capsuleTeaser_en || p.capsuleTeaser_fr || 'Mystery capsule sealed...');
+      const rawCap = hiddenByCapsule
+        ? `🔒 ${teaserTxt}`
+        : (lang === 'fr' ? (p.caption_fr || p.caption_en) : (p.caption_en || p.caption_fr));
+      const formattedCap = escapeHtmlStr(rawCap || '').replace(/#([\w\u00C0-\u024F]+)/g, `<span class="hashtag" onclick="renderSocialFeed('#$1')">#$1</span>`);
+      const liked = u && (p.likes || []).includes(u.uid);
+      const interactiveNoTilt = hiddenByCapsule || p.mediaType === 'html_app' || p.mediaType === 'before_after';
+      const voiceResolved = p.voiceUrl ? RemoMediaDB.resolveSyncOrPlaceholder(p.voiceUrl) : '';
+      const voiceIdbAttr = p.voiceUrl && String(p.voiceUrl).startsWith('idb://') ? `data-idb-src="${p.voiceUrl}"` : '';
+      const rxMap = p.reactions || {};
+      const cityMayor = (REMO_STORE && REMO_STORE.getCityMayor) ? REMO_STORE.getCityMayor(p.cityId) : null;
+      const isMayor = cityMayor && cityMayor.uid === p.uid;
+      const cosm = (REMO_STORE && REMO_STORE.getUserCosmetics) ? REMO_STORE.getUserCosmetics(p.uid) : { frameClass: '', title_fr: '', title_en: '' };
+      const royalTitle = lang === 'fr' ? (cosm.title_fr || '') : (cosm.title_en || '');
+      const dualPair = hiddenByCapsule
+        ? { en: `🔒 ${p.capsuleTeaser_en || teaserTxt}`, fr: `🔒 ${p.capsuleTeaser_fr || teaserTxt}` }
+        : buildPostBilingualPair(p);
+      const isDualOpen = !!(window._openTranslatedPosts && window._openTranslatedPosts[p.id]);
+      const cityTagLabel = `${city.flag || '🌍'} ${getCityName(city, lang)} · ${wx.icon || '🌤️'} ${wx.tempC ?? 20}°${wx.isSurge ? ' ⚡2X' : ''}`;
 
     return `
       <article class="post-card ${p.boosted || p.pinned || sealed ? 'boosted' : ''}" ${interactiveNoTilt ? '' : 'onmousemove="applyHoloTilt(event, this)" onmouseleave="resetHoloTilt(this)"'}>
@@ -893,6 +897,10 @@ function renderSocialFeed(searchQuery = '') {
         </div>
       </article>
     `;
+    } catch (err) {
+      console.warn('Post card render error:', p?.id, err);
+      return '';
+    }
   }).join('');
 
   // Asynchronously attach any IndexedDB video/photo/audio Blobs
@@ -914,15 +922,28 @@ function resetHoloTilt(cardEl) {
 function setFeedMode(mode, chipEl) {
   currentFeedMode = mode;
   currentFeedCityFilter = 'all';
+
+  // Always reset secondary vibe filter to 'all' when switching category or clicking 'Monde Entier'
+  currentFeedVibeFilter = 'all';
+  document.querySelectorAll('#feedVibeChips .fchip').forEach((b) => b.classList.remove('active'));
+  document.querySelector('#feedVibeChips .fchip:first-child')?.classList.add('active');
+
   document.querySelectorAll('#feedModeChips .fchip').forEach((b) => b.classList.remove('active'));
   if (chipEl) chipEl.classList.add('active');
   renderSocialFeed();
 }
 
 function setFeedVibe(vibe, chipEl) {
-  currentFeedVibeFilter = vibe;
-  document.querySelectorAll('#feedVibeChips .fchip').forEach((b) => b.classList.remove('active'));
-  if (chipEl) chipEl.classList.add('active');
+  if (currentFeedVibeFilter === vibe && vibe !== 'all') {
+    // Clicking active vibe toggles it back to 'all'
+    currentFeedVibeFilter = 'all';
+    document.querySelectorAll('#feedVibeChips .fchip').forEach((b) => b.classList.remove('active'));
+    document.querySelector('#feedVibeChips .fchip:first-child')?.classList.add('active');
+  } else {
+    currentFeedVibeFilter = vibe;
+    document.querySelectorAll('#feedVibeChips .fchip').forEach((b) => b.classList.remove('active'));
+    if (chipEl) chipEl.classList.add('active');
+  }
   renderSocialFeed();
 }
 
