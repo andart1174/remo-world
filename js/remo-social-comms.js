@@ -552,10 +552,15 @@ function renderPostMediaStage(p, city, lang) {
   // 2. 60-SECOND HD VIDEO
   if (p.mediaType === 'video') {
     const rawKey = p.mediaUrl || '';
-    const resolved = RemoMediaDB.resolveSyncOrPlaceholder(rawKey);
+    let resolved = '';
+    if (rawKey.startsWith('http') || rawKey.startsWith('data:') || rawKey.startsWith('blob:')) {
+      resolved = rawKey;
+    } else {
+      resolved = RemoMediaDB.resolveSyncOrPlaceholder(rawKey);
+    }
     const idbAttr = String(rawKey).startsWith('idb://') ? `data-idb-src="${rawKey}"` : '';
     const cap60Attr = p.enforce60sCap ? `ontimeupdate="if(this.currentTime>60){this.currentTime=0;}"` : '';
-    return `<video src="${resolved}" ${idbAttr} ${cap60Attr} controls playsinline loop muted></video>`;
+    return `<video src="${resolved}" ${idbAttr} ${cap60Attr} controls playsinline preload="metadata" style="width:100%;max-height:480px;border-radius:12px;background:#050816;object-fit:cover;"></video>`;
   }
 
   // 3. INTERACTIVE BEFORE / AFTER 2-PHOTO COMPARISON SLIDER
@@ -1808,8 +1813,9 @@ async function publishNewRemoPost() {
       remoToast(lang === 'fr' ? 'Importez ou filmez une vidéo de 60s maximum !' : 'Please upload or record a video (max 60s)!');
       return;
     }
+    remoToast(lang === 'fr' ? '⏳ Téléversement vidéo vers le Cloud REMO...' : '⏳ Uploading video to REMO Cloud...', 'coin');
     mediaType = 'video';
-    mediaUrl = await RemoMediaDB.saveBlob(pendingStudioVideoBlob, 'vid60');
+    mediaUrl = await uploadMediaToCloudOrDataUrl(pendingStudioVideoBlob, 'posts');
     videoDuration = pendingStudioVideoDuration || 60;
   } else if (activeCreateStudioTab === 'html') {
     const rawHtml = document.getElementById('createHtmlCodeArea')?.value.trim() || '';

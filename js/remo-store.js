@@ -422,14 +422,32 @@ async function uploadMediaToCloudOrDataUrl(blobOrFile, folder = 'posts') {
   if (typeof firebase !== 'undefined' && firebase.storage) {
     try {
       const storage = firebase.storage();
-      const ext = (blobOrFile.type && blobOrFile.type.includes('video')) ? 'mp4' : 'webm';
+      const isMp4 = blobOrFile.type && blobOrFile.type.includes('mp4');
+      const ext = isMp4 ? 'mp4' : 'webm';
+      const mime = blobOrFile.type || (isMp4 ? 'video/mp4' : 'video/webm');
       const ref = storage.ref().child(`remo_${folder}/${Date.now()}_${Math.random().toString(36).slice(2, 7)}.${ext}`);
-      const snap = await ref.put(blobOrFile);
+      const snap = await ref.put(blobOrFile, { contentType: mime });
       const downloadUrl = await snap.ref.getDownloadURL();
       if (downloadUrl) return downloadUrl;
+    } catch (e) {
+      console.warn('Firebase storage video upload notice:', e);
+    }
+  }
+
+  // If storage is unavailable and video is compact (< 1.2MB), convert to base64 Data URL so all users can see it
+  if (blobOrFile.size && blobOrFile.size < 1200000) {
+    try {
+      const dataUrl = await new Promise((res) => {
+        const r = new FileReader();
+        r.onloadend = () => res(r.result || '');
+        r.onerror = () => res('');
+        r.readAsDataURL(blobOrFile);
+      });
+      if (dataUrl) return dataUrl;
     } catch (e) {}
   }
-  // Fallback to local IndexedDB for large videos
+
+  // Fallback to local IndexedDB for large offline videos
   return RemoMediaDB.saveBlob(blobOrFile, folder);
 }
 
@@ -2009,7 +2027,23 @@ const REMO_STORE = {
   reloadFromDisk() {
     try {
       const raw = localStorage.getItem(this.KEY);
-      if (raw) this.state = JSON.parse(raw);
+      if (raw) {
+        const diskState = JSON.parse(raw);
+        if (diskState && typeof diskState === 'object') {
+          // Never discard newer in-memory posts when reloading from disk
+          const memPosts = this.state.posts || [];
+          if (Array.isArray(diskState.posts)) {
+            memPosts.forEach((mp) => {
+              if (mp && mp.id && !diskState.posts.some((dp) => dp.id === mp.id)) {
+                diskState.posts.unshift(mp);
+              }
+            });
+          } else {
+            diskState.posts = memPosts;
+          }
+          this.state = diskState;
+        }
+      }
     } catch (e) {}
   },
 
@@ -2017,7 +2051,15 @@ const REMO_STORE = {
     try {
       localStorage.setItem(this.KEY, JSON.stringify(this.state));
     } catch (e) {
-      console.warn('LocalStorage quota warning:', e);
+      console.warn('LocalStorage quota limit reached, trimming local cache:', e);
+      try {
+        const pruned = Object.assign({}, this.state);
+        if (Array.isArray(pruned.posts)) {
+          // Keep top 20 posts in localStorage; full posts live safely in Firestore remo_posts
+          pruned.posts = pruned.posts.slice(0, 20);
+        }
+        localStorage.setItem(this.KEY, JSON.stringify(pruned));
+      } catch (e2) {}
     }
     if (this.fbDb && reason !== 'cloud_sync' && reason !== 'cloud_live_update') {
       this.syncToFirestore(reason);
@@ -2658,7 +2700,7 @@ const REMO_STORE = {
       });
 
       // 3. Sync & Watch ALL SOCIAL POSTS in Real Time across all devices (Individual Document Per Post)
-      this.fbDb.collection('remo_posts').orderBy('createdAt', 'desc').limit(60).onSnapshot((snap) => {
+      this.fbDb.collection('remo_posts').limit(80).onSnapshot((snap) => {
         if (!snap) return;
         let changed = false;
         snap.forEach((doc) => {
@@ -2666,10 +2708,30 @@ const REMO_STORE = {
           if (!cloudPost || !cloudPost.id) return;
           const idx = this.state.posts.findIndex((x) => x.id === cloudPost.id);
           if (idx >= 0) {
-            Object.assign(this.state.posts[idx], cloudPost);
+            const ex = this.state.posts[idx];
+            if (ex.htmlCode !== cloudPost.htmlCode ||
+                ex.mediaUrl !== cloudPost.mediaUrl ||
+                (ex.mediaUrls || []).length !== (cloudPost.mediaUrls || []).length ||
+                (ex.likes || []).length !== (cloudPost.likes || []).length ||
+                (ex.comments || []).length !== (cloudPost.comments || []).length ||
+                ex.pinned !== cloudPost.pinned ||
+                ex.boosted !== cloudPost.boosted) {
+              Object.assign(this.state.posts[idx], cloudPost);
+              changed = true;
+            }
           } else {
             this.state.posts.push(cloudPost);
             changed = true;
+          }
+        });
+
+        // Handle document deletions from cloud
+        snap.docChanges().forEach((change) => {
+          if (change.type === 'removed') {
+            const rmId = change.doc.id;
+            const beforeLen = this.state.posts.length;
+            this.state.posts = this.state.posts.filter((p) => p.id !== rmId);
+            if (this.state.posts.length !== beforeLen) changed = true;
           }
         });
 
@@ -2739,7 +2801,10 @@ const REMO_STORE = {
   syncPostToCloud(post) {
     if (!this.fbDb || !post || !post.id) return;
     try {
-      this.fbDb.collection('remo_posts').doc(post.id).set(post, { merge: true })
+      // Sanitize undefined fields so Firestore doesn't reject write
+      const cleanPost = JSON.parse(JSON.stringify(post));
+      if (!cleanPost.createdAt) cleanPost.createdAt = Date.now();
+      this.fbDb.collection('remo_posts').doc(post.id).set(cleanPost, { merge: true })
         .catch((err) => console.warn('Firestore post sync notice:', err.message));
     } catch (e) {
       console.warn('syncPostToCloud exception:', e);
