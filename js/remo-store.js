@@ -1648,87 +1648,9 @@ function upgradeEcosystemState(st) {
     }
   });
 
-  // Seed a live Showcase Time-Capsule Mystery Post so citizens immediately see a live ticking 4D Vault!
-  if (Array.isArray(st.posts) && !st.posts.some((p) => p.id === 'post_capsule_demo_1')) {
-    st.posts.unshift({
-      id: 'post_capsule_demo_1',
-      uid: 'u_elena_kiv',
-      authorName: 'Elena KIV',
-      authorVerified: true,
-      authorPassport: '0002',
-      cityId: 'chisinau',
-      vibe: 'energy',
-      caption_en: '🔓 UNSEALED! Welcome inside the Chișinău 🇲🇩 × Montréal ⚜️ Golden Treasure Mini-Arcade! Tap rising gems & use Promo Code WELCOME2026 in Hub! #TimeCapsule #Chisinau #REMO',
-      caption_fr: '🔓 CAPSULE OUVERTE ! Bienvenue dans le Mini-Jeu Trésor Chișinău 🇲🇩 × Montréal ⚜️ ! Touchez les joyaux et utilisez le code WELCOME2026 ! #CapsuleTemporelle #Chisinau #REMO',
-      mediaType: 'html_app',
-      mediaUrl: '',
-      mediaUrls: [],
-      photoFilter: 'flt-none',
-      videoDuration: 0,
-      htmlCode: getShowcaseTimeCapsuleHtml(),
-      visualHeadline: 'CHIȘINĂU VAULT',
-      wasTimeCapsule: true,
-      unlockAt: Date.now() + 85 * 1000,
-      capsuleTeaser_en: '🇲🇩 Secret Interactive Mini-Game & Founder Vault Code dropping from Chișinău when countdown hits 00:00!',
-      capsuleTeaser_fr: '🇲🇩 Mini-Jeu Interactif Secret & Code Coffre Fondateur en direct de Chișinău à 00:00 !',
-      capsuleWatchers: ['u_admin_founder', 'u_lucas_par', 'u_kenji_tyo'],
-      reactions: { '🔥': 4, '💎': 3, '👑': 2 },
-      boosted: true,
-      mintedCard: false,
-      likes: ['u_admin_founder', 'u_lucas_par'],
-      tipsTotal: 120,
-      comments: [],
-      createdAt: Date.now()
-    });
-  }
-
-  // #1 & #3: Seed a live Showcase Split-Screen City Duet (Chișinău 🇲🇩 ⚡ Montréal ⚜️) + Super-Comments 2.0!
-  if (Array.isArray(st.posts) && !st.posts.some((p) => p.id === 'post_duet_demo_1')) {
-    const insertIdx = Math.min(1, st.posts.length);
-    st.posts.splice(insertIdx, 0, {
-      id: 'post_duet_demo_1',
-      uid: 'u_elena_kiv',
-      authorName: 'Elena KIV',
-      authorVerified: true,
-      authorPassport: '0002',
-      cityId: 'chisinau',
-      vibe: 'energy',
-      caption_en: '🎭 SPLIT-SCREEN CITY DUET! Live night lights in Chișinău 🇲🇩 side-by-side with Montréal ⚜️! Tap 🎭 Duet on any post to link your city! #CityDuet #Chisinau #Montreal',
-      caption_fr: '🎭 DUO VILLES ÉCRAN PARTAGÉ ! Les lumières de Chișinău 🇲🇩 en direct face à Montréal ⚜️ ! Touchez 🎭 Duo sur un post pour relier votre ville ! #CityDuet #Chisinau #Montreal',
-      mediaType: 'city_art',
-      mediaUrl: '',
-      mediaUrls: [],
-      photoFilter: 'flt-none',
-      visualHeadline: 'CHIȘINĂU LIVE',
-      duetOf: {
-        postId: 'seed_mtl_duet',
-        uid: 'u_admin_founder',
-        authorName: 'Founder Admin',
-        cityId: 'montreal',
-        mediaType: 'city_art',
-        mediaUrl: '',
-        visualHeadline: 'MONTRÉAL LIVE'
-      },
-      reactions: { '🔥': 7, '⚡': 5, '👑': 4 },
-      boosted: true,
-      mintedCard: false,
-      likes: ['u_admin_founder', 'u_lucas_par', 'u_kenji_tyo'],
-      tipsTotal: 160,
-      comments: [
-        {
-          id: 'c_super_demo_1',
-          uid: 'u_lucas_par',
-          author: 'Lucas PAR',
-          cityId: 'paris',
-          text: 'Incredible bridge between Chișinău and Montréal! Next duet from Paris 🗼!',
-          superTip: 50,
-          flexCardCityId: 'paris',
-          flexCardRarity: 'Mythic 4D',
-          createdAt: Date.now() - 120000
-        }
-      ],
-      createdAt: Date.now() - 5000
-    });
+  // Ensure all demo posts (capsule and duet) are permanently stripped
+  if (Array.isArray(st.posts)) {
+    st.posts = st.posts.filter((p) => p && p.id !== 'post_capsule_demo_1' && p.id !== 'post_duet_demo_1');
   }
 
   // #5: Upgrade 1-on-1 Direct Messages & Seed an Unclaimed +50 🪙 Gift Envelope!
@@ -1832,7 +1754,7 @@ const REMO_STORE = {
     }
     if (!this.state.settings) this.state = createDefaultState();
     // Strip out legacy built-in mock posts from previous builds
-    const legacyMockIds = new Set(['post_html_fireworks', 'post_html_racer_kiv', 'post_1', 'post_2', 'post_3', 'post_4', 'post_duet_tokyo_paris', 'post_duet_mtl_chisinau', 'post_capsule_locked', 'post_duo_live_kiv_mtl']);
+    const legacyMockIds = new Set(['post_capsule_demo_1', 'post_duet_demo_1', 'post_html_fireworks', 'post_html_racer_kiv', 'post_1', 'post_2', 'post_3', 'post_4', 'post_duet_tokyo_paris', 'post_duet_mtl_chisinau', 'post_capsule_locked', 'post_duo_live_kiv_mtl']);
     if (Array.isArray(this.state.posts)) {
       this.state.posts = this.state.posts.filter((p) => p && p.id && !legacyMockIds.has(p.id) && (!this.deletedPostIds || !this.deletedPostIds.has(p.id)));
     }
@@ -2623,11 +2545,9 @@ const REMO_STORE = {
         snap.forEach((doc) => {
           const cp = doc.data();
           if (cp && cp.id) {
-            // Discard any post that was deleted by admin
-            if (this.deletedPostIds && this.deletedPostIds.has(cp.id)) {
-              if (this.isCurrentUserAdmin()) {
-                this.fbDb.collection('remo_posts').doc(cp.id).delete().catch(() => {});
-              }
+            // Discard and delete any demo posts or posts deleted by admin
+            if (cp.id === 'post_capsule_demo_1' || cp.id === 'post_duet_demo_1' || (this.deletedPostIds && this.deletedPostIds.has(cp.id))) {
+              this.fbDb.collection('remo_posts').doc(cp.id).delete().catch(() => {});
               return;
             }
             cloudPosts.push(cp);
