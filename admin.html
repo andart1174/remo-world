@@ -554,7 +554,10 @@
       <!-- ══ TAB 6: CITIZENS & POSTS MODERATION ══ -->
       <section class="adm-panel" id="adm-panel-moderation">
         <div class="exec-card" style="overflow-x:auto;">
-          <h3 data-i18n="adm_users_hdr">👥 Citizens &amp; VIP Passports</h3>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:10px;">
+            <h3 data-i18n="adm_users_hdr" style="margin:0;">👥 Citizens &amp; VIP Passports</h3>
+            <button type="button" class="adm-btn rose" onclick="adminPurgeFakeUsers()" style="padding:6px 14px;font-size:0.82rem;">🗑️ Nettoyer les faux comptes (Purger Pioneers)</button>
+          </div>
           <table class="adm-table">
             <thead><tr><th>Citizen</th><th>Home City</th><th>Balance</th><th>Executive Actions</th></tr></thead>
             <tbody id="admUsersTable"></tbody>

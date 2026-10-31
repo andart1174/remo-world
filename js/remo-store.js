@@ -1739,12 +1739,18 @@ const REMO_STORE = {
   fbDb: null,
   fbAuth: null,
   deletedPostIds: null,
+  deletedUserIds: null,
 
   init() {
     try {
       this.deletedPostIds = new Set(JSON.parse(localStorage.getItem('remo_deleted_posts') || '[]'));
     } catch (e) {
       this.deletedPostIds = new Set();
+    }
+    try {
+      this.deletedUserIds = new Set(JSON.parse(localStorage.getItem('remo_deleted_users') || '[]'));
+    } catch (e) {
+      this.deletedUserIds = new Set();
     }
     try {
       const raw = localStorage.getItem(this.KEY);
@@ -1757,6 +1763,14 @@ const REMO_STORE = {
     const legacyMockIds = new Set(['post_capsule_demo_1', 'post_duet_demo_1', 'post_html_fireworks', 'post_html_racer_kiv', 'post_1', 'post_2', 'post_3', 'post_4', 'post_duet_tokyo_paris', 'post_duet_mtl_chisinau', 'post_capsule_locked', 'post_duo_live_kiv_mtl']);
     if (Array.isArray(this.state.posts)) {
       this.state.posts = this.state.posts.filter((p) => p && p.id && !legacyMockIds.has(p.id) && (!this.deletedPostIds || !this.deletedPostIds.has(p.id)));
+    }
+    // Strip out legacy fake citizen00XX accounts and deleted users from local state
+    if (Array.isArray(this.state.users)) {
+      this.state.users = this.state.users.filter((u) =>
+        u && u.uid &&
+        !this.deletedUserIds.has(u.uid) &&
+        !(u.email && /^citizen\d+@remo\.world$/i.test(u.email) && u.role !== 'admin')
+      );
     }
     upgradeEcosystemState(this.state);
     this.save(false);
@@ -1974,15 +1988,38 @@ const REMO_STORE = {
   },
 
   ensureGuestOrCitizen(name, email, homeCity = 'montreal', isAdmin = false, fbUid = '') {
-    let u = email ? this.state.users.find((x) => x.email.toLowerCase() === email.toLowerCase()) : null;
+    // 1. If user already logged in and no specific new email/fbUid is requested, keep current user
+    if (!email && !fbUid) {
+      const cur = this.getCurrentUser();
+      if (cur) return cur;
+      // If there's an existing registered user, use it
+      if (this.state.users && this.state.users.length > 0) {
+        const u0 = this.state.users[0];
+        localStorage.setItem(this.USER_KEY, u0.uid);
+        return u0;
+      }
+    }
+
+    let u = email ? this.state.users.find((x) => x.email && x.email.toLowerCase() === email.toLowerCase()) : null;
+    if (!u && fbUid) {
+      u = this.state.users.find((x) => x.uid === ('u_fb_' + fbUid) || x.fbUid === fbUid);
+    }
+
     if (!u) {
+      // Only create if we actually have an email or fbUid (real sign-up)
+      if (!email && !fbUid) {
+        return this.state.users[0] || null;
+      }
       const pNum = String(this.state.users.length + 1).padStart(4, '0');
-      const bonus = this.state.settings.rewards.signupBonus || 150;
+      const bonus = this.state.settings?.rewards?.signupBonus || 150;
+      const finalEmail = email || (fbUid ? `user_${fbUid.slice(0, 8)}@gmail.com` : '');
+
       u = {
         uid: fbUid ? ('u_fb_' + fbUid) : ('u_' + Date.now().toString(36)),
+        fbUid: fbUid || '',
         name: name || 'Citizen #' + pNum,
-        email: email || `citizen${pNum}@remo.world`,
-        role: isAdmin || (email && email.toLowerCase() === this.state.settings.adminEmail.toLowerCase()) ? 'admin' : 'citizen',
+        email: finalEmail,
+        role: isAdmin || (email && email.toLowerCase() === this.state.settings?.adminEmail?.toLowerCase()) ? 'admin' : 'citizen',
         verified: true,
         homeCity: homeCity || 'montreal',
         passportNum: pNum,
@@ -1999,13 +2036,14 @@ const REMO_STORE = {
         avatarColor: '#6366f1'
       };
       this.state.users.push(u);
-      // Give starter Home City Card!
       this.mintCardForUser(u.uid, homeCity || 'montreal', 'Rare', false);
     } else {
       if (name && (!u.name || u.name.startsWith('Citizen #') || u.name === 'REMO Pioneer')) {
         u.name = name;
       }
+      if (fbUid && !u.fbUid) u.fbUid = fbUid;
     }
+
     localStorage.setItem(this.USER_KEY, u.uid);
     const adminEmail = (this.state && this.state.settings && this.state.settings.adminEmail) || 'andart1174@gmail.com';
     if (u && u.email && u.email.toLowerCase().trim() === adminEmail.toLowerCase().trim()) {
@@ -2019,7 +2057,9 @@ const REMO_STORE = {
       localStorage.removeItem('remo_pending_ref');
     }
     this.save(true, 'auth');
-    this.syncUserToCloud(u);
+    if (u.email && !/^citizen\d+@remo\.world$/i.test(u.email)) {
+      this.syncUserToCloud(u);
+    }
     return u;
   },
 
@@ -2056,10 +2096,54 @@ const REMO_STORE = {
   },
 
   deleteUserFromCloud(uid) {
-    if (!this.fbDb || !uid) return;
+    if (!uid) return;
+    if (!this.deletedUserIds) this.deletedUserIds = new Set();
+    this.deletedUserIds.add(uid);
     try {
-      this.fbDb.collection('remo_users').doc(uid).delete().catch(() => {});
+      localStorage.setItem('remo_deleted_users', JSON.stringify([...this.deletedUserIds]));
     } catch (e) {}
+    this.state.users = (this.state.users || []).filter((u) => u.uid !== uid);
+    this.save(false);
+    if (this.fbDb) {
+      try {
+        this.fbDb.collection('remo_users').doc(uid).delete().catch(() => {});
+      } catch (e) {}
+    }
+  },
+
+  async purgeFakeUsersFromCloud() {
+    if (!this.deletedUserIds) this.deletedUserIds = new Set();
+    const fakeUids = [];
+    this.state.users = (this.state.users || []).filter((u) => {
+      const isFake = u && /^citizen\d+@remo\.world$/i.test(u.email || '') && u.role !== 'admin';
+      if (isFake) {
+        fakeUids.push(u.uid);
+        this.deletedUserIds.add(u.uid);
+      }
+      return !isFake;
+    });
+    try {
+      localStorage.setItem('remo_deleted_users', JSON.stringify([...this.deletedUserIds]));
+    } catch (e) {}
+    this.save(false, 'purge_fake_users');
+    if (this.fbDb) {
+      try {
+        const snap = await this.fbDb.collection('remo_users').get();
+        const batch = this.fbDb.batch();
+        snap.forEach((doc) => {
+          const d = doc.data();
+          if (d && ((d.email && /^citizen\d+@remo\.world$/i.test(d.email) && d.role !== 'admin') || fakeUids.includes(doc.id))) {
+            batch.delete(doc.ref);
+          }
+        });
+        await batch.commit();
+        console.log('Fake pioneer citizens purged from Firestore successfully');
+      } catch (e) {
+        console.warn('purgeFakeUsersFromCloud error:', e);
+      }
+    }
+    window.dispatchEvent(new CustomEvent('remo:stateupdate', { detail: { reason: 'purge_users' } }));
+    if (typeof refreshAllAdminPanels === 'function') refreshAllAdminPanels();
   },
 
   syncDmToCloud(dm) {
@@ -2444,46 +2528,45 @@ const REMO_STORE = {
     if (!this.fbDb || this._fbSyncStarted) return;
     this._fbSyncStarted = true;
     try {
-      // 1. Sync & Watch ALL USERS in Real Time across all devices
+      // 1. Sync & Watch ALL USERS in Real Time across all devices (Cloud is Authoritative Source of Truth)
       this.fbDb.collection('remo_users').onSnapshot((snap) => {
         if (!snap) return;
-        let changed = false;
+        const cloudUsers = [];
+        const cloudUserIds = new Set();
         snap.forEach((doc) => {
           const uData = doc.data();
           if (!uData || !uData.uid) return;
-          const idx = this.state.users.findIndex((x) =>
-            x.uid === uData.uid ||
-            (x.email && uData.email && x.email.toLowerCase() === uData.email.toLowerCase())
-          );
-          if (idx >= 0) {
-            Object.assign(this.state.users[idx], uData);
-            changed = true;
-          } else {
-            this.state.users.push(uData);
-            changed = true;
+
+          // Delete any fake pioneer citizens or admin-deleted accounts from Firestore on the fly
+          const isFakeCitizen = (uData.email && /^citizen\d+@remo\.world$/i.test(uData.email) && uData.role !== 'admin');
+          const isDeleted = (this.deletedUserIds && this.deletedUserIds.has(uData.uid));
+          if (isFakeCitizen || isDeleted) {
+            this.fbDb.collection('remo_users').doc(uData.uid).delete().catch(() => {});
+            return;
           }
+          cloudUsers.push(uData);
+          cloudUserIds.add(uData.uid);
         });
-        if (changed) {
-          this.save(false, 'cloud_users_sync');
-          window.dispatchEvent(new CustomEvent('remo:stateupdate', { detail: { reason: 'cloud_users' } }));
-          if (typeof refreshAllAdminPanels === 'function') refreshAllAdminPanels();
-          if (typeof syncHeaderAndSidebars === 'function') syncHeaderAndSidebars();
-          if (typeof renderDirectMessagesView === 'function' && typeof currentRemoView !== 'undefined' && currentRemoView === 'messages') {
-            renderDirectMessagesView();
+
+        // Current active user
+        const curU = this.getCurrentUser();
+        const activeUsers = [...cloudUsers];
+        if (curU && !cloudUserIds.has(curU.uid) && !this.deletedUserIds?.has(curU.uid)) {
+          if (!/^citizen\d+@remo\.world$/i.test(curU.email || '')) {
+            activeUsers.push(curU);
           }
+        }
+        this.state.users = activeUsers;
+        this.save(false, 'cloud_users_sync');
+        window.dispatchEvent(new CustomEvent('remo:stateupdate', { detail: { reason: 'cloud_users' } }));
+        if (typeof refreshAllAdminPanels === 'function') refreshAllAdminPanels();
+        if (typeof syncHeaderAndSidebars === 'function') syncHeaderAndSidebars();
+        if (typeof renderDirectMessagesView === 'function' && typeof currentRemoView !== 'undefined' && currentRemoView === 'messages') {
+          renderDirectMessagesView();
         }
       }, (err) => {
         console.warn('Firestore remo_users sync notice:', err.message);
       });
-
-      // Seed initial users if admin or active citizen
-      setTimeout(() => {
-        if (this.fbDb) {
-          (this.state.users || []).forEach((u) => {
-            if (u.uid && (u.email || u.name)) this.syncUserToCloud(u);
-          });
-        }
-      }, 1500);
 
       // 2. Sync & Watch ALL DIRECT MESSAGES in Real Time
       this.fbDb.collection('remo_direct_messages').orderBy('ts', 'desc').limit(150).onSnapshot((snap) => {

@@ -1129,10 +1129,23 @@ function adminToggleBanUser(uid) {
 function adminDeleteCitizen(uid) {
   const lang = REMO_I18N.getLang();
   if (!confirm(lang === 'fr' ? 'Supprimer définitivement ce compte ?' : 'Permanently delete this citizen account?')) return;
-  REMO_STORE.state.users = (REMO_STORE.state.users || []).filter((u) => u.uid !== uid);
-  REMO_STORE.save(true, 'user_del');
   REMO_STORE.deleteUserFromCloud(uid);
   refreshAllAdminPanels();
+  admToast(lang === 'fr' ? '🗑️ Compte supprimé définitivement !' : '🗑️ Citizen account permanently deleted!');
+}
+
+async function adminPurgeFakeUsers() {
+  const lang = REMO_I18N.getLang();
+  const msg = lang === 'fr'
+    ? '⚠️ Nettoyer tous les faux comptes "citizenXXXX@remo.world" ?\nLes vrais comptes (admin, gmail, etc.) seront conservés.'
+    : '⚠️ Clean all fake citizen accounts? Real accounts will be kept.';
+  if (!confirm(msg)) return;
+  admToast('⏳ Nettoyage des comptes en cours...');
+  if (typeof REMO_STORE.purgeFakeUsersFromCloud === 'function') {
+    await REMO_STORE.purgeFakeUsersFromCloud();
+  }
+  refreshAllAdminPanels();
+  admToast('🗑️ Faux comptes nettoyés avec succès !');
 }
 
 function adminTogglePinPost(pid) {
@@ -1312,6 +1325,7 @@ window.adminToggleHappyHour2x = adminToggleHappyHour2x;
 window.adminToggleCityMayor = adminToggleCityMayor;
 window.adminToggleBanUser = adminToggleBanUser;
 window.adminDeleteCitizen = adminDeleteCitizen;
+window.adminPurgeFakeUsers = adminPurgeFakeUsers;
 window.adminTogglePinPost = adminTogglePinPost;
 window.adminCrownPostAward = adminCrownPostAward;
 window.adminEditPostCaption = adminEditPostCaption;

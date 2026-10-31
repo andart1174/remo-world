@@ -559,6 +559,26 @@ button, input, select, textarea {
   gap: 10px;
 }
 
+.post-owner-delete-btn {
+  background: rgba(244, 63, 94, 0.12);
+  border: 1px solid rgba(244, 63, 94, 0.35);
+  color: #f43f5e;
+  border-radius: 8px;
+  padding: 4px 8px;
+  font-size: 0.82rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  transition: all 0.2s ease;
+}
+.post-owner-delete-btn:hover {
+  background: rgba(244, 63, 94, 0.32);
+  border-color: #f43f5e;
+  transform: scale(1.08);
+}
+
 .post-author {
   display: flex;
   align-items: center;

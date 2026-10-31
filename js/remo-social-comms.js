@@ -783,6 +783,7 @@ function renderSocialFeed(searchQuery = '') {
         : buildPostBilingualPair(p);
       const isDualOpen = !!(window._openTranslatedPosts && window._openTranslatedPosts[p.id]);
       const cityTagLabel = `${city.flag || '🌍'} ${getCityName(city, lang)} · ${wx.icon || '🌤️'} ${wx.tempC ?? 20}°${wx.isSurge ? ' ⚡2X' : ''}`;
+      const isPostOwner = Boolean(u && (u.uid === p.uid || (u.email && p.authorEmail && u.email.toLowerCase() === p.authorEmail.toLowerCase())));
 
     return `
       <article class="post-card ${p.boosted || p.pinned || sealed ? 'boosted' : ''}" ${interactiveNoTilt ? '' : 'onmousemove="applyHoloTilt(event, this)" onmouseleave="resetHoloTilt(this)"'}>
@@ -801,7 +802,10 @@ function renderSocialFeed(searchQuery = '') {
               </div>
             </div>
           </div>
-          <span class="city-tag" onclick="filterFeedByCityFromMap('${city.id}')">${cityTagLabel}</span>
+          <div style="display:flex;align-items:center;gap:6px;">
+            ${(isPostOwner || isAdm) ? `<button type="button" class="post-owner-delete-btn" onclick="userDeleteOwnPost('${p.id}')" title="${lang === 'fr' ? 'Supprimer ma publication' : 'Delete my post'}">🗑️</button>` : ''}
+            <span class="city-tag" onclick="filterFeedByCityFromMap('${city.id}')">${cityTagLabel}</span>
+          </div>
         </div>
 
         <div class="post-media-wrap" id="post_media_${p.id}" ondblclick="handleMediaDoubleTap(event, '${p.id}', this)">
@@ -894,6 +898,7 @@ function renderSocialFeed(searchQuery = '') {
             : `<button class="tk-btn" onclick="mintPostAsCityCard('${p.id}')" title="Mint Card">🎴</button>
                <button class="tk-btn" onclick="switchRemoView('arena')" title="Duel">⚔️</button>`}
           <div class="tk-disc" onclick="toggleHeaderRadio()">🎵</div>
+          ${(isPostOwner || isAdm) ? `<button class="tk-btn" onclick="userDeleteOwnPost('${p.id}')" title="${lang === 'fr' ? 'Supprimer' : 'Delete'}" style="color:#f43f5e;">🗑️</button>` : ''}
         </div>
       </article>
     `;
@@ -1930,6 +1935,7 @@ async function publishNewRemoPost() {
     id: 'post_' + Date.now(),
     uid: u.uid,
     authorName: u.name,
+    authorEmail: u.email || '',
     authorVerified: true,
     authorPassport: u.passportNum,
     cityId,
@@ -3015,6 +3021,30 @@ function createPromoCodeInline() {
       : `🎟️ Code ${code} created (+${coins} 🪙) & copied!`,
     'fanfare'
   );
+}
+
+/* ── Post Author & Admin Deletion Action ── */
+function userDeleteOwnPost(postId) {
+  const lang = REMO_I18N.getLang();
+  const u = REMO_STORE.getCurrentUser();
+  const isAdm = REMO_STORE.isAdminUnlocked();
+  const p = (REMO_STORE.state.posts || []).find((x) => x.id === postId);
+  if (!p) return;
+  const isPostOwner = Boolean(u && (u.uid === p.uid || (u.email && p.authorEmail && u.email.toLowerCase() === p.authorEmail.toLowerCase())));
+  if (!isPostOwner && !isAdm) {
+    remoToast(lang === 'fr' ? 'Vous ne pouvez supprimer que vos propres publications.' : 'You can only delete your own posts.');
+    return;
+  }
+  const confirmMsg = lang === 'fr'
+    ? '🗑️ Voulez-vous vraiment supprimer définitivement cette publication ?'
+    : '🗑️ Are you sure you want to permanently delete this post?';
+  if (!confirm(confirmMsg)) return;
+
+  REMO_STORE.state.posts = (REMO_STORE.state.posts || []).filter((x) => x.id !== postId);
+  REMO_STORE.save(true, 'user_delete_post');
+  REMO_STORE.deletePostFromCloud(postId);
+  renderSocialFeed();
+  remoToast(lang === 'fr' ? '🗑️ Votre publication a été supprimée avec succès.' : '🗑️ Your post was successfully deleted.');
 }
 
 /* ── Direct In-Feed Post Moderation Actions (Admin God-Mode) ── */
@@ -4437,6 +4467,7 @@ window.adminDeleteBottle = adminDeleteBottle;
 window.triggerInlineCoinRain = triggerInlineCoinRain;
 window.createPromoCodeInline = createPromoCodeInline;
 window.adminDeletePostInline = adminDeletePostInline;
+window.userDeleteOwnPost = userDeleteOwnPost;
 window.adminPinPostInline = adminPinPostInline;
 window.adminAwardFounderCrown = adminAwardFounderCrown;
 window.adminEditPostInline = adminEditPostInline;
