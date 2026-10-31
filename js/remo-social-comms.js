@@ -3523,6 +3523,7 @@ function adminBoomCityStock(cityId) {
 }
 
 window.switchRemoView = switchRemoView;
+window.syncHeaderAndSidebars = syncHeaderAndSidebars;
 window.setFeedMode = setFeedMode;
 window.setFeedVibe = setFeedVibe;
 window.filterFeedByCityFromMap = filterFeedByCityFromMap;
@@ -3727,10 +3728,6 @@ function renderVipShopView() {
             🔄 ${lang === 'fr' ? 'Réinitialiser la Boutique' : 'Reset Boutique'}
           </button>
         </div>
-      `;
-    }
-  }
-}
       `;
     }
   }
