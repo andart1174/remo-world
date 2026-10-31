@@ -669,28 +669,37 @@
 
       <!-- TAB 3: LIVE HTML / CSS / JS INTERACTIVE CODE STUDIO -->
       <div class="studio-pane" id="studioPane-html">
-        <p style="font-size:0.76rem;color:#cbd5e1;margin-bottom:8px;" data-i18n="create_html_hint">💻 Write or paste HTML/CSS/JS, upload an .html file, or pick a 1-click starter template:</p>
-        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
-          <button type="button" class="fchip" onclick="loadStudioHtmlTemplate('fireworks')" data-i18n="create_tpl_fireworks">🎆 3D City Fireworks</button>
-          <button type="button" class="fchip" onclick="loadStudioHtmlTemplate('racer')" data-i18n="create_tpl_racer">🏎️ Neon Mini-Game</button>
-          <button type="button" class="fchip" onclick="loadStudioHtmlTemplate('globe')" data-i18n="create_tpl_globe">🌀 4D Matrix Synth</button>
-          <button type="button" class="fchip" onclick="loadStudioHtmlTemplate('beatpad')" data-i18n="create_tpl_beatpad">🎹 Cyber Beat Pad</button>
-          <label class="fchip" style="border-color:#fbbf24;color:#fbbf24;cursor:pointer;">
+        <p style="font-size:0.76rem;color:#cbd5e1;margin-bottom:8px;" data-i18n="create_html_hint">💻 Write or paste HTML/CSS/JS, or upload an .html file:</p>
+
+        <!-- Admin-Only Preset Starter Templates & Arcade Games -->
+        <div id="adminHtmlTemplatesBox" style="display:none;margin-bottom:8px;">
+          <div style="font-size:0.73rem;font-weight:900;color:#fbbf24;margin-bottom:6px;">👑 Modèles Officiels REMO (Admin Only) :</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
+            <button type="button" class="fchip" onclick="loadStudioHtmlTemplate('fireworks')" data-i18n="create_tpl_fireworks">🎆 3D City Fireworks</button>
+            <button type="button" class="fchip" onclick="loadStudioHtmlTemplate('racer')" data-i18n="create_tpl_racer">🏎️ Neon Mini-Game</button>
+            <button type="button" class="fchip" onclick="loadStudioHtmlTemplate('globe')" data-i18n="create_tpl_globe">🌀 4D Matrix Synth</button>
+            <button type="button" class="fchip" onclick="loadStudioHtmlTemplate('beatpad')" data-i18n="create_tpl_beatpad">🎹 Cyber Beat Pad</button>
+          </div>
+          <!-- 5 Distinct City Arcade Game Genres -->
+          <div style="background:rgba(56,189,248,0.08);border:1px solid rgba(56,189,248,0.35);border-radius:12px;padding:8px 10px;margin-bottom:8px;">
+            <div style="font-size:0.73rem;font-weight:900;color:#38bdf8;margin-bottom:6px;" data-i18n="game_genre_lbl">🎮 Choose City Arcade Game Genre:</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;">
+              <button type="button" class="fchip" onclick="copilotGenerateCityHtmlGame('defense')">🏙️ Skyline Laser Defense</button>
+              <button type="button" class="fchip" onclick="copilotGenerateCityHtmlGame('stacker')">🏗️ 4D Tower Builder</button>
+              <button type="button" class="fchip" onclick="copilotGenerateCityHtmlGame('drone')">🛸 Cyber Drone Flier</button>
+              <button type="button" class="fchip" onclick="copilotGenerateCityHtmlGame('metro')">🚇 3D Neon Street Dash</button>
+              <button type="button" class="fchip" onclick="copilotGenerateCityHtmlGame('rhythm')">🎹 City Rhythm Piano</button>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-bottom:8px;">
+          <label class="fchip" style="border-color:#fbbf24;color:#fbbf24;cursor:pointer;display:inline-flex;">
             <span data-i18n="create_html_upload_file">📂 Upload .html File</span>
             <input type="file" accept=".html,.htm,text/html" style="display:none;" onchange="handleStudioHtmlFileUpload(event)">
           </label>
         </div>
-        <!-- 5 Distinct City Arcade Game Genres -->
-        <div style="background:rgba(56,189,248,0.08);border:1px solid rgba(56,189,248,0.35);border-radius:12px;padding:8px 10px;margin-bottom:8px;">
-          <div style="font-size:0.73rem;font-weight:900;color:#38bdf8;margin-bottom:6px;" data-i18n="game_genre_lbl">🎮 Choose City Arcade Game Genre:</div>
-          <div style="display:flex;gap:6px;flex-wrap:wrap;">
-            <button type="button" class="fchip" onclick="copilotGenerateCityHtmlGame('defense')">🏙️ Skyline Laser Defense</button>
-            <button type="button" class="fchip" onclick="copilotGenerateCityHtmlGame('stacker')">🏗️ 4D Tower Builder</button>
-            <button type="button" class="fchip" onclick="copilotGenerateCityHtmlGame('drone')">🛸 Cyber Drone Flier</button>
-            <button type="button" class="fchip" onclick="copilotGenerateCityHtmlGame('metro')">🚇 3D Neon Street Dash</button>
-            <button type="button" class="fchip" onclick="copilotGenerateCityHtmlGame('rhythm')">🎹 City Rhythm Piano</button>
-          </div>
-        </div>
+
         <textarea id="createHtmlCodeArea" class="code-editor-area" spellcheck="false" placeholder="<!DOCTYPE html>&#10;<html>...</html>"></textarea>
         <div style="display:flex;justify-content:space-between;align-items:center;margin:8px 0;">
           <button type="button" class="btn-ghost" onclick="refreshStudioHtmlPreview()" data-i18n="create_html_preview_btn">▶️ Refresh Live Preview</button>
@@ -713,7 +722,7 @@
           <button type="button" class="copilot-btn" onclick="copilotGenerateViralIdea()" data-i18n="copilot_btn_idea">💡 Viral Idea</button>
           <button type="button" class="copilot-btn" onclick="copilotUpgradeHypeHook()" data-i18n="copilot_btn_hook">🔥 Hype Hook</button>
           <button type="button" class="copilot-btn" onclick="copilotAutoTranslateStudio()" data-i18n="copilot_btn_translate">🌐 Auto EN ⇄ FR</button>
-          <button type="button" class="copilot-btn" onclick="copilotGenerateCityHtmlGame()" data-i18n="copilot_btn_html">🎮 City HTML Game</button>
+          <button type="button" class="copilot-btn" id="copilotGameBtn" style="display:none;" onclick="copilotGenerateCityHtmlGame()" data-i18n="copilot_btn_html">🎮 City HTML Game</button>
         </div>
       </div>
 
@@ -797,7 +806,7 @@
       <div class="modal-hdr" style="margin-bottom:10px;">
         <b id="htmlFsTitle" style="font-family:'Orbitron',sans-serif;color:#38bdf8;">💻 REMO LIVE HTML ARCADE</b>
         <div style="display:flex;gap:8px;align-items:center;">
-          <button class="btn-cyber" id="htmlFsRemixBtn">🪄 Remix (+10 🪙)</button>
+          <button class="btn-cyber" id="htmlFsShareBtn" onclick="shareFullscreenPostLink()">🔗 Partager le Lien</button>
           <button class="modal-close" onclick="closeHtmlFullscreenModal()">✕</button>
         </div>
       </div>

@@ -537,14 +537,11 @@ function renderPostMediaStage(p, city, lang) {
   if (p.mediaType === 'html_app' && p.htmlCode) {
     return `
       <iframe class="html-post-frame" id="htmlFrame_${p.id}" sandbox="allow-scripts" loading="lazy" srcdoc="${escapeSrcDocAttr(p.htmlCode)}"></iframe>
-      <pre class="html-code-viewer" id="htmlCodeView_${p.id}">${escapeHtmlStr(p.htmlCode)}</pre>
       <div class="html-post-toolbar">
-        <div style="display:flex;gap:5px;">
-          <button type="button" class="html-tool-btn" onclick="toggleHtmlCodeView('${p.id}', this)">${t('act_view_code')}</button>
-          <button type="button" class="html-tool-btn" onclick="copyPostHtmlCode('${p.id}')">📋 Copy</button>
-          <button type="button" class="html-tool-btn" onclick="openHtmlFullscreenModal('${p.id}')">${t('act_fullscreen')}</button>
+        <div style="display:flex;gap:6px;align-items:center;">
+          <button type="button" class="html-tool-btn" onclick="openHtmlFullscreenModal('${p.id}')">⛶ ${t('act_fullscreen')}</button>
+          <button type="button" class="html-tool-btn active" style="background:rgba(56,189,248,0.15);border-color:#38bdf8;color:#38bdf8;" onclick="sharePostLink('${p.id}')">🔗 ${lang === 'fr' ? 'Partager le Lien' : 'Share Link'}</button>
         </div>
-        <button type="button" class="html-tool-btn active" onclick="remixHtmlPost('${p.id}')">${t('act_remix_html')}</button>
       </div>
     `;
   }
@@ -786,7 +783,7 @@ function renderSocialFeed(searchQuery = '') {
       const isPostOwner = Boolean(u && (u.uid === p.uid || (u.email && p.authorEmail && u.email.toLowerCase() === p.authorEmail.toLowerCase())));
 
     return `
-      <article class="post-card ${p.boosted || p.pinned || sealed ? 'boosted' : ''}" ${interactiveNoTilt ? '' : 'onmousemove="applyHoloTilt(event, this)" onmouseleave="resetHoloTilt(this)"'}>
+      <article id="post_card_${p.id}" class="post-card ${p.boosted || p.pinned || sealed ? 'boosted' : ''}" ${interactiveNoTilt ? '' : 'onmousemove="applyHoloTilt(event, this)" onmouseleave="resetHoloTilt(this)"'}>
         <div class="post-head">
           <div class="post-author" style="cursor:pointer;" onclick="openDirectChatWithUser('${p.uid || ''}')" title="💌 Message @${escapeHtmlStr(p.authorName)}">
             <div class="avatar-circle ${cosm.frameClass}">${escapeHtmlStr((p.authorName || 'R')[0].toUpperCase())}</div>
@@ -857,7 +854,7 @@ function renderSocialFeed(searchQuery = '') {
             <div class="post-actions-secondary">
               ${!hiddenByCapsule ? `<button class="pact-btn pact-pill" style="color:#f472b6;border-color:rgba(244,114,182,0.45);" onclick="startCityDuetFromPost('${p.id}')">${t('act_duet_city')}</button>` : ''}
               ${!hiddenByCapsule && p.mediaType === 'html_app'
-                ? `<button class="pact-btn pact-pill" style="color:#38bdf8;border-color:rgba(56,189,248,0.4);" onclick="remixHtmlPost('${p.id}')">${t('act_remix_html')}</button>`
+                ? `<button class="pact-btn pact-pill" style="color:#38bdf8;border-color:rgba(56,189,248,0.4);" onclick="sharePostLink('${p.id}')">🔗 ${lang === 'fr' ? 'Partager' : 'Share'}</button>`
                 : `<button class="pact-btn pact-pill" onclick="mintPostAsCityCard('${p.id}')">🎴 ${t('act_mint_card')}</button>`}
               <button class="pact-btn pact-pill" onclick="boostPost24h('${p.id}')" title="Boost">🚀</button>
               <button class="pact-btn pact-pill" onclick="saveBookmarkPost('${p.id}')" title="Bookmark">🔖</button>
@@ -894,7 +891,7 @@ function renderSocialFeed(searchQuery = '') {
           <button class="tk-btn" onclick="startCityDuetFromPost('${p.id}')" title="City Duet">🎭</button>
           ${p.mediaType === 'html_app'
             ? `<button class="tk-btn" onclick="openHtmlFullscreenModal('${p.id}')" title="Fullscreen">⛶</button>
-               <button class="tk-btn" onclick="remixHtmlPost('${p.id}')" title="Remix">🪄</button>`
+               <button class="tk-btn" onclick="sharePostLink('${p.id}')" title="${lang === 'fr' ? 'Partager' : 'Share'}">🔗</button>`
             : `<button class="tk-btn" onclick="mintPostAsCityCard('${p.id}')" title="Mint Card">🎴</button>
                <button class="tk-btn" onclick="switchRemoView('arena')" title="Duel">⚔️</button>`}
           <div class="tk-disc" onclick="toggleHeaderRadio()">🎵</div>
@@ -1231,26 +1228,73 @@ function toggleHtmlCodeView(postId, btnEl) {
   if (btnEl) btnEl.textContent = open ? t('act_live_app') : t('act_view_code');
 }
 
-function copyPostHtmlCode(postId) {
-  const p = REMO_STORE.state.posts.find((x) => x.id === postId);
-  if (!p || !p.htmlCode) return;
-  navigator.clipboard?.writeText(p.htmlCode);
-  remoToast(REMO_I18N.getLang() === 'fr' ? '📋 Code HTML copié dans le presse-papiers !' : '📋 HTML code copied to clipboard!', 'click');
+let currentFullscreenPostId = null;
+
+function sharePostLink(postId) {
+  const lang = REMO_I18N.getLang();
+  const post = (REMO_STORE.state.posts || []).find((p) => p.id === postId);
+  const cleanId = encodeURIComponent(postId);
+  const url = `${window.location.origin}${window.location.pathname}?post=${cleanId}#post_${cleanId}`;
+  const title = post ? (lang === 'fr' ? (post.caption_fr || post.caption_en) : (post.caption_en || post.caption_fr)) : 'REMO World';
+
+  if (navigator.share) {
+    navigator.share({
+      title: 'REMO World',
+      text: title ? `${title.slice(0, 85)}... Jouez et découvrez sur REMO !` : 'Découvrez cette publication sur REMO !',
+      url: url
+    }).then(() => {
+      remoToast(lang === 'fr' ? '🔗 Lien partagé avec succès !' : '🔗 Link shared successfully!');
+    }).catch(() => {
+      copyPostUrlToClipboard(url, lang);
+    });
+  } else {
+    copyPostUrlToClipboard(url, lang);
+  }
+}
+
+function copyPostUrlToClipboard(url, lang) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(url).then(() => {
+      remoToast(lang === 'fr' ? '🔗 Lien copié ! Partagez ce moment avec vos amis.' : '🔗 Link copied! Share this moment with friends.');
+    }).catch(() => fallbackCopyPostUrl(url, lang));
+  } else {
+    fallbackCopyPostUrl(url, lang);
+  }
+}
+
+function fallbackCopyPostUrl(url, lang) {
+  const ta = document.createElement('textarea');
+  ta.value = url;
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.select();
+  try {
+    document.execCommand('copy');
+    remoToast(lang === 'fr' ? '🔗 Lien copié dans le presse-papiers !' : '🔗 Link copied to clipboard!');
+  } catch (e) {
+    prompt(lang === 'fr' ? 'Copiez ce lien :' : 'Copy this link:', url);
+  }
+  document.body.removeChild(ta);
+}
+
+function shareFullscreenPostLink() {
+  if (currentFullscreenPostId) sharePostLink(currentFullscreenPostId);
 }
 
 function openHtmlFullscreenModal(postId) {
   const p = REMO_STORE.state.posts.find((x) => x.id === postId);
   if (!p || !p.htmlCode) return;
+  currentFullscreenPostId = postId;
   const modal = document.getElementById('htmlFullscreenModal');
   const iframe = document.getElementById('htmlFsIframe');
   const titleEl = document.getElementById('htmlFsTitle');
-  const remixBtn = document.getElementById('htmlFsRemixBtn');
+  const shareBtn = document.getElementById('htmlFsShareBtn');
   if (titleEl) titleEl.textContent = `💻 @${p.authorName} — LIVE HTML ARCADE`;
   if (iframe) iframe.srcdoc = p.htmlCode;
-  if (remixBtn) {
-    remixBtn.onclick = () => {
-      closeHtmlFullscreenModal();
-      remixHtmlPost(postId);
+  if (shareBtn) {
+    shareBtn.onclick = () => {
+      sharePostLink(postId);
     };
   }
   modal?.classList.add('open');
@@ -1263,6 +1307,10 @@ function closeHtmlFullscreenModal() {
 }
 
 function remixHtmlPost(postId) {
+  if (!REMO_STORE.isAdminUnlocked() && !REMO_STORE.isCurrentUserAdmin()) {
+    sharePostLink(postId);
+    return;
+  }
   const p = REMO_STORE.state.posts.find((x) => x.id === postId);
   if (!p || !p.htmlCode) return;
   const lang = REMO_I18N.getLang();
@@ -1495,9 +1543,19 @@ function openCreatePostModal(prefillTag = '') {
   if (timerRow) timerRow.style.display = 'none';
   const htmlFrame = document.getElementById('studioHtmlLivePreview');
   if (htmlFrame) { htmlFrame.style.display = 'none'; htmlFrame.srcdoc = ''; }
+  const isAdm = REMO_STORE.isAdminUnlocked() || REMO_STORE.isCurrentUserAdmin();
+  const admTplBox = document.getElementById('adminHtmlTemplatesBox');
+  if (admTplBox) admTplBox.style.display = isAdm ? 'block' : 'none';
+  const copilotGameBtn = document.getElementById('copilotGameBtn');
+  if (copilotGameBtn) copilotGameBtn.style.display = isAdm ? 'inline-flex' : 'none';
+
   const htmlArea = document.getElementById('createHtmlCodeArea');
-  if (htmlArea && !htmlArea.value.trim()) {
-    htmlArea.value = REMO_HTML_TEMPLATES.fireworks;
+  if (htmlArea) {
+    if (isAdm && !htmlArea.value.trim()) {
+      htmlArea.value = REMO_HTML_TEMPLATES.fireworks;
+    } else if (!isAdm) {
+      htmlArea.value = '';
+    }
   }
 
   // Reset Poll, Secret Capsule & Viral Goal toggles
@@ -1737,6 +1795,10 @@ async function toggleLiveCam60Recording() {
 
 /* ── TAB 3: Live HTML / CSS / JS Code Studio Handlers ── */
 function loadStudioHtmlTemplate(tplKey) {
+  if (!REMO_STORE.isAdminUnlocked() && !REMO_STORE.isCurrentUserAdmin()) {
+    remoToast(REMO_I18N.getLang() === 'fr' ? 'Les modèles officiels sont réservés aux administrateurs.' : 'Official templates are admin only.');
+    return;
+  }
   const code = REMO_HTML_TEMPLATES[tplKey];
   if (!code) return;
   const area = document.getElementById('createHtmlCodeArea');
@@ -2787,8 +2849,22 @@ document.addEventListener('DOMContentLoaded', () => {
   setInterval(updateFlashDropCountdownUI, 1000);
 
 
-  // Check URL parameters (?view=arena, ?city=chisinau, ?verify=...)
+  // Check URL parameters (?view=arena, ?city=chisinau, ?verify=..., ?post=...)
   const params = new URLSearchParams(window.location.search);
+  const targetPost = params.get('post') || (window.location.hash ? window.location.hash.replace('#post_', '').replace('#', '') : null);
+  if (targetPost) {
+    const scrollToTargetPost = () => {
+      const card = document.getElementById(`post_card_${targetPost}`);
+      if (card) {
+        card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        card.style.transition = 'all 0.5s ease';
+        card.style.boxShadow = '0 0 35px rgba(56, 189, 248, 0.7)';
+        setTimeout(() => { if (card) card.style.boxShadow = ''; }, 3500);
+      }
+    };
+    setTimeout(scrollToTargetPost, 600);
+    setTimeout(scrollToTargetPost, 1800);
+  }
   if (params.get('city')) {
     currentFeedCityFilter = params.get('city');
     renderSocialFeed();
@@ -3365,6 +3441,8 @@ window.toggleHtmlCodeView = toggleHtmlCodeView;
 window.copyPostHtmlCode = copyPostHtmlCode;
 window.openHtmlFullscreenModal = openHtmlFullscreenModal;
 window.closeHtmlFullscreenModal = closeHtmlFullscreenModal;
+window.sharePostLink = sharePostLink;
+window.shareFullscreenPostLink = shareFullscreenPostLink;
 window.remixHtmlPost = remixHtmlPost;
 window.stepPostCarousel = stepPostCarousel;
 window.updateBeforeAfterSlider = updateBeforeAfterSlider;
@@ -3703,6 +3781,10 @@ function copilotAutoTranslateStudio() {
 let _cityArcadeCycleIdx = 0;
 
 function copilotGenerateCityHtmlGame(forcedGenre = '') {
+  if (!REMO_STORE.isAdminUnlocked() && !REMO_STORE.isCurrentUserAdmin()) {
+    remoToast(REMO_I18N.getLang() === 'fr' ? 'La génération de jeux arcade est réservée aux administrateurs.' : 'Arcade game generation is admin only.');
+    return;
+  }
   const lang = REMO_I18N.getLang();
   const cityId = document.getElementById('createCitySelect')?.value || 'chisinau';
   const city = getCityById(cityId);
