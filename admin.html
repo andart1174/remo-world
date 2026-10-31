@@ -573,7 +573,10 @@
         </div>
 
         <div class="exec-card" style="overflow-x:auto;">
-          <h3 data-i18n="adm_posts_hdr">📸 Social Feed Moments Moderation</h3>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:10px;">
+            <h3 data-i18n="adm_posts_hdr" style="margin:0;">📸 Social Feed Moments Moderation</h3>
+            <button type="button" class="adm-btn rose" onclick="adminPurgeAllPosts()" style="padding:6px 14px;font-size:0.82rem;">🗑️ Vider TOUS les posts du Cloud</button>
+          </div>
           <table class="adm-table">
             <thead><tr><th>Author</th><th>Moment</th><th>Stats</th><th>Moderation</th></tr></thead>
             <tbody id="admPostsTable"></tbody>

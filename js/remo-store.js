@@ -858,97 +858,7 @@ function createDefaultState() {
       }
     ],
 
-    posts: [
-      ...getShowcaseInteractivePosts(now),
-      {
-        id: 'post_1',
-        uid: 'u_admin_founder',
-        authorName: 'REMO Founder',
-        authorVerified: true,
-        authorPassport: '0001',
-        cityId: 'montreal',
-        vibe: 'energy',
-        caption_en: 'Sunset over Mont-Royal & Old Port! Team Montréal is leading the World City Cup tonight ⚜️🔥 #RemoGoldenHour #Montreal #CityWars',
-        caption_fr: 'Coucher de soleil sur le Mont-Royal et le Vieux-Port ! Montréal mène la Coupe des Villes ce soir ⚜️🔥 #RemoGoldenHour #Montreal #CityWars',
-        mediaType: 'city_art',
-        visualHeadline: 'MONTRÉAL NIGHT PULSE',
-        visualSub: 'Mont-Royal Summit · 45.5017° N',
-        verifiedGps: true,
-        boosted: true,
-        mintedCard: true,
-        likes: ['u_elena_kiv', 'u_lucas_par', 'u_kenji_tyo'],
-        tipsTotal: 250,
-        comments: [
-          { id: 'c1', author: 'Lucas_Paris', text: 'Paris is right behind you! Magnifique vue 🔥', createdAt: now - 1800000 }
-        ],
-        createdAt: now - 3600000
-      },
-      {
-        id: 'post_2',
-        uid: 'u_elena_kiv',
-        authorName: 'Elena_KIV',
-        authorVerified: true,
-        authorPassport: '0007',
-        cityId: 'chisinau',
-        vibe: 'culture',
-        caption_en: 'Lights at the Triumphal Arch & City Gates in Chișinău! Just minted Serial #0002 Mythic 4D Card 🇲🇩✨ #Chisinau #Moldova #CityCards',
-        caption_fr: 'Lumières sur l’Arc de Triomphe et les Portes de la Ville à Chișinău ! Carte Mythique 4D #0002 activée 🇲🇩✨ #Chisinau #Moldavie #CityCards',
-        mediaType: 'city_art',
-        visualHeadline: 'CHIȘINĂU GOLDEN ARCH',
-        visualSub: 'Capital of Moldova · Mythic 4D Edition',
-        verifiedGps: true,
-        boosted: false,
-        mintedCard: true,
-        likes: ['u_admin_founder', 'u_lucas_par'],
-        tipsTotal: 180,
-        comments: [
-          { id: 'c2', author: 'REMO Founder', text: 'Chișinău climbing fast into Top 3! 🇲🇩🚀', createdAt: now - 900000 }
-        ],
-        createdAt: now - 5400000
-      },
-      {
-        id: 'post_3',
-        uid: 'u_lucas_par',
-        authorName: 'Lucas_Paris',
-        authorVerified: true,
-        authorPassport: '0012',
-        cityId: 'paris',
-        vibe: 'chill',
-        caption_en: 'Midnight sparkle on the Eiffel Tower from Trocadéro 🗼✨ Who dares challenge my Paris Crystal Card in PvP? #Paris #RemoGoldenHour',
-        caption_fr: 'Scintillement de minuit sur la Tour Eiffel depuis le Trocadéro 🗼✨ Qui ose défier ma Carte Cristal Paris en PvP ? #Paris #RemoGoldenHour',
-        mediaType: 'city_art',
-        visualHeadline: 'PARIS MIDNIGHT SPARKLE',
-        visualSub: 'Trocadéro Horizon · Crystal 4D',
-        verifiedGps: true,
-        boosted: false,
-        mintedCard: false,
-        likes: ['u_admin_founder', 'u_kenji_tyo'],
-        tipsTotal: 95,
-        comments: [],
-        createdAt: now - 7200000
-      },
-      {
-        id: 'post_4',
-        uid: 'u_kenji_tyo',
-        authorName: 'Kenji_Shibuya',
-        authorVerified: true,
-        authorPassport: '0019',
-        cityId: 'tokyo',
-        vibe: 'energy',
-        caption_en: 'Neon rain in Shibuya Crossing! Cyber Matrix 4D vibes at 99 Tech Power 🏯⚡ #Tokyo #CyberCity #REMO',
-        caption_fr: 'Pluie néon sur Shibuya Crossing ! Ambiance Cyber Matrix 4D à 99 de Puissance Tech 🏯⚡ #Tokyo #CyberCity #REMO',
-        mediaType: 'city_art',
-        visualHeadline: 'TOKYO SHIBUYA MATRIX',
-        visualSub: 'Shibuya District · 99 Tech Power',
-        verifiedGps: false,
-        boosted: false,
-        mintedCard: true,
-        likes: ['u_elena_kiv'],
-        tipsTotal: 120,
-        comments: [],
-        createdAt: now - 10800000
-      }
-    ],
+    posts: [],
 
     stories: [
       { id: 'st_1', author: 'REMO Founder', cityId: 'montreal', caption_en: 'Mont-Royal Flash Drop Live! ⚡', caption_fr: 'Flash Drop Mont-Royal en direct ! ⚡', createdAt: now - 1200000 },
@@ -1921,13 +1831,10 @@ const REMO_STORE = {
       this.state = createDefaultState();
     }
     if (!this.state.settings) this.state = createDefaultState();
-    if (this.deletedPostIds && Array.isArray(this.state.posts)) {
-      this.state.posts = this.state.posts.filter((p) => !this.deletedPostIds.has(p.id));
-    }
-    // Non-destructive migration: inject Showcase Live HTML posts & new modules into existing user state!
-    if (Array.isArray(this.state.posts) && !this.state.posts.some((p) => p.id === 'post_html_fireworks') && !this.deletedPostIds.has('post_html_fireworks')) {
-      const showcases = getShowcaseInteractivePosts(Date.now());
-      this.state.posts.push(...showcases);
+    // Strip out legacy built-in mock posts from previous builds
+    const legacyMockIds = new Set(['post_html_fireworks', 'post_html_racer_kiv', 'post_1', 'post_2', 'post_3', 'post_4', 'post_duet_tokyo_paris', 'post_duet_mtl_chisinau', 'post_capsule_locked', 'post_duo_live_kiv_mtl']);
+    if (Array.isArray(this.state.posts)) {
+      this.state.posts = this.state.posts.filter((p) => p && p.id && !legacyMockIds.has(p.id) && (!this.deletedPostIds || !this.deletedPostIds.has(p.id)));
     }
     upgradeEcosystemState(this.state);
     this.save(false);
@@ -2734,27 +2641,13 @@ const REMO_STORE = {
           lp && lp.id && !cloudPostIds.has(lp.id) && !this.deletedPostIds?.has(lp.id) && (now - (lp.createdAt || 0) < 4000)
         );
 
-        const merged = [...freshLocal];
+        // Active posts are strictly what's in Firestore + any fresh local drafts
+        const activePosts = [...freshLocal];
         cloudPosts.forEach((cp) => {
-          if (!merged.some((m) => m.id === cp.id)) {
-            merged.push(cp);
+          if (!activePosts.some((m) => m.id === cp.id) && (!this.deletedPostIds || !this.deletedPostIds.has(cp.id))) {
+            activePosts.push(cp);
           }
         });
-
-        // Include default starter showcases (Montreal, Paris, Chisinau, HTML mini-games) unless deleted by admin
-        try {
-          const starters = (getShowcaseInteractivePosts(Date.now()) || []).filter(
-            (sp) => !this.deletedPostIds?.has(sp.id) && !cloudPostIds.has(sp.id)
-          );
-          starters.forEach((sp) => {
-            if (!merged.some((m) => m.id === sp.id)) {
-              merged.push(sp);
-            }
-          });
-        } catch (e) {}
-
-        // Filter out any permanently deleted posts
-        const activePosts = merged.filter((p) => p && p.id && !this.deletedPostIds?.has(p.id));
 
         const prevSignature = (this.state.posts || []).map((p) => `${p.id}_${p.likes?.length || 0}_${p.comments?.length || 0}_${p.pinned ? 1 : 0}`).join('|');
         const nextSignature = activePosts.map((p) => `${p.id}_${p.likes?.length || 0}_${p.comments?.length || 0}_${p.pinned ? 1 : 0}`).join('|');
@@ -2772,6 +2665,9 @@ const REMO_STORE = {
           window.dispatchEvent(new CustomEvent('remo:stateupdate', { detail: { reason: 'cloud_posts' } }));
           if (typeof renderSocialFeed === 'function' && (typeof currentRemoView === 'undefined' || currentRemoView === 'feed')) {
             renderSocialFeed();
+          }
+          if (typeof refreshAllAdminPanels === 'function') {
+            refreshAllAdminPanels();
           }
         }
       }, (err) => {
@@ -2843,6 +2739,29 @@ const REMO_STORE = {
         .then(() => console.log('Successfully deleted post from Firestore:', postId))
         .catch((err) => console.warn('Firestore delete notice:', err.message));
     } catch (e) {}
+  },
+
+  async purgeAllPostsFromCloud() {
+    this.state.posts = [];
+    if (!this.deletedPostIds) this.deletedPostIds = new Set();
+    localStorage.removeItem('remo_deleted_posts');
+    this.deletedPostIds.clear();
+    this.save(false, 'purge_all_posts');
+    if (this.fbDb) {
+      try {
+        const snap = await this.fbDb.collection('remo_posts').get();
+        const batch = this.fbDb.batch();
+        snap.forEach((doc) => {
+          batch.delete(doc.ref);
+        });
+        await batch.commit();
+        console.log('All posts deleted from Firestore successfully');
+      } catch (err) {
+        console.warn('Purge posts error:', err);
+      }
+    }
+    window.dispatchEvent(new CustomEvent('remo:stateupdate', { detail: { reason: 'purge_posts' } }));
+    if (typeof renderSocialFeed === 'function') renderSocialFeed();
   },
 
   syncToFirestore(reason = 'update') {

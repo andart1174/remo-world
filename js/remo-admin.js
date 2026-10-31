@@ -1182,6 +1182,20 @@ function adminDeletePost(pid) {
   admToast('🗑️ Post permanently deleted!');
 }
 
+async function adminPurgeAllPosts() {
+  const lang = REMO_I18N.getLang();
+  const msg = lang === 'fr'
+    ? '⚠️ VOULEZ-VOUS VRAIMENT SUPPRIMER TOUS LES POSTS DU MONDE ?\nCette action videra complètement le flux pour tous les utilisateurs sur tous les appareils.'
+    : '⚠️ ARE YOU SURE YOU WANT TO DELETE ALL POSTS GLOBALLY?\nThis will completely wipe the feed for all users across all devices.';
+  if (!confirm(msg)) return;
+  admToast('⏳ Suppression de tous les posts en cours...');
+  if (typeof REMO_STORE.purgeAllPostsFromCloud === 'function') {
+    await REMO_STORE.purgeAllPostsFromCloud();
+  }
+  refreshAllAdminPanels();
+  admToast('🗑️ Tous les posts ont été supprimés avec succès !');
+}
+
 /* ── 8. FIREBASE CLOUD, CUSTOM DOMAIN, ADMIN PIN & JSON BACKUP ── */
 function renderAdminCloudPanel() {
   const cfg = REMO_STORE.getFirebaseConfig();
@@ -1304,6 +1318,7 @@ window.adminEditPostCaption = adminEditPostCaption;
 window.adminToggleVerifyUser = adminToggleVerifyUser;
 window.adminToggleBoostPost = adminToggleBoostPost;
 window.adminDeletePost = adminDeletePost;
+window.adminPurgeAllPosts = adminPurgeAllPosts;
 window.adminSaveFirebaseConfig = adminSaveFirebaseConfig;
 window.adminSaveSystemSettings = adminSaveSystemSettings;
 window.adminExportBackupJSON = adminExportBackupJSON;
