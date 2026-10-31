@@ -1906,8 +1906,14 @@ const REMO_STORE = {
   fbApp: null,
   fbDb: null,
   fbAuth: null,
+  deletedPostIds: null,
 
   init() {
+    try {
+      this.deletedPostIds = new Set(JSON.parse(localStorage.getItem('remo_deleted_posts') || '[]'));
+    } catch (e) {
+      this.deletedPostIds = new Set();
+    }
     try {
       const raw = localStorage.getItem(this.KEY);
       this.state = raw ? JSON.parse(raw) : createDefaultState();
@@ -1915,8 +1921,11 @@ const REMO_STORE = {
       this.state = createDefaultState();
     }
     if (!this.state.settings) this.state = createDefaultState();
+    if (this.deletedPostIds && Array.isArray(this.state.posts)) {
+      this.state.posts = this.state.posts.filter((p) => !this.deletedPostIds.has(p.id));
+    }
     // Non-destructive migration: inject Showcase Live HTML posts & new modules into existing user state!
-    if (Array.isArray(this.state.posts) && !this.state.posts.some((p) => p.id === 'post_html_fireworks')) {
+    if (Array.isArray(this.state.posts) && !this.state.posts.some((p) => p.id === 'post_html_fireworks') && !this.deletedPostIds.has('post_html_fireworks')) {
       const showcases = getShowcaseInteractivePosts(Date.now());
       this.state.posts.push(...showcases);
     }
@@ -2699,49 +2708,55 @@ const REMO_STORE = {
         console.warn('Firestore remo_direct_messages sync notice:', err.message);
       });
 
-      // 3. Sync & Watch ALL SOCIAL POSTS in Real Time across all devices (Individual Document Per Post)
+      // 3. Sync & Watch ALL SOCIAL POSTS in Real Time across all devices (Cloud is Authoritative Source of Truth)
       this.fbDb.collection('remo_posts').limit(80).onSnapshot((snap) => {
         if (!snap) return;
-        let changed = false;
+        const cloudPosts = [];
+        const cloudPostIds = new Set();
         snap.forEach((doc) => {
-          const cloudPost = doc.data();
-          if (!cloudPost || !cloudPost.id) return;
-          const idx = this.state.posts.findIndex((x) => x.id === cloudPost.id);
-          if (idx >= 0) {
-            const ex = this.state.posts[idx];
-            if (ex.htmlCode !== cloudPost.htmlCode ||
-                ex.mediaUrl !== cloudPost.mediaUrl ||
-                (ex.mediaUrls || []).length !== (cloudPost.mediaUrls || []).length ||
-                (ex.likes || []).length !== (cloudPost.likes || []).length ||
-                (ex.comments || []).length !== (cloudPost.comments || []).length ||
-                ex.pinned !== cloudPost.pinned ||
-                ex.boosted !== cloudPost.boosted) {
-              Object.assign(this.state.posts[idx], cloudPost);
-              changed = true;
+          const cp = doc.data();
+          if (cp && cp.id) {
+            // Discard any post that was deleted by admin
+            if (this.deletedPostIds && this.deletedPostIds.has(cp.id)) {
+              if (this.isCurrentUserAdmin()) {
+                this.fbDb.collection('remo_posts').doc(cp.id).delete().catch(() => {});
+              }
+              return;
             }
-          } else {
-            this.state.posts.push(cloudPost);
-            changed = true;
+            cloudPosts.push(cp);
+            cloudPostIds.add(cp.id);
           }
         });
 
-        // Handle document deletions from cloud
-        snap.docChanges().forEach((change) => {
-          if (change.type === 'removed') {
-            const rmId = change.doc.id;
-            const beforeLen = this.state.posts.length;
-            this.state.posts = this.state.posts.filter((p) => p.id !== rmId);
-            if (this.state.posts.length !== beforeLen) changed = true;
+        const now = Date.now();
+        // Preserve only freshly created local drafts (< 4000ms old) that haven't hit the cloud yet
+        const freshLocal = (this.state.posts || []).filter((lp) =>
+          lp && lp.id && !cloudPostIds.has(lp.id) && !this.deletedPostIds?.has(lp.id) && (now - (lp.createdAt || 0) < 4000)
+        );
+
+        const merged = [...freshLocal];
+        cloudPosts.forEach((cp) => {
+          if (!merged.some((m) => m.id === cp.id)) {
+            merged.push(cp);
           }
         });
 
-        if (changed) {
-          this.state.posts.sort((a, b) =>
-            (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) ||
-            (b.boosted ? 1 : 0) - (a.boosted ? 1 : 0) ||
-            (b.createdAt || 0) - (a.createdAt || 0)
-          );
-          this.save(false, 'cloud_posts_sync');
+        // Filter out any permanently deleted posts
+        const activePosts = merged.filter((p) => p && p.id && !this.deletedPostIds?.has(p.id));
+
+        const prevSignature = (this.state.posts || []).map((p) => `${p.id}_${p.likes?.length || 0}_${p.comments?.length || 0}_${p.pinned ? 1 : 0}`).join('|');
+        const nextSignature = activePosts.map((p) => `${p.id}_${p.likes?.length || 0}_${p.comments?.length || 0}_${p.pinned ? 1 : 0}`).join('|');
+        const hasContentChanged = prevSignature !== nextSignature;
+
+        this.state.posts = activePosts;
+        this.state.posts.sort((a, b) =>
+          (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) ||
+          (b.boosted ? 1 : 0) - (a.boosted ? 1 : 0) ||
+          (b.createdAt || 0) - (a.createdAt || 0)
+        );
+
+        this.save(false, 'cloud_posts_sync');
+        if (hasContentChanged) {
           window.dispatchEvent(new CustomEvent('remo:stateupdate', { detail: { reason: 'cloud_posts' } }));
           if (typeof renderSocialFeed === 'function' && (typeof currentRemoView === 'undefined' || currentRemoView === 'feed')) {
             renderSocialFeed();
@@ -2750,15 +2765,6 @@ const REMO_STORE = {
       }, (err) => {
         console.warn('Firestore remo_posts sync notice:', err.message);
       });
-
-      // Seed initial posts to remo_posts if needed
-      setTimeout(() => {
-        if (this.fbDb && (this.isCurrentUserAdmin() || this.getCurrentUser())) {
-          (this.state.posts || []).slice(0, 15).forEach((p) => {
-            if (p.id) this.syncPostToCloud(p);
-          });
-        }
-      }, 3000);
 
       // 4. Ecosystem Live State (City Scores, Settings & World Bottles - lightweight)
       const docRef = this.fbDb.collection('remo_ecosystem').doc('live_state');
@@ -2812,9 +2818,18 @@ const REMO_STORE = {
   },
 
   deletePostFromCloud(postId) {
-    if (!this.fbDb || !postId) return;
+    if (!postId) return;
     try {
-      this.fbDb.collection('remo_posts').doc(postId).delete().catch(() => {});
+      if (!this.deletedPostIds) this.deletedPostIds = new Set();
+      this.deletedPostIds.add(postId);
+      localStorage.setItem('remo_deleted_posts', JSON.stringify([...this.deletedPostIds]));
+    } catch (e) {}
+    this.state.posts = (this.state.posts || []).filter((p) => p.id !== postId);
+    if (!this.fbDb) return;
+    try {
+      this.fbDb.collection('remo_posts').doc(postId).delete()
+        .then(() => console.log('Successfully deleted post from Firestore:', postId))
+        .catch((err) => console.warn('Firestore delete notice:', err.message));
     } catch (e) {}
   },
 

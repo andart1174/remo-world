@@ -560,6 +560,17 @@ function renderPostMediaStage(p, city, lang) {
     }
     const idbAttr = String(rawKey).startsWith('idb://') ? `data-idb-src="${rawKey}"` : '';
     const cap60Attr = p.enforce60sCap ? `ontimeupdate="if(this.currentTime>60){this.currentTime=0;}"` : '';
+    
+    if (!resolved && String(rawKey).startsWith('idb://')) {
+      return `
+        <div style="background:#090d1e;border:1px dashed rgba(244,63,94,0.4);border-radius:12px;padding:26px 14px;text-align:center;">
+          <div style="font-size:1.8rem;margin-bottom:6px;">📹</div>
+          <div style="font-size:0.84rem;color:#f43f5e;font-weight:700;">${lang === 'fr' ? 'Vidéo locale non disponible sur cet appareil' : 'Local device video'}</div>
+          <div style="font-size:0.75rem;color:var(--muted);margin-top:4px;">${lang === 'fr' ? 'Cette ancienne vidéo a été enregistrée avant l’activation du Cloud Storage.' : 'Legacy video before Cloud Storage.'}</div>
+          ${isAdm ? `<button type="button" class="adm-pbtn danger" style="margin-top:10px;padding:6px 14px;font-size:0.8rem;" onclick="adminDeletePostInline('${p.id}')">🗑️ Supprimer définitivement</button>` : ''}
+        </div>
+      `;
+    }
     return `<video src="${resolved}" ${idbAttr} ${cap60Attr} controls playsinline preload="metadata" style="width:100%;max-height:480px;border-radius:12px;background:#050816;object-fit:cover;"></video>`;
   }
 
