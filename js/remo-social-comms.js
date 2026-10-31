@@ -3529,7 +3529,7 @@ window.handleStudioHtmlFileUpload = handleStudioHtmlFileUpload;
 window.refreshStudioHtmlPreview = refreshStudioHtmlPreview;
 window.handleMediaDoubleTap = handleMediaDoubleTap;
 window.toggleHtmlCodeView = toggleHtmlCodeView;
-window.copyPostHtmlCode = copyPostHtmlCode;
+window.copyPostHtmlCode = (postId) => { if (typeof sharePostLink === 'function') sharePostLink(postId); };
 window.openHtmlFullscreenModal = openHtmlFullscreenModal;
 window.closeHtmlFullscreenModal = closeHtmlFullscreenModal;
 window.sharePostLink = sharePostLink;
@@ -3573,7 +3573,7 @@ function filterVipShop(cat = 'all', chipEl = null) {
   document.querySelectorAll('#shopCategoryChips .fchip').forEach((b) => b.classList.remove('active'));
   if (chipEl) {
     chipEl.classList.add('active');
-  } else {
+  } else if (typeof document.querySelector === 'function') {
     const match = document.querySelector(`#shopCategoryChips .fchip[onclick*="'${cat}'"]`);
     if (match) match.classList.add('active');
   }
