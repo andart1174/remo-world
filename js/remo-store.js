@@ -993,8 +993,58 @@ function createDefaultState() {
     serializedCoins: [
       { id: 'sc_0001', serial: '0001', coinsValue: 1000, ownerUid: 'u_admin_founder', ownerName: 'Founder Admin', mintedAt: now - 86400000, status: 'vault', note: 'Genesis Mint #0001' }
     ],
-    cityPortfolios: {}
+    cityPortfolios: {},
+    wishes: getDefaultWishes(now)
   };
+}
+
+function getDefaultWishes(now = Date.now()) {
+  return [
+    {
+      id: 'wish_mtl_1',
+      cityId: 'chisinau',
+      authorName: 'Elena_KIV',
+      authorUid: 'u_elena_kiv',
+      text: 'Pace, prosperitate și un viitor luminos pentru Chișinău și toți frații noștri de pe glob! 🇲🇩❤️✨',
+      blessings: 18,
+      blessedUids: ['u_admin_founder'],
+      timestamp: now - 3600000 * 3,
+      isAnonymous: false
+    },
+    {
+      id: 'wish_mtl_2',
+      cityId: 'montreal',
+      authorName: 'REMO Founder',
+      authorUid: 'u_admin_founder',
+      text: 'Que Montréal reste un phare d’art, de technologie et de liberté créative pour le monde entier ! ⚜️🍁',
+      blessings: 24,
+      blessedUids: ['u_elena_kiv'],
+      timestamp: now - 3600000 * 5,
+      isAnonymous: false
+    },
+    {
+      id: 'wish_tyo_1',
+      cityId: 'tokyo',
+      authorName: 'Kenji_TYO',
+      authorUid: 'u_kenji_tyo',
+      text: 'May neon dreams inspire every creator in the 4D World! 🗼⚡ Arigato REMO!',
+      blessings: 15,
+      blessedUids: [],
+      timestamp: now - 3600000 * 7,
+      isAnonymous: false
+    },
+    {
+      id: 'wish_par_1',
+      cityId: 'paris',
+      authorName: 'Citoyen Secret',
+      authorUid: '',
+      text: 'Amour, art et lumière sur Paris et toutes les villes reliées par le réseau 4D ! ✨🗼',
+      blessings: 11,
+      blessedUids: [],
+      timestamp: now - 3600000 * 12,
+      isAnonymous: true
+    }
+  ];
 }
 
 function getDefaultBounties(now = Date.now()) {
@@ -1621,6 +1671,9 @@ function upgradeEcosystemState(st) {
     st.serializedCoins = [
       { id: 'sc_0001', serial: '0001', coinsValue: 1000, ownerUid: 'u_admin_founder', ownerName: 'Founder Admin', mintedAt: Date.now() - 86400000, status: 'vault', note: 'Genesis Mint #0001' }
     ];
+  }
+  if (!Array.isArray(st.wishes) || st.wishes.length === 0) {
+    st.wishes = getDefaultWishes();
   }
 
   // Upgrade every citizen with Referral Codes & VIP Cosmetics
@@ -2839,6 +2892,64 @@ const REMO_STORE = {
     }
     window.dispatchEvent(new CustomEvent('remo:stateupdate', { detail: { reason: 'purge_posts' } }));
     if (typeof renderSocialFeed === 'function') renderSocialFeed();
+  },
+
+  tossCoinInWishingWell(cityId, text, isAnonymous = false) {
+    const u = this.getCurrentUser();
+    if (!u) return { success: false, reason: 'no_user' };
+    if ((u.coins || 0) < 1) return { success: false, reason: 'no_coins' };
+    const cleanText = (text || '').trim();
+    if (!cleanText) return { success: false, reason: 'empty_text' };
+
+    u.coins = Math.max(0, (u.coins || 0) - 1);
+    const targetCityId = cityId || (u.homeCity || 'montreal');
+    if (!this.state.cityScores) this.state.cityScores = {};
+    this.state.cityScores[targetCityId] = (this.state.cityScores[targetCityId] || 0) + 5;
+
+    if (!Array.isArray(this.state.wishes)) this.state.wishes = [];
+    const newWish = {
+      id: 'wish_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+      cityId: targetCityId,
+      authorName: isAnonymous ? (typeof REMO_I18N !== 'undefined' && REMO_I18N.getLang() === 'fr' ? 'Citoyen Anonyme' : 'Anonymous Citizen') : u.name,
+      authorUid: isAnonymous ? '' : u.uid,
+      text: cleanText,
+      blessings: 1,
+      blessedUids: u.uid ? [u.uid] : [],
+      timestamp: Date.now(),
+      isAnonymous: Boolean(isAnonymous)
+    };
+
+    this.state.wishes.unshift(newWish);
+    if (this.state.wishes.length > 150) this.state.wishes = this.state.wishes.slice(0, 150);
+    this.save(true);
+    return { success: true, wish: newWish, userCoins: u.coins };
+  },
+
+  blessWish(wishId) {
+    const u = this.getCurrentUser();
+    if (!Array.isArray(this.state.wishes)) return { success: false, reason: 'not_found' };
+    const wish = this.state.wishes.find((w) => w && w.id === wishId);
+    if (!wish) return { success: false, reason: 'not_found' };
+
+    if (!Array.isArray(wish.blessedUids)) wish.blessedUids = [];
+    if (u && u.uid && wish.blessedUids.includes(u.uid)) {
+      return { success: false, reason: 'already_blessed', wish };
+    }
+
+    if (u && u.uid) wish.blessedUids.push(u.uid);
+    wish.blessings = (wish.blessings || 0) + 1;
+
+    // Positive karma reward: +1 coin to current user
+    if (u) {
+      u.coins = (u.coins || 0) + 1;
+    }
+    // Boost city score +1
+    if (this.state.cityScores && wish.cityId) {
+      this.state.cityScores[wish.cityId] = (this.state.cityScores[wish.cityId] || 0) + 1;
+    }
+
+    this.save(true);
+    return { success: true, wish, userCoins: u ? u.coins : null };
   },
 
   syncToFirestore(reason = 'update') {

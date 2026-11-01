@@ -711,7 +711,12 @@ function getInterCityDistanceBridge(postCity, lang) {
     const txt = lang === 'fr'
       ? `🏙️ ${postCity.flag} ${getCityName(postCity, 'fr')} · Même ville en direct 📍`
       : `🏙️ ${postCity.flag} ${getCityName(postCity, 'en')} · Live in your city 📍`;
-    return `<div class="city-distance-bridge">${txt}</div>`;
+    return `
+      <div class="city-distance-bridge">
+        <span>${txt}</span>
+        <button type="button" class="bridge-ticket-btn" onclick="openBoardingPassModal('${viewerCity.id}', 'chisinau')" title="${lang === 'fr' ? 'Générer Billet 4D' : 'Generate 4D Boarding Pass'}">🎫 ${lang === 'fr' ? 'Billet 4D' : '4D Ticket'}</button>
+      </div>
+    `;
   }
 
   const fnHaversine = (typeof haversineKm === 'function')
@@ -732,6 +737,7 @@ function getInterCityDistanceBridge(postCity, lang) {
       <span class="bridge-plane">✈️</span>
       <span class="bridge-route"><b>${postCity.flag} ${getCityName(postCity, lang)}</b> ➔ <b>${viewerCity.flag} ${getCityName(viewerCity, lang)}</b></span>
       <span class="bridge-km">(${km.toLocaleString()} km)</span>
+      <button type="button" class="bridge-ticket-btn" onclick="openBoardingPassModal('${viewerCity.id}', '${postCity.id}')" title="${lang === 'fr' ? 'Générer Billet 4D' : 'Generate 4D Boarding Pass'}">🎫 ${lang === 'fr' ? 'Billet 4D' : '4D Ticket'}</button>
     </div>
   `;
 }
@@ -3369,6 +3375,14 @@ function openPostActionsSheet(postId) {
         <div style="text-align:left;flex:1;">
           <b style="color:#fbcfe8;">${lang === 'fr' ? 'Créer un Duo de Ville' : 'Create City Duet'}</b>
           <div style="font-size:0.72rem;color:var(--muted);">${lang === 'fr' ? 'Répondez avec votre propre vidéo/photo (+20 🪙)' : 'Reply with your city moment (+20 🪙)'}</div>
+        </div>
+      </button>
+
+      <button type="button" class="action-sheet-row" onclick="closePostActionsModal(); openBoardingPassModal('${(u && u.homeCity) ? u.homeCity : 'montreal'}', '${p.cityId || 'chisinau'}');">
+        <span class="as-icon" style="background:rgba(56,189,248,0.15);color:#38bdf8;">🎫</span>
+        <div style="text-align:left;flex:1;">
+          <b style="color:#bae6fd;">${lang === 'fr' ? 'Billet de Téléportation 4D (Story 9:16)' : '4D Teleport Boarding Pass (9:16 Story)'}</b>
+          <div style="font-size:0.72rem;color:var(--muted);">${lang === 'fr' ? 'Générez un billet de vol officiel pour TikTok & Instagram' : 'Generate official cyber flight pass for TikTok & Instagram'}</div>
         </div>
       </button>
 

@@ -2964,3 +2964,161 @@ button, input, select, textarea {
   margin-top: 8px;
 }
 
+/* 🎫 4D Inter-City Boarding Pass Trigger Button */
+.bridge-ticket-btn {
+  margin-left: auto;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, rgba(6, 182, 212, 0.22), rgba(59, 130, 246, 0.22));
+  border: 1px solid rgba(56, 189, 248, 0.6);
+  color: #7dd3fc;
+  font-size: 0.72rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+.bridge-ticket-btn:hover {
+  background: linear-gradient(135deg, #0284c7, #06b6d4);
+  color: #fff;
+  border-color: #38bdf8;
+  box-shadow: 0 0 12px rgba(6, 182, 212, 0.55);
+  transform: scale(1.05);
+}
+
+/* ⛲ 4D Global Wishing Well */
+.wishing-pool-stage {
+  position: relative;
+  width: 100%;
+  height: 180px;
+  border-radius: 20px;
+  overflow: hidden;
+  background: radial-gradient(circle at 50% 60%, #0c1a3a 0%, #050b18 70%, #02050e 100%);
+  border: 2px solid rgba(251, 191, 36, 0.45);
+  box-shadow: inset 0 0 35px rgba(251, 191, 36, 0.25), 0 12px 30px rgba(0, 0, 0, 0.6);
+  cursor: pointer;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.wishing-pool-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.wishing-pool-overlay {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  text-align: center;
+}
+.wishing-center-coin {
+  font-size: 2.8rem;
+  filter: drop-shadow(0 0 16px rgba(251, 191, 36, 0.9));
+  animation: wishCoinHover 2.4s ease-in-out infinite;
+  transition: transform 0.25s ease-out;
+}
+.wishing-pool-stage:hover .wishing-center-coin {
+  transform: scale(1.15) rotate(10deg);
+}
+.wishing-pool-stage:active .wishing-center-coin {
+  transform: scale(0.85) translateY(12px);
+}
+@keyframes wishCoinHover {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(-8px) rotate(-4deg); }
+}
+.wishing-pool-prompt {
+  background: rgba(15, 23, 42, 0.78);
+  border: 1px solid rgba(251, 191, 36, 0.35);
+  backdrop-filter: blur(8px);
+  padding: 5px 14px;
+  border-radius: 999px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.wishing-pool-prompt span {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.82rem;
+  font-weight: 900;
+  color: #fde047;
+  letter-spacing: 0.5px;
+}
+.wishing-pool-prompt small {
+  font-size: 0.68rem;
+  color: #94a3b8;
+  font-weight: 700;
+}
+.wish-item-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  transition: border-color 0.2s, background 0.2s;
+}
+.wish-item-card:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(56, 189, 248, 0.4);
+}
+.wish-item-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.wish-author-badge {
+  font-size: 0.78rem;
+  font-weight: 900;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.wish-item-text {
+  font-size: 0.84rem;
+  line-height: 1.4;
+  color: #e2e8f0;
+  font-style: italic;
+}
+.bless-wish-btn {
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.15), rgba(245, 158, 11, 0.15));
+  border: 1px solid rgba(251, 191, 36, 0.45);
+  color: #fde047;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.bless-wish-btn:hover {
+  background: linear-gradient(135deg, #f59e0b, #fbbf24);
+  color: #050814;
+  box-shadow: 0 0 10px rgba(251, 191, 36, 0.7);
+  transform: scale(1.06);
+}
+.bless-wish-btn.blessed {
+  background: rgba(16, 185, 129, 0.2);
+  border-color: #10b981;
+  color: #6ee7b7;
+  cursor: default;
+}
+
+

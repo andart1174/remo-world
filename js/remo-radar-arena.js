@@ -1860,6 +1860,7 @@ function renderPassportView() {
 
         <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-bottom:14px;">
           <button class="btn-cyber btn-gold" style="background:linear-gradient(135deg,#f59e0b,#ec4899);border-color:#fbbf24;color:#fff;font-weight:900;" onclick="exportPassportStory()">📲 ${t('passport_share_story')}</button>
+          <button class="btn-cyber" style="background:linear-gradient(135deg,#0284c7,#06b6d4);border-color:#38bdf8;color:#fff;font-weight:900;" onclick="openBoardingPassModal()">🎫 ${lang === 'fr' ? 'Billet 4D 9:16' : '4D Boarding Pass'}</button>
           <button class="btn-cyber btn-gold" onclick="downloadCitizenIdPNG()">${t('passport_dl_id_btn')}</button>
           <button class="btn-cyber" onclick="copyMyReferralInviteLink()">${t('passport_copy_ref_btn')} (${refCode})</button>
           <button class="btn-ghost" style="border-color:#10b981;color:#34d399;" onclick="shareReferralOnWhatsApp()">${t('passport_wa_ref_btn')}</button>
@@ -2255,6 +2256,776 @@ function downloadStoryCanvasPNG() {
 function closeStoryExportModal() {
   const m = document.getElementById('storyExportModal');
   if (m) m.classList.remove('open');
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   🎫 4B. 4D CYBER BOARDING PASS (9:16 Story for TikTok / Insta / WhatsApp)
+   ══════════════════════════════════════════════════════════════════════ */
+const CITY_AIRPORT_CODES = {
+  montreal: 'YUL',
+  chisinau: 'KIV',
+  paris: 'CDG',
+  bucharest: 'OTP',
+  newyork: 'JFK',
+  tokyo: 'HND',
+  dubai: 'DXB',
+  london: 'LHR',
+  miami: 'MIA',
+  barcelona: 'BCN',
+  monaco: 'MCM',
+  seoul: 'ICN'
+};
+
+function getCityAirportCode(cityId) {
+  if (!cityId) return 'RMO';
+  const id = String(cityId).toLowerCase();
+  if (CITY_AIRPORT_CODES[id]) return CITY_AIRPORT_CODES[id];
+  return id.replace(/[^a-z]/g, '').slice(0, 3).toUpperCase() || 'RMO';
+}
+
+function drawBoardingPassCanvas(cv, fromCityId, toCityId, u, lang = 'fr') {
+  if (!cv) return;
+  cv.width = 1080;
+  cv.height = 1920;
+  const ctx = cv.getContext('2d');
+  if (!ctx) return;
+
+  if (typeof ctx.roundRect !== 'function') {
+    ctx.roundRect = function (x, y, w, h, radii) {
+      const r = Array.isArray(radii) ? radii[0] : (radii || 0);
+      this.moveTo(x + r, y);
+      this.lineTo(x + w - r, y);
+      this.quadraticCurveTo(x + w, y, x + w, y + r);
+      this.lineTo(x + w, y + h - r);
+      this.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+      this.lineTo(x + r, y + h);
+      this.quadraticCurveTo(x, y + h, x, y + h - r);
+      this.lineTo(x, y + r);
+      this.quadraticCurveTo(x, y, x + r, y);
+    };
+  }
+
+  try {
+    const fromCity = getCityById(fromCityId || 'montreal') || getCityById('montreal');
+    const toCity = getCityById(toCityId || 'chisinau') || getCityById('chisinau');
+    const userObj = u || REMO_STORE.getCurrentUser() || { name: 'Pioneer', passportNum: '0001', referralCode: 'REMO-0001', role: 'citizen' };
+    const refCode = userObj.referralCode || `REMO-${userObj.passportNum || '0001'}`;
+    const inviteUrl = typeof getCitizenInviteUrl === 'function' ? getCitizenInviteUrl(userObj) : `https://andart1174.github.io/remo-world/index.html?ref=${refCode}`;
+
+    const fnHaversine = (typeof haversineKm === 'function')
+      ? haversineKm
+      : (window.haversineKm || ((lat1, lon1, lat2, lon2) => {
+          const R = 6371;
+          const dLat = ((lat2 - lat1) * Math.PI) / 180;
+          const dLon = ((lon2 - lon1) * Math.PI) / 180;
+          const a = Math.sin(dLat / 2) ** 2 + Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon / 2) ** 2;
+          return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        }));
+
+    const km = Math.round(fnHaversine(fromCity.lat, fromCity.lng, toCity.lat, toCity.lng)) || 7140;
+    const fromCode = getCityAirportCode(fromCity.id);
+    const toCode = getCityAirportCode(toCity.id);
+    const flightNum = `RM-${km > 9999 ? String(km).slice(0, 4) : km}`;
+
+    // 1. Cyber Aviation Background
+    const bg = ctx.createLinearGradient(0, 0, 1080, 1920);
+    bg.addColorStop(0, '#030712');
+    bg.addColorStop(0.35, '#07132e');
+    bg.addColorStop(0.7, '#0b162f');
+    bg.addColorStop(1, '#020617');
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, 1080, 1920);
+
+    // Glowing Holographic Radial Gradients
+    const r1 = ctx.createRadialGradient(200, 300, 10, 200, 300, 600);
+    r1.addColorStop(0, 'rgba(6,182,212,0.18)');
+    r1.addColorStop(1, 'rgba(6,182,212,0)');
+    ctx.fillStyle = r1;
+    ctx.fillRect(0, 0, 1080, 1920);
+
+    const r2 = ctx.createRadialGradient(880, 1100, 10, 880, 1100, 600);
+    r2.addColorStop(0, 'rgba(251,191,36,0.14)');
+    r2.addColorStop(1, 'rgba(251,191,36,0)');
+    ctx.fillStyle = r2;
+    ctx.fillRect(0, 0, 1080, 1920);
+
+    // Subtle radar flight arcs
+    ctx.strokeStyle = 'rgba(56,189,248,0.08)';
+    ctx.lineWidth = 1.5;
+    for (let i = 1; i <= 4; i++) {
+      ctx.beginPath();
+      ctx.arc(540, 960, i * 220, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    // 2. Main Ticket Container with Rounded Corners
+    const tX = 70;
+    const tY = 90;
+    const tW = 940;
+    const tH = 1740;
+    const tR = 36;
+
+    // Ticket Outer Border Glow & Background
+    ctx.save();
+    ctx.shadowColor = 'rgba(6, 182, 212, 0.45)';
+    ctx.shadowBlur = 35;
+    ctx.fillStyle = 'rgba(11, 20, 42, 0.88)';
+    ctx.strokeStyle = '#38bdf8';
+    ctx.lineWidth = 3.5;
+    ctx.beginPath();
+    ctx.roundRect(tX, tY, tW, tH, tR);
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+
+    // 3. Airline Header Ribbon
+    const ribbonGrad = ctx.createLinearGradient(tX, tY, tX + tW, tY);
+    ribbonGrad.addColorStop(0, '#0369a1');
+    ribbonGrad.addColorStop(0.5, '#0284c7');
+    ribbonGrad.addColorStop(1, '#06b6d4');
+    ctx.fillStyle = ribbonGrad;
+    ctx.beginPath();
+    ctx.roundRect(tX, tY, tW, 115, [tR, tR, 0, 0]);
+    ctx.fill();
+
+    // Airline Name & Mission
+    ctx.textAlign = 'left';
+    ctx.font = '900 32px "Orbitron", sans-serif';
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText('REMO AIRWAYS 🌐 4D NEXUS', tX + 40, tY + 68);
+
+    ctx.textAlign = 'right';
+    ctx.font = '800 20px "Orbitron", sans-serif';
+    ctx.fillStyle = '#fde047';
+    ctx.fillText('BOARDING PASS', tX + tW - 40, tY + 68);
+
+    // 4. Subheader Class Strip
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.04)';
+    ctx.fillRect(tX, tY + 115, tW, 60);
+    ctx.textAlign = 'left';
+    ctx.font = '800 18px "Orbitron", sans-serif';
+    ctx.fillStyle = '#38bdf8';
+    ctx.fillText('FIRST CLASS · CITOYEN SOUVERAIN 4D', tX + 40, tY + 152);
+
+    ctx.textAlign = 'right';
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = '700 18px monospace';
+    ctx.fillText(`ETKT: 4D-${refCode}`, tX + tW - 40, tY + 152);
+
+    // 5. Giant City Route (From -> To)
+    const routeY = tY + 280;
+
+    // Departure Airport Code
+    ctx.textAlign = 'left';
+    ctx.font = '900 84px "Orbitron", sans-serif';
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(fromCode, tX + 50, routeY);
+
+    ctx.font = '800 24px "Outfit", sans-serif';
+    ctx.fillStyle = '#38bdf8';
+    ctx.fillText(`${fromCity.flag} ${getCityName(fromCity, lang).toUpperCase()}`, tX + 50, routeY + 40);
+
+    // Arrival Airport Code
+    ctx.textAlign = 'right';
+    ctx.font = '900 84px "Orbitron", sans-serif';
+    ctx.fillStyle = '#fde047';
+    ctx.fillText(toCode, tX + tW - 50, routeY);
+
+    ctx.font = '800 24px "Outfit", sans-serif';
+    ctx.fillStyle = '#fbbf24';
+    ctx.fillText(`${toCity.flag} ${getCityName(toCity, lang).toUpperCase()}`, tX + tW - 50, routeY + 40);
+
+    // Flight Arc & Airplane
+    ctx.textAlign = 'center';
+    ctx.beginPath();
+    ctx.strokeStyle = 'rgba(251,191,36,0.6)';
+    ctx.lineWidth = 3;
+    ctx.setLineDash([8, 8]);
+    ctx.moveTo(tX + 260, routeY - 20);
+    ctx.quadraticCurveTo(540, routeY - 80, tX + tW - 260, routeY - 20);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Plane Emoji at Apex
+    ctx.font = '40px sans-serif';
+    ctx.fillText('✈️', 540, routeY - 60);
+
+    // Geodesic Distance Pill
+    ctx.fillStyle = 'rgba(6,182,212,0.18)';
+    ctx.strokeStyle = '#38bdf8';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.roundRect(400, routeY + 10, 280, 42, 21);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.font = '900 20px "Orbitron", sans-serif';
+    ctx.fillStyle = '#e0f2fe';
+    ctx.fillText(`${km.toLocaleString()} KM · 4D TELEPORT`, 540, routeY + 38);
+
+    // 6. Flight Info 4-Box Grid
+    const infoY = tY + 410;
+    const gridCols = [
+      { label: lang === 'fr' ? 'VOL / FLIGHT' : 'FLIGHT', val: flightNum },
+      { label: lang === 'fr' ? 'PORTE / GATE' : 'GATE', val: '4D-01' },
+      { label: lang === 'fr' ? 'SIÈGE / SEAT' : 'SEAT', val: '01A' },
+      { label: lang === 'fr' ? 'EMBARQ. / TIME' : 'TIME', val: 'INSTANT' }
+    ];
+    const boxW = (tW - 80 - 30) / 4;
+    gridCols.forEach((col, idx) => {
+      const bx = tX + 40 + idx * (boxW + 10);
+      ctx.fillStyle = 'rgba(255,255,255,0.03)';
+      ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.roundRect(bx, infoY, boxW, 85, 12);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.textAlign = 'center';
+      ctx.font = '700 15px "Outfit", sans-serif';
+      ctx.fillStyle = '#94a3b8';
+      ctx.fillText(col.label, bx + boxW / 2, infoY + 28);
+
+      ctx.font = '900 24px "Orbitron", sans-serif';
+      ctx.fillStyle = idx === 0 ? '#38bdf8' : idx === 3 ? '#10b981' : '#ffffff';
+      ctx.fillText(col.val, bx + boxW / 2, infoY + 65);
+    });
+
+    // 7. Passenger Identity Strip
+    const passY = tY + 535;
+    ctx.fillStyle = 'rgba(15,23,42,0.95)';
+    ctx.strokeStyle = 'rgba(251,191,36,0.4)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.roundRect(tX + 40, passY, tW - 80, 105, 16);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.textAlign = 'left';
+    ctx.font = '800 17px "Outfit", sans-serif';
+    ctx.fillStyle = '#94a3b8';
+    ctx.fillText(lang === 'fr' ? 'PASSAGER OFFICIEL / PASSENGER' : 'OFFICIAL PASSENGER', tX + 65, passY + 36);
+
+    ctx.font = '900 32px "Orbitron", sans-serif';
+    ctx.fillStyle = '#fde047';
+    ctx.fillText(`@${userObj.name}`, tX + 65, passY + 78);
+
+    ctx.textAlign = 'right';
+    ctx.font = '800 17px "Outfit", sans-serif';
+    ctx.fillStyle = '#94a3b8';
+    ctx.fillText(lang === 'fr' ? 'PASSEPORT №' : 'PASSPORT №', tX + tW - 65, passY + 36);
+
+    ctx.font = '900 28px "Orbitron", sans-serif';
+    ctx.fillStyle = '#38bdf8';
+    ctx.fillText(`#${userObj.passportNum || '0001'}`, tX + tW - 65, passY + 78);
+
+    // 8. Destination City Landmark Visual (Center Artwork)
+    const artY = tY + 840;
+    ctx.textAlign = 'center';
+
+    // Glowing Circle behind Landmark
+    ctx.beginPath();
+    ctx.arc(540, artY, 150, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(6,182,212,0.08)';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(56,189,248,0.3)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    if (typeof drawCityLandmark === 'function') {
+      try {
+        drawCityLandmark(ctx, toCity.id, '#38bdf8', 540, artY, 190);
+      } catch (err) {
+        console.warn('Landmark draw error:', err);
+      }
+    }
+
+    ctx.font = '900 22px "Orbitron", sans-serif';
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(`${toCity.flag} ${getCityName(toCity, lang).toUpperCase()} · DESTINATION 4D`, 540, artY + 175);
+
+    // 9. Classic Ticket Perforation (Tear Line with Notches)
+    const tearY = tY + 1090;
+    ctx.setLineDash([12, 10]);
+    ctx.strokeStyle = 'rgba(255,255,255,0.28)';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(tX + 45, tearY);
+    ctx.lineTo(tX + tW - 45, tearY);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Cut-out circular notches on left & right
+    ctx.fillStyle = '#030712';
+    ctx.beginPath();
+    ctx.arc(tX, tearY, 28, -Math.PI / 2, Math.PI / 2);
+    ctx.fill();
+    ctx.strokeStyle = '#38bdf8';
+    ctx.lineWidth = 3.5;
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.arc(tX + tW, tearY, 28, Math.PI / 2, -Math.PI / 2);
+    ctx.fill();
+    ctx.stroke();
+
+    // 10. QR Code & Airline Barcode Stub
+    const stubY = tearY + 45;
+
+    // Scannable QR Code Box
+    if (typeof RemoQREngine !== 'undefined' && RemoQREngine.toCanvas) {
+      try {
+        const qrCanvas = RemoQREngine.toCanvas(inviteUrl, 260);
+        ctx.drawImage(qrCanvas, 140, stubY, 260, 260);
+      } catch (e) {
+        console.error('Boarding pass QR error:', e);
+      }
+    }
+
+    // Details next to QR
+    ctx.textAlign = 'left';
+    ctx.font = '900 24px "Orbitron", sans-serif';
+    ctx.fillStyle = '#fde047';
+    ctx.fillText(lang === 'fr' ? '🎁 SCANNEZ LE BILLET' : '🎁 SCAN BOARDING PASS', 440, stubY + 45);
+
+    ctx.font = '800 20px "Outfit", sans-serif';
+    ctx.fillStyle = '#10b981';
+    ctx.fillText(lang === 'fr' ? '✓ +100 🪙 offerts à l’arrivée !' : '✓ +100 🪙 welcome bonus!', 440, stubY + 85);
+
+    ctx.font = '800 18px "Orbitron", sans-serif';
+    ctx.fillStyle = '#38bdf8';
+    ctx.fillText(`CODE: ${refCode}`, 440, stubY + 130);
+
+    ctx.font = '700 16px "Outfit", sans-serif';
+    ctx.fillStyle = '#94a3b8';
+    ctx.fillText(lang === 'fr' ? 'Téléportation instantanée en direct' : 'Instant live global teleportation', 440, stubY + 165);
+
+    // Realistic Barcode (drawn with varying line widths)
+    const bcY = stubY + 285;
+    const bcH = 65;
+    ctx.fillStyle = '#ffffff';
+    let curX = tX + 70;
+    const barPattern = [3, 1, 2, 4, 1, 3, 2, 1, 4, 2, 1, 3, 4, 1, 2, 3, 1, 4, 2, 2, 1, 3, 4, 1, 3, 2, 1, 4, 2, 1, 3, 2, 4, 1, 2, 3, 1, 4, 2, 1, 3, 4, 1, 2, 3, 1, 4];
+    while (curX < tX + tW - 80) {
+      for (let p = 0; p < barPattern.length && curX < tX + tW - 80; p++) {
+        const w = barPattern[p];
+        ctx.fillRect(curX, bcY, w, bcH);
+        curX += w + 2 + (p % 3);
+      }
+    }
+
+    // 11. Machine-Readable Zone (MRZ Strip)
+    const mrzY = bcY + 95;
+    ctx.font = '700 17px monospace';
+    ctx.fillStyle = '#64748b';
+    ctx.textAlign = 'center';
+    const cleanUser = userObj.name.replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 12);
+    ctx.fillText(`P<REMO<${fromCode}<<<${toCode}<<<<${cleanUser}<<<<${km}KM<<<<2026<<<<`, 540, mrzY);
+    ctx.fillText(`RM${flightNum}<<<<<<SEAT01A<<<<GATE4D-NEXUS<<<<CITIZEN_APPROVED<<<<`, 540, mrzY + 24);
+
+    // Pre-cache Blob & File
+    if (cv && cv.toBlob) {
+      cv.toBlob((b) => {
+        if (b) {
+          window._cachedBoardingPassBlob = b;
+          try {
+            window._cachedBoardingPassFile = new File([b], `REMO_BoardingPass_${fromCode}_${toCode}_${userObj.passportNum || '0001'}.png`, { type: 'image/png' });
+          } catch (e) {
+            window._cachedBoardingPassFile = null;
+          }
+        }
+      }, 'image/png');
+    }
+  } catch (err) {
+    console.error('drawBoardingPassCanvas error:', err);
+  }
+}
+
+function openBoardingPassModal(fromCityId, toCityId) {
+  const modal = document.getElementById('boardingPassModal');
+  if (!modal) return;
+
+  const u = REMO_STORE.getCurrentUser() || REMO_STORE.ensureGuestOrCitizen('REMO Pioneer', '', 'montreal');
+  const fromSel = document.getElementById('boardingPassFromCitySelect');
+  const toSel = document.getElementById('boardingPassToCitySelect');
+  const cities = window.REMO_CITIES || [];
+  const lang = REMO_I18N.getLang();
+
+  const userCityId = (u && u.homeCity) ? u.homeCity : 'montreal';
+  const selFrom = fromCityId || userCityId;
+  const selTo = toCityId || (selFrom === 'chisinau' ? 'montreal' : 'chisinau');
+
+  if (fromSel && toSel) {
+    const opts = cities.map((c) => `<option value="${c.id}">${c.flag} ${getCityName(c, lang)}</option>`).join('');
+    fromSel.innerHTML = opts;
+    toSel.innerHTML = opts;
+    fromSel.value = selFrom;
+    toSel.value = selTo;
+  }
+
+  modal.classList.add('open');
+  const cv = document.getElementById('boardingPassCanvasPreview');
+  if (cv) {
+    drawBoardingPassCanvas(cv, selFrom, selTo, u, lang);
+  }
+}
+
+function closeBoardingPassModal() {
+  const m = document.getElementById('boardingPassModal');
+  if (m) m.classList.remove('open');
+}
+
+function onBoardingPassRouteChanged() {
+  const fromSel = document.getElementById('boardingPassFromCitySelect');
+  const toSel = document.getElementById('boardingPassToCitySelect');
+  const cv = document.getElementById('boardingPassCanvasPreview');
+  const u = REMO_STORE.getCurrentUser() || { name: 'Pioneer', passportNum: '0001', referralCode: 'REMO-0001' };
+  const lang = REMO_I18N.getLang();
+
+  const fId = fromSel ? fromSel.value : 'montreal';
+  const tId = toSel ? toSel.value : 'chisinau';
+
+  if (cv) {
+    drawBoardingPassCanvas(cv, fId, tId, u, lang);
+  }
+}
+
+async function shareBoardingPassNative() {
+  const cv = document.getElementById('boardingPassCanvasPreview');
+  const u = REMO_STORE.getCurrentUser() || { name: 'Pioneer', passportNum: '0001', referralCode: 'REMO-0001' };
+  const lang = REMO_I18N.getLang();
+  const inviteUrl = typeof getCitizenInviteUrl === 'function' ? getCitizenInviteUrl(u) : `https://andart1174.github.io/remo-world/index.html?ref=${u.referralCode || 'REMO-0001'}`;
+
+  const shareTitle = 'REMO Airways · 4D Holographic Boarding Pass';
+  const shareText = lang === 'fr'
+    ? `🎫 Voici mon Billet de Téléportation 4D sur REMO ! Rejoins le vol avec mon code ${u.referralCode || ('REMO-' + u.passportNum)} et gagne +100 🪙 de bienvenue !`
+    : `🎫 Here is my 4D Holographic Boarding Pass on REMO! Join the flight with code ${u.referralCode || ('REMO-' + u.passportNum)} to earn +100 🪙 welcome bonus!`;
+
+  if (typeof copyTextToClipboard === 'function') copyTextToClipboard(inviteUrl);
+  downloadBoardingPassPNG();
+
+  if (navigator.share) {
+    const file = window._cachedBoardingPassFile;
+    if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({
+          files: [file],
+          title: shareTitle,
+          text: `${shareText} ${inviteUrl}`
+        });
+        remoToast(lang === 'fr' ? '🎉 Billet partagé avec succès !' : '🎉 Boarding Pass shared successfully!', 'fanfare');
+        return;
+      } catch (err) {
+        if (err && err.name === 'AbortError') return;
+      }
+    }
+
+    try {
+      await navigator.share({
+        title: shareTitle,
+        text: shareText,
+        url: inviteUrl
+      });
+      remoToast(lang === 'fr' ? '🎉 Lien du billet envoyé !' : '🎉 Boarding Pass link sent!', 'fanfare');
+      return;
+    } catch (err) {
+      if (err && err.name === 'AbortError') return;
+    }
+  }
+
+  remoToast(
+    lang === 'fr'
+      ? '📥 Billet HD enregistré et lien copié ! Prêt pour votre Story Instagram / TikTok !'
+      : '📥 HD Boarding Pass saved & link copied! Ready for your Instagram / TikTok Story!',
+    'fanfare'
+  );
+}
+
+function downloadBoardingPassPNG() {
+  const cv = document.getElementById('boardingPassCanvasPreview');
+  const fromSel = document.getElementById('boardingPassFromCitySelect');
+  const toSel = document.getElementById('boardingPassToCitySelect');
+  const u = REMO_STORE.getCurrentUser() || { passportNum: '0001' };
+  if (!cv) return;
+
+  const fCode = getCityAirportCode(fromSel ? fromSel.value : 'montreal');
+  const tCode = getCityAirportCode(toSel ? toSel.value : 'chisinau');
+  downloadCanvasAsPNG(cv, `REMO_BoardingPass_${fCode}_${tCode}_${u.passportNum || '0001'}.png`);
+  remoToast(REMO_I18N.getLang() === 'fr' ? '📥 Billet 4D HD téléchargé !' : '📥 4D HD Boarding Pass downloaded!', 'coin');
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   ⛲ 4C. 4D GLOBAL WISHING WELL (Fântâna Dorințelor Urbane)
+   ══════════════════════════════════════════════════════════════════════ */
+let _wishingWellAnimId = null;
+let _wishingWellRipples = [];
+
+function formatRelativeTime(ts, lang = 'fr') {
+  const diffSec = Math.max(1, Math.floor((Date.now() - (ts || Date.now())) / 1000));
+  if (diffSec < 60) return lang === 'fr' ? 'À l’instant' : 'Just now';
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return lang === 'fr' ? `il y a ${diffMin} min` : `${diffMin}m ago`;
+  const diffHr = Math.floor(diffMin / 60);
+  if (diffHr < 24) return lang === 'fr' ? `il y a ${diffHr} h` : `${diffHr}h ago`;
+  const diffDays = Math.floor(diffHr / 24);
+  return lang === 'fr' ? `il y a ${diffDays} j` : `${diffDays}d ago`;
+}
+
+function openWishingWellModal(prefillCityId) {
+  const modal = document.getElementById('wishingWellModal');
+  if (!modal) return;
+
+  const u = REMO_STORE.getCurrentUser() || REMO_STORE.ensureGuestOrCitizen('REMO Pioneer', '', 'montreal');
+  const citySel = document.getElementById('wishingWellCitySelect');
+  const cities = window.REMO_CITIES || [];
+  const lang = REMO_I18N.getLang();
+
+  if (citySel) {
+    citySel.innerHTML = cities.map((c) => `<option value="${c.id}">${c.flag} ${getCityName(c, lang)}</option>`).join('');
+    citySel.value = prefillCityId || (u && u.homeCity) || 'montreal';
+  }
+
+  modal.classList.add('open');
+  initWishingWellCanvas();
+  renderWishingWellStream();
+}
+
+function closeWishingWellModal() {
+  const modal = document.getElementById('wishingWellModal');
+  if (modal) modal.classList.remove('open');
+  if (_wishingWellAnimId) {
+    cancelAnimationFrame(_wishingWellAnimId);
+    _wishingWellAnimId = null;
+  }
+}
+
+function initWishingWellCanvas() {
+  const cv = document.getElementById('wishingPoolCanvas');
+  if (!cv) return;
+  const ctx = cv.getContext('2d');
+  if (!ctx) return;
+
+  _wishingWellRipples = [
+    { x: cv.width * 0.5, y: cv.height * 0.55, r: 20, maxR: 140, alpha: 0.6, speed: 0.8 },
+    { x: cv.width * 0.5, y: cv.height * 0.55, r: 60, maxR: 140, alpha: 0.4, speed: 0.8 }
+  ];
+
+  if (_wishingWellAnimId) cancelAnimationFrame(_wishingWellAnimId);
+
+  function animatePool() {
+    ctx.clearRect(0, 0, cv.width, cv.height);
+
+    // Deep luminous water gradient
+    const grad = ctx.createRadialGradient(cv.width * 0.5, cv.height * 0.55, 10, cv.width * 0.5, cv.height * 0.55, cv.width * 0.55);
+    grad.addColorStop(0, '#102a5c');
+    grad.addColorStop(0.5, '#071630');
+    grad.addColorStop(1, '#020713');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, cv.width, cv.height);
+
+    // Faint reflective caustics
+    const t = Date.now() * 0.002;
+    ctx.strokeStyle = 'rgba(56, 189, 248, 0.08)';
+    ctx.lineWidth = 1;
+    for (let i = 0; i < 5; i++) {
+      ctx.beginPath();
+      ctx.arc(cv.width * 0.5 + Math.sin(t + i) * 15, cv.height * 0.55 + Math.cos(t + i) * 8, 40 + i * 25, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    // Expanding Ripples
+    for (let i = _wishingWellRipples.length - 1; i >= 0; i--) {
+      const rip = _wishingWellRipples[i];
+      rip.r += rip.speed;
+      rip.alpha -= 0.005;
+
+      if (rip.alpha <= 0 || rip.r >= rip.maxR) {
+        _wishingWellRipples.splice(i, 1);
+        continue;
+      }
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(rip.x, rip.y, rip.r, 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(251, 191, 36, ${rip.alpha * 0.85})`;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.arc(rip.x, rip.y, Math.max(0, rip.r - 8), 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(56, 189, 248, ${rip.alpha * 0.5})`;
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // Keep gentle ambient ripples going
+    if (_wishingWellRipples.length < 2 && Math.random() < 0.03) {
+      _wishingWellRipples.push({
+        x: cv.width * 0.5 + (Math.random() - 0.5) * 40,
+        y: cv.height * 0.55 + (Math.random() - 0.5) * 20,
+        r: 10,
+        maxR: 120,
+        alpha: 0.5,
+        speed: 0.7
+      });
+    }
+
+    const modal = document.getElementById('wishingWellModal');
+    if (modal && modal.classList.contains('open')) {
+      _wishingWellAnimId = requestAnimationFrame(animatePool);
+    }
+  }
+
+  animatePool();
+}
+
+function tossWishingCoinWithAnimation() {
+  const coinEl = document.getElementById('wishingCenterCoin');
+  const cv = document.getElementById('wishingPoolCanvas');
+  const txtInput = document.getElementById('wishingWellTextInput');
+
+  if (coinEl) {
+    coinEl.style.transform = 'scale(0.4) translateY(60px)';
+    coinEl.style.opacity = '0.3';
+    setTimeout(() => {
+      coinEl.style.transform = '';
+      coinEl.style.opacity = '';
+    }, 450);
+  }
+
+  if (cv) {
+    _wishingWellRipples.push(
+      { x: cv.width * 0.5, y: cv.height * 0.55, r: 8, maxR: 160, alpha: 0.95, speed: 2.2 },
+      { x: cv.width * 0.5, y: cv.height * 0.55, r: 2, maxR: 120, alpha: 0.8, speed: 1.6 }
+    );
+  }
+
+  if (REMO_STORE && REMO_STORE.audio) {
+    REMO_STORE.audio.play('splash');
+    setTimeout(() => {
+      if (REMO_STORE && REMO_STORE.audio) REMO_STORE.audio.play('coin');
+    }, 120);
+  }
+
+  if (txtInput) {
+    txtInput.focus();
+  }
+}
+
+function submitWishingWellCoin() {
+  const txtInput = document.getElementById('wishingWellTextInput');
+  const citySel = document.getElementById('wishingWellCitySelect');
+  const anonSel = document.getElementById('wishingWellAnonSelect');
+  const lang = REMO_I18N.getLang();
+
+  const text = (txtInput ? txtInput.value : '').trim();
+  if (!text) {
+    remoToast(lang === 'fr' ? '✍️ Veuillez écrire un vœu pour votre ville !' : '✍️ Please write a heartfelt wish for your city!', 'alert');
+    if (txtInput) txtInput.focus();
+    return;
+  }
+
+  const cityId = citySel ? citySel.value : 'montreal';
+  const isAnonymous = anonSel ? anonSel.value === '1' : false;
+
+  const res = REMO_STORE.tossCoinInWishingWell(cityId, text, isAnonymous);
+  if (!res.success) {
+    if (res.reason === 'no_coins') {
+      remoToast(lang === 'fr' ? '🪙 Vous n’avez pas assez de pièces REMO (1 🪙 requis).' : '🪙 Not enough REMO Coins (1 🪙 required).', 'alert');
+    }
+    return;
+  }
+
+  tossWishingCoinWithAnimation();
+
+  if (txtInput) txtInput.value = '';
+  renderWishingWellStream();
+
+  // Update header coins counter
+  const u = REMO_STORE.getCurrentUser();
+  const hdrCoins = document.getElementById('hdrCoinsVal');
+  if (hdrCoins && u) {
+    hdrCoins.textContent = u.coins.toLocaleString();
+  }
+
+  const city = getCityById(cityId);
+  const cityName = city ? getCityName(city, lang) : cityId;
+  remoToast(
+    lang === 'fr'
+      ? `✨ Vœu jeté dans la fontaine ! +5 points pour ${cityName} !`
+      : `✨ Wish tossed into the well! +5 City Points for ${cityName}!`,
+    'fanfare'
+  );
+}
+
+function renderWishingWellStream() {
+  const listEl = document.getElementById('wishingWellStreamList');
+  const countEl = document.getElementById('wishingWellTotalCount');
+  if (!listEl) return;
+
+  const wishes = (REMO_STORE.state && REMO_STORE.state.wishes) || [];
+  const lang = REMO_I18N.getLang();
+  const u = REMO_STORE.getCurrentUser();
+
+  if (countEl) {
+    countEl.textContent = `${wishes.length} ${lang === 'fr' ? 'vœux mondiaux' : 'global wishes'}`;
+  }
+
+  if (wishes.length === 0) {
+    listEl.innerHTML = `<div style="text-align:center;padding:20px;color:var(--muted);font-size:0.8rem;">${lang === 'fr' ? 'Soyez le premier à jeter une pièce et formuler un vœu !' : 'Be the first to toss a coin and make a wish!'}</div>`;
+    return;
+  }
+
+  listEl.innerHTML = wishes.map((w) => {
+    const city = getCityById(w.cityId) || getCityById('montreal');
+    const isBlessedByMe = Boolean(u && u.uid && Array.isArray(w.blessedUids) && w.blessedUids.includes(u.uid));
+    const timeAgo = formatRelativeTime(w.timestamp || Date.now(), lang);
+
+    return `
+      <div class="wish-item-card">
+        <div class="wish-item-top">
+          <div class="wish-author-badge">
+            <span>${w.isAnonymous ? '🎭' : '✨'}</span>
+            <span style="color:#ffffff;">${w.isAnonymous ? (lang === 'fr' ? 'Citoyen Anonyme' : 'Anonymous Citizen') : (typeof escapeHtmlStr === 'function' ? escapeHtmlStr(w.authorName) : w.authorName)}</span>
+            <span class="pbadge" style="font-size:0.68rem;padding:2px 7px;background:rgba(255,255,255,0.06);border:1px solid var(--border);">${city.flag} ${getCityName(city, lang)}</span>
+          </div>
+          <div style="font-size:0.72rem;color:var(--muted);">${timeAgo}</div>
+        </div>
+        <div class="wish-item-text">"${typeof escapeHtmlStr === 'function' ? escapeHtmlStr(w.text) : w.text}"</div>
+        <div style="display:flex;justify-content:flex-end;align-items:center;margin-top:2px;">
+          <button type="button" class="bless-wish-btn ${isBlessedByMe ? 'blessed' : ''}" onclick="blessWishingWellItem('${w.id}')" title="${lang === 'fr' ? 'Bénir ce vœu (+1 🪙 Karma)' : 'Bless this wish (+1 🪙 Karma)'}">
+            ${isBlessedByMe ? '✓ Béni' : '✨ Bénir'} (${w.blessings || 1})
+          </button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function blessWishingWellItem(wishId) {
+  const res = REMO_STORE.blessWish(wishId);
+  const lang = REMO_I18N.getLang();
+
+  if (!res.success) {
+    if (res.reason === 'already_blessed') {
+      remoToast(lang === 'fr' ? '✨ Vous avez déjà béni ce vœu !' : '✨ You already blessed this wish!', 'info');
+    }
+    return;
+  }
+
+  if (REMO_STORE && REMO_STORE.audio) REMO_STORE.audio.play('coin');
+
+  // Update header coins counter
+  const u = REMO_STORE.getCurrentUser();
+  const hdrCoins = document.getElementById('hdrCoinsVal');
+  if (hdrCoins && u) {
+    hdrCoins.textContent = u.coins.toLocaleString();
+  }
+
+  renderWishingWellStream();
+  remoToast(lang === 'fr' ? '✨ Bénédiction envoyée ! +1 🪙 Karma gagné !' : '✨ Blessing sent! +1 🪙 Karma earned!', 'coin');
 }
 
 /* ── 5. LIVE AUCTION HOUSE & DAILY LUCKY WHEEL ── */
@@ -2657,6 +3428,19 @@ window.drawStoryVerticalCanvas = drawStoryVerticalCanvas;
 window.shareStoryCanvasNative = shareStoryCanvasNative;
 window.downloadStoryCanvasPNG = downloadStoryCanvasPNG;
 window.closeStoryExportModal = closeStoryExportModal;
+window.drawBoardingPassCanvas = drawBoardingPassCanvas;
+window.openBoardingPassModal = openBoardingPassModal;
+window.closeBoardingPassModal = closeBoardingPassModal;
+window.onBoardingPassRouteChanged = onBoardingPassRouteChanged;
+window.shareBoardingPassNative = shareBoardingPassNative;
+window.downloadBoardingPassPNG = downloadBoardingPassPNG;
+window.openWishingWellModal = openWishingWellModal;
+window.closeWishingWellModal = closeWishingWellModal;
+window.initWishingWellCanvas = initWishingWellCanvas;
+window.tossWishingCoinWithAnimation = tossWishingCoinWithAnimation;
+window.submitWishingWellCoin = submitWishingWellCoin;
+window.renderWishingWellStream = renderWishingWellStream;
+window.blessWishingWellItem = blessWishingWellItem;
 window.teleportRadarCity = teleportRadarCity;
 window.renderAuctionsView = renderAuctionsView;
 window.placeAuctionBid = placeAuctionBid;
