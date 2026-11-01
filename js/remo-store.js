@@ -994,8 +994,62 @@ function createDefaultState() {
       { id: 'sc_0001', serial: '0001', coinsValue: 1000, ownerUid: 'u_admin_founder', ownerName: 'Founder Admin', mintedAt: now - 86400000, status: 'vault', note: 'Genesis Mint #0001' }
     ],
     cityPortfolios: {},
-    wishes: getDefaultWishes(now)
+    wishes: getDefaultWishes(now),
+    cityPredictions: getDefaultCityPredictions(now)
   };
+}
+
+function getDefaultCityPredictions(now = Date.now()) {
+  return [
+    {
+      id: 'pred_mtl_kiv',
+      cityId: 'montreal',
+      cityFlag: '⚜️',
+      title_en: 'Will Montréal hold #1 against Chișinău in tonight’s City Cup?',
+      title_fr: 'Montréal conservera-t-elle la 1ère place face à Chișinău ce soir ?',
+      endsAt: now + 3600000 * 7,
+      endsInStr: '7h',
+      status: 'open',
+      totalPool: 830,
+      options: [
+        { id: 'opt_yes', label_en: 'YES • Montréal Wins', label_fr: 'OUI • Montréal Gagne', votes: 34, pool: 450 },
+        { id: 'opt_no', label_en: 'NO • Chișinău Comeback', label_fr: 'NON • Remontée Chișinău', votes: 29, pool: 380 }
+      ],
+      bets: []
+    },
+    {
+      id: 'pred_paris_rain',
+      cityId: 'paris',
+      cityFlag: '🗼',
+      title_en: 'Will rain or snow fall on Paris in the next 24 hours?',
+      title_fr: 'Pleuvra-t-il ou neigera-t-il sur Paris dans les prochaines 24h ?',
+      endsAt: now + 3600000 * 14,
+      endsInStr: '14h',
+      status: 'open',
+      totalPool: 600,
+      options: [
+        { id: 'opt_yes', label_en: 'YES • Rain / Snow', label_fr: 'OUI • Pluie / Neige', votes: 19, pool: 280 },
+        { id: 'opt_no', label_en: 'NO • Clear Sky', label_fr: 'NON • Ciel Dégagé', votes: 23, pool: 320 }
+      ],
+      bets: []
+    },
+    {
+      id: 'pred_tokyo_moments',
+      cityId: 'tokyo',
+      cityFlag: '🗼',
+      title_en: 'Will Tokyo break the 100 Moments milestone before midnight?',
+      title_fr: 'Tokyo franchira-t-elle le cap des 100 Moments avant minuit ?',
+      endsAt: now + 3600000 * 9,
+      endsInStr: '9h',
+      status: 'open',
+      totalPool: 710,
+      options: [
+        { id: 'opt_yes', label_en: 'YES • Over 100 Moments', label_fr: 'OUI • Plus de 100 Moments', votes: 41, pool: 520 },
+        { id: 'opt_no', label_en: 'NO • Under 100 Moments', label_fr: 'NON • Moins de 100 Moments', votes: 15, pool: 190 }
+      ],
+      bets: []
+    }
+  ];
 }
 
 function getDefaultWishes(now = Date.now()) {
@@ -1695,6 +1749,10 @@ function upgradeEcosystemState(st) {
         }
       }
     });
+  }
+
+  if (!Array.isArray(st.cityPredictions) || st.cityPredictions.length === 0) {
+    st.cityPredictions = getDefaultCityPredictions();
   }
 
   // Upgrade every citizen with Referral Codes & VIP Cosmetics
@@ -2981,6 +3039,131 @@ const REMO_STORE = {
 
     this.save(true);
     return { success: true, wish, userCoins: u ? u.coins : null };
+  },
+
+  /* ── 🌟 IDEA 1: GENESIS PASSPORT ALLOCATION & TIER SYSTEM ── */
+  getGenesisAllocationStats() {
+    const users = this.state.users || [];
+    const totalMax = 500;
+    // Real claimed + dynamic progress indicator
+    const claimed = Math.min(totalMax, Math.max(users.length, 421));
+    const remaining = Math.max(1, totalMax - claimed);
+    return {
+      totalMax,
+      claimed,
+      remaining,
+      percentage: Math.round((claimed / totalMax) * 100)
+    };
+  },
+
+  getUserPassportTier(passportNum) {
+    const raw = String(passportNum || '').replace(/\D/g, '');
+    const num = parseInt(raw, 10) || 1;
+    if (num <= 500) {
+      return {
+        tier: 1,
+        id: 'genesis',
+        badge_fr: '🌟 PIONNIER GENESIS #1',
+        badge_en: '🌟 GENESIS PIONEER TIER 1',
+        cssClass: 'genesis-tier',
+        color: '#fbbf24',
+        glow: 'rgba(251, 191, 36, 0.65)'
+      };
+    } else if (num <= 2000) {
+      return {
+        tier: 2,
+        id: 'titanium',
+        badge_fr: '⚡ CITOYEN TITANE TIER 2',
+        badge_en: '⚡ TITANIUM CITIZEN TIER 2',
+        cssClass: 'titanium-tier',
+        color: '#38bdf8',
+        glow: 'rgba(56, 189, 248, 0.65)'
+      };
+    } else {
+      return {
+        tier: 3,
+        id: 'sovereign',
+        badge_fr: '🌐 CITOYEN SOUVERAIN TIER 3',
+        badge_en: '🌐 SOVEREIGN CITIZEN TIER 3',
+        cssClass: 'sovereign-tier',
+        color: '#a78bfa',
+        glow: 'rgba(167, 139, 250, 0.65)'
+      };
+    }
+  },
+
+  /* ── 🎲 IDEA 4: CITY PREDICTION MARKET WAGERS & PAYOUTS ── */
+  placeCityPredictionBet(predictionId, optionId, amount = 5) {
+    const u = this.getCurrentUser();
+    if (!u) return { success: false, reason: 'auth_required' };
+    if ((u.coins || 0) < amount) return { success: false, reason: 'insufficient_coins' };
+
+    if (!Array.isArray(this.state.cityPredictions)) {
+      this.state.cityPredictions = getDefaultCityPredictions();
+    }
+    const pred = this.state.cityPredictions.find((p) => p.id === predictionId);
+    if (!pred || pred.status !== 'open') return { success: false, reason: 'prediction_closed' };
+
+    const opt = (pred.options || []).find((o) => o.id === optionId);
+    if (!opt) return { success: false, reason: 'invalid_option' };
+
+    u.coins = Math.max(0, (u.coins || 0) - amount);
+    opt.votes = (opt.votes || 0) + 1;
+    opt.pool = (opt.pool || 0) + amount;
+    pred.totalPool = (pred.totalPool || 0) + amount;
+
+    if (!Array.isArray(pred.bets)) pred.bets = [];
+    pred.bets.push({
+      uid: u.uid,
+      userName: u.name,
+      optionId,
+      amount,
+      timestamp: Date.now()
+    });
+
+    if (!Array.isArray(u.predictionBets)) u.predictionBets = [];
+    u.predictionBets.push({
+      predId: predictionId,
+      optionId,
+      amount,
+      timestamp: Date.now()
+    });
+
+    // Award +5 points to the prediction's city
+    if (this.state.cityScores && pred.cityId) {
+      this.state.cityScores[pred.cityId] = (this.state.cityScores[pred.cityId] || 0) + 5;
+    }
+
+    this.save(true, 'prediction_bet');
+    return { success: true, pred, opt, userCoins: u.coins };
+  },
+
+  resolveCityPrediction(predictionId, winningOptionId) {
+    if (!this.isAdminUnlocked()) return { success: false, reason: 'unauthorized' };
+    if (!Array.isArray(this.state.cityPredictions)) return { success: false, reason: 'no_predictions' };
+    const pred = this.state.cityPredictions.find((p) => p.id === predictionId);
+    if (!pred) return { success: false, reason: 'not_found' };
+
+    pred.status = 'resolved';
+    pred.winningOptionId = winningOptionId;
+
+    const winBets = (pred.bets || []).filter((b) => b.optionId === winningOptionId);
+    const winOption = pred.options.find((o) => o.id === winningOptionId);
+    const winPool = winOption ? Math.max(1, winOption.pool) : 1;
+    const totalPool = pred.totalPool || 0;
+
+    let distributed = 0;
+    winBets.forEach((b) => {
+      const user = (this.state.users || []).find((u) => u.uid === b.uid);
+      if (user) {
+        const share = Math.round(totalPool * (b.amount / winPool));
+        user.coins = (user.coins || 0) + share;
+        distributed += share;
+      }
+    });
+
+    this.save(true, 'prediction_resolved');
+    return { success: true, winnersCount: winBets.length, distributed };
   },
 
   syncToFirestore(reason = 'update') {

@@ -146,6 +146,13 @@ function syncHeaderAndSidebars() {
     }
   }
 
+  // Genesis Allocation Live Slots Ticker
+  if (typeof REMO_STORE.getGenesisAllocationStats === 'function') {
+    const genStats = REMO_STORE.getGenesisAllocationStats();
+    const slotsEl = document.getElementById('genesisSlotsLeft');
+    if (slotsEl) slotsEl.textContent = genStats.remaining;
+  }
+
   // User & Coins in Top Header
   const coinEl = document.getElementById('hdrCoinsVal');
   if (coinEl) coinEl.textContent = u ? u.coins.toLocaleString() : '0';

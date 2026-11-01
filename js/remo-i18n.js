@@ -498,7 +498,34 @@ const REMO_DICT = {
     welcome_splash_gift_sub: 'Welcome coins instantly credited to your vault',
     welcome_splash_desc: 'Explore world cities in 4D, collect holographic passes, and represent your city in the World City Cup!',
     welcome_splash_enter_btn: '🚀 Enter 4D World',
-    welcome_splash_auto: 'Entering automatically in'
+    welcome_splash_auto: 'Entering automatically in',
+
+    // 🌟 Idea 1: Genesis Passports Ticker & Tier System
+    genesis_fomo_badge: 'GENESIS PASS ALLOCATION (#0001–#0500):',
+    genesis_fomo_alert: 'Only',
+    genesis_fomo_rem: 'Gold Pioneer Passports remaining!',
+    genesis_claim_btn: '⚡ Claim +150 🪙',
+    genesis_tier_1_title: '🌟 GENESIS PIONEER TIER 1',
+    genesis_tier_1_desc: 'Permanent Founder Privilege • 24K Gold Holographic Proof',
+    genesis_tier_2_title: '⚡ TITANIUM CITIZEN TIER 2',
+    genesis_tier_3_title: '🌐 SOVEREIGN CITIZEN TIER 3',
+    genesis_progress_hdr: 'GENESIS CITIZEN ALLOCATION',
+    genesis_progress_stat: 'Claimed',
+    genesis_progress_rem: 'Remaining',
+
+    // 🎲 Idea 4: City Predictions Market
+    pred_market_title: 'City Prediction Market 🪙',
+    pred_market_sub: 'Wager REMO Coins on live world city events & split the winners’ jackpot!',
+    pred_total_pool: 'Total Jackpot',
+    pred_ends_in: 'Ends in',
+    pred_bet_5: 'Bet 5 🪙',
+    pred_bet_10: 'Bet 10 🪙',
+    pred_bet_25: 'Bet 25 🪙',
+    pred_your_bet: 'Your Wager',
+    pred_voted_toast: '🎯 Prediction wager placed (+5 City Points)!',
+    pred_err_coins: '⚠️ Insufficient REMO Coins in your vault!',
+    pred_opt_yes: 'YES',
+    pred_opt_no: 'NO'
   },
 
   fr: {
@@ -995,7 +1022,34 @@ const REMO_DICT = {
     welcome_splash_gift_sub: 'Pièces de bienvenue créditées instantanément dans votre coffre',
     welcome_splash_desc: 'Explorez les villes du monde en 4D, collectionnez des billets holographiques et défendez votre ville dans la Coupe du Monde !',
     welcome_splash_enter_btn: '🚀 Entrer dans le Monde 4D',
-    welcome_splash_auto: 'Accès automatique dans'
+    welcome_splash_auto: 'Accès automatique dans',
+
+    // 🌟 Idea 1: Genesis Passports Ticker & Tier System
+    genesis_fomo_badge: 'ALLOCATION PASSEPORTS GENESIS (#0001–#0500) :',
+    genesis_fomo_alert: 'Il ne reste que',
+    genesis_fomo_rem: 'Passeports Pionniers Or disponibles !',
+    genesis_claim_btn: '⚡ Réclamer +150 🪙',
+    genesis_tier_1_title: '🌟 PIONNIER GENESIS TIER 1',
+    genesis_tier_1_desc: 'Privilège Fondateur Permanent • Épreuve Holographique Or 24K',
+    genesis_tier_2_title: '⚡ CITOYEN TITANE TIER 2',
+    genesis_tier_3_title: '🌐 CITOYEN SOUVERAIN TIER 3',
+    genesis_progress_hdr: 'ALLOCATION CITOYENS GENESIS',
+    genesis_progress_stat: 'Attribués',
+    genesis_progress_rem: 'Restants',
+
+    // 🎲 Idea 4: City Predictions Market
+    pred_market_title: 'Marché des Prédictions Urbaines 🪙',
+    pred_market_sub: 'Pariez vos Pièces REMO sur les événements urbains en direct et partagez le jackpot !',
+    pred_total_pool: 'Jackpot Total',
+    pred_ends_in: 'Fin dans',
+    pred_bet_5: 'Parier 5 🪙',
+    pred_bet_10: 'Parier 10 🪙',
+    pred_bet_25: 'Parier 25 🪙',
+    pred_your_bet: 'Votre Pari',
+    pred_voted_toast: '🎯 Pari enregistré avec succès (+5 points Ville) !',
+    pred_err_coins: '⚠️ Solde de Pièces REMO insuffisant dans votre coffre !',
+    pred_opt_yes: 'OUI',
+    pred_opt_no: 'NON'
   }
 };
 

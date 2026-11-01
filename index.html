@@ -79,7 +79,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-  <link rel="stylesheet" href="css/remo-core.css?v=46">
+  <link rel="stylesheet" href="css/remo-core.css?v=47">
 </head>
 <body>
 
@@ -129,6 +129,18 @@
       <a href="admin.html" class="btn-ghost hide-mobile" id="hdrAdminOfficeLink" style="display:none;border-color:rgba(251,191,36,0.5);color:#fbbf24;" data-i18n="btn_admin_office">🛡️ Admin Office</a>
     </div>
   </header>
+
+  <!-- 🔥 Genesis Passports Urgency Ticker (#0001–#0500 Allocation) -->
+  <div class="genesis-fomo-bar" id="genesisFomoBar" onclick="switchRemoView('passport')" title="Genesis Passport Allocation">
+    <div class="genesis-fomo-inner">
+      <span class="genesis-fomo-fire">🔥</span>
+      <span class="genesis-fomo-txt">
+        <b data-i18n="genesis_fomo_badge">ALLOCATION PASSEPORTS GENESIS (#0001–#0500) :</b>
+        <span data-i18n="genesis_fomo_alert">Il ne reste que</span> <b id="genesisSlotsLeft" style="color:#fde047;">79</b> <span data-i18n="genesis_fomo_rem">Passeports Pionniers Or disponibles !</span>
+      </span>
+      <span class="genesis-fomo-pill" data-i18n="genesis_claim_btn">⚡ Réclamer +150 🪙</span>
+    </div>
+  </div>
 
   <!-- 🖥️ Desktop 3-Column Cyber Dashboard / 📱 Mobile Full-Screen Stage -->
   <main class="remo-shell">
@@ -280,6 +292,24 @@
         <div class="glass-box" style="margin-bottom:16px;">
           <h2 style="font-family:'Orbitron',sans-serif;font-size:1.18rem;margin-bottom:14px;" data-i18n="arena_title">⚔️ City Wars &amp; 3D Card PvP Battle Arena</h2>
           <div id="arenaWarsList"></div>
+        </div>
+
+        <!-- 🎲 Idea 4: City Prediction Market Section -->
+        <div class="glass-box" style="margin-bottom:16px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px;">
+            <div>
+              <h3 style="font-family:'Orbitron',sans-serif;font-size:1.12rem;color:#fbbf24;display:flex;align-items:center;gap:8px;margin:0;">
+                <span>🎲</span> <span data-i18n="pred_market_title">Marché des Prédictions Urbaines 🪙</span>
+              </h3>
+              <p style="font-size:0.78rem;color:var(--muted);margin-top:3px;" data-i18n="pred_market_sub">
+                Pariez vos Pièces REMO sur les événements urbains en direct et partagez le jackpot !
+              </p>
+            </div>
+            <div style="display:inline-flex;align-items:center;gap:6px;background:rgba(251,191,36,0.1);border:1px solid rgba(251,191,36,0.35);padding:4px 12px;border-radius:20px;font-size:0.78rem;font-weight:800;color:#fbbf24;">
+              <span>🪙</span> <span id="predUserVaultBalance">...</span>
+            </div>
+          </div>
+          <div id="cityPredictionsGrid"></div>
         </div>
 
         <div class="glass-box">
@@ -1632,12 +1662,12 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 
   <!-- REMO Modular Engines -->
-  <script src="js/remo-i18n.js?v=46"></script>
-  <script src="js/remo-cities-data.js?v=46"></script>
-  <script src="js/remo-store.js?v=46"></script>
-  <script src="js/remo-card-engine.js?v=46"></script>
-  <script src="js/remo-radar-arena.js?v=46"></script>
-  <script src="js/remo-social-comms.js?v=46"></script>
-  <script src="js/remo-radio-engine.js?v=46"></script>
+  <script src="js/remo-i18n.js?v=47"></script>
+  <script src="js/remo-cities-data.js?v=47"></script>
+  <script src="js/remo-store.js?v=47"></script>
+  <script src="js/remo-card-engine.js?v=47"></script>
+  <script src="js/remo-radar-arena.js?v=47"></script>
+  <script src="js/remo-social-comms.js?v=47"></script>
+  <script src="js/remo-radio-engine.js?v=47"></script>
 </body>
 </html>

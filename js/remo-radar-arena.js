@@ -857,7 +857,127 @@ function renderArenaView() {
     }).join('');
     updatePvPCardPreviews();
   }
+
+  // 🎲 Render City Predictions Market
+  renderCityPredictionsView();
 }
+
+/* ── 🎲 IDEA 4: CITY PREDICTION MARKET (POLYMARKET 4D) ── */
+function renderCityPredictionsView() {
+  const grid = document.getElementById('cityPredictionsGrid');
+  if (!grid) return;
+
+  const lang = REMO_I18N.getLang();
+  const u = REMO_STORE.getCurrentUser() || REMO_STORE.ensureGuestOrCitizen('REMO Pioneer', '', 'montreal');
+  const balEl = document.getElementById('predUserVaultBalance');
+  if (balEl && u) {
+    balEl.textContent = `${(u.coins || 0).toLocaleString()} 🪙`;
+  }
+
+  const preds = Array.isArray(REMO_STORE.state.cityPredictions) ? REMO_STORE.state.cityPredictions : [];
+  if (preds.length === 0) {
+    grid.innerHTML = `<div style="color:var(--muted);font-size:0.85rem;padding:12px;">${lang === 'fr' ? 'Aucune prédiction active pour le moment.' : 'No active predictions right now.'}</div>`;
+    return;
+  }
+
+  grid.innerHTML = preds.map((p) => {
+    const c = getCityById(p.cityId) || { flag: p.cityFlag || '🌍', name_fr: 'Monde', name_en: 'World' };
+    const ttl = lang === 'fr' ? (p.title_fr || p.title_en) : (p.title_en || p.title_fr);
+    const optA = p.options && p.options[0];
+    const optB = p.options && p.options[1];
+    const poolA = optA ? (optA.pool || 0) : 0;
+    const poolB = optB ? (optB.pool || 0) : 0;
+    const totPool = Math.max(1, poolA + poolB);
+    const pctA = Math.round((poolA / totPool) * 100);
+    const pctB = 100 - pctA;
+
+    const optALabel = optA ? (lang === 'fr' ? optA.label_fr : optA.label_en) : 'OUI';
+    const optBLabel = optB ? (lang === 'fr' ? optB.label_fr : optB.label_en) : 'NON';
+
+    // Check if user already placed a bet
+    const userBet = (u && u.predictionBets && Array.isArray(u.predictionBets))
+      ? u.predictionBets.find((b) => b && b.predId === p.id)
+      : null;
+
+    let betStatusHtml = '';
+    if (userBet) {
+      const chosenOpt = (userBet.optionId === optA?.id) ? optALabel : optBLabel;
+      betStatusHtml = `
+        <div class="pred-user-bet-status">
+          ✓ ${t('pred_your_bet')}: <b>${userBet.amount} 🪙</b> · <b>${chosenOpt}</b>
+        </div>
+      `;
+    }
+
+    return `
+      <div class="pred-card">
+        <div>
+          <div class="pred-card-hdr">
+            <span class="pred-city-badge">${c.flag} ${getCityName(c, lang)}</span>
+            <span class="pred-timer-badge">⏳ ${t('pred_ends_in')} ${p.endsInStr || '8h'}</span>
+          </div>
+
+          <div class="pred-question">${ttl}</div>
+
+          <div class="pred-pool-strip">
+            <span>🪙 <b>${(p.totalPool || totPool).toLocaleString()}</b> ${t('pred_total_pool')}</span>
+            <span>${(p.bets || []).length} ${lang === 'fr' ? 'paris' : 'bets'}</span>
+          </div>
+
+          <div class="pred-split-bar-box">
+            <div class="pred-split-fill-a" style="width:${pctA}%;"></div>
+          </div>
+
+          <div class="pred-options-row">
+            <!-- Option A -->
+            <div class="pred-opt-box">
+              <div class="pred-opt-label" title="${optALabel}">${optALabel}</div>
+              <div class="pred-opt-pct" style="color:#34d399;">${pctA}%</div>
+              <div class="pred-opt-pool">🪙 ${poolA} (${optA?.votes || 0})</div>
+              <div class="pred-bet-btns-row">
+                <button type="button" class="pred-bet-pill-btn" onclick="placePredictionBetAction('${p.id}', '${optA?.id}', 5)">+5</button>
+                <button type="button" class="pred-bet-pill-btn" onclick="placePredictionBetAction('${p.id}', '${optA?.id}', 10)">+10</button>
+                <button type="button" class="pred-bet-pill-btn" onclick="placePredictionBetAction('${p.id}', '${optA?.id}', 25)">+25</button>
+              </div>
+            </div>
+
+            <!-- Option B -->
+            <div class="pred-opt-box">
+              <div class="pred-opt-label" title="${optBLabel}">${optBLabel}</div>
+              <div class="pred-opt-pct" style="color:#fb7185;">${pctB}%</div>
+              <div class="pred-opt-pool">🪙 ${poolB} (${optB?.votes || 0})</div>
+              <div class="pred-bet-btns-row">
+                <button type="button" class="pred-bet-pill-btn" onclick="placePredictionBetAction('${p.id}', '${optB?.id}', 5)">+5</button>
+                <button type="button" class="pred-bet-pill-btn" onclick="placePredictionBetAction('${p.id}', '${optB?.id}', 10)">+10</button>
+                <button type="button" class="pred-bet-pill-btn" onclick="placePredictionBetAction('${p.id}', '${optB?.id}', 25)">+25</button>
+              </div>
+            </div>
+          </div>
+
+          ${betStatusHtml}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function placePredictionBetAction(predId, optId, amount = 5) {
+  const res = REMO_STORE.placeCityPredictionBet(predId, optId, amount);
+  if (!res.ok && !res.success) {
+    if (res.reason === 'insufficient_coins') {
+      remoToast(t('pred_err_coins'), 'warn');
+    } else {
+      remoToast('⚠️ Error placing bet.', 'warn');
+    }
+    return;
+  }
+  spawnRemoCoinsFX(8);
+  remoToast(t('pred_voted_toast'), 'fanfare');
+  renderCityPredictionsView();
+  syncHeaderAndSidebars();
+}
+window.renderCityPredictionsView = renderCityPredictionsView;
+window.placePredictionBetAction = placePredictionBetAction;
 
 function voteCityWar(warId, side) {
   const lang = REMO_I18N.getLang();
@@ -1473,6 +1593,15 @@ function renderPassportView() {
   const equippedTitleItem = allShopItems.find((x) => x.id === u.equippedTitleId);
   const titleBadge = equippedTitleItem ? (lang === 'fr' ? (equippedTitleItem.badge_fr || equippedTitleItem.name_fr) : (equippedTitleItem.badge_en || equippedTitleItem.name_en)) : '';
 
+  // Genesis Tier & Allocation Stats
+  const userTier = (typeof REMO_STORE.getUserPassportTier === 'function')
+    ? REMO_STORE.getUserPassportTier(u.passportNum)
+    : { badge_fr: '🌟 PIONNIER GENESIS #1', badge_en: '🌟 GENESIS PIONEER TIER 1', cssClass: 'genesis-tier-badge' };
+  const tierBadgeText = lang === 'fr' ? userTier.badge_fr : userTier.badge_en;
+  const genStats = (typeof REMO_STORE.getGenesisAllocationStats === 'function')
+    ? REMO_STORE.getGenesisAllocationStats()
+    : { totalMax: 500, claimed: 421, remaining: 79, percentage: 84 };
+
   // User City Stock Portfolio
   const userPortfolio = (REMO_STORE.state.cityPortfolios && REMO_STORE.state.cityPortfolios[u.uid]) || {};
   const ownedCityEntries = Object.entries(userPortfolio).filter(([cId, count]) => count > 0);
@@ -1498,6 +1627,7 @@ function renderPassportView() {
               ${u.verified ? '<span style="color:#38bdf8;font-size:1.1rem;" title="Vérifié">✓</span>' : ''}
               ${u.role === 'admin' ? '<span class="adm-badge">👑 ADMIN</span>' : ''}
               ${titleBadge ? `<span class="royal-title-pill">${escapeHtmlStr(titleBadge)}</span>` : ''}
+              <span class="${userTier.cssClass || 'genesis-tier-badge'}">${escapeHtmlStr(tierBadgeText)}</span>
             </div>
             <div style="font-size:0.84rem;color:#94a3b8;margin-top:3px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
               <span>${home.flag} <b>${escapeHtmlStr(getCityName(home, lang))}</b></span>
@@ -1539,6 +1669,17 @@ function renderPassportView() {
         </div>
         <div class="prof-stat-badge">
           🛂 <b>${(u.visas || []).length} / ${allCities.length}</b> ${lang === 'fr' ? 'Visas GPS' : 'Visas'}
+        </div>
+      </div>
+
+      <!-- Genesis Allocation Progress Bar -->
+      <div style="margin-top:14px;background:rgba(251,191,36,0.06);border:1px solid rgba(251,191,36,0.25);border-radius:14px;padding:12px 14px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;font-size:0.75rem;font-weight:800;color:#fbbf24;margin-bottom:6px;flex-wrap:wrap;gap:6px;">
+          <span>🔥 ${t('genesis_progress_hdr')} (#0001–#0500)</span>
+          <span style="color:#fde047;">${genStats.claimed} / ${genStats.totalMax} ${t('genesis_progress_stat')} (${genStats.remaining} ${t('genesis_progress_rem')})</span>
+        </div>
+        <div style="height:6px;width:100%;border-radius:999px;background:rgba(255,255,255,0.1);overflow:hidden;">
+          <div style="height:100%;width:${genStats.percentage}%;background:linear-gradient(90deg,#fbbf24,#f59e0b);border-radius:999px;"></div>
         </div>
       </div>
     </div>

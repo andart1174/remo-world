@@ -3376,5 +3376,276 @@ button, input, select, textarea {
   transform: scaleX(0);
 }
 
+/* ══════════════════════════════════════════════════════════════════════
+   🌟 IDEA 1: GENESIS PASSPORT FOMO TICKER & TIER SYSTEM
+   ══════════════════════════════════════════════════════════════════════ */
+.genesis-fomo-bar {
+  background: linear-gradient(90deg, #1e1b4b 0%, #0f172a 50%, #1e1b4b 100%);
+  border-bottom: 1.5px solid rgba(251, 191, 36, 0.45);
+  padding: 7px 14px;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  position: relative;
+  overflow: hidden;
+  z-index: 90;
+}
+
+.genesis-fomo-bar:hover {
+  background: linear-gradient(90deg, #2e1065 0%, #1e1b4b 50%, #2e1065 100%);
+  border-bottom-color: #fbbf24;
+}
+
+.genesis-fomo-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 0.78rem;
+}
+
+.genesis-fomo-fire {
+  font-size: 1rem;
+  animation: fomoFirePulse 1.4s ease-in-out infinite;
+}
+
+@keyframes fomoFirePulse {
+  0%, 100% { transform: scale(1); filter: drop-shadow(0 0 4px #f59e0b); }
+  50% { transform: scale(1.22); filter: drop-shadow(0 0 10px #ef4444); }
+}
+
+.genesis-fomo-txt {
+  color: #f8fafc;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+}
+
+.genesis-fomo-pill {
+  background: linear-gradient(135deg, #f59e0b, #fbbf24);
+  color: #050814;
+  font-family: 'Orbitron', sans-serif;
+  font-weight: 900;
+  font-size: 0.72rem;
+  padding: 3px 10px;
+  border-radius: 999px;
+  box-shadow: 0 0 12px rgba(251, 191, 36, 0.55);
+  animation: fomoPillGlow 2.2s ease-in-out infinite;
+}
+
+@keyframes fomoPillGlow {
+  0%, 100% { box-shadow: 0 0 8px rgba(251,191,36,0.4); }
+  50% { box-shadow: 0 0 18px rgba(251,191,36,0.85); transform: translateY(-1px); }
+}
+
+/* Genesis Tier Badges */
+.genesis-tier-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.72rem;
+  font-weight: 900;
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.2), rgba(245, 158, 11, 0.15));
+  border: 1px solid #fbbf24;
+  color: #fde047;
+  box-shadow: 0 0 10px rgba(251, 191, 36, 0.3);
+}
+
+.titanium-tier-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.72rem;
+  font-weight: 900;
+  background: linear-gradient(135deg, rgba(56, 189, 248, 0.2), rgba(14, 165, 233, 0.15));
+  border: 1px solid #38bdf8;
+  color: #7dd3fc;
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.3);
+}
+
+.sovereign-tier-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.72rem;
+  font-weight: 900;
+  background: linear-gradient(135deg, rgba(167, 139, 250, 0.2), rgba(139, 92, 246, 0.15));
+  border: 1px solid #a78bfa;
+  color: #c4b5fd;
+  box-shadow: 0 0 10px rgba(167, 139, 250, 0.3);
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   🎲 IDEA 4: CITY PREDICTION MARKET CARDS & BARS
+   ══════════════════════════════════════════════════════════════════════ */
+.pred-card {
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.9), rgba(10, 14, 35, 0.95));
+  border: 1.5px solid rgba(56, 189, 248, 0.25);
+  border-radius: 18px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 12px;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5);
+  position: relative;
+  overflow: hidden;
+}
+
+.pred-card:hover {
+  border-color: rgba(56, 189, 248, 0.6);
+  transform: translateY(-2px);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.7), 0 0 20px rgba(56, 189, 248, 0.2);
+}
+
+.pred-card-hdr {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.pred-city-badge {
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: #38bdf8;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.pred-timer-badge {
+  background: rgba(251, 191, 36, 0.12);
+  border: 1px solid rgba(251, 191, 36, 0.35);
+  color: #fbbf24;
+  font-size: 0.7rem;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.pred-question {
+  font-size: 0.92rem;
+  font-weight: 800;
+  color: #f8fafc;
+  line-height: 1.35;
+  margin: 6px 0 10px 0;
+}
+
+.pred-pool-strip {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.76rem;
+  color: #94a3b8;
+  margin-bottom: 8px;
+}
+
+.pred-split-bar-box {
+  height: 8px;
+  width: 100%;
+  border-radius: 999px;
+  background: rgba(244, 63, 94, 0.75);
+  overflow: hidden;
+  display: flex;
+  margin-bottom: 12px;
+}
+
+.pred-split-fill-a {
+  height: 100%;
+  background: linear-gradient(90deg, #10b981, #06b6d4);
+  transition: width 0.4s ease;
+}
+
+.pred-options-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.pred-opt-box {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 8px 10px;
+  text-align: center;
+  transition: all 0.2s ease;
+}
+
+.pred-opt-box:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(56, 189, 248, 0.4);
+}
+
+.pred-opt-label {
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: #e2e8f0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pred-opt-pct {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 1.05rem;
+  font-weight: 900;
+  margin: 2px 0;
+}
+
+.pred-opt-pool {
+  font-size: 0.68rem;
+  color: var(--muted);
+}
+
+.pred-bet-btns-row {
+  display: flex;
+  gap: 4px;
+  margin-top: 6px;
+  justify-content: center;
+}
+
+.pred-bet-pill-btn {
+  background: rgba(251, 191, 36, 0.15);
+  border: 1px solid rgba(251, 191, 36, 0.4);
+  color: #fde047;
+  font-size: 0.68rem;
+  font-weight: 800;
+  padding: 3px 6px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.pred-bet-pill-btn:hover {
+  background: #fbbf24;
+  color: #050814;
+  transform: scale(1.05);
+}
+
+.pred-user-bet-status {
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px dashed #10b981;
+  color: #6ee7b7;
+  font-size: 0.72rem;
+  font-weight: 800;
+  padding: 5px 10px;
+  border-radius: 8px;
+  text-align: center;
+  margin-top: 6px;
+}
+
 
 
