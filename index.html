@@ -565,6 +565,7 @@
         <button class="btn-ghost" onclick="switchRemoView('messages')">💌 <span data-i18n="nav_messages">Messenger</span></button>
         <button class="btn-ghost" onclick="switchRemoView('bottles')" style="border-color:#38bdf8;color:#7dd3fc;">🍾 <span data-i18n="nav_bottles">City Bottle</span></button>
         <button class="btn-ghost" onclick="switchRemoView('wheel')">🎡 <span data-i18n="nav_wheel">Lucky Spin</span></button>
+        <button class="btn-ghost" onclick="document.getElementById('mobileHubModal').classList.remove('open');openRemoRadioModal();" style="border-color:#10b981;color:#6ee7b7;"><span id="mbRadioBtnTxt">📻 Radio du Monde</span></button>
         <button class="btn-ghost" id="mbHubAdminGodBtn" style="display:none;" onclick="document.getElementById('mobileHubModal').classList.remove('open');openAdminQuickModal();">👑 Admin God-Mode</button>
         <a href="admin.html" id="mbHubAdminOfficeBtn" class="btn-cyber btn-gold" style="display:none;justify-content:center;">🛡️ Admin Office</a>
         <button class="btn-ghost" onclick="document.getElementById('mobileHubModal').classList.remove('open');userSignOutAction();" style="border-color:#f43f5e;color:#fda4af;grid-column:1/-1;">🚪 Déconnexion / Sign Out</button>
@@ -573,6 +574,65 @@
         <input type="text" id="mbPromoInput" class="remo-input" style="padding:8px 11px;text-transform:uppercase;" data-i18n-placeholder="promo_redeem_ph" placeholder="REMO2026">
         <button class="btn-cyber" onclick="redeemPromoCodeInput('mbPromoInput')" data-i18n="promo_redeem_btn">Claim</button>
       </div>
+    </div>
+  </div>
+
+  <!-- 📻 REMO World Radio™ Live Stream & City Console Modal -->
+  <div class="remo-modal-backdrop" id="remoRadioModal" onclick="if(event.target===this)closeRemoRadioModal()">
+    <div class="remo-modal radio-console-modal">
+      <div class="modal-hdr" style="margin-bottom:14px;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span style="font-size:1.4rem;">📻</span>
+          <div>
+            <b style="font-family:'Orbitron',sans-serif;font-size:0.96rem;color:#fbbf24;">REMO WORLD RADIO™</b>
+            <div style="font-size:0.72rem;color:var(--muted);">Live World Cities &amp; Chill Vibe Streams</div>
+          </div>
+        </div>
+        <button class="modal-close" onclick="closeRemoRadioModal()">✕</button>
+      </div>
+
+      <!-- Now Playing Card -->
+      <div class="radio-np-card">
+        <div style="display:flex;align-items:center;gap:14px;min-width:0;flex:1;">
+          <div class="radio-np-avatar" id="radioNpIcon">☕</div>
+          <div style="min-width:0;flex:1;">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span id="radioNpBadge" style="font-size:0.72rem;font-weight:900;color:#10b981;letter-spacing:0.8px;">🟢 ON AIR</span>
+            </div>
+            <div id="radioNpName" style="font-weight:900;font-size:1.05rem;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px;">
+              Capital Chill UK
+            </div>
+            <div id="radioNpDesc" style="font-size:0.75rem;color:#bae6fd;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+              Downtempo, Chillhop &amp; Lofi Beats 24/7
+            </div>
+          </div>
+        </div>
+        <div>
+          <button type="button" class="btn-cyber btn-gold" id="radioMainPlayBtn" style="padding:10px 18px;font-size:0.86rem;" onclick="toggleRadioPlayPause()">
+            <span>▶️</span> <span>Écouter</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Volume & Sound Bar -->
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;background:rgba(255,255,255,0.03);padding:10px 14px;border-radius:12px;border:1px solid rgba(255,255,255,0.06);">
+        <span style="font-size:1.1rem;color:#38bdf8;">🔊</span>
+        <input type="range" class="radio-slider" id="radioVolumeSlider" min="0" max="100" value="65" oninput="setRadioVolume(this)">
+        <span id="radioVolumeVal" style="font-size:0.78rem;font-weight:800;color:#f8fafc;width:38px;text-align:right;">65%</span>
+      </div>
+
+      <!-- Category Filter Tabs: Vibes vs Cities -->
+      <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;" id="radioCategoryTabs">
+        <button type="button" class="fchip active" onclick="setRadioCategoryTab('vibe', this)">
+          🎧 Ambiances &amp; Chill (Lofi / Synth)
+        </button>
+        <button type="button" class="fchip" onclick="setRadioCategoryTab('city', this)">
+          🌍 Villes du Monde en Direct
+        </button>
+      </div>
+
+      <!-- Stations List -->
+      <div class="radio-stations-grid" id="radioStationsGrid"></div>
     </div>
   </div>
 
@@ -1277,5 +1337,6 @@
   <script src="js/remo-card-engine.js"></script>
   <script src="js/remo-radar-arena.js"></script>
   <script src="js/remo-social-comms.js"></script>
+  <script src="js/remo-radio-engine.js"></script>
 </body>
 </html>

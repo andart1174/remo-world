@@ -2852,6 +2852,10 @@ function userSignOutAction() {
 }
 
 function toggleHeaderRadio() {
+  if (typeof window.openRemoRadioModal === 'function') {
+    window.openRemoRadioModal();
+    return;
+  }
   const active = RemoAudio.toggleCyberLofiRadio();
   const btn = document.getElementById('btnRadioToggle');
   if (btn) btn.style.borderColor = active ? '#10b981' : '';

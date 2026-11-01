@@ -3,7 +3,7 @@
    Offline Shell Caching + Native Push & Incoming Call Notifications
    ════════════════════════════════════════════════════════════════════ */
 
-const CACHE_NAME = 'remo-pwa-v33';
+const CACHE_NAME = 'remo-pwa-v34';
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -32,6 +32,7 @@ const CORE_ASSETS = [
   './js/remo-card-engine.js',
   './js/remo-radar-arena.js',
   './js/remo-social-comms.js',
+  './js/remo-radio-engine.js',
   './js/remo-admin.js'
 ];
 
