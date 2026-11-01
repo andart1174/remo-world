@@ -1728,6 +1728,10 @@ function upgradeEcosystemState(st) {
   if (!Array.isArray(st.vipOrders)) st.vipOrders = [];
   if (!Array.isArray(st.geoVaults) || st.geoVaults.length === 0) {
     st.geoVaults = getDefaultGeoVaults();
+  } else {
+    st.geoVaults.forEach((v) => {
+      if (!v.tier) v.tier = (v.coinsReward >= 500 ? 'diamond' : (v.coinsReward >= 250 ? 'gold' : 'wood'));
+    });
   }
   if (!Array.isArray(st.serializedCoins) || st.serializedCoins.length === 0) {
     st.serializedCoins = [
@@ -2446,6 +2450,17 @@ const REMO_STORE = {
     // Mark as unlocked
     v.unlockedBy.push(u.uid);
 
+    // First Finder Hall of Fame engraving
+    if (!v.firstClaimedBy) {
+      v.firstClaimedBy = {
+        uid: u.uid,
+        name: u.name,
+        passportNum: u.passportNum,
+        timeStr: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        timestamp: Date.now()
+      };
+    }
+
     // Reward Coins
     const coinsWon = v.coinsReward || 250;
     this.addCoins(u.uid, coinsWon, 50);
@@ -2480,6 +2495,7 @@ const REMO_STORE = {
     const u = this.getCurrentUser() || this.ensureGuestOrCitizen('Admin Founder', '', data.cityId || 'montreal');
 
     const bountyCoins = Math.max(50, Number(data.coinsReward) || 150);
+    const tier = data.tier || (bountyCoins >= 500 ? 'diamond' : (bountyCoins >= 250 ? 'gold' : 'wood'));
 
     const newVault = {
       id: 'vault_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
@@ -2493,17 +2509,119 @@ const REMO_STORE = {
       lng: Number(data.lng) || -73.5673,
       radiusMeters: Math.max(100, Math.min(2000, Number(data.radiusMeters) || 350)),
       coinsReward: bountyCoins,
-      rarity: data.rarity || 'Mythic 4D',
+      tier: tier,
+      rarity: data.rarity || (tier === 'diamond' ? 'Mythic 4D' : (tier === 'gold' ? 'Legendary Gold' : 'Urban Rare')),
       cardCityId: data.cardCityId || data.cityId,
       sponsorName: u.name || 'REMO Admin',
       creatorUid: u.uid,
       unlockedBy: [],
+      firstClaimedBy: null,
       createdAt: Date.now()
     };
 
     this.state.geoVaults.unshift(newVault);
+    this.state.latestChestAlert = {
+      id: newVault.id,
+      cityId: newVault.cityId,
+      tier: newVault.tier,
+      coinsReward: newVault.coinsReward,
+      timestamp: Date.now()
+    };
     this.save(true, 'geovault_buried', newVault);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('remo:worldchest_dropped', { detail: newVault }));
+    }
     return { success: true, vault: newVault };
+  },
+
+  /* ── 🛂 4D Sovereign Border Control & Live GPS Passport Stamping ── */
+  verifyAndStampGpsBorder(userUid, coords) {
+    if (!this.state || !coords) return { ok: false, reason: 'invalid_coords' };
+    const u = userUid ? (this.state.users || []).find((x) => x.uid === userUid) : this.getCurrentUser();
+    if (!u) return { ok: false, reason: 'no_user' };
+
+    const uLat = Number(coords.latitude);
+    const uLng = Number(coords.longitude);
+    if (isNaN(uLat) || isNaN(uLng)) return { ok: false, reason: 'invalid_coords' };
+
+    const allCities = (typeof REMO_CITIES_DATA !== 'undefined' && REMO_CITIES_DATA.cities) ? REMO_CITIES_DATA.cities : [];
+    let closestCity = null;
+    let minDistKm = Infinity;
+
+    allCities.forEach((c) => {
+      const cLat = typeof c.lat === 'number' ? c.lat : (c.coords ? c.coords.lat : 0);
+      const cLng = typeof c.lng === 'number' ? c.lng : (c.coords ? c.coords.lng : 0);
+      const d = this._calcGeoDistKm(uLat, uLng, cLat, cLng);
+      if (d < minDistKm) {
+        minDistKm = d;
+        closestCity = c;
+      }
+    });
+
+    if (!closestCity) return { ok: false, reason: 'no_cities' };
+
+    u.gpsBorderVisas = Array.isArray(u.gpsBorderVisas) ? u.gpsBorderVisas : [];
+    const existingIndex = u.gpsBorderVisas.findIndex((v) => v.cityId === closestCity.id);
+
+    const inRange = minDistKm <= 45; // 45km radius covers any metropolitan area
+    if (!inRange) {
+      return {
+        ok: false,
+        reason: 'too_far',
+        closestCity,
+        distanceKm: Math.round(minDistKm),
+        userLat: uLat,
+        userLng: uLng
+      };
+    }
+
+    const now = Date.now();
+    const stampData = {
+      id: 'bdr_' + closestCity.id + '_' + now,
+      cityId: closestCity.id,
+      cityName_en: closestCity.name_en || closestCity.name,
+      cityName_fr: closestCity.name_fr || closestCity.name,
+      flag: closestCity.flag,
+      code: closestCity.code || closestCity.id.toUpperCase().slice(0, 3),
+      lat: uLat,
+      lng: uLng,
+      accuracy: Math.round(coords.accuracy || 25),
+      stampedAt: now,
+      serial: `BDR-${closestCity.code || 'REMO'}-${String(u.gpsBorderVisas.length + 1).padStart(3, '0')}`
+    };
+
+    let bonusAwarded = 0;
+    let isNew = false;
+    if (existingIndex === -1) {
+      isNew = true;
+      u.gpsBorderVisas.push(stampData);
+      bonusAwarded = 150;
+      this.addCoins(u.uid, bonusAwarded, 25);
+      if (!Array.isArray(u.visas)) u.visas = [];
+      if (!u.visas.includes(closestCity.id)) u.visas.push(closestCity.id);
+    } else {
+      u.gpsBorderVisas[existingIndex] = stampData;
+    }
+
+    const count = u.gpsBorderVisas.length;
+    let diplomaticTitle = 'Attaché Diplomatique';
+    if (count >= 5) diplomaticTitle = 'Ambassadeur Mondial';
+    else if (count >= 3) diplomaticTitle = 'Globetrotter Vérifié';
+    else diplomaticTitle = 'Attaché Diplomatique';
+
+    u.diplomaticRank = diplomaticTitle;
+
+    this.save(true, 'gps_border_stamp', { uid: u.uid, cityId: closestCity.id, count });
+    return {
+      ok: true,
+      isNew,
+      closestCity,
+      stamp: stampData,
+      distanceKm: Math.round(minDistKm),
+      bonusAwarded,
+      totalGpsVisas: count,
+      diplomaticTitle
+    };
   },
 
   /* ── Sovereign REMO Coin Serialization Bureau (Admin Exclusive) ── */

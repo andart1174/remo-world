@@ -107,6 +107,18 @@ function initRemoRadarMap() {
       refreshRadarMarkers();
       remoToast(lang === 'fr' ? '📌 Balise publiée (+15 🪙) !' : '📌 Live Pin dropped (+15 🪙)!', 'coin');
     });
+
+    // Admin Right-Click / Contextmenu to plant GeoVault anywhere on Earth!
+    remoMap.on('contextmenu', (ev) => {
+      if (REMO_STORE.isAdminUnlocked() || REMO_STORE.isCurrentUserAdmin()) {
+        openBuryGeoVaultModalAtCoords(ev.latlng.lat, ev.latlng.lng);
+      }
+    });
+
+    // Radar Sonar Proximity HUD update
+    remoMap.on('move', () => {
+      if (typeof updateRadarSonarHUD === 'function') updateRadarSonarHUD();
+    });
   }
 
   setTimeout(() => { if (remoMap) remoMap.invalidateSize(); }, 80);
@@ -326,12 +338,15 @@ function renderRadarGeoVaultMarkers() {
     const c = getCityById(v.cityId);
     const title = lang === 'fr' ? (v.title_fr || v.title_en) : v.title_en;
 
+    const tier = v.tier || 'gold';
+    const tierIcon = tier === 'wood' ? '🪵' : (tier === 'diamond' ? '💎' : '🪙');
+
     const vaultIcon = L.divIcon({
       className: 'remo-geovault-pin-wrap',
       html: `
-        <div class="remo-geovault-marker" title="${title}">
+        <div class="remo-geovault-marker tier-${tier}" title="${title}">
           <div class="vault-ping-wave"></div>
-          <div class="vault-icon-core">💎</div>
+          <div class="vault-icon-core">${tierIcon}</div>
           <div class="vault-lbl-pill">${c ? c.flag : '🌍'} +${v.coinsReward}🪙</div>
         </div>
       `,
@@ -684,6 +699,9 @@ function submitBuryGeoVault(event) {
   const lat = Number(document.getElementById('buryVaultLatInp')?.value) || 45.5017;
   const lng = Number(document.getElementById('buryVaultLngInp')?.value) || -73.5673;
 
+  const tier = document.getElementById('buryVaultTierSel')?.value || 'gold';
+  const shouldAlert = document.getElementById('buryVaultAlertCheck')?.checked ?? true;
+
   const res = REMO_STORE.buryNewGeoVault({
     cityId,
     address,
@@ -691,11 +709,12 @@ function submitBuryGeoVault(event) {
     title_fr: title,
     hint_en: hint,
     hint_fr: hint,
+    tier,
     coinsReward,
     radiusMeters,
     lat,
     lng,
-    rarity: coinsReward >= 300 ? 'Mythic 4D' : 'Legendary Gold',
+    rarity: tier === 'diamond' ? 'Mythic 4D' : (tier === 'gold' ? 'Legendary Gold' : 'Urban Rare'),
     cardCityId: cityId
   });
 
@@ -712,6 +731,10 @@ function submitBuryGeoVault(event) {
   RemoAudio.play('fanfare');
   spawnRemoCoinsFX(10);
   refreshRadarMarkers();
+
+  if (shouldAlert && res.vault) {
+    showWorldChestDropAlert(res.vault);
+  }
 
   if (remoMap) {
     remoMap.flyTo([lat, lng], 15, { duration: 1.2 });
@@ -773,24 +796,46 @@ function verifyPhysicalGpsVisa() {
     remoToast(lang === 'fr' ? 'GPS non disponible sur cet appareil.' : 'GPS not supported on this browser.');
     return;
   }
-  remoToast(lang === 'fr' ? '🧭 Scan satellite GPS en cours...' : '🧭 Scanning GPS satellite coordinates...');
+  remoToast(lang === 'fr' ? '📡 Verrouillage des coordonnées satellites...' : '📡 Locking satellite coordinates...');
   navigator.geolocation.getCurrentPosition(
     (pos) => {
       const { latitude, longitude } = pos.coords;
       if (remoMap) remoMap.flyTo([latitude, longitude], 13);
-      const { city, distanceKm } = findNearestRemoCity(latitude, longitude);
-      const u = REMO_STORE.getCurrentUser() || REMO_STORE.ensureGuestOrCitizen('GPS Explorer', '', city.id);
-      const isLocal = distanceKm <= 80;
-      const card = REMO_STORE.mintCardForUser(u.uid, city.id, isLocal ? 'Legendary Gold' : 'Rare', isLocal);
-      REMO_STORE.addCoins(u.uid, 50, 40);
-      spawnRemoCoinsFX(10);
-      remoToast(
-        lang === 'fr'
-          ? `🛂 Visa ${getCityName(city, 'fr')} tamponné ! Carte #${card.serial} reçue (+50 🪙)`
-          : `🛂 ${getCityName(city, 'en')} Visa stamped! Card #${card.serial} unlocked (+50 🪙)`,
-        'fanfare'
-      );
-      inspectCardModal(card);
+      const curU = REMO_STORE.getCurrentUser() || REMO_STORE.ensureGuestOrCitizen('GPS Explorer', '', 'montreal');
+      const res = REMO_STORE.verifyAndStampGpsBorder(curU.uid, pos.coords);
+
+      if (res && res.ok) {
+        document.body.classList.add('screen-rumble');
+        setTimeout(() => document.body.classList.remove('screen-rumble'), 400);
+
+        RemoAudio.play('fanfare');
+        spawnRemoCoinsFX(16);
+
+        if (res.isNew) {
+          remoToast(
+            lang === 'fr'
+              ? `🛂 Entrée frontière authentifiée à ${getCityName(res.closestCity, 'fr')} ! (+${res.bonusAwarded} 🪙)`
+              : `🛂 Border entry authenticated in ${getCityName(res.closestCity, 'en')}! (+${res.bonusAwarded} 🪙)`,
+            'fanfare'
+          );
+        } else {
+          remoToast(
+            lang === 'fr'
+              ? `🛂 Tampon de frontière réactualisé à ${getCityName(res.closestCity, 'fr')} !`
+              : `🛂 Border entry re-stamped in ${getCityName(res.closestCity, 'en')}!`,
+            'fanfare'
+          );
+        }
+
+        openGpsBorderStampSuccessModal(res);
+        if (typeof renderPassportView === 'function') renderPassportView();
+      } else if (res && res.reason === 'too_far') {
+        const cityObj = res.closestCity;
+        const msg = lang === 'fr'
+          ? `⚠️ Vous êtes à ${res.distanceKm} km de ${getCityName(cityObj, 'fr')}. Rapprochez-vous (< 45 km) pour tamponner votre passeport !`
+          : `⚠️ You are ${res.distanceKm} km from ${getCityName(cityObj, 'en')}. Travel closer (< 45 km) to receive this official border stamp!`;
+        remoToast(msg);
+      }
     },
     () => {
       remoToast(
@@ -799,8 +844,149 @@ function verifyPhysicalGpsVisa() {
           : '⚠️ GPS permission denied — allow location access in your browser.'
       );
     },
-    { enableHighAccuracy: true, timeout: 8000 }
+    { enableHighAccuracy: true, timeout: 9000 }
   );
+}
+
+function openGpsBorderStampSuccessModal(res) {
+  const modal = document.getElementById('gpsBorderStampModal');
+  const body = document.getElementById('gpsBorderStampModalBody');
+  if (!modal || !body || !res || !res.stamp) return;
+  const lang = REMO_I18N.getLang();
+  const c = res.closestCity;
+  const s = res.stamp;
+  const dateStr = new Date(s.stampedAt).toLocaleDateString([], { year: 'numeric', month: 'short', day: 'numeric' });
+  const timeStr = new Date(s.stampedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+  body.innerHTML = `
+    <div style="padding:10px 0;">
+      <div class="stamp-seal-circle stamp-animated-slam" style="width:115px;height:115px;margin:0 auto 16px;">
+        <span class="stamp-seal-flag" style="font-size:2.3rem;">${c.flag}</span>
+        <span class="stamp-seal-code" style="font-size:0.85rem;">${s.code} · ${s.serial}</span>
+      </div>
+      <h3 style="font-family:'Orbitron',sans-serif;color:#fbbf24;font-size:1.1rem;margin-bottom:6px;">
+        ${lang === 'fr' ? 'ENTRÉE DE FRONTIÈRE AUTHENTIFIÉE' : 'OFFICIAL IN-PERSON BORDER ENTRY'}
+      </h3>
+      <p style="font-size:0.84rem;color:#e2e8f0;margin-bottom:12px;">
+        ${c.flag} <b>${getCityName(c, lang)}</b> · ${dateStr} ${timeStr}
+      </p>
+
+      <div style="background:rgba(15,23,42,0.8);border:1px solid rgba(251,191,36,0.3);border-radius:14px;padding:12px;margin-bottom:14px;text-align:left;font-size:0.75rem;">
+        <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+          <span style="color:#94a3b8;">GPS Satellites :</span>
+          <span style="color:#38bdf8;font-family:monospace;font-weight:700;">${s.lat.toFixed(4)}° N, ${s.lng.toFixed(4)}° W (±${s.accuracy}m)</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+          <span style="color:#94a3b8;">${lang === 'fr' ? 'Rang Diplomatique :' : 'Diplomatic Rank:'}</span>
+          <span style="color:#fbbf24;font-weight:900;">👑 ${res.diplomaticTitle}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;">
+          <span style="color:#94a3b8;">${lang === 'fr' ? 'Prime Découverte :' : 'Discovery Bounty:'}</span>
+          <span style="color:#34d399;font-weight:900;">+${res.bonusAwarded} 🪙 REMO Coins</span>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:8px;">
+        <button type="button" class="btn-cyber btn-gold" style="width:100%;justify-content:center;padding:11px;" onclick="document.getElementById('gpsBorderStampModal').classList.remove('open');switchRemoView('passport');">
+          🪪 ${lang === 'fr' ? 'Voir dans mon Passeport' : 'View in my Passport'}
+        </button>
+      </div>
+    </div>
+  `;
+  modal.classList.add('open');
+}
+
+function showWorldChestDropAlert(v) {
+  if (!v) return;
+  const lang = REMO_I18N.getLang();
+  const c = getCityById(v.cityId) || { flag: '🌍', name_en: 'City', name_fr: 'Ville' };
+  const banner = document.getElementById('worldChestAlertBanner');
+  const titleEl = document.getElementById('worldChestAlertTitle');
+  const textEl = document.getElementById('worldChestAlertText');
+  if (!banner) return;
+
+  const cityName = getCityName(c, lang);
+  if (titleEl) titleEl.textContent = lang === 'fr' ? '🚨 ALERTE TRÉSOR MONDIAL !' : '🚨 WORLD TREASURE DROP!';
+  if (textEl) {
+    textEl.textContent = lang === 'fr'
+      ? `Un coffre secret a atterri à ${cityName} (+${v.coinsReward} 🪙) ! Chasse ouverte ➔`
+      : `A secret chest landed in ${cityName} (+${v.coinsReward} 🪙)! Tap to hunt ➔`;
+  }
+
+  banner.style.display = 'flex';
+  RemoAudio.play('fanfare');
+
+  if (window._chestAlertTimer) clearTimeout(window._chestAlertTimer);
+  window._chestAlertTimer = setTimeout(() => {
+    banner.style.display = 'none';
+  }, 15000);
+}
+
+function trackWorldChestOnRadar(vaultId) {
+  const banner = document.getElementById('worldChestAlertBanner');
+  if (banner) banner.style.display = 'none';
+  switchRemoView('radar');
+  const vaults = (REMO_STORE.state && REMO_STORE.state.geoVaults) || [];
+  const v = (vaultId ? vaults.find((x) => x.id === vaultId) : null) || vaults[0];
+  if (v && remoMap) {
+    remoMap.flyTo([v.lat, v.lng], 16, { duration: 1.5 });
+    setTimeout(() => {
+      openGeoVaultInspector(v.id);
+    }, 1600);
+  }
+}
+
+function openBuryGeoVaultModalAtCoords(lat, lng) {
+  openBuryGeoVaultModal();
+  const latInp = document.getElementById('buryVaultLatInp');
+  const lngInp = document.getElementById('buryVaultLngInp');
+  if (latInp) latInp.value = Number(lat).toFixed(4);
+  if (lngInp) lngInp.value = Number(lng).toFixed(4);
+  const { city } = findNearestRemoCity(lat, lng);
+  const sel = document.getElementById('buryVaultCitySelect');
+  if (sel && city) sel.value = city.id;
+  remoToast(REMO_I18N.getLang() === 'fr' ? `📍 Coordonnées ciblées : ${Number(lat).toFixed(4)}, ${Number(lng).toFixed(4)}` : `📍 Coordinates targeted: ${Number(lat).toFixed(4)}, ${Number(lng).toFixed(4)}`);
+}
+
+function updateRadarSonarHUD() {
+  if (!remoMap) return;
+  const hud = document.getElementById('radarSonarHUD');
+  const dot = document.getElementById('radarSonarDot');
+  const txt = document.getElementById('radarSonarText');
+  if (!hud || !dot || !txt) return;
+
+  const center = remoMap.getCenter();
+  const u = REMO_STORE.getCurrentUser() || { uid: 'guest' };
+  const vaults = (REMO_STORE.state && REMO_STORE.state.geoVaults) || [];
+  const activeVaults = vaults.filter((v) => !Array.isArray(v.unlockedBy) || !v.unlockedBy.includes(u.uid));
+
+  if (activeVaults.length === 0) {
+    hud.style.display = 'none';
+    return;
+  }
+
+  let minM = Infinity;
+  activeVaults.forEach((v) => {
+    const dM = Math.round(haversineKm(center.lat, center.lng, v.lat, v.lng) * 1000);
+    if (dM < minM) minM = dM;
+  });
+
+  const lang = REMO_I18N.getLang();
+  if (minM <= 1500) {
+    hud.style.display = 'flex';
+    if (minM <= 250) {
+      dot.style.color = '#ef4444';
+      txt.textContent = lang === 'fr' ? `🔥 CHAUD ! Trésor à ~${minM}m !` : `🔥 HOT! Treasure ~${minM}m away!`;
+    } else if (minM <= 700) {
+      dot.style.color = '#f59e0b';
+      txt.textContent = lang === 'fr' ? `⚡ TIÈDE ! Recherche à ~${minM}m...` : `⚡ WARM! Searching ~${minM}m...`;
+    } else {
+      dot.style.color = '#38bdf8';
+      txt.textContent = lang === 'fr' ? `❄️ FROID... Trésor à ~${(minM / 1000).toFixed(1)}km` : `❄️ COLD... Chest ~${(minM / 1000).toFixed(1)}km away`;
+    }
+  } else {
+    hud.style.display = 'none';
+  }
 }
 
 /* ── 2. CITY WARS & 3-ROUND 3D CARD PVP BATTLE ARENA ── */
@@ -2036,6 +2222,56 @@ function renderPassportView() {
             `;
           }).join('')}
         </div>
+      </div>
+
+      <!-- 🛂 4D Sovereign Border Control Station & Real GPS Stamps -->
+      <div class="border-control-station-box">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
+          <div>
+            <h3 style="font-family:'Orbitron',sans-serif;font-size:1.05rem;color:#fbbf24;display:flex;align-items:center;gap:8px;">
+              <span>🛂</span> <span>${t('border_control_hdr')}</span>
+            </h3>
+            <p style="font-size:0.78rem;color:#cbd5e1;margin-top:2px;">${t('border_control_sub')}</p>
+          </div>
+          <button class="btn-cyber btn-gold" style="padding:9px 16px;font-size:0.84rem;font-weight:900;" onclick="verifyPhysicalGpsVisa()">
+            ${t('border_stamp_btn')}
+          </button>
+        </div>
+
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;background:rgba(251,191,36,0.1);border:1px solid rgba(251,191,36,0.3);border-radius:10px;padding:8px 12px;">
+          <span style="font-size:1.2rem;">🏛️</span>
+          <div style="font-size:0.78rem;">
+            <span style="color:#94a3b8;">${lang === 'fr' ? 'Rang Diplomatique :' : 'Diplomatic Rank:'}</span>
+            <b style="color:#fbbf24;font-family:'Orbitron',sans-serif;margin-left:6px;">${u.diplomaticRank || ((Array.isArray(u.gpsBorderVisas) ? u.gpsBorderVisas.length : 0) >= 5 ? 'Ambassadeur Mondial' : ((Array.isArray(u.gpsBorderVisas) ? u.gpsBorderVisas.length : 0) >= 3 ? 'Globetrotter Vérifié' : ((Array.isArray(u.gpsBorderVisas) ? u.gpsBorderVisas.length : 0) >= 1 ? 'Attaché Diplomatique' : (lang === 'fr' ? 'Citoyen Virtuel' : 'Virtual Citizen'))))}</b>
+            <span style="color:#64748b;margin-left:8px;">(${(Array.isArray(u.gpsBorderVisas) ? u.gpsBorderVisas.length : 0)} ${lang === 'fr' ? 'Vérifications GPS réelles' : 'Real GPS Visas'})</span>
+          </div>
+        </div>
+
+        ${!(Array.isArray(u.gpsBorderVisas) && u.gpsBorderVisas.length > 0) ? `
+          <div style="text-align:center;padding:20px 10px;color:var(--muted);font-size:0.8rem;border:1px dashed rgba(255,255,255,0.1);border-radius:12px;">
+            ${t('border_visas_empty')}
+          </div>
+        ` : `
+          <div class="diplomatic-passport-grid">
+            ${u.gpsBorderVisas.map((s) => {
+              const c = getCityById(s.cityId) || { flag: '🌍', name_en: 'City', name_fr: 'Ville' };
+              const dateStr = new Date(s.stampedAt).toLocaleDateString([], { year: 'numeric', month: 'short', day: 'numeric' });
+              return `
+                <div class="diplomatic-stamp-card">
+                  <div class="stamp-seal-circle">
+                    <span class="stamp-seal-flag">${c.flag}</span>
+                    <span class="stamp-seal-code">${s.code || c.code}</span>
+                  </div>
+                  <b style="font-family:'Orbitron',sans-serif;font-size:0.88rem;color:#f8fafc;display:block;">${getCityName(c, lang)}</b>
+                  <div class="stamp-meta-serial">${s.serial || 'BDR-GPS-001'}</div>
+                  <div class="stamp-meta-time">📅 ${dateStr}</div>
+                  <div class="stamp-meta-coords">🛰️ ${Number(s.lat).toFixed(4)}° N, ${Number(s.lng).toFixed(4)}° W</div>
+                  <div class="stamp-verified-ribbon">${t('border_stamp_verified_badge')}</div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        `}
       </div>
     `;
   }
@@ -3726,3 +3962,20 @@ window.geocodeVaultAddress = geocodeVaultAddress;
 window.renderWheelView = renderWheelView;
 window.drawLuckyWheelCanvas = drawLuckyWheelCanvas;
 window.spinLuckyWheel = spinLuckyWheel;
+window.verifyPhysicalGpsVisa = verifyPhysicalGpsVisa;
+window.openGpsBorderStampSuccessModal = openGpsBorderStampSuccessModal;
+window.showWorldChestDropAlert = showWorldChestDropAlert;
+window.trackWorldChestOnRadar = trackWorldChestOnRadar;
+window.openBuryGeoVaultModalAtCoords = openBuryGeoVaultModalAtCoords;
+window.updateRadarSonarHUD = updateRadarSonarHUD;
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('remo:worldchest_dropped', (e) => {
+    if (typeof showWorldChestDropAlert === 'function') {
+      showWorldChestDropAlert(e.detail);
+    }
+    if (typeof renderRadarGeoVaultMarkers === 'function') {
+      renderRadarGeoVaultMarkers();
+    }
+  });
+}

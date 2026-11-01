@@ -530,7 +530,41 @@ const REMO_DICT = {
     pred_voted_toast: '🎯 Prediction wager placed (+5 City Points)!',
     pred_err_coins: '⚠️ Insufficient REMO Coins in your vault!',
     pred_opt_yes: 'YES',
-    pred_opt_no: 'NO'
+    pred_opt_no: 'NO',
+
+    // 🎁 Idea 3: World Treasure Hunt & Admin God-Mode
+    adm_drop_chest_btn: '📍 Plant Secret Chest (God-Mode)',
+    adm_drop_chest_title: '👑 Plant Secret Treasure Chest (Admin God-Mode)',
+    adm_drop_chest_sub: 'Drop a real-time secret chest anywhere on Earth. Set loot, clue, and trigger world alert!',
+    chest_tier_wood: '🪵 Urban Wooden Chest (100 🪙)',
+    chest_tier_gold: '🪙 Founder Gold Chest (250 🪙)',
+    chest_tier_diamond: '💎 Cyber-Diamond 4D Chest (500 🪙)',
+    chest_bounty_label: 'Coin Bounty Reward',
+    chest_clue_label: 'Secret Riddle / Hint',
+    chest_clue_ph: 'e.g. Near the ancient bridge, look for the clock tower...',
+    chest_launch_btn: '🚀 Launch World Chest Now',
+    chest_drop_alert_title: '🚨 WORLD TREASURE DROP!',
+    chest_drop_alert_body: 'A secret chest has just landed in {city}! The first citizen to find it claims {coins} 🪙!',
+    chest_claimed_by: 'First opened by @{name} in {time}!',
+    chest_sonar_hot: '🔥 HOT! You are right above the treasure!',
+    chest_sonar_warm: '⚡ WARM! Searching nearby...',
+    chest_sonar_cold: '❄️ COLD... Search around landmarks.',
+    chest_unboxed_title: '🎉 CHEST UNSEALED!',
+    chest_unboxed_msg: 'You discovered the hidden {tier} in {city} and claimed +{coins} 🪙!',
+
+    // 🛂 Idea 4: 4D Sovereign Border Control & Real GPS Stamps
+    border_control_hdr: '🛂 4D Sovereign Border Control',
+    border_control_sub: 'In-person satellite verification: Prove physical presence in a World City to stamp your diplomatic passport!',
+    border_stamp_btn: '🛂 Stamp Official Border Entry (Live GPS)',
+    border_stamp_modal_title: '🛂 4D Sovereign Border Control Station',
+    border_stamp_scanning: '📡 Locking satellite coordinates...',
+    border_stamp_in_city: '✓ BORDER ENTRY STAMPED! Welcome to {city}!',
+    border_stamp_too_far: '⚠️ You are {dist} km from {city}. Travel closer (< 45 km) to receive this border stamp!',
+    border_stamp_title_attache: '🏛️ Attaché Diplomatique',
+    border_stamp_title_globetrotter: '✈️ Globetrotter Vérifié',
+    border_stamp_title_ambassador: '🌐 Ambassadeur Mondial',
+    border_stamp_verified_badge: 'AUTHENTICATED BORDER ENTRY · IN-PERSON CITIZEN',
+    border_visas_empty: 'No in-person GPS border stamps yet. Travel to a REMO world city and stamp your passport live!'
   },
 
   fr: {
@@ -1059,7 +1093,41 @@ const REMO_DICT = {
     pred_voted_toast: '🎯 Pari enregistré avec succès (+5 points Ville) !',
     pred_err_coins: '⚠️ Solde de Pièces REMO insuffisant dans votre coffre !',
     pred_opt_yes: 'OUI',
-    pred_opt_no: 'NON'
+    pred_opt_no: 'NON',
+
+    // 🎁 Idea 3: World Treasure Hunt & Admin God-Mode
+    adm_drop_chest_btn: '📍 Déposer Coffre Secret (God-Mode)',
+    adm_drop_chest_title: '👑 Déposer un Coffre au Trésor Secret (God-Mode)',
+    adm_drop_chest_sub: 'Déposez un coffre secret en temps réel n’importe où sur Terre. Définissez le butin, l’énigme et l’alerte mondiale !',
+    chest_tier_wood: '🪵 Coffre en Bois Urbain (100 🪙)',
+    chest_tier_gold: '🪙 Coffre d’Or Fondateur (250 🪙)',
+    chest_tier_diamond: '💎 Coffre Cyber-Diamant 4D (500 🪙)',
+    chest_bounty_label: 'Prime en Pièces REMO',
+    chest_clue_label: 'Énigme Secrète / Indice',
+    chest_clue_ph: 'ex: Près du vieux pont, cherchez la tour de l’horloge...',
+    chest_launch_btn: '🚀 Lancer le Coffre Mondial Maintenant',
+    chest_drop_alert_title: '🚨 ALERTE TRÉSOR MONDIAL !',
+    chest_drop_alert_body: 'Un coffre secret vient d’atterrir à {city} ! Le premier citoyen à le trouver empoche {coins} 🪙 !',
+    chest_claimed_by: 'Ouvert en premier par @{name} en {time} !',
+    chest_sonar_hot: '🔥 CHAUD ! Vous êtes juste au-dessus du trésor !',
+    chest_sonar_warm: '⚡ TIÈDE ! Recherche à proximité...',
+    chest_sonar_cold: '❄️ FROID... Explorez autour des monuments.',
+    chest_unboxed_title: '🎉 COFFRE DÉVERROUILLÉ !',
+    chest_unboxed_msg: 'Vous avez découvert le {tier} caché à {city} et gagné +{coins} 🪙 !',
+
+    // 🛂 Idea 4: 4D Sovereign Border Control & Real GPS Stamps
+    border_control_hdr: '🛂 Contrôle de Frontière Souverain 4D',
+    border_control_sub: 'Vérification par satellite : Prouvez votre présence physique dans une Ville Mondiale pour tamponner votre passeport diplomatique !',
+    border_stamp_btn: '🛂 Tamponner mon Entrée de Frontière (GPS Réel)',
+    border_stamp_modal_title: '🛂 Poste de Contrôle de Frontière 4D',
+    border_stamp_scanning: '📡 Verrouillage des coordonnées satellites...',
+    border_stamp_in_city: '✓ ENTRÉE FRONTIÈRE TAMPONNÉE ! Bienvenue à {city} !',
+    border_stamp_too_far: '⚠️ Vous êtes à {dist} km de {city}. Rapprochez-vous (< 45 km) pour tamponner votre passeport !',
+    border_stamp_title_attache: '🏛️ Attaché Diplomatique',
+    border_stamp_title_globetrotter: '✈️ Globetrotter Vérifié',
+    border_stamp_title_ambassador: '🌐 Ambassadeur Mondial',
+    border_stamp_verified_badge: 'ENTRÉE FRONTIÈRE AUTHENTIFIÉE · CITOYEN PRÉSENTIEL',
+    border_visas_empty: 'Aucun tampon GPS en présentiel pour le moment. Voyagez dans une ville REMO pour tamponner en direct !'
   }
 };
 
