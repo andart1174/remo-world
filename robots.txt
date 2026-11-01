@@ -1,4 +1,5 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://remo-world.web.app/sitemap.xml
+Sitemap: https://remoworld.com/sitemap.xml
+
