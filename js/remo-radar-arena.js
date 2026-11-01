@@ -1422,6 +1422,15 @@ function renderPassportView() {
   const equippedTitleItem = allShopItems.find((x) => x.id === u.equippedTitleId);
   const titleBadge = equippedTitleItem ? (lang === 'fr' ? (equippedTitleItem.badge_fr || equippedTitleItem.name_fr) : (equippedTitleItem.badge_en || equippedTitleItem.name_en)) : '';
 
+  // User City Stock Portfolio
+  const userPortfolio = (REMO_STORE.state.cityPortfolios && REMO_STORE.state.cityPortfolios[u.uid]) || {};
+  const ownedCityEntries = Object.entries(userPortfolio).filter(([cId, count]) => count > 0);
+  const totalSharesOwned = ownedCityEntries.reduce((sum, [cId, count]) => sum + count, 0);
+  const totalPortfolioValue = ownedCityEntries.reduce((sum, [cId, count]) => {
+    const p = REMO_STORE.getCitySharePrice(cId);
+    return sum + (p * count);
+  }, 0);
+
   // 1. Profile Hero Card
   let html = `
     <div class="profile-hero-card">
@@ -1465,6 +1474,9 @@ function renderPassportView() {
         <div class="prof-stat-badge" style="border-color:#fbbf24;color:#fbbf24;">
           🪙 <b>${u.coins.toLocaleString()}</b> REMO Coins
         </div>
+        <div class="prof-stat-badge" style="border-color:#10b981;color:#6ee7b7;cursor:pointer;" onclick="setPassportTab('stocks')" title="${lang === 'fr' ? 'Voir mon portefeuille d’actions' : 'View stock portfolio'}">
+          📈 <b>${totalSharesOwned}</b> ${lang === 'fr' ? 'Actions Villes' : 'City Shares'}
+        </div>
         <div class="prof-stat-badge">
           📸 <b>${myPosts.length}</b> ${lang === 'fr' ? 'Publications' : 'Posts'}
         </div>
@@ -1487,6 +1499,9 @@ function renderPassportView() {
       </button>
       <button type="button" class="fchip ${activeTab === 'messages' ? 'active' : ''}" onclick="setPassportTab('messages')">
         💌 ${lang === 'fr' ? 'Mes Discussions' : 'My Messages'} (${partnerList.length})
+      </button>
+      <button type="button" class="fchip ${activeTab === 'stocks' ? 'active' : ''}" onclick="setPassportTab('stocks')">
+        📈 ${lang === 'fr' ? 'Bourse & Actions' : 'City Stocks'} (${totalSharesOwned})
       </button>
       <button type="button" class="fchip ${activeTab === 'inventory' ? 'active' : ''}" onclick="setPassportTab('inventory')">
         🎴 ${lang === 'fr' ? 'Inventaire & Rames VIP' : 'Inventory & Styles'}
@@ -1625,6 +1640,84 @@ function renderPassportView() {
         </div>
       `;
     }
+  } else if (activeTab === 'stocks') {
+    // 📈 User City Stocks Portfolio
+    html += `
+      <div class="glass-box" style="margin-bottom:16px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:14px;">
+          <div>
+            <h3 style="font-family:'Orbitron',sans-serif;font-size:1.05rem;color:#10b981;margin:0;">
+              📈 ${lang === 'fr' ? 'Portefeuille d’Actions des Villes' : 'City Stock Portfolio'}
+            </h3>
+            <p style="font-size:0.79rem;color:var(--muted);margin-top:3px;">
+              ${lang === 'fr' ? 'Vos investissements dans les villes du monde. Vendez quand le cours monte pour encaisser vos plus-values !' : 'Your investments in world cities. Sell when prices rise to cash in profits!'}
+            </p>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <div style="padding:6px 14px;border-radius:12px;background:rgba(16,185,129,0.12);border:1px solid #10b981;font-size:0.84rem;font-weight:900;color:#34d399;">
+              🪙 ${totalPortfolioValue.toLocaleString()} ${lang === 'fr' ? 'Valeur Totale' : 'Total Value'}
+            </div>
+            <button type="button" class="btn-cyber" style="padding:7px 14px;font-size:0.8rem;" onclick="switchRemoView('exchange')">
+              🏛️ ${lang === 'fr' ? 'Bourse des Villes' : 'City Exchange'}
+            </button>
+          </div>
+        </div>
+
+        ${ownedCityEntries.length === 0 ? `
+          <div style="text-align:center;padding:40px 20px;background:rgba(255,255,255,0.02);border-radius:16px;border:1px dashed var(--border);">
+            <div style="font-size:2.6rem;margin-bottom:8px;">📈</div>
+            <h4 style="font-family:'Orbitron',sans-serif;color:#fff;margin-bottom:6px;">
+              ${lang === 'fr' ? 'Vous ne possédez aucune action de ville' : 'No city shares owned yet'}
+            </h4>
+            <p style="color:var(--muted);font-size:0.84rem;max-width:420px;margin:0 auto 14px;">
+              ${lang === 'fr' ? 'Investissez vos Pièces REMO dans vos villes favorites ($MTL, $KIV, $PAR, $BUH...) et devenez actionnaire officiel de leur rayonnement !' : 'Invest your REMO Coins in your favorite cities ($MTL, $KIV, $PAR, $BUH...) and become an official shareholder!'}
+            </p>
+            <button type="button" class="btn-cyber btn-gold" onclick="switchRemoView('exchange')">
+              📈 ${lang === 'fr' ? 'Acheter mes Premières Actions' : 'Buy My First City Shares'}
+            </button>
+          </div>
+        ` : `
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px;">
+            ${ownedCityEntries.map(([cId, count]) => {
+              const c = getCityById(cId) || { id: cId, flag: '🌍', code: cId.toUpperCase() };
+              const currentPrice = REMO_STORE.getCitySharePrice(cId);
+              const totalVal = currentPrice * count;
+              const mayor = REMO_STORE.getCityMayor(cId);
+
+              return `
+                <div style="padding:14px;border-radius:16px;background:rgba(255,255,255,0.04);border:1px solid rgba(16,185,129,0.35);display:flex;flex-direction:column;justify-content:space-between;gap:10px;">
+                  <div>
+                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                      <b style="font-size:1.02rem;color:#fff;">${c.flag} $${c.code}</b>
+                      <span style="color:#10b981;font-weight:900;font-size:0.92rem;">🪙 ${currentPrice}</span>
+                    </div>
+                    <div style="font-weight:800;font-size:0.86rem;color:#7dd3fc;margin-top:2px;">
+                      ${getCityName(c, lang)}
+                    </div>
+                    <div style="font-size:0.73rem;color:var(--muted);margin-top:4px;">
+                      ${mayor ? `👑 ${lang === 'fr' ? 'Maire' : 'Mayor'}: @${escapeHtmlStr(mayor.name)}` : ''}
+                    </div>
+                    <div style="margin-top:10px;padding:8px 10px;border-radius:10px;background:rgba(0,0,0,0.3);display:flex;justify-content:space-between;align-items:center;font-size:0.82rem;">
+                      <span style="color:#cbd5e1;">${lang === 'fr' ? 'Détenu :' : 'Owned:'} <b style="color:#fbbf24;font-size:0.95rem;">${count}</b></span>
+                      <span style="color:#34d399;font-weight:900;">= 🪙 ${totalVal.toLocaleString()}</span>
+                    </div>
+                  </div>
+
+                  <div style="display:flex;gap:6px;margin-top:4px;">
+                    <button type="button" class="btn-cyber" style="flex:1;justify-content:center;padding:7px;font-size:0.78rem;" onclick="buyCityStockShare('${c.id}')">
+                      ➕ ${lang === 'fr' ? 'Acheter' : 'Buy (+1)'}
+                    </button>
+                    <button type="button" class="btn-cyber btn-gold" style="flex:1;justify-content:center;padding:7px;font-size:0.78rem;" onclick="sellCityStockShare('${c.id}')">
+                      💰 ${lang === 'fr' ? 'Vendre' : 'Sell (-1)'}
+                    </button>
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        `}
+      </div>
+    `;
   } else if (activeTab === 'inventory') {
     // Inventory: Frames & Titles & 4D Cards
     const ownedIds = Array.isArray(u.ownedShopItems) ? u.ownedShopItems : [];

@@ -3665,11 +3665,14 @@ function buyCityStockShare(cityId) {
     remoToast(lang === 'fr' ? `Il vous faut ${price} 🪙 pour acheter 1 action !` : `Need ${price} 🪙 to buy 1 share!`);
     return;
   }
+  REMO_STORE.state.cityPortfolios = REMO_STORE.state.cityPortfolios || {};
   REMO_STORE.state.cityPortfolios[u.uid] = REMO_STORE.state.cityPortfolios[u.uid] || {};
   REMO_STORE.state.cityPortfolios[u.uid][cityId] = (REMO_STORE.state.cityPortfolios[u.uid][cityId] || 0) + 1;
   REMO_STORE.addCityScore(cityId, 35); // Buying pushes share value up!
+  REMO_STORE.save(true, 'city_stock_buy');
   syncHeaderAndSidebars();
   renderCityExchangeView();
+  if (typeof renderPassportView === 'function') renderPassportView();
   const c = getCityById(cityId);
   remoToast(`📈 +1 $${c.code} Share acquired!`, 'coin');
 }
@@ -3686,9 +3689,11 @@ function sellCityStockShare(cityId) {
   const price = REMO_STORE.getCitySharePrice(cityId);
   port[cityId] -= 1;
   REMO_STORE.adminAdjustUserCoins(u.uid, 'add', price);
+  REMO_STORE.save(true, 'city_stock_sell');
   spawnRemoCoinsFX(6);
   syncHeaderAndSidebars();
   renderCityExchangeView();
+  if (typeof renderPassportView === 'function') renderPassportView();
   const c = getCityById(cityId);
   remoToast(`💰 Sold 1 $${c.code} Share for +${price} 🪙!`, 'coin');
 }
