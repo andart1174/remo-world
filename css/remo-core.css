@@ -3121,4 +3121,260 @@ button, input, select, textarea {
   cursor: default;
 }
 
+/* ══════════════════════════════════════════════════════════════════════
+   🌐 HOLOGRAPHIC ONBOARDING WELCOME SPLASH SCREEN (3-SECOND VIRAL POP)
+   ══════════════════════════════════════════════════════════════════════ */
+.welcome-splash-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 999999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at 50% 30%, rgba(14, 165, 233, 0.22), rgba(10, 14, 35, 0.96) 65%, #030712 100%);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  padding: 18px;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.4s ease;
+}
+
+.welcome-splash-overlay.show {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+.welcome-splash-card {
+  position: relative;
+  width: 100%;
+  max-width: 440px;
+  background: linear-gradient(180deg, rgba(17, 24, 39, 0.94), rgba(10, 14, 35, 0.98));
+  border: 1.5px solid rgba(56, 189, 248, 0.45);
+  border-radius: 24px;
+  padding: 26px 22px 20px 22px;
+  text-align: center;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.85), 0 0 45px rgba(56, 189, 248, 0.25), inset 0 0 25px rgba(56, 189, 248, 0.08);
+  transform: scale(0.92) translateY(12px);
+  transition: transform 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+  overflow: hidden;
+}
+
+.welcome-splash-overlay.show .welcome-splash-card {
+  transform: scale(1) translateY(0);
+}
+
+.welcome-splash-card::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle, rgba(251, 191, 36, 0.12) 0%, transparent 60%);
+  pointer-events: none;
+  animation: splashHaloSpin 12s linear infinite;
+}
+
+@keyframes splashHaloSpin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.welcome-splash-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #94a3b8;
+  font-size: 1rem;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  z-index: 2;
+}
+
+.welcome-splash-close:hover {
+  background: rgba(239, 68, 68, 0.2);
+  color: #f87171;
+  border-color: rgba(239, 68, 68, 0.4);
+}
+
+.welcome-splash-coin-badge {
+  position: relative;
+  width: 76px;
+  height: 76px;
+  margin: 0 auto 14px auto;
+  border-radius: 50%;
+  background: radial-gradient(circle, #f59e0b, #b45309);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.3rem;
+  box-shadow: 0 0 30px rgba(251, 191, 36, 0.7), inset 0 2px 4px rgba(255, 255, 255, 0.6);
+  animation: splashCoinPulse 2.4s ease-in-out infinite;
+  z-index: 1;
+}
+
+.welcome-splash-coin-badge::after {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  border: 2px dashed rgba(251, 191, 36, 0.6);
+  animation: splashRingRotate 8s linear infinite;
+}
+
+@keyframes splashCoinPulse {
+  0%, 100% { transform: scale(1); filter: drop-shadow(0 0 16px rgba(251, 191, 36, 0.6)); }
+  50% { transform: scale(1.08); filter: drop-shadow(0 0 28px rgba(251, 191, 36, 0.9)); }
+}
+
+@keyframes splashRingRotate {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.welcome-splash-title {
+  font-family: 'Orbitron', -apple-system, sans-serif;
+  font-size: 1.25rem;
+  font-weight: 900;
+  color: #f8fafc;
+  letter-spacing: 0.5px;
+  margin: 0 0 4px 0;
+  text-shadow: 0 0 15px rgba(56, 189, 248, 0.5);
+  position: relative;
+  z-index: 1;
+}
+
+.welcome-splash-sub {
+  font-size: 0.8rem;
+  color: #94a3b8;
+  margin: 0 0 16px 0;
+  position: relative;
+  z-index: 1;
+}
+
+.welcome-splash-passport-box {
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.85), rgba(30, 41, 59, 0.85));
+  border: 1.5px solid rgba(251, 191, 36, 0.45);
+  border-radius: 16px;
+  padding: 14px 16px;
+  margin-bottom: 12px;
+  position: relative;
+  z-index: 1;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+}
+
+.welcome-splash-passport-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 1px;
+  color: #fbbf24;
+  margin-bottom: 6px;
+}
+
+.welcome-splash-passport-num {
+  font-family: 'Orbitron', monospace;
+  font-size: 1.5rem;
+  font-weight: 900;
+  color: #fde047;
+  letter-spacing: 2px;
+  text-shadow: 0 0 12px rgba(253, 224, 71, 0.6);
+}
+
+.welcome-splash-gift-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(5, 150, 105, 0.15));
+  border: 1px solid rgba(52, 211, 153, 0.5);
+  color: #6ee7b7;
+  font-weight: 800;
+  font-size: 0.92rem;
+  padding: 8px 16px;
+  border-radius: 999px;
+  margin-bottom: 14px;
+  box-shadow: 0 0 18px rgba(16, 185, 129, 0.25);
+  position: relative;
+  z-index: 1;
+}
+
+.welcome-splash-desc {
+  font-size: 0.77rem;
+  line-height: 1.45;
+  color: #cbd5e1;
+  margin-bottom: 16px;
+  position: relative;
+  z-index: 1;
+}
+
+.welcome-splash-enter-btn {
+  width: 100%;
+  padding: 13px 18px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #0284c7, #06b6d4 50%, #10b981 100%);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: #ffffff;
+  font-family: 'Orbitron', sans-serif;
+  font-weight: 900;
+  font-size: 0.95rem;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  box-shadow: 0 10px 25px rgba(2, 132, 199, 0.45);
+  transition: all 0.2s ease;
+  position: relative;
+  z-index: 1;
+}
+
+.welcome-splash-enter-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 30px rgba(6, 182, 212, 0.6);
+  filter: brightness(1.1);
+}
+
+.welcome-splash-timer-box {
+  margin-top: 10px;
+  position: relative;
+  z-index: 1;
+}
+
+.welcome-splash-timer-text {
+  font-size: 0.7rem;
+  color: #64748b;
+  margin-bottom: 5px;
+}
+
+.welcome-splash-timer-bar {
+  height: 4px;
+  width: 100%;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.welcome-splash-timer-fill {
+  height: 100%;
+  width: 100%;
+  background: linear-gradient(90deg, #38bdf8, #fbbf24);
+  transform-origin: left center;
+  transition: transform 3.2s linear;
+}
+
+.welcome-splash-overlay.show .welcome-splash-timer-fill {
+  transform: scaleX(0);
+}
+
+
 

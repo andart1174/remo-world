@@ -478,7 +478,18 @@ const REMO_DICT = {
     wishing_submit_btn: '🪙 Toss Coin & Send Wish (-1 🪙)',
     wishing_stream_title: '🌊 Live Community Wishes',
     wishing_bless_btn: '✨ Bless',
-    wishing_blessed_btn: '✓ Blessed'
+    wishing_blessed_btn: '✓ Blessed',
+
+    // 🌐 Holographic Onboarding Welcome Splash
+    welcome_splash_title: 'Welcome to REMO World 🌐',
+    welcome_splash_sub: 'The 4D Global Metaverse & City Network',
+    welcome_splash_passport_lbl: 'OFFICIAL CITIZEN PASSPORT ISSUED',
+    welcome_splash_passport_sub: 'Sovereign 4D Global Citizen ID',
+    welcome_splash_gift_val: '+150 🪙 Free Gift Claimed',
+    welcome_splash_gift_sub: 'Welcome coins instantly credited to your vault',
+    welcome_splash_desc: 'Explore world cities in 4D, collect holographic passes, and represent your city in the World City Cup!',
+    welcome_splash_enter_btn: '🚀 Enter 4D World',
+    welcome_splash_auto: 'Entering automatically in'
   },
 
   fr: {
@@ -955,7 +966,18 @@ const REMO_DICT = {
     wishing_submit_btn: '🪙 Jeter la Pièce & Envoyer le Vœu (-1 🪙)',
     wishing_stream_title: '🌊 Vœux de la Communauté en Direct',
     wishing_bless_btn: '✨ Bénir',
-    wishing_blessed_btn: '✓ Béni'
+    wishing_blessed_btn: '✓ Béni',
+
+    // 🌐 Holographic Onboarding Welcome Splash
+    welcome_splash_title: 'Bienvenue sur REMO World 🌐',
+    welcome_splash_sub: 'Le Réseau Mondial 4D & Métavers Urbain',
+    welcome_splash_passport_lbl: 'PASSEPORT CITOYEN OFFICIEL ATTRIBUÉ',
+    welcome_splash_passport_sub: 'Identifiant Souverain Citoyen du Monde 4D',
+    welcome_splash_gift_val: '+150 🪙 Cadeau de Bienvenue Offert',
+    welcome_splash_gift_sub: 'Pièces de bienvenue créditées instantanément dans votre coffre',
+    welcome_splash_desc: 'Explorez les villes du monde en 4D, collectionnez des billets holographiques et défendez votre ville dans la Coupe du Monde !',
+    welcome_splash_enter_btn: '🚀 Entrer dans le Monde 4D',
+    welcome_splash_auto: 'Accès automatique dans'
   }
 };
 

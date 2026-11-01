@@ -3121,6 +3121,13 @@ document.addEventListener('DOMContentLoaded', () => {
     else if (e.key.toLowerCase() === 'g') switchRemoView('cards');
     else if (e.key.toLowerCase() === 'a') switchRemoView('arena');
   });
+
+  // 🌐 Holographic Onboarding Welcome Splash Screen (Auto-trigger for new users or ?welcome=1)
+  setTimeout(() => {
+    if (typeof showWelcomeSplashScreen === 'function') {
+      showWelcomeSplashScreen();
+    }
+  }, 400);
 });
 
 window.addEventListener('remo:langchange', () => {
@@ -5245,3 +5252,87 @@ window.flipRemoCoin3D = flipRemoCoin3D;
 window.ringRemoCoinChime = ringRemoCoinChime;
 window.setRemoCoin3DSerial = setRemoCoin3DSerial;
 window.setRemoCoin3DAlloy = setRemoCoin3DAlloy;
+
+/* ══════════════════════════════════════════════════════════════════════
+   🌐 HOLOGRAPHIC ONBOARDING WELCOME SPLASH SCREEN (3-SECOND VIRAL POP)
+   ══════════════════════════════════════════════════════════════════════ */
+let welcomeSplashTimerInterval = null;
+let welcomeSplashTimeoutId = null;
+
+function showWelcomeSplashScreen(force = false) {
+  const splash = document.getElementById('remoWelcomeSplash');
+  if (!splash) return;
+
+  const params = new URLSearchParams(window.location.search);
+  const hasWelcomeParam = params.has('welcome') || params.has('onboarding');
+  const hasRefParam = params.has('ref');
+  const alreadySeen = localStorage.getItem('remo_welcome_splash_seen');
+
+  if (!force && alreadySeen && !hasWelcomeParam && !hasRefParam) {
+    return;
+  }
+
+  const u = REMO_STORE.getCurrentUser() || REMO_STORE.ensureGuestOrCitizen('REMO Pioneer', '', 'montreal');
+  const pNumEl = document.getElementById('welcomeSplashPassportNum');
+  if (pNumEl) {
+    const rawNum = (u && u.passportNum) ? String(u.passportNum) : '0001';
+    pNumEl.textContent = rawNum.startsWith('#') ? rawNum : `#${rawNum}`;
+  }
+
+  if (typeof REMO_I18N !== 'undefined' && REMO_I18N.applyDOM) {
+    REMO_I18N.applyDOM(splash);
+  }
+
+  splash.classList.add('show');
+
+  // Spawn introductory burst of golden coins
+  if (typeof spawnRemoCoinsFX === 'function') {
+    setTimeout(() => spawnRemoCoinsFX(8), 250);
+  }
+
+  // 3-second animated countdown
+  let secondsLeft = 3;
+  const secEl = document.getElementById('welcomeSplashSeconds');
+  if (secEl) secEl.textContent = '3';
+
+  if (welcomeSplashTimerInterval) clearInterval(welcomeSplashTimerInterval);
+  if (welcomeSplashTimeoutId) clearTimeout(welcomeSplashTimeoutId);
+
+  welcomeSplashTimerInterval = setInterval(() => {
+    secondsLeft--;
+    if (secEl) secEl.textContent = Math.max(0, secondsLeft);
+    if (secondsLeft <= 0) {
+      clearInterval(welcomeSplashTimerInterval);
+      welcomeSplashTimerInterval = null;
+    }
+  }, 1000);
+
+  welcomeSplashTimeoutId = setTimeout(() => {
+    dismissWelcomeSplash();
+  }, 3500);
+}
+
+function dismissWelcomeSplash() {
+  const splash = document.getElementById('remoWelcomeSplash');
+  if (welcomeSplashTimerInterval) {
+    clearInterval(welcomeSplashTimerInterval);
+    welcomeSplashTimerInterval = null;
+  }
+  if (welcomeSplashTimeoutId) {
+    clearTimeout(welcomeSplashTimeoutId);
+    welcomeSplashTimeoutId = null;
+  }
+  if (splash) {
+    splash.classList.remove('show');
+  }
+  localStorage.setItem('remo_welcome_splash_seen', '1');
+
+  // Celebratory coins burst on entering the 4D world
+  if (typeof spawnRemoCoinsFX === 'function') {
+    spawnRemoCoinsFX(10);
+  }
+}
+
+window.showWelcomeSplashScreen = showWelcomeSplashScreen;
+window.dismissWelcomeSplash = dismissWelcomeSplash;
+

@@ -672,6 +672,55 @@
     </div>
   </div>
 
+  <!-- 🌐 Holographic Onboarding Welcome Splash Screen (3-Second Cyber Welcome) -->
+  <div class="welcome-splash-overlay" id="remoWelcomeSplash" onclick="if(event.target===this)dismissWelcomeSplash()">
+    <div class="welcome-splash-card">
+      <button type="button" class="welcome-splash-close" onclick="dismissWelcomeSplash()" title="Close">✕</button>
+
+      <div class="welcome-splash-coin-badge">🪙</div>
+
+      <h2 class="welcome-splash-title" data-i18n="welcome_splash_title">Bienvenue sur REMO World 🌐</h2>
+      <p class="welcome-splash-sub" data-i18n="welcome_splash_sub">Le Réseau Mondial 4D &amp; Métavers Urbain</p>
+
+      <!-- Passport Box -->
+      <div class="welcome-splash-passport-box">
+        <div class="welcome-splash-passport-top">
+          <span data-i18n="welcome_splash_passport_lbl">PASSEPORT CITOYEN OFFICIEL ATTRIBUÉ</span>
+          <span style="color:#38bdf8;">100% VERIFIED</span>
+        </div>
+        <div class="welcome-splash-passport-num" id="welcomeSplashPassportNum">#0001</div>
+        <div style="font-size:0.72rem;color:#94a3b8;margin-top:4px;" data-i18n="welcome_splash_passport_sub">Identifiant Souverain Citoyen du Monde 4D</div>
+      </div>
+
+      <!-- Welcome Gift Pill -->
+      <div>
+        <div class="welcome-splash-gift-pill">
+          <span>🎁</span>
+          <span data-i18n="welcome_splash_gift_val">+150 🪙 Cadeau de Bienvenue Offert</span>
+        </div>
+      </div>
+
+      <p class="welcome-splash-desc" data-i18n="welcome_splash_desc">
+        Explorez les villes du monde en 4D, collectionnez des billets holographiques et défendez votre ville dans la Coupe du Monde !
+      </p>
+
+      <!-- Action Button -->
+      <button type="button" class="welcome-splash-enter-btn" onclick="dismissWelcomeSplash()" data-i18n="welcome_splash_enter_btn">
+        🚀 Entrer dans le Monde 4D
+      </button>
+
+      <!-- Auto-dismiss Progress Bar -->
+      <div class="welcome-splash-timer-box">
+        <div class="welcome-splash-timer-text">
+          <span data-i18n="welcome_splash_auto">Accès automatique dans</span> <b id="welcomeSplashSeconds" style="color:#fbbf24;">3</b>s...
+        </div>
+        <div class="welcome-splash-timer-bar">
+          <div class="welcome-splash-timer-fill" id="welcomeSplashTimerFill"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- ⋯ Post Actions & Creator Tools Bottom-Sheet Modal -->
   <div class="remo-modal-backdrop" id="postActionsModal" onclick="if(event.target===this)closePostActionsModal()">
     <div class="remo-modal" style="max-width:440px;" id="postActionsModalContent"></div>
@@ -1522,12 +1571,12 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 
   <!-- REMO Modular Engines -->
-  <script src="js/remo-i18n.js?v=44"></script>
-  <script src="js/remo-cities-data.js?v=44"></script>
-  <script src="js/remo-store.js?v=44"></script>
-  <script src="js/remo-card-engine.js?v=44"></script>
-  <script src="js/remo-radar-arena.js?v=44"></script>
-  <script src="js/remo-social-comms.js?v=44"></script>
-  <script src="js/remo-radio-engine.js?v=44"></script>
+  <script src="js/remo-i18n.js?v=45"></script>
+  <script src="js/remo-cities-data.js?v=45"></script>
+  <script src="js/remo-store.js?v=45"></script>
+  <script src="js/remo-card-engine.js?v=45"></script>
+  <script src="js/remo-radar-arena.js?v=45"></script>
+  <script src="js/remo-social-comms.js?v=45"></script>
+  <script src="js/remo-radio-engine.js?v=45"></script>
 </body>
 </html>
