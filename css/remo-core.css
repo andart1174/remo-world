@@ -2947,3 +2947,20 @@ button, input, select, textarea {
   font-size: 1.15rem;
   flex-shrink: 0;
 }
+
+/* 🗺️ Secret Spots & Urban Treasure Hunting */
+.pbadge.secret-spot {
+  background: linear-gradient(135deg, #0284c7, #06b6d4);
+  color: #fff;
+  border: 1px solid rgba(56, 189, 248, 0.6);
+  box-shadow: 0 0 12px rgba(6, 182, 212, 0.5);
+}
+
+.secret-spot-card {
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(6, 182, 212, 0.12), rgba(59, 130, 246, 0.08));
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  margin-top: 8px;
+}
+

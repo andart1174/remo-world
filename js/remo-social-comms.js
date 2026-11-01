@@ -875,6 +875,7 @@ function renderSocialFeed(searchQuery = '') {
             ${!hiddenByCapsule && p.mediaType === 'before_after' ? `<span class="pbadge html">${t('post_slider_badge')}</span>` : ''}
             ${p.verifiedGps ? `<span class="pbadge gps">${t('post_verified_gps')}</span>` : ''}
             ${p.mintedCard ? `<span class="pbadge mint">${t('post_minted_badge')}</span>` : ''}
+            ${p.isSecretSpot ? `<span class="pbadge secret-spot">🗺️ ${lang === 'fr' ? 'LIEU SECRET' : 'SECRET SPOT'}</span>` : ''}
           </div>
           ${renderPostMediaStage(p, city, lang)}
         </div>
@@ -909,6 +910,24 @@ function renderSocialFeed(searchQuery = '') {
             <div><b style="color:#38bdf8;">🇬🇧 EN:</b> ${escapeHtmlStr(dualPair.en)}</div>
             <div><b style="color:#fbbf24;">🇫🇷 FR:</b> ${escapeHtmlStr(dualPair.fr)}</div>
           </div>
+          ${p.isSecretSpot ? `
+            <div class="secret-spot-card">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;gap:8px;">
+                <span style="font-family:'Orbitron',sans-serif;font-size:0.78rem;font-weight:900;color:#38bdf8;letter-spacing:0.5px;">
+                  🗺️ ${lang === 'fr' ? 'LIEU SECRET URBAIN' : 'URBAN SECRET SPOT'}
+                </span>
+                <button type="button" class="btn-cyber" style="padding:4px 9px;font-size:0.72rem;background:#0284c7;" onclick="focusCityOnRadar('${p.cityId}')">
+                  🧭 ${lang === 'fr' ? 'Radar GPS' : 'GPS Radar'}
+                </button>
+              </div>
+              <b style="font-size:0.86rem;color:#f8fafc;display:block;">${escapeHtmlStr(p.secretSpotTitle || '')}</b>
+              ${p.secretSpotClue ? `
+                <div style="font-size:0.78rem;color:#94a3b8;margin-top:3px;font-style:italic;">
+                  💡 <span style="color:#cbd5e1;">${lang === 'fr' ? 'Indice' : 'Clue'}:</span> "${escapeHtmlStr(p.secretSpotClue)}"
+                </div>
+              ` : ''}
+            </div>
+          ` : ''}
           ${hiddenByCapsule ? '' : renderPostPollWidget(p, lang, u)}
           ${hiddenByCapsule ? '' : renderSecretCapsuleWidget(p, lang, u)}
           ${hiddenByCapsule ? '' : renderViralGoalWidget(p, lang, isAdm)}
@@ -1629,6 +1648,15 @@ function openCreatePostModal(prefillTag = '') {
   const tcInp = document.getElementById('createCapsuleTeaserInp');
   if (tcInp) tcInp.value = '';
 
+  const spotT = document.getElementById('createSecretSpotToggle');
+  if (spotT) spotT.checked = false;
+  const spotF = document.getElementById('createSecretSpotFields');
+  if (spotF) spotF.style.display = 'none';
+  const spotTitle = document.getElementById('createSecretSpotTitleInp');
+  if (spotTitle) spotTitle.value = '';
+  const spotClue = document.getElementById('createSecretSpotClueInp');
+  if (spotClue) spotClue.value = '';
+
   document.getElementById('createMediaPreviewStatus').innerHTML = '';
   switchCreateStudioTab('photo');
   document.getElementById('createModal')?.classList.add('open');
@@ -2044,6 +2072,10 @@ async function publishNewRemoPost() {
   const finalFr = (drawerEl && drawerEl.style.display !== 'none' && frBoxVal) ? frBoxVal : (autoPair.fr || cap);
   if (drawerEl) drawerEl.style.display = 'none';
 
+  const isSecretSpot = Boolean(document.getElementById('createSecretSpotToggle')?.checked);
+  const rawSpotTitle = document.getElementById('createSecretSpotTitleInp')?.value.trim() || '';
+  const rawSpotClue = document.getElementById('createSecretSpotClueInp')?.value.trim() || '';
+
   const newPost = {
     id: 'post_' + Date.now(),
     uid: u.uid,
@@ -2068,6 +2100,9 @@ async function publishNewRemoPost() {
     poll: pollObj,
     secretCapsule: secretObj,
     viralGoal: viralGoalObj,
+    isSecretSpot,
+    secretSpotTitle: isSecretSpot ? (rawSpotTitle || (lang === 'fr' ? 'Lieu Secret Urbain' : 'Urban Secret Spot')) : '',
+    secretSpotClue: isSecretSpot ? rawSpotClue : '',
     wasTimeCapsule,
     unlockAt: unlockAtTs,
     capsuleTeaser_en: capsuleTeaserEn,
@@ -2093,6 +2128,26 @@ async function publishNewRemoPost() {
   }
 
   REMO_STORE.state.posts.unshift(newPost);
+
+  if (isSecretSpot) {
+    const cObj = getCityById(cityId) || getCityById('montreal');
+    const jitterLat = (Math.random() - 0.5) * 0.018;
+    const jitterLng = (Math.random() - 0.5) * 0.018;
+    if (!Array.isArray(REMO_STORE.state.radarPins)) REMO_STORE.state.radarPins = [];
+    REMO_STORE.state.radarPins.push({
+      id: 'spot_' + newPost.id,
+      postId: newPost.id,
+      cityId: cObj.id,
+      lat: (cObj.coords ? cObj.coords.lat : (cObj.lat || 45.5017)) + jitterLat,
+      lng: (cObj.coords ? cObj.coords.lng : (cObj.lng || -73.5673)) + jitterLng,
+      isSecretSpot: true,
+      title_en: rawSpotTitle || ('Secret Spot: ' + (cObj.name_en || cObj.name)),
+      title_fr: rawSpotTitle || ('Lieu Secret: ' + (cObj.name_fr || cObj.name)),
+      clue: rawSpotClue,
+      reward: 60
+    });
+    if (typeof refreshRadarMarkers === 'function') refreshRadarMarkers();
+  }
   const baseReward = pendingDuetParent ? 20 : (REMO_STORE.state.settings.rewards.postReward || 15);
   pendingDuetParent = null;
   const wxStatus = REMO_WEATHER.getCityLiveStatus(cityId);
@@ -3704,6 +3759,15 @@ function adminBoomCityStock(cityId) {
   renderCityExchangeView();
   remoToast('🚀 Bull Market Boom (+500 PTS)!', 'fanfare');
 }
+
+function focusCityOnRadar(cityId) {
+  if (typeof switchRemoView === 'function') switchRemoView('radar');
+  setTimeout(() => {
+    if (typeof teleportRadarCity === 'function') teleportRadarCity(cityId);
+  }, 350);
+}
+
+window.focusCityOnRadar = focusCityOnRadar;
 
 window.switchRemoView = switchRemoView;
 window.syncHeaderAndSidebars = syncHeaderAndSidebars;

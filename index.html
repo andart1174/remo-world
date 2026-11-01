@@ -669,6 +669,37 @@
     <div class="remo-modal" style="max-width:440px;" id="postActionsModalContent"></div>
   </div>
 
+  <!-- 📲 9:16 Viral Story Export Modal (TikTok, Instagram, WhatsApp) -->
+  <div class="remo-modal-backdrop" id="storyExportModal" onclick="if(event.target===this)closeStoryExportModal()">
+    <div class="remo-modal" style="max-width:440px;text-align:center;">
+      <div class="modal-hdr">
+        <b style="font-family:'Orbitron',sans-serif;color:#fbbf24;font-size:0.95rem;">📲 Story Citoyenne 9:16 (TikTok &amp; Insta)</b>
+        <button class="modal-close" onclick="closeStoryExportModal()">✕</button>
+      </div>
+      <p style="font-size:0.79rem;color:var(--muted);margin-bottom:12px;">
+        Partagez votre statut de citoyen officiel en Story 9:16 ! Chaque ami qui scanne votre QR gagne +100 🪙 et vous offre +100 🪙 !
+      </p>
+
+      <div style="display:flex;justify-content:center;margin-bottom:14px;">
+        <canvas id="citizenStoryCanvasPreview" style="width:100%;max-width:270px;aspect-ratio:9/16;border-radius:18px;box-shadow:0 16px 40px rgba(0,0,0,0.85);border:2px solid rgba(251,191,36,0.4);"></canvas>
+      </div>
+
+      <div style="display:flex;gap:8px;flex-direction:column;">
+        <button type="button" class="btn-cyber btn-gold" style="width:100%;justify-content:center;padding:11px;" onclick="shareStoryCanvasNative()">
+          📲 Partager en Story (Insta / TikTok / WhatsApp)
+        </button>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          <button type="button" class="btn-cyber" style="justify-content:center;padding:9px;" onclick="downloadStoryCanvasPNG()">
+            📥 Télécharger HD (.PNG)
+          </button>
+          <button type="button" class="btn-ghost" style="justify-content:center;padding:9px;border-color:#38bdf8;color:#7dd3fc;" onclick="copyMyReferralInviteLink()">
+            🔗 Copier Mon Lien
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- ➕ Multi-Format Creator Studio Modal (Photo / 60s Video / Live HTML Code / Viral Power-Ups) -->
   <div class="remo-modal-backdrop" id="createModal" onclick="if(event.target===this)closeCreatePostModal()">
     <div class="remo-modal" style="max-width:650px;">
@@ -879,6 +910,15 @@
             <option value="1440">⏱️ 24 Hours</option>
           </select>
           <input type="text" id="createCapsuleTeaserInp" class="remo-input" data-i18n-placeholder="capsule_teaser_ph" placeholder="Mystery teaser shown before countdown reaches 00:00:00...">
+        </div>
+
+        <label style="display:flex;align-items:center;gap:8px;font-size:0.8rem;font-weight:800;color:#38bdf8;cursor:pointer;">
+          <input type="checkbox" id="createSecretSpotToggle" onchange="document.getElementById('createSecretSpotFields').style.display=this.checked?'grid':'none'">
+          <span>🗺️ Marquer comme Lieu Secret Urbain (Secret Spot Radar &amp; Chasse)</span>
+        </label>
+        <div id="createSecretSpotFields" style="display:none;grid-template-columns:1fr;gap:7px;">
+          <input type="text" id="createSecretSpotTitleInp" class="remo-input" placeholder="Nom du lieu secret (ex: Le Belvédère Caché, Café Secret fără firmă...)">
+          <input type="text" id="createSecretSpotClueInp" class="remo-input" placeholder="Indice énigme pour le trouver (ex: Cherchez derrière l'arche en pierre...)">
         </div>
       </div>
 
