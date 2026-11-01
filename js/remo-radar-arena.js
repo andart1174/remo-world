@@ -1811,10 +1811,10 @@ function renderPassportView() {
         </div>
 
         <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-bottom:14px;">
+          <button class="btn-cyber btn-gold" style="background:linear-gradient(135deg,#f59e0b,#ec4899);border-color:#fbbf24;color:#fff;font-weight:900;" onclick="exportPassportStory()">📲 ${t('passport_share_story')}</button>
           <button class="btn-cyber btn-gold" onclick="downloadCitizenIdPNG()">${t('passport_dl_id_btn')}</button>
           <button class="btn-cyber" onclick="copyMyReferralInviteLink()">${t('passport_copy_ref_btn')} (${refCode})</button>
           <button class="btn-ghost" style="border-color:#10b981;color:#34d399;" onclick="shareReferralOnWhatsApp()">${t('passport_wa_ref_btn')}</button>
-          <button class="btn-ghost" onclick="exportPassportStory()">${t('passport_share_story')}</button>
         </div>
 
         ${!u.referredBy ? `
@@ -1936,180 +1936,197 @@ function changeUserHomeCity(cityId) {
 
 function drawStoryVerticalCanvas(cv, u, lang) {
   if (!cv) return;
-  cv.width = 1080;
-  cv.height = 1920;
-  const ctx = cv.getContext('2d');
-  const home = getCityById((u && u.homeCity) || 'montreal');
-  const col = home.themeColor || '#38bdf8';
-  const refCode = (u && u.referralCode) || `REMO-${(u && u.passportNum) || '0001'}`;
-  const inviteUrl = getCitizenInviteUrl(u || { passportNum: '0001' });
-  const cosm = u && u.uid ? REMO_STORE.getUserCosmetics(u.uid) : { title_en: '', title_fr: '' };
-  const royalTitle = lang === 'fr' ? (cosm.title_fr || (u.role === 'admin' ? 'FONDATEUR' : 'CITOYEN OFFICIEL')) : (cosm.title_en || (u.role === 'admin' ? 'FOUNDER' : 'OFFICIAL CITIZEN'));
-
-  // 1. Deep Cyber Cosmic Gradient Background
-  const bg = ctx.createLinearGradient(0, 0, 1080, 1920);
-  bg.addColorStop(0, '#02050f');
-  bg.addColorStop(0.3, '#09102b');
-  bg.addColorStop(0.7, '#13113d');
-  bg.addColorStop(1, '#030511');
-  ctx.fillStyle = bg;
-  ctx.fillRect(0, 0, 1080, 1920);
-
-  // 2. City Aura Glow
-  const glow = ctx.createRadialGradient(540, 740, 40, 540, 740, 500);
-  glow.addColorStop(0, col + '44');
-  glow.addColorStop(0.6, col + '15');
-  glow.addColorStop(1, 'transparent');
-  ctx.fillStyle = glow;
-  ctx.fillRect(0, 0, 1080, 1920);
-
-  // 3. Holographic Security Grid
-  ctx.strokeStyle = 'rgba(255,255,255,0.035)';
-  ctx.lineWidth = 1;
-  for (let x = 0; x < 1080; x += 45) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, 1920); ctx.stroke(); }
-  for (let y = 0; y < 1920; y += 45) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(1080, y); ctx.stroke(); }
-
-  // 4. Double Cyber Borders
-  ctx.strokeStyle = '#fbbf24';
-  ctx.lineWidth = 6;
-  ctx.strokeRect(36, 36, 1008, 1848);
-  ctx.strokeStyle = col;
-  ctx.lineWidth = 2;
-  ctx.strokeRect(50, 50, 980, 1820);
-
-  // 5. Header Branding Strip
-  ctx.fillStyle = 'rgba(251,191,36,0.12)';
-  ctx.fillRect(52, 52, 976, 120);
-  ctx.textAlign = 'center';
-  ctx.font = '900 48px "Orbitron", sans-serif';
-  ctx.fillStyle = '#fbbf24';
-  ctx.fillText('🌐 REMO WORLD', 540, 116);
-  ctx.font = '800 24px "Outfit", sans-serif';
-  ctx.fillStyle = '#94a3b8';
-  ctx.fillText(lang === 'fr' ? 'PASSEPORT CITOYEN OFFICIEL · COUPE DES VILLES 4D' : 'OFFICIAL WORLD CITIZEN PASSPORT · 4D CITIES CUP', 540, 154);
-
-  // 6. User Avatar Badge & Name
-  const avatarY = 270;
-  ctx.beginPath();
-  ctx.arc(540, avatarY, 68, 0, Math.PI * 2);
-  ctx.fillStyle = '#0f172a';
-  ctx.fill();
-  ctx.strokeStyle = '#fbbf24';
-  ctx.lineWidth = 4;
-  ctx.stroke();
-
-  ctx.fillStyle = '#fbbf24';
-  ctx.font = '900 58px "Orbitron", sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(((u && u.name) || 'R').charAt(0).toUpperCase(), 540, avatarY);
-  ctx.textBaseline = 'alphabetic';
-
-  // Citizen Name
-  ctx.font = '900 50px "Outfit", sans-serif';
-  ctx.fillStyle = '#ffffff';
-  ctx.fillText(`@${(u && u.name) || 'Pioneer'}`, 540, 395);
-
-  // Royal / Pioneer Badge Pill
-  ctx.fillStyle = 'rgba(251,191,36,0.18)';
-  ctx.strokeStyle = '#fbbf24';
-  ctx.lineWidth = 2;
-  const pillW = 340;
-  ctx.strokeRect(540 - pillW / 2, 415, pillW, 44);
-  ctx.fillRect(540 - pillW / 2, 415, pillW, 44);
-  ctx.font = '900 20px "Orbitron", sans-serif';
-  ctx.fillStyle = '#fbbf24';
-  ctx.fillText(`👑 ${royalTitle.toUpperCase()} · #${(u && u.passportNum) || '0001'}`, 540, 444);
-
-  // 7. Middle Stage: City Landmark
-  drawCityLandmark(ctx, home.id, col, 540, 710, 220);
-
-  // City Title
-  ctx.font = '900 54px "Orbitron", sans-serif';
-  ctx.fillStyle = col;
-  ctx.fillText(`${home.flag} ${getCityName(home, lang).toUpperCase()}`, 540, 990);
-
-  ctx.font = '700 24px monospace';
-  ctx.fillStyle = '#cbd5e1';
-  ctx.fillText(`${home.coords.lat.toFixed(2)}° N, ${Math.abs(home.coords.lng).toFixed(2)}° W · ${home.country}`, 540, 1030);
-
-  // 8. Stats Strip
-  const statsY = 1080;
-  const statBoxW = 280;
-  const stats = [
-    { label: lang === 'fr' ? 'PIÈCES REMO' : 'REMO COINS', val: `🪙 ${u.coins || 0}` },
-    { label: lang === 'fr' ? 'VISAS VILLES' : 'CITY VISAS', val: `🌍 ${(u.visas || []).length}` },
-    { label: lang === 'fr' ? 'PARRAINAGES' : 'REFERRALS', val: `👥 ${u.referralCount || 0}` }
-  ];
-  stats.forEach((st, idx) => {
-    const bx = 100 + idx * 300;
-    ctx.fillStyle = 'rgba(255,255,255,0.04)';
-    ctx.strokeStyle = 'rgba(255,255,255,0.15)';
-    ctx.lineWidth = 1.5;
-    ctx.fillRect(bx, statsY, statBoxW, 95);
-    ctx.strokeRect(bx, statsY, statBoxW, 95);
-
-    ctx.font = '900 32px "Orbitron", sans-serif';
-    ctx.fillStyle = '#fbbf24';
-    ctx.fillText(st.val, bx + statBoxW / 2, statsY + 48);
-
-    ctx.font = '800 16px "Outfit", sans-serif';
-    ctx.fillStyle = '#94a3b8';
-    ctx.fillText(st.label, bx + statBoxW / 2, statsY + 78);
-  });
-
-  // 9. Scannable QR Code Box
-  const qrBoxY = 1220;
-  ctx.fillStyle = 'rgba(15,23,42,0.88)';
-  ctx.strokeStyle = '#fbbf24';
-  ctx.lineWidth = 3;
-  ctx.fillRect(140, qrBoxY, 800, 480);
-  ctx.strokeRect(140, qrBoxY, 800, 480);
-
-  // Top QR Box Ribbon
-  ctx.fillStyle = '#fbbf24';
-  ctx.fillRect(140, qrBoxY, 800, 52);
-  ctx.font = '900 24px "Orbitron", sans-serif';
-  ctx.fillStyle = '#050814';
-  ctx.fillText(lang === 'fr' ? '🎁 SCANNEZ LE QR POUR GAGNER +100 🪙' : '🎁 SCAN QR TO EARN +100 🪙 BONUS', 540, qrBoxY + 35);
-
-  // Draw 280x280 QR Code
   try {
-    const qrCanvas = RemoQREngine.toCanvas(inviteUrl, 280);
-    ctx.drawImage(qrCanvas, 400, qrBoxY + 75, 280, 280);
+    cv.width = 1080;
+    cv.height = 1920;
+    const ctx = cv.getContext('2d');
+    const home = getCityById((u && u.homeCity) || 'montreal') || getCityById('montreal');
+    const col = home.themeColor || '#38bdf8';
+    const refCode = (u && u.referralCode) || `REMO-${(u && u.passportNum) || '0001'}`;
+    const inviteUrl = getCitizenInviteUrl(u || { passportNum: '0001' });
+    const cosm = u && u.uid ? REMO_STORE.getUserCosmetics(u.uid) : { title_en: '', title_fr: '' };
+    const royalTitle = lang === 'fr' ? (cosm.title_fr || (u.role === 'admin' ? 'FONDATEUR' : 'CITOYEN OFFICIEL')) : (cosm.title_en || (u.role === 'admin' ? 'FOUNDER' : 'OFFICIAL CITIZEN'));
+
+    // 1. Deep Cyber Cosmic Gradient Background
+    const bg = ctx.createLinearGradient(0, 0, 1080, 1920);
+    bg.addColorStop(0, '#02050f');
+    bg.addColorStop(0.3, '#09102b');
+    bg.addColorStop(0.7, '#13113d');
+    bg.addColorStop(1, '#030511');
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, 1080, 1920);
+
+    // 2. City Aura Glow
+    const glow = ctx.createRadialGradient(540, 740, 40, 540, 740, 500);
+    glow.addColorStop(0, col + '44');
+    glow.addColorStop(0.6, col + '15');
+    glow.addColorStop(1, 'transparent');
+    ctx.fillStyle = glow;
+    ctx.fillRect(0, 0, 1080, 1920);
+
+    // 3. Holographic Security Grid
+    ctx.strokeStyle = 'rgba(255,255,255,0.035)';
+    ctx.lineWidth = 1;
+    for (let x = 0; x < 1080; x += 45) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, 1920); ctx.stroke(); }
+    for (let y = 0; y < 1920; y += 45) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(1080, y); ctx.stroke(); }
+
+    // 4. Double Cyber Borders
+    ctx.strokeStyle = '#fbbf24';
+    ctx.lineWidth = 6;
+    ctx.strokeRect(36, 36, 1008, 1848);
+    ctx.strokeStyle = col;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(50, 50, 980, 1820);
+
+    // 5. Header Branding Strip
+    ctx.fillStyle = 'rgba(251,191,36,0.12)';
+    ctx.fillRect(52, 52, 976, 120);
+    ctx.textAlign = 'center';
+    ctx.font = '900 48px "Orbitron", sans-serif';
+    ctx.fillStyle = '#fbbf24';
+    ctx.fillText('🌐 REMO WORLD', 540, 116);
+    ctx.font = '800 24px "Outfit", sans-serif';
+    ctx.fillStyle = '#94a3b8';
+    ctx.fillText(lang === 'fr' ? 'PASSEPORT CITOYEN OFFICIEL · COUPE DES VILLES 4D' : 'OFFICIAL WORLD CITIZEN PASSPORT · 4D CITIES CUP', 540, 154);
+
+    // 6. User Avatar Badge & Name
+    const avatarY = 270;
+    ctx.beginPath();
+    ctx.arc(540, avatarY, 68, 0, Math.PI * 2);
+    ctx.fillStyle = '#0f172a';
+    ctx.fill();
+    ctx.strokeStyle = '#fbbf24';
+    ctx.lineWidth = 4;
+    ctx.stroke();
+
+    ctx.fillStyle = '#fbbf24';
+    ctx.font = '900 58px "Orbitron", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(((u && u.name) || 'R').charAt(0).toUpperCase(), 540, avatarY);
+    ctx.textBaseline = 'alphabetic';
+
+    // Citizen Name
+    ctx.font = '900 50px "Outfit", sans-serif';
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(`@${(u && u.name) || 'Pioneer'}`, 540, 395);
+
+    // Royal / Pioneer Badge Pill
+    ctx.fillStyle = 'rgba(251,191,36,0.18)';
+    ctx.strokeStyle = '#fbbf24';
+    ctx.lineWidth = 2;
+    const pillW = 340;
+    ctx.strokeRect(540 - pillW / 2, 415, pillW, 44);
+    ctx.fillRect(540 - pillW / 2, 415, pillW, 44);
+    ctx.font = '900 20px "Orbitron", sans-serif';
+    ctx.fillStyle = '#fbbf24';
+    ctx.fillText(`👑 ${royalTitle.toUpperCase()} · #${(u && u.passportNum) || '0001'}`, 540, 444);
+
+    // 7. Middle Stage: City Landmark
+    if (typeof drawCityLandmark === 'function') {
+      drawCityLandmark(ctx, home.id, col, 540, 710, 220);
+    }
+
+    // City Title
+    ctx.font = '900 54px "Orbitron", sans-serif';
+    ctx.fillStyle = col;
+    ctx.fillText(`${home.flag} ${getCityName(home, lang).toUpperCase()}`, 540, 990);
+
+    const latVal = typeof home.lat === 'number' ? home.lat : (home.coords ? home.coords.lat : 45.50);
+    const lngVal = typeof home.lng === 'number' ? home.lng : (home.coords ? home.coords.lng : -73.57);
+    const countryName = lang === 'fr' ? (home.country_fr || 'Monde') : (home.country_en || 'World');
+
+    ctx.font = '700 24px monospace';
+    ctx.fillStyle = '#cbd5e1';
+    ctx.fillText(`${latVal.toFixed(2)}° N, ${Math.abs(lngVal).toFixed(2)}° W · ${countryName}`, 540, 1030);
+
+    // 8. Stats Strip
+    const statsY = 1080;
+    const statBoxW = 280;
+    const stats = [
+      { label: lang === 'fr' ? 'PIÈCES REMO' : 'REMO COINS', val: `🪙 ${(u && u.coins) || 0}` },
+      { label: lang === 'fr' ? 'VISAS VILLES' : 'CITY VISAS', val: `🌍 ${((u && u.visas) || []).length}` },
+      { label: lang === 'fr' ? 'PARRAINAGES' : 'REFERRALS', val: `👥 ${(u && u.referralCount) || 0}` }
+    ];
+    stats.forEach((st, idx) => {
+      const bx = 100 + idx * 300;
+      ctx.fillStyle = 'rgba(255,255,255,0.04)';
+      ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+      ctx.lineWidth = 1.5;
+      ctx.fillRect(bx, statsY, statBoxW, 95);
+      ctx.strokeRect(bx, statsY, statBoxW, 95);
+
+      ctx.font = '900 32px "Orbitron", sans-serif';
+      ctx.fillStyle = '#fbbf24';
+      ctx.fillText(st.val, bx + statBoxW / 2, statsY + 48);
+
+      ctx.font = '800 16px "Outfit", sans-serif';
+      ctx.fillStyle = '#94a3b8';
+      ctx.fillText(st.label, bx + statBoxW / 2, statsY + 78);
+    });
+
+    // 9. Scannable QR Code Box
+    const qrBoxY = 1220;
+    ctx.fillStyle = 'rgba(15,23,42,0.88)';
+    ctx.strokeStyle = '#fbbf24';
+    ctx.lineWidth = 3;
+    ctx.fillRect(140, qrBoxY, 800, 480);
+    ctx.strokeRect(140, qrBoxY, 800, 480);
+
+    // Top QR Box Ribbon
+    ctx.fillStyle = '#fbbf24';
+    ctx.fillRect(140, qrBoxY, 800, 52);
+    ctx.font = '900 24px "Orbitron", sans-serif';
+    ctx.fillStyle = '#050814';
+    ctx.fillText(lang === 'fr' ? '🎁 SCANNEZ LE QR POUR GAGNER +100 🪙' : '🎁 SCAN QR TO EARN +100 🪙 BONUS', 540, qrBoxY + 35);
+
+    // Draw 280x280 QR Code
+    if (typeof RemoQREngine !== 'undefined' && RemoQREngine.toCanvas) {
+      try {
+        const qrCanvas = RemoQREngine.toCanvas(inviteUrl, 280);
+        ctx.drawImage(qrCanvas, 400, qrBoxY + 75, 280, 280);
+      } catch (err) {
+        console.error('QR draw failed:', err);
+      }
+    }
+
+    // Under QR Code
+    ctx.font = '900 26px "Orbitron", sans-serif';
+    ctx.fillStyle = '#38bdf8';
+    ctx.fillText(`CODE CITOYEN: ${refCode}`, 540, qrBoxY + 400);
+
+    ctx.font = '700 20px "Outfit", sans-serif';
+    ctx.fillStyle = '#10b981';
+    ctx.fillText(lang === 'fr' ? '✓ +100 🪙 offerts à l’inscription !' : '✓ +100 🪙 awarded on sign-up!', 540, qrBoxY + 440);
+
+    // 10. Bottom Footer
+    ctx.font = '900 24px "Orbitron", sans-serif';
+    ctx.fillStyle = '#fbbf24';
+    ctx.fillText('REMOWORLD.COM', 540, 1780);
+    ctx.font = '700 18px "Outfit", sans-serif';
+    ctx.fillStyle = '#64748b';
+    ctx.fillText(lang === 'fr' ? 'Le Réseau Social Mondial 4D · Explorez sans frontières' : 'The 4D Global Social Network · Explore without borders', 540, 1812);
   } catch (err) {
-    console.error('QR draw failed:', err);
+    console.error('drawStoryVerticalCanvas error:', err);
   }
-
-  // Under QR Code
-  ctx.font = '900 26px "Orbitron", sans-serif';
-  ctx.fillStyle = '#38bdf8';
-  ctx.fillText(`CODE CITOYEN: ${refCode}`, 540, qrBoxY + 400);
-
-  ctx.font = '700 20px "Outfit", sans-serif';
-  ctx.fillStyle = '#10b981';
-  ctx.fillText(lang === 'fr' ? '✓ +100 🪙 offerts à l’inscription !' : '✓ +100 🪙 awarded on sign-up!', 540, qrBoxY + 440);
-
-  // 10. Bottom Footer
-  ctx.font = '900 24px "Orbitron", sans-serif';
-  ctx.fillStyle = '#fbbf24';
-  ctx.fillText('REMOWORLD.COM', 540, 1780);
-  ctx.font = '700 18px "Outfit", sans-serif';
-  ctx.fillStyle = '#64748b';
-  ctx.fillText(lang === 'fr' ? 'Le Réseau Social Mondial 4D · Explorez sans frontières' : 'The 4D Global Social Network · Explore without borders', 540, 1812);
 }
 
 function exportPassportStory() {
   const lang = REMO_I18N.getLang();
   const u = REMO_STORE.getCurrentUser() || REMO_STORE.ensureGuestOrCitizen('REMO Pioneer', '', 'montreal');
   const modal = document.getElementById('storyExportModal');
-  const cv = document.getElementById('citizenStoryCanvasPreview');
-  if (cv) {
-    drawStoryVerticalCanvas(cv, u, lang);
-  }
   if (modal) {
     modal.classList.add('open');
-  } else if (cv) {
+  }
+  const cv = document.getElementById('citizenStoryCanvasPreview');
+  if (cv) {
+    try {
+      drawStoryVerticalCanvas(cv, u, lang);
+    } catch (e) {
+      console.error('drawStoryVerticalCanvas invocation error:', e);
+    }
+  }
+  if (!modal && cv) {
     downloadStoryCanvasPNG();
   }
 }
