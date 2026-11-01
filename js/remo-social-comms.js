@@ -730,7 +730,7 @@ function getInterCityDistanceBridge(postCity, lang) {
       }));
 
   const km = Math.round(fnHaversine(postCity.lat, postCity.lng, viewerCity.lat, viewerCity.lng));
-  const sub = lang === 'fr' ? 'Fereastră deschisă peste ocean' : 'Live window across the world';
+  const sub = lang === 'fr' ? 'Une fenêtre ouverte sur le monde' : 'Live window across the world';
 
   return `
     <div class="city-distance-bridge" title="${sub}">

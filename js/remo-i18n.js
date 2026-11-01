@@ -446,7 +446,39 @@ const REMO_DICT = {
     adm_mint_user_lbl: 'Assign to Citizen (or Keep in Founder Vault)',
     adm_mint_btn: '⚡ Mint & Grant Serialized Coin',
     adm_mint_export_btn: '🖨️ Export Print Duplex (300 DPI)',
-    adm_mint_history_hdr: '🏆 Official Coin Register & Issued Serials'
+    adm_mint_history_hdr: '🏆 Official Coin Register & Issued Serials',
+
+    // 🎫 4D Cyber Boarding Pass (9:16 Story)
+    hdr_wishing_well: '⛲ Wishing Well',
+    nav_wishing_well: '⛲ Wishing Well 🪙',
+    nav_boarding_pass: '🎫 4D Boarding Pass',
+    bridge_ticket_btn: '🎫 4D Ticket',
+    boarding_modal_title: '🎫 4D Holographic Boarding Pass (9:16 Story)',
+    boarding_modal_sub: 'Official 9:16 cyber boarding pass for TikTok, Instagram & WhatsApp! Friends scanning your ticket earn +100 🪙 welcome bonus!',
+    boarding_from_label: 'DEPARTURE CITY',
+    boarding_to_label: 'DESTINATION CITY',
+    boarding_from_ph: 'Type or pick departure city...',
+    boarding_to_ph: 'Type or pick destination city...',
+    boarding_share_btn: '📲 Share Story Pass (Insta / TikTok / WhatsApp)',
+    boarding_dl_btn: '📥 Download HD (.PNG)',
+    boarding_copy_btn: '🔗 Copy My Invite Link',
+
+    // ⛲ 4D Global Wishing Well
+    wishing_modal_title: '⛲ 4D Global Wishing Well 🪙',
+    wishing_pool_prompt: 'Toss 1 REMO Coin',
+    wishing_pool_sub: '-1 🪙 • Grants +5 City Points',
+    wishing_form_title: '✨ Make a Heartfelt Wish for a City',
+    wishing_form_cost: 'Cost',
+    wishing_city_label: 'BENEFICIARY CITY',
+    wishing_city_ph: 'Type or pick city name...',
+    wishing_identity_label: 'IDENTITY',
+    wishing_identity_signed: 'Sign with my Official Badge',
+    wishing_identity_anon: '🎭 Anonymous Wish',
+    wishing_input_ph: 'Write a heartfelt wish for your city or the 4D World...',
+    wishing_submit_btn: '🪙 Toss Coin & Send Wish (-1 🪙)',
+    wishing_stream_title: '🌊 Live Community Wishes',
+    wishing_bless_btn: '✨ Bless',
+    wishing_blessed_btn: '✓ Blessed'
   },
 
   fr: {
@@ -891,7 +923,39 @@ const REMO_DICT = {
     adm_mint_user_lbl: 'Attribuer au Citoyen (ou Conserver au Trésor)',
     adm_mint_btn: '⚡ Frapper & Attribuer la Pièce Numérotée',
     adm_mint_export_btn: '🖨️ Exporter pour Impression Duplex (300 DPI)',
-    adm_mint_history_hdr: '🏆 Registre Officiel des Pièces Numérotées'
+    adm_mint_history_hdr: '🏆 Registre Officiel des Pièces Numérotées',
+
+    // 🎫 4D Cyber Boarding Pass (9:16 Story)
+    hdr_wishing_well: '⛲ Fontaine',
+    nav_wishing_well: '⛲ Puits aux Souhaits 🪙',
+    nav_boarding_pass: '🎫 Billet de Vol 4D',
+    bridge_ticket_btn: '🎫 Billet 4D',
+    boarding_modal_title: '🎫 Billet d’Embarquement 4D (Story 9:16)',
+    boarding_modal_sub: 'Générez un billet holographique officiel 9:16 pour TikTok, Instagram & WhatsApp ! Vos amis qui scannent votre billet gagnent +100 🪙 de bonus !',
+    boarding_from_label: 'VILLE DE DÉPART',
+    boarding_to_label: 'VILLE D’ARRIVÉE',
+    boarding_from_ph: 'Tapez ou choisissez une ville...',
+    boarding_to_ph: 'Tapez ou choisissez une ville...',
+    boarding_share_btn: '📲 Partager Billet Story (Insta / TikTok / WhatsApp)',
+    boarding_dl_btn: '📥 Télécharger HD (.PNG)',
+    boarding_copy_btn: '🔗 Copier Mon Lien',
+
+    // ⛲ 4D Global Wishing Well
+    wishing_modal_title: '⛲ Le Puits aux Souhaits 4D 🪙',
+    wishing_pool_prompt: 'Jeter 1 Pièce REMO',
+    wishing_pool_sub: '-1 🪙 • Offre +5 points à votre Ville',
+    wishing_form_title: '✨ Formuler un Vœu pour une Ville',
+    wishing_form_cost: 'Coût',
+    wishing_city_label: 'VILLE BÉNÉFICIAIRE',
+    wishing_city_ph: 'Tapez ou choisissez le nom de la ville...',
+    wishing_identity_label: 'IDENTITÉ',
+    wishing_identity_signed: 'Signer avec mon Écusson Officiel',
+    wishing_identity_anon: '🎭 Vœu Anonyme',
+    wishing_input_ph: 'Écrivez un vœu sincère pour votre ville ou le Monde 4D...',
+    wishing_submit_btn: '🪙 Jeter la Pièce & Envoyer le Vœu (-1 🪙)',
+    wishing_stream_title: '🌊 Vœux de la Communauté en Direct',
+    wishing_bless_btn: '✨ Bénir',
+    wishing_blessed_btn: '✓ Béni'
   }
 };
 

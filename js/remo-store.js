@@ -1001,11 +1001,13 @@ function createDefaultState() {
 function getDefaultWishes(now = Date.now()) {
   return [
     {
-      id: 'wish_mtl_1',
+      id: 'wish_kiv_1',
       cityId: 'chisinau',
+      cityName: 'Chișinău',
+      cityFlag: '🇲🇩',
       authorName: 'Elena_KIV',
       authorUid: 'u_elena_kiv',
-      text: 'Pace, prosperitate și un viitor luminos pentru Chișinău și toți frații noștri de pe glob! 🇲🇩❤️✨',
+      text: 'Paix, prospérité et un avenir radieux pour Chișinău et tous nos concitoyens à travers le monde ! 🇲🇩✨',
       blessings: 18,
       blessedUids: ['u_admin_founder'],
       timestamp: now - 3600000 * 3,
@@ -1014,6 +1016,8 @@ function getDefaultWishes(now = Date.now()) {
     {
       id: 'wish_mtl_2',
       cityId: 'montreal',
+      cityName: 'Montréal',
+      cityFlag: '⚜️',
       authorName: 'REMO Founder',
       authorUid: 'u_admin_founder',
       text: 'Que Montréal reste un phare d’art, de technologie et de liberté créative pour le monde entier ! ⚜️🍁',
@@ -1025,6 +1029,8 @@ function getDefaultWishes(now = Date.now()) {
     {
       id: 'wish_tyo_1',
       cityId: 'tokyo',
+      cityName: 'Tokyo',
+      cityFlag: '🗼',
       authorName: 'Kenji_TYO',
       authorUid: 'u_kenji_tyo',
       text: 'May neon dreams inspire every creator in the 4D World! 🗼⚡ Arigato REMO!',
@@ -1036,9 +1042,11 @@ function getDefaultWishes(now = Date.now()) {
     {
       id: 'wish_par_1',
       cityId: 'paris',
+      cityName: 'Paris',
+      cityFlag: '🗼',
       authorName: 'Citoyen Secret',
       authorUid: '',
-      text: 'Amour, art et lumière sur Paris et toutes les villes reliées par le réseau 4D ! ✨🗼',
+      text: 'Amour, art et lumière sur Paris et toutes les cités reliées par le réseau 4D ! ✨🗼',
       blessings: 11,
       blessedUids: [],
       timestamp: now - 3600000 * 12,
@@ -1674,6 +1682,19 @@ function upgradeEcosystemState(st) {
   }
   if (!Array.isArray(st.wishes) || st.wishes.length === 0) {
     st.wishes = getDefaultWishes();
+  } else {
+    st.wishes.forEach((w) => {
+      if (w.text && (w.text.includes('Pace,') || w.text.includes('pentru Chișinău și toți'))) {
+        w.text = 'Paix, prospérité et un avenir radieux pour Chișinău et tous nos concitoyens à travers le monde ! 🇲🇩✨';
+      }
+      if (!w.cityName && w.cityId && typeof getCityById === 'function') {
+        const c = getCityById(w.cityId);
+        if (c) {
+          w.cityName = c.name_fr || c.name_en;
+          w.cityFlag = c.flag;
+        }
+      }
+    });
   }
 
   // Upgrade every citizen with Referral Codes & VIP Cosmetics
@@ -2894,7 +2915,7 @@ const REMO_STORE = {
     if (typeof renderSocialFeed === 'function') renderSocialFeed();
   },
 
-  tossCoinInWishingWell(cityId, text, isAnonymous = false) {
+  tossCoinInWishingWell(cityQuery, text, isAnonymous = false) {
     const u = this.getCurrentUser();
     if (!u) return { success: false, reason: 'no_user' };
     if ((u.coins || 0) < 1) return { success: false, reason: 'no_coins' };
@@ -2902,7 +2923,15 @@ const REMO_STORE = {
     if (!cleanText) return { success: false, reason: 'empty_text' };
 
     u.coins = Math.max(0, (u.coins || 0) - 1);
-    const targetCityId = cityId || (u.homeCity || 'montreal');
+
+    const resolvedCity = (typeof resolveCityFromQuery === 'function')
+      ? resolveCityFromQuery(cityQuery || (u.homeCity || 'montreal'))
+      : (typeof getCityById === 'function' ? getCityById(cityQuery || 'montreal') : null);
+
+    const targetCityId = (resolvedCity && resolvedCity.id) ? resolvedCity.id : 'montreal';
+    const targetCityName = (resolvedCity && (resolvedCity.name_fr || resolvedCity.name_en)) ? (resolvedCity.name_fr || resolvedCity.name_en) : (cityQuery || 'Montréal');
+    const targetCityFlag = (resolvedCity && resolvedCity.flag) ? resolvedCity.flag : '🌍';
+
     if (!this.state.cityScores) this.state.cityScores = {};
     this.state.cityScores[targetCityId] = (this.state.cityScores[targetCityId] || 0) + 5;
 
@@ -2910,6 +2939,8 @@ const REMO_STORE = {
     const newWish = {
       id: 'wish_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
       cityId: targetCityId,
+      cityName: targetCityName,
+      cityFlag: targetCityFlag,
       authorName: isAnonymous ? (typeof REMO_I18N !== 'undefined' && REMO_I18N.getLang() === 'fr' ? 'Citoyen Anonyme' : 'Anonymous Citizen') : u.name,
       authorUid: isAnonymous ? '' : u.uid,
       text: cleanText,
@@ -2922,7 +2953,7 @@ const REMO_STORE = {
     this.state.wishes.unshift(newWish);
     if (this.state.wishes.length > 150) this.state.wishes = this.state.wishes.slice(0, 150);
     this.save(true);
-    return { success: true, wish: newWish, userCoins: u.coins };
+    return { success: true, wish: newWish, userCoins: u.coins, cityName: targetCityName };
   },
 
   blessWish(wishId) {

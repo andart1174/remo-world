@@ -54,7 +54,7 @@
       <span class="happy-hour-pill" id="hdrHappyHourBadge" style="display:none;" data-i18n="happy_hour_badge">⚡ 2X REWARDS HAPPY HOUR</span>
 
       <button class="btn-ghost" id="btnRadioToggle" onclick="toggleHeaderRadio()">📻 Radio</button>
-      <button class="btn-ghost" id="btnWishingWellToggle" onclick="openWishingWellModal()" title="Fântâna Dorințelor Urbane 🪙">⛲ Fântână</button>
+      <button class="btn-ghost" id="btnWishingWellToggle" onclick="openWishingWellModal()" title="Wishing Well" data-i18n="hdr_wishing_well">⛲ Fontaine</button>
 
       <div class="coin-pill" onclick="openRemoCoin3DModal()" title="REMO Sovereign 3D Coin">
         <span>🪙</span>
@@ -84,10 +84,10 @@
             <span class="nav-ic">🏠</span> <span data-i18n="nav_feed">World Feed</span>
           </button>
           <button class="nav-btn" onclick="openWishingWellModal()">
-            <span class="nav-ic">⛲</span> <span>Fântâna Dorințelor 🪙</span>
+            <span class="nav-ic">⛲</span> <span data-i18n="nav_wishing_well">Puits aux Souhaits 🪙</span>
           </button>
           <button class="nav-btn" onclick="openBoardingPassModal()">
-            <span class="nav-ic">🎫</span> <span>Bilet de Zbor 4D</span>
+            <span class="nav-ic">🎫</span> <span data-i18n="nav_boarding_pass">Billet de Vol 4D</span>
           </button>
           <button class="nav-btn" data-nav-view="chat" onclick="switchRemoView('chat')">
             <span class="nav-ic">💬</span> <span data-i18n="nav_chat">City Live Chat</span>
@@ -712,23 +712,33 @@
   <div class="remo-modal-backdrop" id="boardingPassModal" onclick="if(event.target===this)closeBoardingPassModal()">
     <div class="remo-modal" style="max-width:440px;text-align:center;">
       <div class="modal-hdr">
-        <b style="font-family:'Orbitron',sans-serif;color:#38bdf8;font-size:0.95rem;">🎫 Bilet de Zbor Holografic 4D (Story 9:16)</b>
+        <b style="font-family:'Orbitron',sans-serif;color:#38bdf8;font-size:0.95rem;" data-i18n="boarding_modal_title">🎫 Billet d’Embarquement 4D (Story 9:16)</b>
         <button class="modal-close" onclick="closeBoardingPassModal()">✕</button>
       </div>
-      <p style="font-size:0.79rem;color:var(--muted);margin-bottom:12px;">
-        Generați biletul oficial de teleportare 9:16 pentru TikTok, Instagram &amp; WhatsApp! Fiecare călător care scanează biletul dvs. primește +100 🪙!
+      <p style="font-size:0.79rem;color:var(--muted);margin-bottom:12px;" data-i18n="boarding_modal_sub">
+        Générez un billet holographique officiel 9:16 pour TikTok, Instagram &amp; WhatsApp ! Vos amis qui scannent votre billet gagnent +100 🪙 de bonus !
       </p>
 
-      <!-- Route Selector (Departure -> Destination) -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;text-align:left;">
+      <!-- Route Inputs (Departure -> Destination) with Datalists & Quick Preset Pills -->
+      <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:6px;align-items:flex-end;margin-bottom:8px;text-align:left;">
         <div>
-          <label style="font-size:0.72rem;font-weight:800;color:#94a3b8;display:block;margin-bottom:4px;">PLECARE (DEPARTURE)</label>
-          <select id="boardingPassFromCitySelect" class="remo-input" style="padding:6px 8px;font-size:0.8rem;" onchange="onBoardingPassRouteChanged()"></select>
+          <label style="font-size:0.72rem;font-weight:800;color:#94a3b8;display:block;margin-bottom:4px;" data-i18n="boarding_from_label">VILLE DE DÉPART</label>
+          <input type="text" id="boardingPassFromInput" list="boardingPassCitiesList" class="remo-input" style="padding:7px 9px;font-size:0.84rem;width:100%;" placeholder="Montréal" oninput="onBoardingPassRouteChanged()" data-i18n-placeholder="boarding_from_ph">
         </div>
+        <button type="button" class="btn-ghost" style="padding:7px 9px;margin-bottom:1px;border-color:rgba(56,189,248,0.5);color:#38bdf8;font-size:1.05rem;" onclick="swapBoardingPassRoute()" title="Swap Departure &amp; Destination">⇄</button>
         <div>
-          <label style="font-size:0.72rem;font-weight:800;color:#94a3b8;display:block;margin-bottom:4px;">DESTINAȚIE (ARRIVAL)</label>
-          <select id="boardingPassToCitySelect" class="remo-input" style="padding:6px 8px;font-size:0.8rem;" onchange="onBoardingPassRouteChanged()"></select>
+          <label style="font-size:0.72rem;font-weight:800;color:#94a3b8;display:block;margin-bottom:4px;" data-i18n="boarding_to_label">VILLE D’ARRIVÉE</label>
+          <input type="text" id="boardingPassToInput" list="boardingPassCitiesList" class="remo-input" style="padding:7px 9px;font-size:0.84rem;width:100%;" placeholder="Chișinău" oninput="onBoardingPassRouteChanged()" data-i18n-placeholder="boarding_to_ph">
         </div>
+      </div>
+      <datalist id="boardingPassCitiesList"></datalist>
+
+      <!-- Popular Route Pills -->
+      <div style="display:flex;gap:5px;flex-wrap:wrap;justify-content:center;margin-bottom:12px;">
+        <button type="button" class="btn-ghost" style="padding:3px 8px;font-size:0.72rem;border-color:rgba(56,189,248,0.4);" onclick="setBoardingPassRoutePreset('montreal', 'chisinau')">⚜️ MTL ➔ 🇲🇩 KIV</button>
+        <button type="button" class="btn-ghost" style="padding:3px 8px;font-size:0.72rem;border-color:rgba(56,189,248,0.4);" onclick="setBoardingPassRoutePreset('paris', 'tokyo')">🗼 PAR ➔ 🗼 TYO</button>
+        <button type="button" class="btn-ghost" style="padding:3px 8px;font-size:0.72rem;border-color:rgba(56,189,248,0.4);" onclick="setBoardingPassRoutePreset('newyork', 'london')">🗽 NYC ➔ 🎡 LON</button>
+        <button type="button" class="btn-ghost" style="padding:3px 8px;font-size:0.72rem;border-color:rgba(56,189,248,0.4);" onclick="setBoardingPassRoutePreset('montreal', 'paris')">⚜️ MTL ➔ 🗼 PAR</button>
       </div>
 
       <div style="display:flex;justify-content:center;margin-bottom:14px;">
@@ -736,26 +746,26 @@
       </div>
 
       <div style="display:flex;gap:8px;flex-direction:column;">
-        <button type="button" class="btn-cyber" style="width:100%;justify-content:center;padding:11px;background:linear-gradient(135deg,#0284c7,#06b6d4);color:#fff;" onclick="shareBoardingPassNative()">
-          📲 Partajează Bilet Story (Insta / TikTok / WhatsApp)
+        <button type="button" class="btn-cyber" style="width:100%;justify-content:center;padding:11px;background:linear-gradient(135deg,#0284c7,#06b6d4);color:#fff;" onclick="shareBoardingPassNative()" data-i18n="boarding_share_btn">
+          📲 Partager Billet Story (Insta / TikTok / WhatsApp)
         </button>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-          <button type="button" class="btn-cyber btn-gold" style="justify-content:center;padding:9px;" onclick="downloadBoardingPassPNG()">
-            📥 Descarcă HD (.PNG)
+          <button type="button" class="btn-cyber btn-gold" style="justify-content:center;padding:9px;" onclick="downloadBoardingPassPNG()" data-i18n="boarding_dl_btn">
+            📥 Télécharger HD (.PNG)
           </button>
-          <button type="button" class="btn-ghost" style="justify-content:center;padding:9px;border-color:#38bdf8;color:#7dd3fc;" onclick="copyMyReferralInviteLink()">
-            🔗 Copiază Linkul Meu
+          <button type="button" class="btn-ghost" style="justify-content:center;padding:9px;border-color:#38bdf8;color:#7dd3fc;" onclick="copyMyReferralInviteLink()" data-i18n="boarding_copy_btn">
+            🔗 Copier Mon Lien
           </button>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- 🪙 4D Global Wishing Well Modal (Fântâna Dorințelor Urbane) -->
+  <!-- 🪙 4D Global Wishing Well Modal (Le Puits aux Souhaits 4D) -->
   <div class="remo-modal-backdrop" id="wishingWellModal" onclick="if(event.target===this)closeWishingWellModal()">
     <div class="remo-modal" style="max-width:560px;">
       <div class="modal-hdr">
-        <b style="font-family:'Orbitron',sans-serif;color:#fbbf24;font-size:0.95rem;">⛲ Fântâna Dorințelor Urbane 🪙</b>
+        <b style="font-family:'Orbitron',sans-serif;color:#fbbf24;font-size:0.95rem;" data-i18n="wishing_modal_title">⛲ Le Puits aux Souhaits 4D 🪙</b>
         <button class="modal-close" onclick="closeWishingWellModal()">✕</button>
       </div>
 
@@ -765,41 +775,42 @@
         <div class="wishing-pool-overlay">
           <div class="wishing-center-coin" id="wishingCenterCoin">🪙</div>
           <div class="wishing-pool-prompt">
-            <span>Aruncă 1 Monedă REMO</span>
-            <small>-1 🪙 • Oferă +5 puncte orașului tău</small>
+            <span data-i18n="wishing_pool_prompt">Jeter 1 Pièce REMO</span>
+            <small data-i18n="wishing_pool_sub">-1 🪙 • Offre +5 points à votre Ville</small>
           </div>
         </div>
       </div>
 
-      <!-- Form for submitting a wish -->
+      <!-- Form for submitting a wish with Datalist & Custom typing -->
       <div style="background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:14px;padding:12px;margin:12px 0;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-          <b style="font-size:0.82rem;color:#fde047;">✨ Pune o Dorință pentru Orașul Tău</b>
-          <div style="font-size:0.75rem;color:var(--muted);">Cost: <b style="color:#fbbf24;">1 🪙</b></div>
+          <b style="font-size:0.82rem;color:#fde047;" data-i18n="wishing_form_title">✨ Formuler un Vœu pour une Ville</b>
+          <div style="font-size:0.75rem;color:var(--muted);"><span data-i18n="wishing_form_cost">Coût</span>: <b style="color:#fbbf24;">1 🪙</b></div>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
           <div>
-            <label style="font-size:0.72rem;color:#94a3b8;font-weight:800;display:block;margin-bottom:4px;">ORAȘUL BENEFICIAR</label>
-            <select id="wishingWellCitySelect" class="remo-input" style="padding:6px 8px;font-size:0.8rem;"></select>
+            <label style="font-size:0.72rem;color:#94a3b8;font-weight:800;display:block;margin-bottom:4px;" data-i18n="wishing_city_label">VILLE BÉNÉFICIAIRE</label>
+            <input type="text" id="wishingWellCityInput" list="wishingWellCitiesList" class="remo-input" style="padding:7px 9px;font-size:0.82rem;width:100%;" placeholder="Montréal, Chișinău, Paris..." data-i18n-placeholder="wishing_city_ph">
+            <datalist id="wishingWellCitiesList"></datalist>
           </div>
           <div>
-            <label style="font-size:0.72rem;color:#94a3b8;font-weight:800;display:block;margin-bottom:4px;">IDENTITATE</label>
-            <select id="wishingWellAnonSelect" class="remo-input" style="padding:6px 8px;font-size:0.8rem;">
-              <option value="0">Semnează cu ecusonul meu</option>
-              <option value="1">🎭 Vœu Anonyme (Anonim)</option>
+            <label style="font-size:0.72rem;color:#94a3b8;font-weight:800;display:block;margin-bottom:4px;" data-i18n="wishing_identity_label">IDENTITÉ</label>
+            <select id="wishingWellAnonSelect" class="remo-input" style="padding:7px 9px;font-size:0.82rem;width:100%;">
+              <option value="0" data-i18n="wishing_identity_signed">Signer avec mon Écusson</option>
+              <option value="1" data-i18n="wishing_identity_anon">🎭 Vœu Anonyme</option>
             </select>
           </div>
         </div>
-        <textarea id="wishingWellTextInput" class="remo-input" rows="2" placeholder="Scrie o dorință din suflet pentru orașul tău sau pentru lumea 4D..." style="width:100%;resize:none;margin-bottom:8px;font-size:0.85rem;"></textarea>
-        <button type="button" class="btn-cyber btn-gold" style="width:100%;justify-content:center;padding:9px;" onclick="submitWishingWellCoin()">
-          🪙 Aruncă Moneda &amp; Trimite Dorința (-1 🪙)
+        <textarea id="wishingWellTextInput" class="remo-input" rows="2" placeholder="Écrivez un vœu sincère pour votre ville ou le Monde 4D..." style="width:100%;resize:none;margin-bottom:8px;font-size:0.85rem;" data-i18n-placeholder="wishing_input_ph"></textarea>
+        <button type="button" class="btn-cyber btn-gold" style="width:100%;justify-content:center;padding:10px;" onclick="submitWishingWellCoin()" data-i18n="wishing_submit_btn">
+          🪙 Jeter la Pièce &amp; Envoyer le Vœu (-1 🪙)
         </button>
       </div>
 
       <!-- Stream of community wishes -->
       <div style="margin-top:14px;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-          <b style="font-size:0.82rem;color:#38bdf8;">🌊 Dorințe Recente din Lume (Live)</b>
+          <b style="font-size:0.82rem;color:#38bdf8;" data-i18n="wishing_stream_title">🌊 Vœux de la Communauté en Direct</b>
           <span style="font-size:0.72rem;color:var(--muted);" id="wishingWellTotalCount"></span>
         </div>
         <div id="wishingWellStreamList" style="display:flex;flex-direction:column;gap:8px;max-height:240px;overflow-y:auto;padding-right:4px;"></div>
@@ -1511,12 +1522,12 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 
   <!-- REMO Modular Engines -->
-  <script src="js/remo-i18n.js?v=43"></script>
-  <script src="js/remo-cities-data.js?v=43"></script>
-  <script src="js/remo-store.js?v=43"></script>
-  <script src="js/remo-card-engine.js?v=43"></script>
-  <script src="js/remo-radar-arena.js?v=43"></script>
-  <script src="js/remo-social-comms.js?v=43"></script>
-  <script src="js/remo-radio-engine.js?v=43"></script>
+  <script src="js/remo-i18n.js?v=44"></script>
+  <script src="js/remo-cities-data.js?v=44"></script>
+  <script src="js/remo-store.js?v=44"></script>
+  <script src="js/remo-card-engine.js?v=44"></script>
+  <script src="js/remo-radar-arena.js?v=44"></script>
+  <script src="js/remo-social-comms.js?v=44"></script>
+  <script src="js/remo-radio-engine.js?v=44"></script>
 </body>
 </html>
