@@ -1272,6 +1272,113 @@ function drawOfficialCitizenIdCard(cv, u, lang) {
   ctx.fillText(lang === 'fr' ? `SCANNER = +${refBonus} 🪙 BONUS` : `SCAN QR = +${refBonus} 🪙 BONUS`, 905, 432);
 }
 
+function escapeHtmlStr(str = '') {
+  return String(str || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+window.escapeHtmlStr = escapeHtmlStr;
+
+window._activeProfileTab = window._activeProfileTab || 'posts';
+
+function setPassportTab(tabId) {
+  window._activeProfileTab = tabId;
+  renderPassportView();
+}
+window.setPassportTab = setPassportTab;
+
+function openEditProfileModal() {
+  const modal = document.getElementById('editProfileModal');
+  const u = REMO_STORE.getCurrentUser();
+  if (!modal || !u) return;
+  const nameInp = document.getElementById('editProfNameInp');
+  const bioInp = document.getElementById('editProfBioInp');
+  const citySel = document.getElementById('editProfCitySel');
+  const lang = REMO_I18N.getLang();
+
+  if (nameInp) nameInp.value = u.name || '';
+  if (bioInp) bioInp.value = u.bio || '';
+  if (citySel) {
+    citySel.innerHTML = getRemoCities().map((c) => `<option value="${c.id}" ${c.id === u.homeCity ? 'selected' : ''}>${c.flag} ${getCityName(c, lang)}</option>`).join('');
+  }
+  modal.classList.add('open');
+}
+
+function closeEditProfileModal() {
+  const modal = document.getElementById('editProfileModal');
+  if (modal) modal.classList.remove('open');
+}
+
+function saveUserProfile(event) {
+  event.preventDefault();
+  const lang = REMO_I18N.getLang();
+  const u = REMO_STORE.getCurrentUser();
+  if (!u) return;
+
+  const nameInp = document.getElementById('editProfNameInp');
+  const bioInp = document.getElementById('editProfBioInp');
+  const citySel = document.getElementById('editProfCitySel');
+
+  const newName = nameInp ? nameInp.value.trim() : '';
+  const newBio = bioInp ? bioInp.value.trim() : '';
+  const newCity = citySel ? citySel.value : u.homeCity;
+
+  if (!newName) {
+    remoToast(lang === 'fr' ? 'Veuillez entrer un nom valide.' : 'Please enter a valid name.');
+    return;
+  }
+
+  const oldName = u.name;
+  u.name = newName;
+  u.bio = newBio;
+  u.homeCity = newCity;
+
+  // Add home city to visas if not present
+  u.visas = Array.isArray(u.visas) ? u.visas : [];
+  if (!u.visas.includes(newCity)) {
+    u.visas.push(newCity);
+  }
+
+  // Update authorName on user's own posts, comments, bottles & DMs
+  (REMO_STORE.state.posts || []).forEach((p) => {
+    if (p) {
+      if (p.uid === u.uid || p.authorName === oldName) p.authorName = newName;
+      if (Array.isArray(p.comments)) {
+        p.comments.forEach((c) => {
+          if (c && (c.uid === u.uid || c.author === oldName)) c.author = newName;
+        });
+      }
+    }
+  });
+
+  (REMO_STORE.state.bottles || []).forEach((b) => {
+    if (b && (b.fromUid === u.uid || b.fromName === oldName)) b.fromName = newName;
+  });
+
+  (REMO_STORE.state.directMessages || []).forEach((m) => {
+    if (m) {
+      if (m.fromUid === u.uid || m.fromName === oldName) m.fromName = newName;
+      if (m.toUid === u.uid || m.toName === oldName) m.toName = newName;
+    }
+  });
+
+  REMO_STORE.save(true, 'profile_updated');
+
+  closeEditProfileModal();
+  syncHeaderAndSidebars();
+  renderPassportView();
+  if (typeof renderSocialFeed === 'function') renderSocialFeed();
+
+  RemoAudio.play('coin');
+  remoToast(lang === 'fr' ? '✓ Profil mis à jour avec succès !' : '✓ Profile updated successfully!', 'coin');
+}
+
+window.openEditProfileModal = openEditProfileModal;
+window.closeEditProfileModal = closeEditProfileModal;
+window.saveUserProfile = saveUserProfile;
+
 function renderPassportView() {
   const box = document.getElementById('passportContentBox');
   if (!box) return;
@@ -1280,89 +1387,379 @@ function renderPassportView() {
   const home = getCityById(u.homeCity || 'montreal');
   const allCities = getRemoCities();
   const refCode = u.referralCode || `REMO-${u.passportNum}`;
-  const ambassadors = (REMO_STORE.state.users || [])
-    .slice()
-    .sort((a, b) => (b.referralsCount || 0) - (a.referralsCount || 0))
-    .slice(0, 6);
+  const activeTab = window._activeProfileTab || 'posts';
 
-  box.innerHTML = `
-    <!-- Official Citizen ID & Referral QR Card (#9) -->
-    <div class="glass-box" style="background:linear-gradient(135deg,#0b1124,#1e1b4b);border-color:rgba(251,191,36,0.55);margin-bottom:16px;">
-      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
-        <div>
-          <h2 style="font-family:'Orbitron',sans-serif;font-size:1.08rem;color:#fbbf24;">${t('passport_id_hdr')}</h2>
-          <p style="font-size:0.79rem;color:#cbd5e1;margin-top:3px;">${t('passport_id_sub')}</p>
+  // My Posts
+  const myPosts = (REMO_STORE.state.posts || []).filter(
+    (p) => p && (p.uid === u.uid || (u.email && p.authorEmail && u.email.toLowerCase() === p.authorEmail.toLowerCase()) || p.authorName === u.name)
+  );
+
+  // My Discussions / Direct Messages
+  const dms = Array.isArray(REMO_STORE.state.directMessages) ? REMO_STORE.state.directMessages : [];
+  const myDms = dms.filter((m) => m && (m.fromUid === u.uid || m.toUid === u.uid));
+  const partnerMap = new Map();
+  myDms.forEach((m) => {
+    const partnerUid = m.fromUid === u.uid ? m.toUid : m.fromUid;
+    if (!partnerUid || partnerUid === u.uid) return;
+    if (!partnerMap.has(partnerUid)) {
+      partnerMap.set(partnerUid, { lastMsg: m, count: 1 });
+    } else {
+      const prev = partnerMap.get(partnerUid);
+      prev.count++;
+      if ((m.ts || 0) > (prev.lastMsg.ts || 0)) prev.lastMsg = m;
+    }
+  });
+  const partnerList = Array.from(partnerMap.entries()).map(([pUid, info]) => {
+    const pUser = (REMO_STORE.state.users || []).find((x) => x.uid === pUid) || { uid: pUid, name: info.lastMsg.fromName || 'Citizen', homeCity: 'montreal' };
+    return { user: pUser, ...info };
+  });
+
+  // Equipped VIP Cosmetics
+  const allShopItems = Array.isArray(REMO_STORE.state.vipShopItems) ? REMO_STORE.state.vipShopItems : [];
+  const equippedFrameItem = allShopItems.find((x) => x.id === u.equippedFrame);
+  const frameClass = equippedFrameItem ? equippedFrameItem.cssClass : (u.equippedFrame || 'av-frame-gold_fire');
+  const equippedTitleItem = allShopItems.find((x) => x.id === u.equippedTitleId);
+  const titleBadge = equippedTitleItem ? (lang === 'fr' ? (equippedTitleItem.badge_fr || equippedTitleItem.name_fr) : (equippedTitleItem.badge_en || equippedTitleItem.name_en)) : '';
+
+  // 1. Profile Hero Card
+  let html = `
+    <div class="profile-hero-card">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px;">
+        <div style="display:flex;align-items:center;gap:16px;min-width:0;">
+          <div class="avatar-circle ${frameClass}" style="width:68px;height:68px;font-size:1.75rem;flex-shrink:0;">
+            ${escapeHtmlStr((u.name || 'R')[0].toUpperCase())}
+          </div>
+          <div style="min-width:0;">
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+              <h2 style="font-family:'Orbitron',sans-serif;font-size:1.3rem;color:#fbbf24;margin:0;">
+                ${escapeHtmlStr(u.name)}
+              </h2>
+              ${u.verified ? '<span style="color:#38bdf8;font-size:1.1rem;" title="Vérifié">✓</span>' : ''}
+              ${u.role === 'admin' ? '<span class="adm-badge">👑 ADMIN</span>' : ''}
+              ${titleBadge ? `<span class="royal-title-pill">${escapeHtmlStr(titleBadge)}</span>` : ''}
+            </div>
+            <div style="font-size:0.84rem;color:#94a3b8;margin-top:3px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+              <span>${home.flag} <b>${escapeHtmlStr(getCityName(home, lang))}</b></span>
+              <span>•</span>
+              <span style="color:#cbd5e1;">#${escapeHtmlStr(u.passportNum || '0001')}</span>
+              ${u.email ? `<span>•</span> <span style="font-size:0.75rem;color:#64748b;">${escapeHtmlStr(u.email)}</span>` : ''}
+            </div>
+            <div style="font-size:0.83rem;color:#e2e8f0;margin-top:6px;font-style:italic;">
+              "${escapeHtmlStr(u.bio || (lang === 'fr' ? 'Citoyen explorateur de REMO World 🌍' : 'Exploring the cities of REMO World 🌍'))}"
+            </div>
+          </div>
         </div>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-          <select class="remo-input" style="width:auto;" onchange="changeUserHomeCity(this.value)">
-            ${allCities.map((c) => `<option value="${c.id}" ${c.id === u.homeCity ? 'selected' : ''}>${c.flag} ${getCityName(c, lang)}</option>`).join('')}
-          </select>
-          <button class="btn-cyber" style="background:linear-gradient(135deg,#10b981,#059669);padding:8px 12px;font-size:0.76rem;" onclick="openAddUserCityModal()">${t('add_city_btn')}</button>
+          <button class="btn-cyber" style="padding:8px 14px;font-size:0.82rem;" onclick="openEditProfileModal()">
+            ✏️ ${lang === 'fr' ? 'Modifier Profil' : 'Edit Profile'}
+          </button>
+          <button class="btn-ghost" style="border-color:#f43f5e;color:#fda4af;padding:8px 12px;font-size:0.82rem;" onclick="userSignOutAction()">
+            🚪 ${lang === 'fr' ? 'Déconnexion' : 'Sign Out'}
+          </button>
         </div>
       </div>
 
-      <div style="text-align:center;margin:10px 0 14px;">
-        <canvas id="citizenOfficialIdCanvas" style="width:100%;max-width:680px;height:auto;border-radius:16px;box-shadow:0 16px 40px rgba(0,0,0,0.75);"></canvas>
-      </div>
-
-      <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-bottom:14px;">
-        <button class="btn-cyber btn-gold" onclick="downloadCitizenIdPNG()">${t('passport_dl_id_btn')}</button>
-        <button class="btn-cyber" onclick="copyMyReferralInviteLink()">${t('passport_copy_ref_btn')} (${refCode})</button>
-        <button class="btn-ghost" style="border-color:#10b981;color:#34d399;" onclick="shareReferralOnWhatsApp()">${t('passport_wa_ref_btn')}</button>
-        <button class="btn-ghost" onclick="exportPassportStory()">${t('passport_share_story')}</button>
-        <button class="btn-ghost" style="border-color:#f43f5e;color:#fda4af;" onclick="userSignOutAction()">🚪 ${lang === 'fr' ? 'Déconnexion' : 'Sign Out'}</button>
-      </div>
-
-      ${!u.referredBy ? `
-        <div style="background:rgba(16,185,129,0.1);border:1px dashed #10b981;border-radius:14px;padding:10px 12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-          <span style="font-size:0.8rem;font-weight:800;color:#6ee7b7;flex:1;min-width:200px;">${t('passport_claim_ref_hdr')}</span>
-          <input type="text" id="claimFriendRefInp" class="remo-input" style="max-width:190px;text-transform:uppercase;padding:7px 11px;" placeholder="${t('passport_claim_ref_ph')}">
-          <button class="btn-cyber" style="background:#10b981;" onclick="claimFriendReferralInput()">${t('passport_claim_ref_btn')}</button>
+      <!-- Quick Stats Strip -->
+      <div class="profile-stats-strip">
+        <div class="prof-stat-badge" style="border-color:#fbbf24;color:#fbbf24;">
+          🪙 <b>${u.coins.toLocaleString()}</b> REMO Coins
         </div>
-      ` : `
-        <div style="text-align:center;font-size:0.78rem;color:#34d399;font-weight:800;">
-          ✓ ${lang === 'fr' ? 'Parrainé avec le code' : 'Invited via Citizen Code'}: ${u.referredBy}
+        <div class="prof-stat-badge">
+          📸 <b>${myPosts.length}</b> ${lang === 'fr' ? 'Publications' : 'Posts'}
         </div>
-      `}
-    </div>
-
-    <!-- Top Viral Referral Ambassadors Leaderboard -->
-    <div class="glass-box" style="margin-bottom:16px;">
-      <h3 style="font-family:'Orbitron',sans-serif;font-size:0.95rem;color:#38bdf8;margin-bottom:10px;">${t('passport_ambassadors_hdr')}</h3>
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(195px,1fr));gap:8px;">
-        ${ambassadors.map((amb, idx) => {
-          const ac = getCityById(amb.homeCity);
-          return `
-            <div style="padding:9px 12px;border-radius:12px;background:rgba(255,255,255,0.04);border:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
-              <span style="font-weight:800;font-size:0.82rem;">#${idx + 1} ${ac.flag} @${amb.name}</span>
-              <span style="color:#fbbf24;font-weight:900;font-size:0.8rem;">🤝 ${amb.referralsCount || 0}</span>
-            </div>
-          `;
-        }).join('')}
+        <div class="prof-stat-badge">
+          💬 <b>${partnerList.length}</b> Discussions
+        </div>
+        <div class="prof-stat-badge">
+          🎴 <b>${(u.cards || []).length}</b> ${lang === 'fr' ? 'Cartes 4D' : '4D Cards'}
+        </div>
+        <div class="prof-stat-badge">
+          🛂 <b>${(u.visas || []).length} / ${allCities.length}</b> ${lang === 'fr' ? 'Visas GPS' : 'Visas'}
+        </div>
       </div>
     </div>
 
-    <!-- 3D Visa Stamp Album -->
-    <div class="glass-box">
-      <h3 style="margin-bottom:12px;">${t('passport_visas_collected')} ${(u.visas || []).length} / ${allCities.length}</h3>
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(135px,1fr));gap:10px;">
-        ${allCities.map((c) => {
-          const stamped = (u.visas || []).includes(c.id);
-          return `
-            <div style="padding:12px;border-radius:14px;text-align:center;border:1px solid ${stamped ? '#fbbf24' : 'rgba(255,255,255,0.08)'};background:${stamped ? 'rgba(251,191,36,0.12)' : 'rgba(255,255,255,0.02)'};opacity:${stamped ? '1' : '0.45'};">
-              <div style="font-size:1.6rem;">${c.flag}</div>
-              <div style="font-weight:800;font-size:0.82rem;margin-top:4px;">${getCityName(c, lang)}</div>
-              <div style="font-size:0.68rem;color:${stamped ? '#10b981' : '#94a3b8'};font-weight:800;margin-top:3px;">
-                ${stamped ? (lang === 'fr' ? '✓ VISA ACTIF' : '✓ STAMPED') : (lang === 'fr' ? 'VERROUILLÉ' : 'LOCKED')}
-              </div>
-            </div>
-          `;
-        }).join('')}
-      </div>
+    <!-- Navigation Tabs Rail -->
+    <div class="profile-tabs-rail">
+      <button type="button" class="fchip ${activeTab === 'posts' ? 'active' : ''}" onclick="setPassportTab('posts')">
+        📸 ${lang === 'fr' ? 'Mes Publications' : 'My Posts'} (${myPosts.length})
+      </button>
+      <button type="button" class="fchip ${activeTab === 'messages' ? 'active' : ''}" onclick="setPassportTab('messages')">
+        💌 ${lang === 'fr' ? 'Mes Discussions' : 'My Messages'} (${partnerList.length})
+      </button>
+      <button type="button" class="fchip ${activeTab === 'inventory' ? 'active' : ''}" onclick="setPassportTab('inventory')">
+        🎴 ${lang === 'fr' ? 'Inventaire & Rames VIP' : 'Inventory & Styles'}
+      </button>
+      <button type="button" class="fchip ${activeTab === 'id' ? 'active' : ''}" onclick="setPassportTab('id')">
+        🪪 ${lang === 'fr' ? 'ID Officiel & Visas' : 'Citizen ID & Visas'}
+      </button>
     </div>
   `;
 
-  drawOfficialCitizenIdCard(document.getElementById('citizenOfficialIdCanvas'), u, lang);
+  // 2. Tab Contents
+  if (activeTab === 'posts') {
+    if (myPosts.length === 0) {
+      html += `
+        <div class="glass-box" style="text-align:center;padding:48px 20px;border-radius:18px;">
+          <div style="font-size:2.8rem;margin-bottom:10px;">📸</div>
+          <h3 style="font-family:'Orbitron',sans-serif;color:#fff;margin-bottom:6px;">
+            ${lang === 'fr' ? 'Aucune publication pour le moment' : 'No posts yet'}
+          </h3>
+          <p style="color:var(--muted);font-size:0.85rem;max-width:380px;margin:0 auto 16px;">
+            ${lang === 'fr' ? 'Partagez une photo, une vidéo de 60s ou une application HTML interactive avec les citoyens du monde !' : 'Share a photo, 60s video, or live HTML app with the citizens of the world!'}
+          </p>
+          <button class="btn-cyber btn-gold" onclick="openCreatePostModal()">
+            + ${lang === 'fr' ? 'Créer ma Première Publication' : 'Create My First Post'}
+          </button>
+        </div>
+      `;
+    } else {
+      html += `
+        <div class="my-posts-grid">
+          ${myPosts.map((p) => {
+            const cap = lang === 'fr' ? (p.caption_fr || p.caption_en || '') : (p.caption_en || p.caption_fr || '');
+            let mediaPreview = '';
+            if (p.mediaType === 'html_app') {
+              mediaPreview = `
+                <div style="background:radial-gradient(circle,#1e1b4b,#020617);width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#38bdf8;padding:12px;text-align:center;">
+                  <span style="font-size:2.2rem;margin-bottom:4px;">💻</span>
+                  <b style="font-size:0.8rem;letter-spacing:1px;">LIVE HTML APP</b>
+                </div>
+              `;
+            } else if (p.mediaType === 'video') {
+              mediaPreview = `
+                <div style="background:#020617;width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#ec4899;">
+                  <span style="font-size:2.2rem;margin-bottom:4px;">🎬</span>
+                  <b style="font-size:0.75rem;">VIDEO (60s)</b>
+                </div>
+              `;
+            } else {
+              const src = p.mediaUrl || (Array.isArray(p.mediaUrls) && p.mediaUrls[0]) || '';
+              mediaPreview = `<img src="${src}" alt="Post Media" loading="lazy" style="width:100%;height:100%;object-fit:cover;">`;
+            }
+
+            return `
+              <div class="my-post-card">
+                <div class="my-post-thumb-box">${mediaPreview}</div>
+                <div style="padding:12px;display:flex;flex-direction:column;justify-content:space-between;flex:1;">
+                  <div>
+                    <div style="font-size:0.84rem;color:#f8fafc;line-height:1.4;margin-bottom:8px;max-height:56px;overflow:hidden;text-overflow:ellipsis;">
+                      ${escapeHtmlStr(cap || (lang === 'fr' ? 'Publication sans légende' : 'Untitled post'))}
+                    </div>
+                    <div style="display:flex;gap:12px;font-size:0.78rem;font-weight:800;color:var(--muted);margin-bottom:10px;">
+                      <span>❤️ ${Array.isArray(p.likes) ? p.likes.length : (p.likes || 0)}</span>
+                      <span>💬 ${(p.comments || []).length}</span>
+                      <span>🪙 ${p.tipsTotal || 0}</span>
+                    </div>
+                  </div>
+                  <div style="display:flex;gap:8px;justify-content:space-between;align-items:center;padding-top:8px;border-top:1px solid rgba(255,255,255,0.06);">
+                    <button class="btn-ghost" style="padding:5px 10px;font-size:0.75rem;" onclick="sharePostLink('${p.id}')">
+                      🔗 ${lang === 'fr' ? 'Partager' : 'Share'}
+                    </button>
+                    <button class="adm-pbtn danger" style="padding:5px 9px;" onclick="userDeleteOwnPost('${p.id}'); setTimeout(renderPassportView, 120);" title="${lang === 'fr' ? 'Supprimer' : 'Delete'}">
+                      🗑️
+                    </button>
+                  </div>
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      `;
+    }
+  } else if (activeTab === 'messages') {
+    if (partnerList.length === 0) {
+      html += `
+        <div class="glass-box" style="text-align:center;padding:48px 20px;border-radius:18px;">
+          <div style="font-size:2.8rem;margin-bottom:10px;">💌</div>
+          <h3 style="font-family:'Orbitron',sans-serif;color:#fff;margin-bottom:6px;">
+            ${lang === 'fr' ? 'Aucune discussion active' : 'No active discussions'}
+          </h3>
+          <p style="color:var(--muted);font-size:0.85rem;max-width:380px;margin:0 auto 16px;">
+            ${lang === 'fr' ? 'Discutez en direct avec d’autres citoyens ou envoyez une bouteille à la mer !' : 'Chat live with other citizens or toss a message in a bottle!'}
+          </p>
+          <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
+            <button class="btn-cyber" onclick="switchRemoView('chat')">
+              💬 ${lang === 'fr' ? 'Ouvrir le Chat des Villes' : 'Open World Chat'}
+            </button>
+            <button class="btn-ghost" onclick="switchRemoView('bottles')" style="border-color:#38bdf8;color:#7dd3fc;">
+              🍾 ${lang === 'fr' ? 'Bouteille à la Mer' : 'City Bottle'}
+            </button>
+          </div>
+        </div>
+      `;
+    } else {
+      html += `
+        <div class="glass-box">
+          <h3 style="font-family:'Orbitron',sans-serif;font-size:0.98rem;color:#fbbf24;margin-bottom:14px;">
+            💌 ${lang === 'fr' ? 'Vos Conversations Récentes' : 'Recent Discussions'}
+          </h3>
+          ${partnerList.map(({ user: pUser, lastMsg, count }) => {
+            const pCity = getCityById(pUser.homeCity || 'montreal');
+            const snippet = lastMsg ? (lastMsg.text || (lastMsg.voiceUrl ? '🎤 Voice Note' : '💬 Message')) : '';
+            return `
+              <div class="my-dm-thread-card" onclick="openDirectChatWithUser('${pUser.uid}')">
+                <div style="display:flex;align-items:center;gap:12px;min-width:0;flex:1;">
+                  <div class="avatar-circle" style="width:44px;height:44px;font-size:1.15rem;flex-shrink:0;">
+                    ${escapeHtmlStr((pUser.name || 'C')[0].toUpperCase())}
+                  </div>
+                  <div style="min-width:0;flex:1;">
+                    <div style="font-weight:900;font-size:0.92rem;color:#fff;display:flex;align-items:center;gap:6px;">
+                      <span>${pCity.flag} @${escapeHtmlStr(pUser.name)}</span>
+                      <span style="font-size:0.72rem;color:var(--muted);font-weight:700;">(${count} msg)</span>
+                    </div>
+                    <div style="font-size:0.78rem;color:#cbd5e1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px;">
+                      ${escapeHtmlStr(snippet)}
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <button class="btn-cyber btn-gold" style="padding:6px 12px;font-size:0.76rem;" onclick="event.stopPropagation();openDirectChatWithUser('${pUser.uid}')">
+                    💬 ${lang === 'fr' ? 'Ouvrir' : 'Open'}
+                  </button>
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      `;
+    }
+  } else if (activeTab === 'inventory') {
+    // Inventory: Frames & Titles & 4D Cards
+    const ownedIds = Array.isArray(u.ownedShopItems) ? u.ownedShopItems : [];
+    const ownedItems = allShopItems.filter((it) => ownedIds.includes(it.id));
+    const userCards = Array.isArray(u.cards) ? u.cards : [];
+
+    html += `
+      <div class="glass-box" style="margin-bottom:16px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
+          <h3 style="font-family:'Orbitron',sans-serif;font-size:0.98rem;color:#fbbf24;">
+            ✨ ${lang === 'fr' ? 'Rames d’Avatar & Titres Royaux Détenus' : 'Owned Avatar Frames & Royal Titles'}
+          </h3>
+          <button class="btn-cyber" style="padding:6px 12px;font-size:0.78rem;" onclick="switchRemoView('shop')">
+            🛍️ ${lang === 'fr' ? 'Boutique VIP' : 'VIP Shop'}
+          </button>
+        </div>
+
+        ${ownedItems.length === 0 ? `
+          <div style="text-align:center;padding:24px;color:var(--muted);font-size:0.85rem;">
+            ${lang === 'fr' ? 'Vous n’avez pas encore de cadre ou de titre VIP.' : 'You don’t own any VIP frames or titles yet.'}<br>
+            <button class="btn-cyber btn-gold" style="margin-top:10px;" onclick="switchRemoView('shop')">
+              🛍️ ${lang === 'fr' ? 'Découvrir la Boutique VIP' : 'Explore VIP Boutique'}
+            </button>
+          </div>
+        ` : `
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px;">
+            ${ownedItems.map((it) => {
+              const isEquipped = (it.category === 'frame' && u.equippedFrame === it.id) || (it.category === 'title' && u.equippedTitleId === it.id);
+              const itName = lang === 'fr' ? (it.name_fr || it.name_en) : (it.name_en || it.name_fr);
+              return `
+                <div style="padding:12px;border-radius:14px;background:rgba(255,255,255,0.04);border:1px solid ${isEquipped ? '#10b981' : 'var(--border)'};text-align:center;">
+                  <div style="font-size:1.8rem;margin-bottom:6px;">${it.icon || '💎'}</div>
+                  <b style="font-size:0.86rem;color:#fff;">${escapeHtmlStr(itName)}</b>
+                  <div style="font-size:0.7rem;color:var(--muted);text-transform:uppercase;margin:3px 0 10px;">${it.category}</div>
+                  <button class="${isEquipped ? 'btn-ghost' : 'btn-cyber btn-gold'}" style="width:100%;justify-content:center;padding:5px 8px;font-size:0.75rem;${isEquipped ? 'border-color:#10b981;color:#34d399;' : ''}" onclick="buyOrEquipVipItem('${it.id}'); setTimeout(renderPassportView, 120);">
+                    ${isEquipped ? (lang === 'fr' ? '✓ Équipé' : '✓ Equipped') : (lang === 'fr' ? '✨ Équiper' : '✨ Equip')}
+                  </button>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        `}
+      </div>
+
+      <div class="glass-box">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
+          <h3 style="font-family:'Orbitron',sans-serif;font-size:0.98rem;color:#38bdf8;">
+            🎴 ${lang === 'fr' ? 'Collection de Cartes de Villes 4D' : '4D City Cards Collection'} (${userCards.length})
+          </h3>
+          <button class="btn-cyber btn-gold" style="padding:6px 12px;font-size:0.78rem;" onclick="switchRemoView('cards')">
+            🎁 ${lang === 'fr' ? 'Ouvrir un Pack' : 'Open Pack'}
+          </button>
+        </div>
+        ${userCards.length === 0 ? `
+          <div style="text-align:center;padding:24px;color:var(--muted);font-size:0.85rem;">
+            ${lang === 'fr' ? 'Aucune carte dans votre inventaire.' : 'No cards in your collection yet.'}
+          </div>
+        ` : `
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;">
+            ${userCards.slice(0, 12).map((c) => {
+              const cCity = getCityById(c.cityId);
+              return `
+                <div style="padding:10px;border-radius:12px;background:rgba(255,255,255,0.03);border:1px solid var(--border);text-align:center;cursor:pointer;" onclick="inspectCardById('${c.id}')">
+                  <div style="font-size:1.6rem;">${cCity.flag}</div>
+                  <b style="font-size:0.78rem;color:#fff;">${getCityName(cCity, lang)}</b>
+                  <div style="font-size:0.68rem;color:#fbbf24;font-weight:900;margin-top:2px;">#${c.serial} · ${c.rarity}</div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        `}
+      </div>
+    `;
+  } else if (activeTab === 'id') {
+    // ID Card Canvas & Visas
+    html += `
+      <!-- Official Citizen ID & Referral QR Card -->
+      <div class="glass-box" style="background:linear-gradient(135deg,#0b1124,#1e1b4b);border-color:rgba(251,191,36,0.55);margin-bottom:16px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
+          <div>
+            <h2 style="font-family:'Orbitron',sans-serif;font-size:1.08rem;color:#fbbf24;">${t('passport_id_hdr')}</h2>
+            <p style="font-size:0.79rem;color:#cbd5e1;margin-top:3px;">${t('passport_id_sub')}</p>
+          </div>
+        </div>
+
+        <div style="text-align:center;margin:10px 0 14px;">
+          <canvas id="citizenOfficialIdCanvas" style="width:100%;max-width:680px;height:auto;border-radius:16px;box-shadow:0 16px 40px rgba(0,0,0,0.75);"></canvas>
+        </div>
+
+        <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-bottom:14px;">
+          <button class="btn-cyber btn-gold" onclick="downloadCitizenIdPNG()">${t('passport_dl_id_btn')}</button>
+          <button class="btn-cyber" onclick="copyMyReferralInviteLink()">${t('passport_copy_ref_btn')} (${refCode})</button>
+          <button class="btn-ghost" style="border-color:#10b981;color:#34d399;" onclick="shareReferralOnWhatsApp()">${t('passport_wa_ref_btn')}</button>
+          <button class="btn-ghost" onclick="exportPassportStory()">${t('passport_share_story')}</button>
+        </div>
+
+        ${!u.referredBy ? `
+          <div style="background:rgba(16,185,129,0.1);border:1px dashed #10b981;border-radius:14px;padding:10px 12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <span style="font-size:0.8rem;font-weight:800;color:#6ee7b7;flex:1;min-width:200px;">${t('passport_claim_ref_hdr')}</span>
+            <input type="text" id="claimFriendRefInp" class="remo-input" style="max-width:190px;text-transform:uppercase;padding:7px 11px;" placeholder="${t('passport_claim_ref_ph')}">
+            <button class="btn-cyber" style="background:#10b981;" onclick="claimFriendReferralInput()">${t('passport_claim_ref_btn')}</button>
+          </div>
+        ` : `
+          <div style="text-align:center;font-size:0.78rem;color:#34d399;font-weight:800;">
+            ✓ ${lang === 'fr' ? 'Parrainé avec le code' : 'Invited via Citizen Code'}: ${u.referredBy}
+          </div>
+        `}
+      </div>
+
+      <!-- 3D Visa Stamp Album -->
+      <div class="glass-box">
+        <h3 style="margin-bottom:12px;">${t('passport_visas_collected')} ${(u.visas || []).length} / ${allCities.length}</h3>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(135px,1fr));gap:10px;">
+          ${allCities.map((c) => {
+            const stamped = (u.visas || []).includes(c.id);
+            return `
+              <div style="padding:12px;border-radius:14px;text-align:center;border:1px solid ${stamped ? '#fbbf24' : 'rgba(255,255,255,0.08)'};background:${stamped ? 'rgba(251,191,36,0.12)' : 'rgba(255,255,255,0.02)'};opacity:${stamped ? '1' : '0.45'};">
+                <div style="font-size:1.6rem;">${c.flag}</div>
+                <div style="font-weight:800;font-size:0.82rem;margin-top:4px;">${getCityName(c, lang)}</div>
+                <div style="font-size:0.68rem;color:${stamped ? '#10b981' : '#94a3b8'};font-weight:800;margin-top:3px;">
+                  ${stamped ? (lang === 'fr' ? '✓ VISA ACTIF' : '✓ STAMPED') : (lang === 'fr' ? 'VERROUILLÉ' : 'LOCKED')}
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  box.innerHTML = html;
+
+  if (activeTab === 'id') {
+    const cv = document.getElementById('citizenOfficialIdCanvas');
+    if (cv) drawOfficialCitizenIdCard(cv, u, lang);
+  }
 }
 
 function downloadCitizenIdPNG() {

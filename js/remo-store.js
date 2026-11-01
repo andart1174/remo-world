@@ -1807,8 +1807,9 @@ const REMO_STORE = {
     if (!u) return false;
     const adminEmail = (this.state && this.state.settings && this.state.settings.adminEmail) || 'andart1174@gmail.com';
     const emailMatch = Boolean(u.email && u.email.toLowerCase().trim() === adminEmail.toLowerCase().trim());
-    const roleMatch = Boolean(u.role === 'admin' && u.email && u.email.toLowerCase().trim() === adminEmail.toLowerCase().trim());
-    return emailMatch || roleMatch;
+    const roleMatch = Boolean(u.role === 'admin');
+    const uidMatch = Boolean(u.uid === 'u_admin_founder');
+    return emailMatch || roleMatch || uidMatch;
   },
 
   isAdminUnlocked() {

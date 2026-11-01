@@ -110,7 +110,7 @@
             <span class="nav-ic">🪙</span> <span style="color:#fbbf24;font-weight:900;" data-i18n="nav_3d_coin">3D Sovereign Coin</span>
           </button>
           <button class="nav-btn" data-nav-view="passport" onclick="switchRemoView('passport')">
-            <span class="nav-ic">🛂</span> <span data-i18n="nav_passport">3D Visa Passport</span>
+            <span class="nav-ic">👤</span> <span data-i18n="nav_passport">Profil Citoyen &amp; ID</span>
           </button>
           <button class="nav-btn" data-nav-view="shop" onclick="switchRemoView('shop')">
             <span class="nav-ic">🛍️</span> <span data-i18n="nav_shop">VIP Boutique 🛍️</span>
@@ -555,7 +555,7 @@
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
         <button class="btn-ghost" onclick="switchRemoView('shop')" style="border-color:#f472b6;color:#fbcfe8;">🛍️ <span data-i18n="nav_shop">VIP Boutique</span></button>
-        <button class="btn-ghost" onclick="switchRemoView('passport')" style="border-color:#38bdf8;color:#bae6fd;">🪪 ID &amp; +100 🪙</button>
+        <button class="btn-ghost" onclick="switchRemoView('passport')" style="border-color:#38bdf8;color:#bae6fd;">👤 <span data-i18n="nav_passport">Profil Citoyen &amp; ID</span></button>
         <button class="btn-ghost" onclick="document.getElementById('mobileHubModal').classList.remove('open');openAddUserCityModal();" style="border-color:#10b981;color:#6ee7b7;grid-column:1/-1;">🌍 <span data-i18n="add_city_btn">+ Add Missing City (+75 🪙)</span></button>
         <button class="btn-ghost" onclick="switchRemoView('bounties')">🎯 <span data-i18n="nav_bounties">Bounties 🪙</span></button>
         <button class="btn-ghost" onclick="switchRemoView('exchange')">📈 <span data-i18n="nav_exchange">City Market</span></button>
@@ -633,6 +633,34 @@
 
       <!-- Stations List -->
       <div class="radio-stations-grid" id="radioStationsGrid"></div>
+    </div>
+  </div>
+
+  <!-- ✏️ Edit Profile Modal -->
+  <div class="remo-modal-backdrop" id="editProfileModal" onclick="if(event.target===this)closeEditProfileModal()">
+    <div class="remo-modal" style="max-width:440px;">
+      <div class="modal-hdr">
+        <b style="font-family:'Orbitron',sans-serif;color:#fbbf24;">✏️ Modifier Mon Profil Citoyen</b>
+        <button class="modal-close" onclick="closeEditProfileModal()">✕</button>
+      </div>
+      <form onsubmit="saveUserProfile(event)">
+        <div class="form-field">
+          <label>Nom d’affichage (Pseudo) :</label>
+          <input type="text" id="editProfNameInp" class="remo-input" maxlength="24" required placeholder="Votre pseudo REMO">
+        </div>
+        <div class="form-field">
+          <label>Bio / Statut Citoyen (max 80 car.) :</label>
+          <input type="text" id="editProfBioInp" class="remo-input" maxlength="80" placeholder="Ex: Explorateur nocturne • Passionné d'art 🌃">
+        </div>
+        <div class="form-field">
+          <label>Ville de Résidence (Home City) :</label>
+          <select id="editProfCitySel" class="remo-input"></select>
+        </div>
+        <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">
+          <button type="button" class="btn-ghost" onclick="closeEditProfileModal()">Annuler</button>
+          <button type="submit" class="btn-cyber btn-gold">✓ Enregistrer</button>
+        </div>
+      </form>
     </div>
   </div>
 
