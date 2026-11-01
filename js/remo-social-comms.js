@@ -1319,15 +1319,11 @@ function sharePostLink(postId) {
   const lang = REMO_I18N.getLang();
   const post = (REMO_STORE.state.posts || []).find((p) => p.id === postId);
   const cleanId = encodeURIComponent(postId);
-  let baseOrigin = window.location.origin;
-  let basePath = window.location.pathname;
-  if (!baseOrigin || baseOrigin === 'null' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-    baseOrigin = 'https://andart1174.github.io';
-    basePath = '/remo-world/index.html';
+  let baseOrigin = (window.location && window.location.origin && window.location.origin !== 'null') ? window.location.origin : 'https://remoworld.com';
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    baseOrigin = 'https://remoworld.com';
   }
-  const cleanPath = (basePath || '').replace(/\/+$/, '');
-  const finalPath = cleanPath.endsWith('.html') ? cleanPath : (cleanPath ? `${cleanPath}/index.html` : '/index.html');
-  const url = `${baseOrigin}${finalPath}?post=${cleanId}#post_${cleanId}`;
+  const url = `${baseOrigin}/?post=${cleanId}#post_${cleanId}`;
   const title = post ? (lang === 'fr' ? (post.caption_fr || post.caption_en) : (post.caption_en || post.caption_fr)) : 'REMO World';
 
   if (navigator.share) {

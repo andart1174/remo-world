@@ -1258,18 +1258,17 @@ function getCitizenInviteUrl(u) {
   const customDom = localStorage.getItem('remo_custom_domain');
   if (customDom && customDom.trim()) {
     const cleanDom = customDom.trim().replace(/\/+$/, '');
-    return cleanDom.endsWith('.html') ? `${cleanDom}?ref=${encodeURIComponent(ref)}` : `${cleanDom}/index.html?ref=${encodeURIComponent(ref)}`;
+    return cleanDom.endsWith('.html') ? `${cleanDom}?ref=${encodeURIComponent(ref)}` : `${cleanDom}/?ref=${encodeURIComponent(ref)}`;
   }
   if (typeof window !== 'undefined' && window.location && window.location.origin && window.location.origin !== 'null' && window.location.protocol.startsWith('http')) {
     const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
     if (!isLocal) {
-      const cleanPath = window.location.pathname.replace(/\/+$/, '');
-      const pathWithFile = cleanPath.endsWith('.html') ? cleanPath : (cleanPath ? `${cleanPath}/index.html` : '/index.html');
-      return `${window.location.origin}${pathWithFile}?ref=${encodeURIComponent(ref)}`;
+      const cleanOrigin = window.location.origin.replace(/\/+$/, '');
+      return `${cleanOrigin}/?ref=${encodeURIComponent(ref)}`;
     }
   }
-  // Production fallback that works across any device, mobile and desktop
-  return `https://andart1174.github.io/remo-world/index.html?ref=${encodeURIComponent(ref)}`;
+  // Official Production Domain
+  return `https://remoworld.com/?ref=${encodeURIComponent(ref)}`;
 }
 
 function copyTextToClipboard(text) {
@@ -2201,16 +2200,34 @@ function drawStoryVerticalCanvas(cv, u, lang) {
     ctx.fillStyle = '#ffffff';
     ctx.fillText(`@${(u && u.name) || 'Pioneer'}`, 540, 395);
 
-    // Royal / Pioneer Badge Pill
-    ctx.fillStyle = 'rgba(251,191,36,0.18)';
-    ctx.strokeStyle = '#fbbf24';
-    ctx.lineWidth = 2;
-    const pillW = 340;
-    ctx.strokeRect(540 - pillW / 2, 415, pillW, 44);
-    ctx.fillRect(540 - pillW / 2, 415, pillW, 44);
+    // Royal / Genesis Pioneer Badge Pill
+    const pNum = (u && u.passportNum) || '0001';
+    const tierInfo = (typeof REMO_STORE !== 'undefined' && typeof REMO_STORE.getUserPassportTier === 'function')
+      ? REMO_STORE.getUserPassportTier(pNum)
+      : { tier: 1, color: '#fbbf24', border: '#f59e0b', badge: '🌟 GENESIS PIONEER TIER 1', name_en: 'GENESIS PIONEER TIER 1', name_fr: 'PIONNIER GENESIS TIER 1' };
+    const tierBadgeText = lang === 'fr' ? (tierInfo.tier === 1 ? '🌟 PIONNIER GENESIS TIER 1' : tierInfo.tier === 2 ? '🛡️ CITOYEN TITANE TIER 2' : '🌍 CITOYEN SOUVERAIN TIER 3') : tierInfo.badge;
+
+    const pillW = 560;
+    ctx.fillStyle = tierInfo.tier === 1 ? 'rgba(251,191,36,0.22)' : tierInfo.tier === 2 ? 'rgba(56,189,248,0.2)' : 'rgba(167,139,250,0.18)';
+    ctx.strokeStyle = tierInfo.color;
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    if (typeof ctx.roundRect === 'function') {
+      ctx.roundRect(540 - pillW / 2, 415, pillW, 46, 23);
+    } else {
+      ctx.rect(540 - pillW / 2, 415, pillW, 46);
+    }
+    ctx.fill();
+    ctx.stroke();
     ctx.font = '900 20px "Orbitron", sans-serif';
-    ctx.fillStyle = '#fbbf24';
-    ctx.fillText(`👑 ${royalTitle.toUpperCase()} · #${(u && u.passportNum) || '0001'}`, 540, 444);
+    ctx.fillStyle = tierInfo.color;
+    ctx.fillText(`${tierBadgeText} · #${pNum}`, 540, 444);
+
+    if (tierInfo.tier === 1) {
+      ctx.font = '800 16px "Orbitron", sans-serif';
+      ctx.fillStyle = '#fde68a';
+      ctx.fillText(lang === 'fr' ? '★ CLUB DES FONDATEURS EXCLUSIF (1 SUR 500 DANS LE MONDE) ★' : '★ EXCLUSIVE FOUNDERS CLUB (1 OF ONLY 500 IN THE WORLD) ★', 540, 482);
+    }
 
     // 7. Middle Stage: City Landmark
     if (typeof drawCityLandmark === 'function') {
@@ -2233,10 +2250,11 @@ function drawStoryVerticalCanvas(cv, u, lang) {
     // 8. Stats Strip
     const statsY = 1080;
     const statBoxW = 280;
+    const refsCount = (u && (u.referralsCount !== undefined ? u.referralsCount : u.referralCount)) || 0;
     const stats = [
       { label: lang === 'fr' ? 'PIÈCES REMO' : 'REMO COINS', val: `🪙 ${(u && u.coins) || 0}` },
       { label: lang === 'fr' ? 'VISAS VILLES' : 'CITY VISAS', val: `🌍 ${((u && u.visas) || []).length}` },
-      { label: lang === 'fr' ? 'PARRAINAGES' : 'REFERRALS', val: `👥 ${(u && u.referralCount) || 0}` }
+      { label: lang === 'fr' ? 'PARRAINAGES' : 'REFERRALS', val: `👥 ${refsCount}` }
     ];
     stats.forEach((st, idx) => {
       const bx = 100 + idx * 300;
@@ -2258,17 +2276,17 @@ function drawStoryVerticalCanvas(cv, u, lang) {
     // 9. Scannable QR Code Box
     const qrBoxY = 1220;
     ctx.fillStyle = 'rgba(15,23,42,0.88)';
-    ctx.strokeStyle = '#fbbf24';
+    ctx.strokeStyle = tierInfo.color;
     ctx.lineWidth = 3;
     ctx.fillRect(140, qrBoxY, 800, 480);
     ctx.strokeRect(140, qrBoxY, 800, 480);
 
     // Top QR Box Ribbon
-    ctx.fillStyle = '#fbbf24';
+    ctx.fillStyle = tierInfo.color;
     ctx.fillRect(140, qrBoxY, 800, 52);
-    ctx.font = '900 24px "Orbitron", sans-serif';
+    ctx.font = '900 23px "Orbitron", sans-serif';
     ctx.fillStyle = '#050814';
-    ctx.fillText(lang === 'fr' ? '🎁 SCANNEZ LE QR POUR GAGNER +100 🪙' : '🎁 SCAN QR TO EARN +100 🪙 BONUS', 540, qrBoxY + 35);
+    ctx.fillText(lang === 'fr' ? '🎁 SCANNEZ LE QR POUR GAGNER +100 🪙 DE BIENVENUE' : '🎁 SCAN QR TO EARN +100 🪙 WELCOME BONUS', 540, qrBoxY + 35);
 
     // Draw 280x280 QR Code
     if (typeof RemoQREngine !== 'undefined' && RemoQREngine.toCanvas) {
@@ -2283,11 +2301,15 @@ function drawStoryVerticalCanvas(cv, u, lang) {
     // Under QR Code
     ctx.font = '900 26px "Orbitron", sans-serif';
     ctx.fillStyle = '#38bdf8';
-    ctx.fillText(`CODE CITOYEN: ${refCode}`, 540, qrBoxY + 400);
+    ctx.fillText(`CODE CITOYEN: ${refCode}`, 540, qrBoxY + 395);
 
-    ctx.font = '700 20px "Outfit", sans-serif';
+    ctx.font = '800 21px "Outfit", sans-serif';
     ctx.fillStyle = '#10b981';
-    ctx.fillText(lang === 'fr' ? '✓ +100 🪙 offerts à l’inscription !' : '✓ +100 🪙 awarded on sign-up!', 540, qrBoxY + 440);
+    ctx.fillText(lang === 'fr' ? '✓ +100 🪙 offerts à l’inscription !' : '✓ +100 🪙 awarded on sign-up!', 540, qrBoxY + 430);
+
+    ctx.font = '700 17px "Orbitron", sans-serif';
+    ctx.fillStyle = '#fbbf24';
+    ctx.fillText(lang === 'fr' ? '⚡ PLACES GENESIS TIER 1 LIMITÉES : REMOWORLD.COM' : '⚡ LIMITED GENESIS TIER 1 SLOTS : REMOWORLD.COM', 540, qrBoxY + 460);
 
     // 10. Bottom Footer
     ctx.font = '900 24px "Orbitron", sans-serif';
@@ -2535,7 +2557,7 @@ function drawBoardingPassCanvas(cv, fromQuery, toQuery, u, lang = 'fr') {
     const toCity = resolveCityFromQuery(toQuery || 'chisinau');
     const userObj = u || REMO_STORE.getCurrentUser() || { name: 'Pioneer', passportNum: '0001', referralCode: 'REMO-0001', role: 'citizen' };
     const refCode = userObj.referralCode || `REMO-${userObj.passportNum || '0001'}`;
-    const inviteUrl = typeof getCitizenInviteUrl === 'function' ? getCitizenInviteUrl(userObj) : `https://andart1174.github.io/remo-world/index.html?ref=${refCode}`;
+    const inviteUrl = typeof getCitizenInviteUrl === 'function' ? getCitizenInviteUrl(userObj) : `https://remoworld.com/?ref=${encodeURIComponent(refCode)}`;
 
     const fnHaversine = (typeof haversineKm === 'function')
       ? haversineKm
@@ -2942,7 +2964,7 @@ async function shareBoardingPassNative() {
   const cv = document.getElementById('boardingPassCanvasPreview');
   const u = REMO_STORE.getCurrentUser() || { name: 'Pioneer', passportNum: '0001', referralCode: 'REMO-0001' };
   const lang = REMO_I18N.getLang();
-  const inviteUrl = typeof getCitizenInviteUrl === 'function' ? getCitizenInviteUrl(u) : `https://andart1174.github.io/remo-world/index.html?ref=${u.referralCode || 'REMO-0001'}`;
+  const inviteUrl = typeof getCitizenInviteUrl === 'function' ? getCitizenInviteUrl(u) : `https://remoworld.com/?ref=${encodeURIComponent(u.referralCode || 'REMO-0001')}`;
 
   const shareTitle = lang === 'fr' ? 'REMO Airways · Billet de Vol Holographique 4D' : 'REMO Airways · 4D Holographic Boarding Pass';
   const shareText = lang === 'fr'

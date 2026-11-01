@@ -480,7 +480,7 @@ function getRemoBaseUrl(spec = {}) {
   if (window.location.origin && window.location.origin !== 'null' && window.location.protocol.startsWith('http')) {
     return window.location.origin.replace(/\/$/, '');
   }
-  return 'https://remo.world';
+  return 'https://remoworld.com';
 }
 
 function getRarityColor(rarity) {

@@ -471,6 +471,11 @@ const REMO_DICT = {
     boarding_share_btn: '📲 Share Story Pass (Insta / TikTok / WhatsApp)',
     boarding_dl_btn: '📥 Download HD (.PNG)',
     boarding_copy_btn: '🔗 Copy My Invite Link',
+    story_modal_title: '📲 Official Citizen Story 9:16 (TikTok & Insta)',
+    story_modal_sub: 'Share your official Citizen ID as a 9:16 Story! Every friend scanning your QR earns +100 🪙 and gives you +100 🪙!',
+    story_share_btn: '📲 Share to Story (Insta / TikTok / WhatsApp)',
+    story_dl_btn: '📥 Download HD (.PNG)',
+    story_copy_btn: '🔗 Copy My Invite Link',
 
     // ⛲ 4D Global Wishing Well
     wishing_modal_title: '⛲ 4D Global Wishing Well 🪙',
@@ -995,6 +1000,11 @@ const REMO_DICT = {
     boarding_share_btn: '📲 Partager Billet Story (Insta / TikTok / WhatsApp)',
     boarding_dl_btn: '📥 Télécharger HD (.PNG)',
     boarding_copy_btn: '🔗 Copier Mon Lien',
+    story_modal_title: '📲 Story Citoyenne Officielle 9:16 (TikTok & Insta)',
+    story_modal_sub: 'Partagez votre statut de citoyen officiel en Story 9:16 ! Chaque ami qui scanne votre QR gagne +100 🪙 et vous offre +100 🪙 !',
+    story_share_btn: '📲 Partager en Story (Insta / TikTok / WhatsApp)',
+    story_dl_btn: '📥 Télécharger HD (.PNG)',
+    story_copy_btn: '🔗 Copier Mon Lien',
 
     // ⛲ 4D Global Wishing Well
     wishing_modal_title: '⛲ Le Puits aux Souhaits 4D 🪙',

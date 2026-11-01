@@ -79,7 +79,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-  <link rel="stylesheet" href="css/remo-core.css?v=47">
+  <link rel="stylesheet" href="css/remo-core.css?v=48">
 </head>
 <body>
 
@@ -653,6 +653,7 @@
         <button class="modal-close" onclick="document.getElementById('mobileHubModal').classList.remove('open')">✕</button>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+        <button class="btn-cyber btn-gold" onclick="document.getElementById('mobileHubModal').classList.remove('open');exportPassportStory();" style="grid-column:1/-1;justify-content:center;background:linear-gradient(135deg,#f59e0b,#ec4899);border-color:#fbbf24;color:#fff;font-weight:900;padding:10px;font-size:0.85rem;">📲 <span data-i18n="passport_share_story">Story 9:16 (TikTok &amp; Insta)</span></button>
         <button class="btn-ghost" onclick="switchRemoView('shop')" style="border-color:#f472b6;color:#fbcfe8;">🛍️ <span data-i18n="nav_shop">VIP Boutique</span></button>
         <button class="btn-ghost" onclick="switchRemoView('passport')" style="border-color:#38bdf8;color:#bae6fd;">👤 <span data-i18n="nav_passport">Profil Citoyen &amp; ID</span></button>
         <button class="btn-ghost" onclick="document.getElementById('mobileHubModal').classList.remove('open');openAddUserCityModal();" style="border-color:#10b981;color:#6ee7b7;grid-column:1/-1;">🌍 <span data-i18n="add_city_btn">+ Add Missing City (+75 🪙)</span></button>
@@ -821,10 +822,10 @@
   <div class="remo-modal-backdrop" id="storyExportModal" onclick="if(event.target===this)closeStoryExportModal()">
     <div class="remo-modal" style="max-width:440px;text-align:center;">
       <div class="modal-hdr">
-        <b style="font-family:'Orbitron',sans-serif;color:#fbbf24;font-size:0.95rem;">📲 Story Citoyenne 9:16 (TikTok &amp; Insta)</b>
+        <b style="font-family:'Orbitron',sans-serif;color:#fbbf24;font-size:0.95rem;" data-i18n="story_modal_title">📲 Story Citoyenne 9:16 (TikTok &amp; Insta)</b>
         <button class="modal-close" onclick="closeStoryExportModal()">✕</button>
       </div>
-      <p style="font-size:0.79rem;color:var(--muted);margin-bottom:12px;">
+      <p style="font-size:0.79rem;color:var(--muted);margin-bottom:12px;" data-i18n="story_modal_sub">
         Partagez votre statut de citoyen officiel en Story 9:16 ! Chaque ami qui scanne votre QR gagne +100 🪙 et vous offre +100 🪙 !
       </p>
 
@@ -833,14 +834,14 @@
       </div>
 
       <div style="display:flex;gap:8px;flex-direction:column;">
-        <button type="button" class="btn-cyber btn-gold" style="width:100%;justify-content:center;padding:11px;" onclick="shareStoryCanvasNative()">
+        <button type="button" class="btn-cyber btn-gold" style="width:100%;justify-content:center;padding:11px;" onclick="shareStoryCanvasNative()" data-i18n="story_share_btn">
           📲 Partager en Story (Insta / TikTok / WhatsApp)
         </button>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-          <button type="button" class="btn-cyber" style="justify-content:center;padding:9px;" onclick="downloadStoryCanvasPNG()">
+          <button type="button" class="btn-cyber" style="justify-content:center;padding:9px;" onclick="downloadStoryCanvasPNG()" data-i18n="story_dl_btn">
             📥 Télécharger HD (.PNG)
           </button>
-          <button type="button" class="btn-ghost" style="justify-content:center;padding:9px;border-color:#38bdf8;color:#7dd3fc;" onclick="copyMyReferralInviteLink()">
+          <button type="button" class="btn-ghost" style="justify-content:center;padding:9px;border-color:#38bdf8;color:#7dd3fc;" onclick="copyMyReferralInviteLink()" data-i18n="story_copy_btn">
             🔗 Copier Mon Lien
           </button>
         </div>
@@ -1662,12 +1663,12 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 
   <!-- REMO Modular Engines -->
-  <script src="js/remo-i18n.js?v=47"></script>
-  <script src="js/remo-cities-data.js?v=47"></script>
-  <script src="js/remo-store.js?v=47"></script>
-  <script src="js/remo-card-engine.js?v=47"></script>
-  <script src="js/remo-radar-arena.js?v=47"></script>
-  <script src="js/remo-social-comms.js?v=47"></script>
-  <script src="js/remo-radio-engine.js?v=47"></script>
+  <script src="js/remo-i18n.js?v=48"></script>
+  <script src="js/remo-cities-data.js?v=48"></script>
+  <script src="js/remo-store.js?v=48"></script>
+  <script src="js/remo-card-engine.js?v=48"></script>
+  <script src="js/remo-radar-arena.js?v=48"></script>
+  <script src="js/remo-social-comms.js?v=48"></script>
+  <script src="js/remo-radio-engine.js?v=48"></script>
 </body>
 </html>
