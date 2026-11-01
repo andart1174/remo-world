@@ -701,6 +701,41 @@ function renderAdminPostBar(p) {
   `;
 }
 
+function getInterCityDistanceBridge(postCity, lang) {
+  if (!postCity) return '';
+  const u = REMO_STORE.getCurrentUser();
+  const viewerCity = getCityById((u && u.homeCity) ? u.homeCity : 'montreal') || getCityById('montreal');
+  if (!viewerCity) return '';
+
+  if (postCity.id === viewerCity.id) {
+    const txt = lang === 'fr'
+      ? `🏙️ ${postCity.flag} ${getCityName(postCity, 'fr')} · Même ville en direct 📍`
+      : `🏙️ ${postCity.flag} ${getCityName(postCity, 'en')} · Live in your city 📍`;
+    return `<div class="city-distance-bridge">${txt}</div>`;
+  }
+
+  const fnHaversine = (typeof haversineKm === 'function')
+    ? haversineKm
+    : (window.haversineKm || ((lat1, lon1, lat2, lon2) => {
+        const R = 6371;
+        const dLat = ((lat2 - lat1) * Math.PI) / 180;
+        const dLon = ((lon2 - lon1) * Math.PI) / 180;
+        const a = Math.sin(dLat / 2) ** 2 + Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon / 2) ** 2;
+        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      }));
+
+  const km = Math.round(fnHaversine(postCity.lat, postCity.lng, viewerCity.lat, viewerCity.lng));
+  const sub = lang === 'fr' ? 'Fereastră deschisă peste ocean' : 'Live window across the world';
+
+  return `
+    <div class="city-distance-bridge" title="${sub}">
+      <span class="bridge-plane">✈️</span>
+      <span class="bridge-route"><b>${postCity.flag} ${getCityName(postCity, lang)}</b> ➔ <b>${viewerCity.flag} ${getCityName(viewerCity, lang)}</b></span>
+      <span class="bridge-km">(${km.toLocaleString()} km)</span>
+    </div>
+  `;
+}
+
 function renderSocialFeed(searchQuery = '') {
   renderStoriesAndBanners();
   const grid = document.getElementById('remoPostsGrid');
@@ -810,20 +845,21 @@ function renderSocialFeed(searchQuery = '') {
           <div class="post-author" style="cursor:pointer;" onclick="openDirectChatWithUser('${p.uid || ''}')" title="💌 Message @${escapeHtmlStr(p.authorName)}">
             <div class="avatar-circle ${cosm.frameClass}">${escapeHtmlStr((p.authorName || 'R')[0].toUpperCase())}</div>
             <div>
-              <div style="font-weight:800;font-size:0.88rem;">
-                ${escapeHtmlStr(p.authorName)} ${p.authorVerified ? '<span style="color:#38bdf8;">✓</span>' : ''}
+              <div style="font-weight:800;font-size:0.88rem;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+                <span>${escapeHtmlStr(p.authorName)}</span>
+                ${p.authorVerified ? '<span style="color:#38bdf8;">✓</span>' : ''}
                 ${isMayor ? `<span class="mayor-tag">${t('mayor_badge')}</span>` : ''}
                 ${royalTitle ? `<span class="royal-title-pill">${escapeHtmlStr(royalTitle)}</span>` : ''}
               </div>
-              <div style="font-size:0.7rem;color:var(--muted);">
-                #${p.authorPassport || '0001'} · 🕒 ${wx.timeStr} · <span style="color:#38bdf8;">💌 DM</span>
+              <div style="font-size:0.72rem;color:var(--muted);margin-top:2px;">
+                <span>${city.flag} ${getCityName(city, lang)}</span> · <span>🕒 ${wx.timeStr}</span>
                 ${p.remixedFromAuthor ? ` · <span style="color:#34d399;">${t('post_remix_from')} @${escapeHtmlStr(p.remixedFromAuthor)}</span>` : ''}
               </div>
             </div>
           </div>
-          <div style="display:flex;align-items:center;gap:6px;">
-            ${(isPostOwner || isAdm) ? `<button type="button" class="post-owner-delete-btn" onclick="userDeleteOwnPost('${p.id}')" title="${lang === 'fr' ? 'Supprimer ma publication' : 'Delete my post'}">🗑️</button>` : ''}
-            <span class="city-tag" onclick="filterFeedByCityFromMap('${city.id}')">${cityTagLabel}</span>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span class="city-tag" onclick="filterFeedByCityFromMap('${city.id}')">${wx.icon || '🌤️'} ${wx.tempC ?? 20}°${wx.isSurge ? ' ⚡2X' : ''}</span>
+            <button type="button" class="post-more-dot-btn" onclick="openPostActionsSheet('${p.id}')" title="${lang === 'fr' ? 'Options de la publication' : 'Post options'}">⋯</button>
           </div>
         </div>
 
@@ -843,10 +879,29 @@ function renderSocialFeed(searchQuery = '') {
           ${renderPostMediaStage(p, city, lang)}
         </div>
 
-        <!-- Desktop Body -->
+        <!-- Modern Sleek Post Body -->
         <div class="post-body">
-          ${renderAdminPostBar(p)}
-          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+          ${getInterCityDistanceBridge(city, lang)}
+
+          <div class="post-actions-bar">
+            <button type="button" class="pact-btn ${liked ? 'liked' : ''}" onclick="toggleLikePost('${p.id}')" title="Like">
+              ❤️ <span>${(p.likes || []).length}</span>
+            </button>
+            <button type="button" class="pact-btn" onclick="openCommentsModal('${p.id}')" title="Comments">
+              💬 <span>${(p.comments || []).length}</span>
+            </button>
+            <button type="button" class="pact-btn" onclick="tipPostAuthor('${p.id}')" title="Tip Coins">
+              🪙 <span>${p.tipsTotal || 0}</span>
+            </button>
+            <button type="button" class="pact-btn" onclick="sharePostLink('${p.id}')" title="${lang === 'fr' ? 'Partager le lien' : 'Share link'}">
+              🔗
+            </button>
+            <button type="button" class="pact-btn pact-more-btn" onclick="openPostActionsSheet('${p.id}')" title="${lang === 'fr' ? 'Plus d’actions (Duo, Carte, Boost)' : 'More options'}">
+              ⋯
+            </button>
+          </div>
+
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-top:6px;">
             <div class="post-caption" style="flex:1;">${formattedCap}</div>
             <button type="button" class="translate-pill-btn ${isDualOpen ? 'active' : ''}" onclick="togglePostAutoTranslate('${p.id}')">${isDualOpen ? t('post_translate_hide') : t('post_translate_btn')}</button>
           </div>
@@ -857,30 +912,7 @@ function renderSocialFeed(searchQuery = '') {
           ${hiddenByCapsule ? '' : renderPostPollWidget(p, lang, u)}
           ${hiddenByCapsule ? '' : renderSecretCapsuleWidget(p, lang, u)}
           ${hiddenByCapsule ? '' : renderViralGoalWidget(p, lang, isAdm)}
-          ${!hiddenByCapsule && p.voiceUrl ? `<audio src="${voiceResolved}" ${voiceIdbAttr} controls style="width:100%;height:34px;"></audio>` : ''}
-
-          <div class="cyber-react-row">
-            ${EMOJIS.map((em) => `
-              <button type="button" class="creact-pill" onclick="reactEmojiToPost('${p.id}', '${em}')">
-                ${em} ${rxMap[em] ? `<span>${rxMap[em]}</span>` : ''}
-              </button>
-            `).join('')}
-          </div>
-
-          <div class="post-actions">
-            <div class="post-actions-primary">
-              <button class="pact-btn pact-primary ${liked ? 'liked' : ''}" onclick="toggleLikePost('${p.id}')">❤️ ${(p.likes || []).length}</button>
-              <button class="pact-btn pact-primary" onclick="openCommentsModal('${p.id}')">💬 ${(p.comments || []).length}</button>
-              <button class="pact-btn pact-primary" onclick="tipPostAuthor('${p.id}')">🪙 ${p.tipsTotal || 0}</button>
-            </div>
-            <div class="post-actions-secondary">
-              ${!hiddenByCapsule ? `<button class="pact-btn pact-pill" style="color:#f472b6;border-color:rgba(244,114,182,0.45);" onclick="startCityDuetFromPost('${p.id}')">${t('act_duet_city')}</button>` : ''}
-              ${!hiddenByCapsule ? `<button class="pact-btn pact-pill" style="color:#38bdf8;border-color:rgba(56,189,248,0.4);" onclick="sharePostLink('${p.id}')">🔗 ${lang === 'fr' ? 'Partager' : 'Share'}</button>` : ''}
-              <button class="pact-btn pact-pill" onclick="mintPostAsCityCard('${p.id}')">🎴 ${t('act_mint_card')}</button>
-              <button class="pact-btn pact-pill" onclick="boostPost24h('${p.id}')" title="Boost">🚀</button>
-              <button class="pact-btn pact-pill" onclick="saveBookmarkPost('${p.id}')" title="Bookmark">🔖</button>
-            </div>
-          </div>
+          ${!hiddenByCapsule && p.voiceUrl ? `<audio src="${voiceResolved}" ${voiceIdbAttr} controls style="width:100%;height:34px;margin-top:6px;"></audio>` : ''}
         </div>
 
         <!-- Mobile TikTok Bottom-Left Info Overlay -->
@@ -3212,6 +3244,149 @@ function createPromoCodeInline() {
     'fanfare'
   );
 }
+
+/* ── ⋯ Post Actions & Creator Tools Bottom-Sheet Modal ── */
+function openPostActionsSheet(postId) {
+  const modal = document.getElementById('postActionsModal');
+  const content = document.getElementById('postActionsModalContent');
+  if (!modal || !content) return;
+
+  const lang = REMO_I18N.getLang();
+  const u = REMO_STORE.getCurrentUser();
+  const isAdm = REMO_STORE.isAdminUnlocked() || REMO_STORE.isCurrentUserAdmin();
+  const p = (REMO_STORE.state.posts || []).find((x) => x.id === postId);
+  if (!p) return;
+
+  const city = getCityById(p.cityId) || getCityById('montreal');
+  const isPostOwner = Boolean(u && (
+    (p.uid && u.uid === p.uid) ||
+    (p.authorUid && u.uid === p.authorUid) ||
+    (u.email && p.authorEmail && u.email.toLowerCase() === p.authorEmail.toLowerCase()) ||
+    (u.name && p.authorName && u.name.trim().toLowerCase() === p.authorName.trim().toLowerCase())
+  ));
+  const isBookmarked = JSON.parse(localStorage.getItem('remo_saved_posts') || '[]').includes(p.id);
+
+  const EMOJIS = ['🔥', '⚡', '💎', '🤯', '👑'];
+  const rxMap = p.reactions || {};
+
+  content.innerHTML = `
+    <div class="modal-hdr">
+      <div style="display:flex;align-items:center;gap:10px;min-width:0;">
+        <div class="avatar-circle" style="width:36px;height:36px;font-size:0.95rem;flex-shrink:0;">
+          ${escapeHtmlStr((p.authorName || 'R')[0].toUpperCase())}
+        </div>
+        <div style="min-width:0;">
+          <div style="font-weight:900;font-size:0.92rem;color:#fff;">@${escapeHtmlStr(p.authorName)}</div>
+          <div style="font-size:0.75rem;color:var(--muted);">${city.flag} ${getCityName(city, lang)}</div>
+        </div>
+      </div>
+      <button class="modal-close" onclick="closePostActionsModal()">✕</button>
+    </div>
+
+    <!-- Quick Emoji Reactions Row -->
+    <div style="margin:12px 0 16px;">
+      <div style="font-size:0.75rem;font-weight:800;color:#94a3b8;margin-bottom:8px;text-transform:uppercase;">
+        ${lang === 'fr' ? 'Réagir avec un Émoji' : 'React with Emoji'}
+      </div>
+      <div style="display:flex;justify-content:space-between;gap:6px;">
+        ${EMOJIS.map((em) => `
+          <button type="button" class="creact-pill" style="flex:1;justify-content:center;padding:8px 0;font-size:1.15rem;" onclick="reactEmojiToPost('${p.id}', '${em}'); closePostActionsModal();">
+            ${em} ${rxMap[em] ? `<span style="font-size:0.75rem;">${rxMap[em]}</span>` : ''}
+          </button>
+        `).join('')}
+      </div>
+    </div>
+
+    <!-- Action Buttons List -->
+    <div style="display:flex;flex-direction:column;gap:8px;">
+      <button type="button" class="action-sheet-row" onclick="closePostActionsModal(); startCityDuetFromPost('${p.id}');">
+        <span class="as-icon" style="background:rgba(244,114,182,0.15);color:#f472b6;">🎭</span>
+        <div style="text-align:left;flex:1;">
+          <b style="color:#fbcfe8;">${lang === 'fr' ? 'Créer un Duo de Ville' : 'Create City Duet'}</b>
+          <div style="font-size:0.72rem;color:var(--muted);">${lang === 'fr' ? 'Répondez avec votre propre vidéo/photo (+20 🪙)' : 'Reply with your city moment (+20 🪙)'}</div>
+        </div>
+      </button>
+
+      <button type="button" class="action-sheet-row" onclick="closePostActionsModal(); mintPostAsCityCard('${p.id}');">
+        <span class="as-icon" style="background:rgba(251,191,36,0.15);color:#fbbf24;">🎴</span>
+        <div style="text-align:left;flex:1;">
+          <b style="color:#fef08a;">${lang === 'fr' ? 'Créer Carte Ville 4D' : 'Mint 4D City Card'}</b>
+          <div style="font-size:0.72rem;color:var(--muted);">${lang === 'fr' ? 'Transformez ce moment en carte de collection' : 'Turn this moment into a collectible 4D card'}</div>
+        </div>
+      </button>
+
+      <button type="button" class="action-sheet-row" onclick="closePostActionsModal(); boostPost24h('${p.id}');">
+        <span class="as-icon" style="background:rgba(56,189,248,0.15);color:#38bdf8;">🚀</span>
+        <div style="text-align:left;flex:1;">
+          <b style="color:#bae6fd;">${lang === 'fr' ? 'Booster la Publication' : 'Boost Post'}</b>
+          <div style="font-size:0.72rem;color:var(--muted);">${lang === 'fr' ? 'Propulsez ce moment en tête du fil (+100 🪙)' : 'Propel this post to top of global feed'}</div>
+        </div>
+      </button>
+
+      <button type="button" class="action-sheet-row" onclick="closePostActionsModal(); saveBookmarkPost('${p.id}');">
+        <span class="as-icon" style="background:rgba(168,85,247,0.15);color:#c084fc;">${isBookmarked ? '⭐' : '🔖'}</span>
+        <div style="text-align:left;flex:1;">
+          <b style="color:#e9d5ff;">${isBookmarked ? (lang === 'fr' ? 'Retirer des Favoris' : 'Remove Bookmark') : (lang === 'fr' ? 'Enregistrer dans Favoris' : 'Save Bookmark')}</b>
+        </div>
+      </button>
+
+      <button type="button" class="action-sheet-row" onclick="closePostActionsModal(); sharePostLink('${p.id}');">
+        <span class="as-icon" style="background:rgba(52,211,153,0.15);color:#34d399;">🔗</span>
+        <div style="text-align:left;flex:1;">
+          <b style="color:#a7f3d0;">${lang === 'fr' ? 'Copier le Lien Direct' : 'Copy Share Link'}</b>
+        </div>
+      </button>
+
+      <button type="button" class="action-sheet-row" onclick="closePostActionsModal(); openDirectChatWithUser('${p.uid || ''}');">
+        <span class="as-icon" style="background:rgba(56,189,248,0.15);color:#38bdf8;">💌</span>
+        <div style="text-align:left;flex:1;">
+          <b style="color:#bae6fd;">${lang === 'fr' ? 'Message Privé (DM)' : 'Send Private Message'}</b>
+        </div>
+      </button>
+
+      ${(isPostOwner || isAdm) ? `
+        <button type="button" class="action-sheet-row danger" onclick="closePostActionsModal(); userDeleteOwnPost('${p.id}');">
+          <span class="as-icon" style="background:rgba(244,63,94,0.15);color:#f43f5e;">🗑️</span>
+          <div style="text-align:left;flex:1;">
+            <b style="color:#fda4af;">${lang === 'fr' ? 'Supprimer ma Publication' : 'Delete My Post'}</b>
+          </div>
+        </button>
+      ` : ''}
+
+      ${isAdm ? `
+        <div style="margin-top:10px;padding-top:10px;border-top:1px dashed rgba(251,191,36,0.35);">
+          <div style="font-size:0.75rem;font-weight:900;color:#fbbf24;margin-bottom:8px;">
+            👑 ADMIN GOD-MODE TOOLS (#${escapeHtmlStr((p.id || '').slice(-6))})
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+            <button type="button" class="adm-pbtn gold" onclick="closePostActionsModal(); adminPinPostInline('${p.id}');">
+              📌 ${p.pinned ? 'Désépingler' : 'Épingler'}
+            </button>
+            <button type="button" class="adm-pbtn gold" onclick="closePostActionsModal(); adminAwardFounderCrown('${p.id}');">
+              👑 Couronne (+100🪙)
+            </button>
+            <button type="button" class="adm-pbtn" onclick="closePostActionsModal(); adminEditPostInline('${p.id}');">
+              ✏️ Modifier Texte
+            </button>
+            <button type="button" class="adm-pbtn danger" onclick="closePostActionsModal(); adminDeletePostInline('${p.id}');">
+              🗑️ Supprimer (Admin)
+            </button>
+          </div>
+        </div>
+      ` : ''}
+    </div>
+  `;
+
+  modal.classList.add('open');
+}
+
+function closePostActionsModal() {
+  const modal = document.getElementById('postActionsModal');
+  if (modal) modal.classList.remove('open');
+}
+
+window.openPostActionsSheet = openPostActionsSheet;
+window.closePostActionsModal = closePostActionsModal;
 
 /* ── Post Author & Admin Deletion Action ── */
 function userDeleteOwnPost(postId) {

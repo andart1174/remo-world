@@ -2810,3 +2810,140 @@ button, input, select, textarea {
     padding: 4px 8px;
   }
 }
+
+.post-more-dot-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border);
+  color: #cbd5e1;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  font-weight: 900;
+  cursor: pointer;
+  line-height: 1;
+  transition: all 0.2s;
+  padding: 0;
+}
+.post-more-dot-btn:hover {
+  background: rgba(56, 189, 248, 0.15);
+  border-color: rgba(56, 189, 248, 0.5);
+  color: #fff;
+  transform: scale(1.08);
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   ✈️ INTER-CITY KILOMETRIC BRIDGE & MINIMALIST POST CONTROLS
+   ════════════════════════════════════════════════════════════════════ */
+.city-distance-bridge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  margin: 8px 0 10px;
+  background: linear-gradient(90deg, rgba(56, 189, 248, 0.12), rgba(99, 102, 241, 0.08), rgba(251, 191, 36, 0.08));
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  border-radius: 99px;
+  font-size: 0.76rem;
+  color: #e2e8f0;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.city-distance-bridge .bridge-plane {
+  font-size: 0.85rem;
+  display: inline-block;
+  animation: planeFloat 3s ease-in-out infinite;
+}
+@keyframes planeFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-2px); }
+}
+.city-distance-bridge .bridge-route {
+  color: #f8fafc;
+  font-weight: 800;
+}
+.city-distance-bridge .bridge-km {
+  color: #fbbf24;
+  font-weight: 900;
+  margin-left: auto;
+}
+
+/* Single-Line Sleek Action Bar */
+.post-actions-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 0 8px;
+  flex-wrap: nowrap;
+}
+.post-actions-bar .pact-btn {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: 99px;
+  font-size: 0.82rem;
+  font-weight: 800;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+  color: #f8fafc;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+.post-actions-bar .pact-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(56, 189, 248, 0.4);
+}
+.post-actions-bar .pact-btn.liked {
+  color: #f43f5e;
+  border-color: rgba(244, 63, 94, 0.5);
+  background: rgba(244, 63, 94, 0.12);
+}
+.post-actions-bar .pact-more-btn {
+  flex: 0 0 42px;
+  font-size: 1.15rem;
+  letter-spacing: 1px;
+}
+
+/* Action Sheet Row */
+.action-sheet-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border);
+  color: #fff;
+  cursor: pointer;
+  transition: all 0.2s;
+  width: 100%;
+}
+.action-sheet-row:hover {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(56, 189, 248, 0.35);
+}
+.action-sheet-row.danger {
+  border-color: rgba(244, 63, 94, 0.3);
+}
+.action-sheet-row.danger:hover {
+  background: rgba(244, 63, 94, 0.1);
+  border-color: #f43f5e;
+}
+.action-sheet-row .as-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.15rem;
+  flex-shrink: 0;
+}

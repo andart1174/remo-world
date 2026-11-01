@@ -42,6 +42,7 @@ function haversineKm(lat1, lon1, lat2, lon2) {
     Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon / 2) ** 2;
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
+window.haversineKm = haversineKm;
 
 /* ── 1. REMO EARTH™ LIVE LEAFLET RADAR MAP (100% Free, Zero API Key, file:// Safe!) ── */
 let remoLabelsOverlayLayer = null;
