@@ -1306,7 +1306,15 @@ function sharePostLink(postId) {
   const lang = REMO_I18N.getLang();
   const post = (REMO_STORE.state.posts || []).find((p) => p.id === postId);
   const cleanId = encodeURIComponent(postId);
-  const url = `${window.location.origin}${window.location.pathname}?post=${cleanId}#post_${cleanId}`;
+  let baseOrigin = window.location.origin;
+  let basePath = window.location.pathname;
+  if (!baseOrigin || baseOrigin === 'null' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    baseOrigin = 'https://andart1174.github.io';
+    basePath = '/remo-world/index.html';
+  }
+  const cleanPath = (basePath || '').replace(/\/+$/, '');
+  const finalPath = cleanPath.endsWith('.html') ? cleanPath : (cleanPath ? `${cleanPath}/index.html` : '/index.html');
+  const url = `${baseOrigin}${finalPath}?post=${cleanId}#post_${cleanId}`;
   const title = post ? (lang === 'fr' ? (post.caption_fr || post.caption_en) : (post.caption_en || post.caption_fr)) : 'REMO World';
 
   if (navigator.share) {
@@ -3093,9 +3101,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // Register Service Worker for PWA
+  // Register Service Worker for PWA with auto-update
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
-    navigator.serviceWorker.register('./sw.js').catch(() => {});
+    navigator.serviceWorker.register('./sw.js').then((reg) => {
+      reg.update().catch(() => {});
+    }).catch(() => {});
   }
 
   // Desktop Keyboard Shortcuts (J/K scroll, M radar, G cards)

@@ -1136,9 +1136,57 @@ function listInspectedCardInAuction() {
 function getCitizenInviteUrl(u) {
   const ref = (u && u.referralCode) || `REMO-${(u && u.passportNum) || '0001'}`;
   const customDom = localStorage.getItem('remo_custom_domain');
-  const base = customDom ? customDom.replace(/\/$/, '') + '/index.html' : `${window.location.origin}${window.location.pathname}`;
-  return `${base}?ref=${encodeURIComponent(ref)}`;
+  if (customDom && customDom.trim()) {
+    const cleanDom = customDom.trim().replace(/\/+$/, '');
+    return cleanDom.endsWith('.html') ? `${cleanDom}?ref=${encodeURIComponent(ref)}` : `${cleanDom}/index.html?ref=${encodeURIComponent(ref)}`;
+  }
+  if (typeof window !== 'undefined' && window.location && window.location.origin && window.location.origin !== 'null' && window.location.protocol.startsWith('http')) {
+    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    if (!isLocal) {
+      const cleanPath = window.location.pathname.replace(/\/+$/, '');
+      const pathWithFile = cleanPath.endsWith('.html') ? cleanPath : (cleanPath ? `${cleanPath}/index.html` : '/index.html');
+      return `${window.location.origin}${pathWithFile}?ref=${encodeURIComponent(ref)}`;
+    }
+  }
+  // Production fallback that works across any device, mobile and desktop
+  return `https://andart1174.github.io/remo-world/index.html?ref=${encodeURIComponent(ref)}`;
 }
+
+function copyTextToClipboard(text) {
+  if (!text) return;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).catch(() => {
+      fallbackCopyText(text);
+    });
+  } else {
+    fallbackCopyText(text);
+  }
+}
+
+function fallbackCopyText(text) {
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.top = '0';
+    ta.style.left = '0';
+    ta.style.width = '2em';
+    ta.style.height = '2em';
+    ta.style.padding = '0';
+    ta.style.border = 'none';
+    ta.style.outline = 'none';
+    ta.style.boxShadow = 'none';
+    ta.style.background = 'transparent';
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+  } catch (err) {}
+}
+
+window.getCitizenInviteUrl = getCitizenInviteUrl;
+window.copyTextToClipboard = copyTextToClipboard;
 
 function drawOfficialCitizenIdCard(cv, u, lang) {
   if (!cv) return;
@@ -1871,7 +1919,7 @@ function copyMyReferralInviteLink() {
   const lang = REMO_I18N.getLang();
   const u = REMO_STORE.getCurrentUser() || REMO_STORE.ensureGuestOrCitizen('REMO Pioneer', '', 'montreal');
   const url = getCitizenInviteUrl(u);
-  navigator.clipboard?.writeText(url).catch(() => {});
+  copyTextToClipboard(url);
   remoToast(
     lang === 'fr'
       ? `🔗 Lien d’invitation copié (${u.referralCode}) ! +100 🪙 par ami !`
@@ -2106,6 +2154,19 @@ function drawStoryVerticalCanvas(cv, u, lang) {
     ctx.font = '700 18px "Outfit", sans-serif';
     ctx.fillStyle = '#64748b';
     ctx.fillText(lang === 'fr' ? 'Le Réseau Social Mondial 4D · Explorez sans frontières' : 'The 4D Global Social Network · Explore without borders', 540, 1812);
+
+    if (cv && cv.toBlob) {
+      cv.toBlob((b) => {
+        if (b) {
+          window._cachedStoryBlob = b;
+          try {
+            window._cachedStoryFile = new File([b], `REMO_Story_${(u && u.passportNum) || '0001'}.png`, { type: 'image/png' });
+          } catch (e) {
+            window._cachedStoryFile = null;
+          }
+        }
+      }, 'image/png');
+    }
   } catch (err) {
     console.error('drawStoryVerticalCanvas error:', err);
   }
@@ -2138,41 +2199,49 @@ async function shareStoryCanvasNative() {
   const inviteUrl = getCitizenInviteUrl(u);
   const shareTitle = 'REMO World · Official Citizen Passport';
   const shareText = lang === 'fr'
-    ? `🌐 Rejoins ma ville sur REMO avec mon code ${u.referralCode || ('REMO-' + u.passportNum)} et gagne +100 🪙 de bienvenue ! ${inviteUrl}`
-    : `🌐 Join my city on REMO with code ${u.referralCode || ('REMO-' + u.passportNum)} to earn +100 🪙 welcome coins! ${inviteUrl}`;
+    ? `🌐 Rejoins ma ville sur REMO avec mon code ${u.referralCode || ('REMO-' + u.passportNum)} et gagne +100 🪙 de bienvenue !`
+    : `🌐 Join my city on REMO with code ${u.referralCode || ('REMO-' + u.passportNum)} to earn +100 🪙 welcome coins!`;
 
-  if (cv && cv.toBlob) {
-    cv.toBlob(async (blob) => {
-      if (!blob) {
-        downloadStoryCanvasPNG();
+  // Always copy link with fallback and trigger HD PNG download
+  copyTextToClipboard(inviteUrl);
+  downloadStoryCanvasPNG();
+
+  // Try native Web Share API
+  if (navigator.share) {
+    const file = window._cachedStoryFile;
+    if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({
+          files: [file],
+          title: shareTitle,
+          text: `${shareText} ${inviteUrl}`
+        });
+        remoToast(lang === 'fr' ? '🎉 Story partagée avec succès !' : '🎉 Story shared successfully!', 'fanfare');
         return;
+      } catch (err) {
+        if (err && err.name === 'AbortError') return;
       }
-      const file = new File([blob], `REMO_Citizen_Story_${u.passportNum || '0001'}.png`, { type: 'image/png' });
-      if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        try {
-          await navigator.share({
-            files: [file],
-            title: shareTitle,
-            text: shareText
-          });
-          remoToast(lang === 'fr' ? '🎉 Story partagée avec succès !' : '🎉 Story shared successfully!', 'fanfare');
-          return;
-        } catch (e) {
-          if (e && e.name === 'AbortError') return;
-        }
-      }
-      downloadStoryCanvasPNG();
-      navigator.clipboard?.writeText(inviteUrl).catch(() => {});
-      remoToast(
-        lang === 'fr'
-          ? '📥 Image HD téléchargée et lien copié ! Prêt pour votre Story Instagram / TikTok !'
-          : '📥 HD Story downloaded & link copied! Ready for your Instagram / TikTok Story!',
-        'fanfare'
-      );
-    }, 'image/png');
-  } else {
-    downloadStoryCanvasPNG();
+    }
+
+    try {
+      await navigator.share({
+        title: shareTitle,
+        text: shareText,
+        url: inviteUrl
+      });
+      remoToast(lang === 'fr' ? '🎉 Lien de partage envoyé !' : '🎉 Share link sent!', 'fanfare');
+      return;
+    } catch (err) {
+      if (err && err.name === 'AbortError') return;
+    }
   }
+
+  remoToast(
+    lang === 'fr'
+      ? '📥 Image HD enregistrée et lien copié ! Prêt pour votre Story Instagram / TikTok !'
+      : '📥 HD image saved & link copied! Ready for your Instagram / TikTok Story!',
+    'fanfare'
+  );
 }
 
 function downloadStoryCanvasPNG() {
