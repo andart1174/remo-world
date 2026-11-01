@@ -1,6 +1,7 @@
 /* ════════════════════════════════════════════════════════════════════
    REMO WORLD RADIO ENGINE™ — Live World Cities & Chill Vibe Streams
-   High-Fidelity Audio Streaming + City-Adaptive Audio System
+   Continuous-Play Audio Streaming + Anti-Pause Watchdog & MediaSession
+   Strict Bilingual (EN / FR Only)
    ════════════════════════════════════════════════════════════════════ */
 
 (function () {
@@ -20,14 +21,36 @@
       cityId: null
     },
     {
+      id: 'somafm_groove',
+      category: 'vibe',
+      name: 'SomaFM Groove Salad',
+      desc_fr: 'Ambient, Downtempo & Chillout Électronique',
+      desc_en: 'Ambient, Downtempo & Chilled Electronica',
+      icon: '🥗',
+      streamUrl: 'https://ice1.somafm.com/groovesalad-128-mp3',
+      badge: 'AMBIENT CHILL',
+      cityId: null
+    },
+    {
+      id: 'somafm_defcon',
+      category: 'vibe',
+      name: 'DEF CON Cyber Radio',
+      desc_fr: 'Cyberpunk, Synthwave & Underground Beats',
+      desc_en: 'Cyberpunk, Synthwave & Underground Beats',
+      icon: '⚡',
+      streamUrl: 'https://ice2.somafm.com/defcon-128-mp3',
+      badge: 'CYBERPUNK',
+      cityId: null
+    },
+    {
       id: 'nightwave_plaza',
       category: 'vibe',
       name: 'Nightwave Plaza',
-      desc_fr: 'Vaporwave, Synthwave & Cyber Electronica',
-      desc_en: 'Vaporwave, Synthwave & Cyber Electronic',
-      icon: '⚡',
+      desc_fr: 'Vaporwave, Synthwave & Électronique Rétro',
+      desc_en: 'Vaporwave, Synthwave & Retro Electronic',
+      icon: '🌆',
       streamUrl: 'https://radio.plaza.one/mp3',
-      badge: 'SYNTHWAVE',
+      badge: 'VAPORWAVE',
       cityId: null
     },
     {
@@ -55,28 +78,6 @@
 
     // 🌍 LIVE WORLD CITIES STATIONS
     {
-      id: 'chisinau_kiss',
-      category: 'city',
-      name: 'Kiss FM Moldova',
-      desc_fr: 'Chișinău • Muzică Vie, Hituri & Energie',
-      desc_en: 'Chișinău • Live Hits & Fresh Vibes',
-      icon: '🇲🇩',
-      streamUrl: 'https://live.kissfm.ro/kissfm.aacp',
-      badge: 'CHIȘINĂU',
-      cityId: 'chisinau'
-    },
-    {
-      id: 'bucarest_magic',
-      category: 'city',
-      name: 'Magic FM Bucarest',
-      desc_fr: 'București • Cele mai frumoase melodii',
-      desc_en: 'Bucarest • Always Great Classics & Hits',
-      icon: '🇷🇴',
-      streamUrl: 'https://live.magicfm.ro/magicfm.aacp',
-      badge: 'BUCAREST',
-      cityId: 'bucarest'
-    },
-    {
       id: 'paris_fip',
       category: 'city',
       name: 'FIP Radio France Paris',
@@ -85,6 +86,39 @@
       icon: '🇫🇷',
       streamUrl: 'https://icecast.radiofrance.fr/fip-midfi.mp3',
       badge: 'PARIS',
+      cityId: 'paris'
+    },
+    {
+      id: 'paris_mouv',
+      category: 'city',
+      name: 'Mouv’ Radio Paris',
+      desc_fr: 'Paris • Hip-Hop, Rap, RnB & Électro Urbain',
+      desc_en: 'Paris • Hip-Hop, Rap, RnB & Urban Beats',
+      icon: '🎧',
+      streamUrl: 'https://icecast.radiofrance.fr/mouv-midfi.mp3',
+      badge: 'PARIS URBAN',
+      cityId: 'paris'
+    },
+    {
+      id: 'nrj_france',
+      category: 'city',
+      name: 'NRJ Paris Hits',
+      desc_fr: 'Paris • Hit Music Only & Top 40 Mondial',
+      desc_en: 'Paris • Hit Music Only & Global Top 40',
+      icon: '🔥',
+      streamUrl: 'https://scdn.nrjaudio.fm/audio1/fr/30001/mp3_128.mp3',
+      badge: 'PARIS HITS',
+      cityId: 'paris'
+    },
+    {
+      id: 'skyrock_paris',
+      category: 'city',
+      name: 'Skyrock FM Paris',
+      desc_fr: 'Paris • Premier sur le Rap & Musique Urbaine',
+      desc_en: 'Paris • Leading French Rap & Urban Hits',
+      icon: '🎙️',
+      streamUrl: 'https://icecast.skyrock.net/s/natio_aac_64k',
+      badge: 'SKYROCK',
       cityId: 'paris'
     },
     {
@@ -99,10 +133,21 @@
       cityId: 'montreal'
     },
     {
+      id: 'montreal_ckac',
+      category: 'city',
+      name: 'Montréal Direct Stream',
+      desc_fr: 'Montréal • Actualités Urbaines & Culture Locale',
+      desc_en: 'Montréal • Urban News & Local Montreal Life',
+      icon: '⚜️',
+      streamUrl: 'https://playerservices.streamtheworld.com/api/livestream-redirect/CKACAM.mp3',
+      badge: 'MONTRÉAL QC',
+      cityId: 'montreal'
+    },
+    {
       id: 'newyork_wnyc',
       category: 'city',
       name: 'WNYC 93.9 FM New York',
-      desc_fr: 'New York • NPR, Jazz & Indie Culture',
+      desc_fr: 'New York • NPR, Jazz & Culture Indie',
       desc_en: 'New York • NPR, Jazz & Indie Culture',
       icon: '🇺🇸',
       streamUrl: 'https://fm939.wnyc.org/wnycfm.mp3',
@@ -113,12 +158,23 @@
       id: 'london_capital',
       category: 'city',
       name: 'Capital FM London',
-      desc_fr: 'Londres • Top 40 UK & World Hits',
+      desc_fr: 'Londres • Top 40 UK & Hits Mondiaux',
       desc_en: 'London • The UK\'s No.1 Hit Music Station',
       icon: '🇬🇧',
       streamUrl: 'https://media-ice.musicradio.com/CapitalMP3',
       badge: 'LONDRES',
       cityId: 'londres'
+    },
+    {
+      id: 'swiss_pop',
+      category: 'city',
+      name: 'Radio Swiss Pop',
+      desc_fr: 'Genève • Les Meilleurs Hits Pop & Doux Classiques',
+      desc_en: 'Geneva • Best Pop Hits & Soft Classics 24/7',
+      icon: '🇨🇭',
+      streamUrl: 'https://stream.srg-ssr.ch/m/rsp/mp3_128',
+      badge: 'SUISSE',
+      cityId: null
     },
     {
       id: 'tokyo_jpop',
@@ -141,6 +197,28 @@
       streamUrl: 'https://listen.radioking.com/radio/623812/stream/685903',
       badge: 'DUBAÏ',
       cityId: 'dubai'
+    },
+    {
+      id: 'chisinau_kiss',
+      category: 'city',
+      name: 'Kiss FM Moldova',
+      desc_fr: 'Chișinău • Hits En Direct, Musique & Énergie',
+      desc_en: 'Chișinău • Live Hits & Fresh Energy',
+      icon: '🇲🇩',
+      streamUrl: 'https://live.kissfm.ro/kissfm.aacp',
+      badge: 'CHIȘINĂU',
+      cityId: 'chisinau'
+    },
+    {
+      id: 'bucarest_magic',
+      category: 'city',
+      name: 'Magic FM Bucarest',
+      desc_fr: 'Bucarest • Grands Classiques & Meilleurs Hits',
+      desc_en: 'Bucarest • Always Great Classics & Hits',
+      icon: '🇷🇴',
+      streamUrl: 'https://live.magicfm.ro/magicfm.aacp',
+      badge: 'BUCAREST',
+      cityId: 'bucarest'
     }
   ];
 
@@ -149,56 +227,231 @@
       this.stations = REMO_RADIO_STATIONS;
       this.audioEl = new Audio();
       this.audioEl.preload = 'none';
+      this.audioEl.crossOrigin = 'anonymous';
       this.currentCategory = 'vibe'; // 'vibe' or 'city'
 
-      // Load preferences from localStorage
+      // Persistent preferences
       const savedStationId = localStorage.getItem('remo_radio_current_station') || 'capital_chill';
       this.currentStation = this.stations.find((s) => s.id === savedStationId) || this.stations[0];
       const savedVol = parseFloat(localStorage.getItem('remo_radio_volume'));
       this.volume = !isNaN(savedVol) ? Math.max(0, Math.min(1, savedVol)) : 0.65;
       this.audioEl.volume = this.volume;
 
+      // Robust Continuous Playback State
       this.isPlaying = false;
       this.isLoading = false;
       this.isSynthMode = false;
+      this.userWantsPlaying = false; // Source of truth: did user click Play?
+      this.isReconnecting = false;
+      this.reconnectAttempts = 0;
+      this._reconnectTimer = null;
+      this._watchdogTimer = null;
 
       this._bindAudioEvents();
+      this._initMediaSessionHandlers();
+      this._startAntiPauseWatchdog();
+      this._bindVisibilityWatchdog();
     }
 
     _bindAudioEvents() {
       this.audioEl.addEventListener('playing', () => {
         this.isLoading = false;
         this.isPlaying = true;
+        this.isReconnecting = false;
+        this.reconnectAttempts = 0;
+        this._updateMediaSession();
         this._updateUI();
       });
 
       this.audioEl.addEventListener('waiting', () => {
-        this.isLoading = true;
-        this._updateUI();
-      });
-
-      this.audioEl.addEventListener('pause', () => {
-        if (!this.isSynthMode) {
-          this.isPlaying = false;
-          this.isLoading = false;
+        if (this.userWantsPlaying) {
+          this.isLoading = true;
           this._updateUI();
         }
       });
 
-      this.audioEl.addEventListener('error', (err) => {
-        console.warn('RemoRadio stream error:', err);
-        this.isLoading = false;
-        this.isPlaying = false;
-        this._updateUI();
-        const lang = (window.REMO_I18N && window.REMO_I18N.getLang) ? window.REMO_I18N.getLang() : 'fr';
-        if (typeof window.remoToast === 'function') {
-          window.remoToast(
-            lang === 'fr'
-              ? `⚠️ Flux temporairement indisponible pour ${this.currentStation.name}. Essayez un autre canal !`
-              : `⚠️ Stream temporarily unavailable for ${this.currentStation.name}. Try another station!`
-          );
+      this.audioEl.addEventListener('loadstart', () => {
+        if (this.userWantsPlaying) {
+          this.isLoading = true;
+          this._updateUI();
         }
       });
+
+      this.audioEl.addEventListener('pause', () => {
+        if (this.isSynthMode) return;
+
+        // CRITICAL FIX: If audio paused unexpectedly (buffer underrun, OS sleep, stream glitch)
+        // while the user WANTED music playing, do NOT treat it as user pause! Auto-resume!
+        if (this.userWantsPlaying) {
+          console.warn('[REMO Radio] Stream paused unexpectedly while userWantsPlaying=true. Triggering auto-recovery...');
+          this._scheduleAutoReconnect('pause_event');
+        } else {
+          this.isPlaying = false;
+          this.isLoading = false;
+          this._updateMediaSession();
+          this._updateUI();
+        }
+      });
+
+      this.audioEl.addEventListener('stalled', () => {
+        if (this.userWantsPlaying && !this.isSynthMode) {
+          console.warn('[REMO Radio] Stream stalled, scheduling reconnect...');
+          this._scheduleAutoReconnect('stalled');
+        }
+      });
+
+      this.audioEl.addEventListener('ended', () => {
+        // Live streams should never end normally; if browser fires ended, stream dropped
+        if (this.userWantsPlaying && !this.isSynthMode) {
+          console.warn('[REMO Radio] Stream ended event fired, auto-reconnecting live stream...');
+          this._scheduleAutoReconnect('ended');
+        }
+      });
+
+      this.audioEl.addEventListener('error', (err) => {
+        console.warn('[REMO Radio] Stream error encountered:', err);
+        if (this.userWantsPlaying && !this.isSynthMode) {
+          this._scheduleAutoReconnect('error');
+        } else {
+          this.isLoading = false;
+          this.isPlaying = false;
+          this._updateUI();
+        }
+      });
+    }
+
+    /* ── 🛡️ ANTI-PAUSE RECONNECT WATCHDOG ── */
+    _scheduleAutoReconnect(reason = 'unknown') {
+      if (!this.userWantsPlaying || this.isSynthMode) return;
+      if (this.isReconnecting) return;
+
+      this.isReconnecting = true;
+      this.isLoading = true;
+      this._updateUI();
+
+      if (this._reconnectTimer) clearTimeout(this._reconnectTimer);
+
+      const delay = Math.min(6000, 1000 * Math.pow(1.4, this.reconnectAttempts));
+      this.reconnectAttempts++;
+
+      this._reconnectTimer = setTimeout(() => {
+        if (!this.userWantsPlaying || this.isSynthMode) {
+          this.isReconnecting = false;
+          return;
+        }
+        this._reconnectStream(reason);
+      }, delay);
+    }
+
+    _reconnectStream(reason = '') {
+      if (!this.currentStation || !this.currentStation.streamUrl) {
+        this.isReconnecting = false;
+        return;
+      }
+
+      const rawUrl = this.currentStation.streamUrl;
+      if (rawUrl === 'internal://synth') {
+        this.isReconnecting = false;
+        return;
+      }
+
+      console.log(`[REMO Radio] Reconnecting to ${this.currentStation.name} (${reason}, try ${this.reconnectAttempts})...`);
+
+      // Bust stale TCP / Icecast buffer
+      const sep = rawUrl.includes('?') ? '&' : '?';
+      const freshUrl = `${rawUrl}${sep}_r=${Date.now()}`;
+
+      try {
+        this.audioEl.pause();
+        this.audioEl.removeAttribute('src');
+        this.audioEl.load();
+      } catch (e) {}
+
+      this.audioEl.src = freshUrl;
+      this.audioEl.volume = this.volume;
+
+      const p = this.audioEl.play();
+      if (p && typeof p.then === 'function') {
+        p.then(() => {
+          this.isPlaying = true;
+          this.isLoading = false;
+          this.isReconnecting = false;
+          this.reconnectAttempts = 0;
+          this._updateMediaSession();
+          this._updateUI();
+        }).catch((err) => {
+          console.warn('[REMO Radio] Reconnect play rejected:', err);
+          this.isReconnecting = false;
+          if (this.userWantsPlaying && this.reconnectAttempts < 6) {
+            this._scheduleAutoReconnect('retry_after_reject');
+          } else {
+            this.isLoading = false;
+            this._updateUI();
+          }
+        });
+      }
+    }
+
+    _startAntiPauseWatchdog() {
+      if (this._watchdogTimer) clearInterval(this._watchdogTimer);
+      // Run every 4 seconds to guarantee music NEVER silently pauses after 5-10 minutes
+      this._watchdogTimer = setInterval(() => {
+        if (this.userWantsPlaying && !this.isSynthMode) {
+          if (this.audioEl.paused && !this.isReconnecting) {
+            console.log('[REMO Radio Watchdog] Stream unexpectedly halted. Reviving stream immediately...');
+            this._scheduleAutoReconnect('watchdog_revive');
+          }
+        }
+      }, 4000);
+    }
+
+    _bindVisibilityWatchdog() {
+      // When screen turns on or user switches back to REMO tab, ensure audio is alive
+      document.addEventListener('visibilitychange', () => {
+        if (!document.hidden && this.userWantsPlaying && !this.isSynthMode) {
+          if (this.audioEl.paused) {
+            console.log('[REMO Radio] Tab visible, reviving paused stream...');
+            this._reconnectStream('visibility_revive');
+          }
+        }
+      });
+      window.addEventListener('focus', () => {
+        if (this.userWantsPlaying && !this.isSynthMode && this.audioEl.paused) {
+          this._reconnectStream('window_focus');
+        }
+      });
+    }
+
+    /* ── 📱 MEDIASESSION API (Mobile Lockscreen Controls & OS High-Priority Audio) ── */
+    _initMediaSessionHandlers() {
+      if (!('mediaSession' in navigator)) return;
+      try {
+        navigator.mediaSession.setActionHandler('play', () => this.play());
+        navigator.mediaSession.setActionHandler('pause', () => this.pause());
+        navigator.mediaSession.setActionHandler('stop', () => this.stop());
+        navigator.mediaSession.setActionHandler('nexttrack', () => this.nextStation());
+        navigator.mediaSession.setActionHandler('previoustrack', () => this.prevStation());
+      } catch (e) {
+        console.warn('MediaSession handler error:', e);
+      }
+    }
+
+    _updateMediaSession() {
+      if (!('mediaSession' in navigator) || !this.currentStation) return;
+      try {
+        const lang = (window.REMO_I18N && window.REMO_I18N.getLang) ? window.REMO_I18N.getLang() : 'fr';
+        const desc = lang === 'fr' ? this.currentStation.desc_fr : this.currentStation.desc_en;
+        navigator.mediaSession.metadata = new MediaMetadata({
+          title: this.currentStation.name,
+          artist: 'REMO World Radio 4D 🌐',
+          album: `${this.currentStation.badge} • ${desc}`,
+          artwork: [
+            { src: 'img/remo_icon_192.png', sizes: '192x192', type: 'image/png' },
+            { src: 'img/remo_icon_512.png', sizes: '512x512', type: 'image/png' }
+          ]
+        });
+        navigator.mediaSession.playbackState = this.isPlaying ? 'playing' : 'paused';
+      } catch (e) {}
     }
 
     selectStation(stationId, autoPlay = true) {
@@ -208,7 +461,6 @@
       this.currentStation = st;
       localStorage.setItem('remo_radio_current_station', st.id);
 
-      // Stop any existing stream / synth
       this.stop();
 
       if (autoPlay) {
@@ -218,8 +470,22 @@
       }
     }
 
+    nextStation() {
+      const curIdx = this.stations.findIndex((s) => s.id === this.currentStation.id);
+      const nextIdx = (curIdx + 1) % this.stations.length;
+      this.selectStation(this.stations[nextIdx].id, this.userWantsPlaying);
+    }
+
+    prevStation() {
+      const curIdx = this.stations.findIndex((s) => s.id === this.currentStation.id);
+      const prevIdx = (curIdx - 1 + this.stations.length) % this.stations.length;
+      this.selectStation(this.stations[prevIdx].id, this.userWantsPlaying);
+    }
+
     play() {
       if (!this.currentStation) return;
+      this.userWantsPlaying = true;
+      this.reconnectAttempts = 0;
 
       if (this.currentStation.streamUrl === 'internal://synth') {
         this.isSynthMode = true;
@@ -230,6 +496,7 @@
         }
         this.isPlaying = true;
         this.isLoading = false;
+        this._updateMediaSession();
         this._updateUI();
         return;
       }
@@ -250,6 +517,7 @@
         p.then(() => {
           this.isPlaying = true;
           this.isLoading = false;
+          this._updateMediaSession();
           this._updateUI();
         }).catch((err) => {
           console.warn('Playback error (often autoplay restrictions):', err);
@@ -261,11 +529,15 @@
     }
 
     pause() {
+      this.userWantsPlaying = false; // User explicitly initiated pause
+      if (this._reconnectTimer) clearTimeout(this._reconnectTimer);
+
       if (this.isSynthMode) {
         if (window.RemoAudio && window.RemoAudio.radioPlaying) {
           window.RemoAudio.stopRadio();
         }
         this.isPlaying = false;
+        this._updateMediaSession();
         this._updateUI();
         return;
       }
@@ -273,10 +545,14 @@
       this.audioEl.pause();
       this.isPlaying = false;
       this.isLoading = false;
+      this._updateMediaSession();
       this._updateUI();
     }
 
     stop() {
+      this.userWantsPlaying = false;
+      if (this._reconnectTimer) clearTimeout(this._reconnectTimer);
+
       if (window.RemoAudio && window.RemoAudio.radioPlaying) {
         window.RemoAudio.stopRadio();
       }
@@ -286,6 +562,7 @@
       this.audioEl.load();
       this.isPlaying = false;
       this.isLoading = false;
+      this._updateMediaSession();
       this._updateUI();
     }
 
@@ -348,7 +625,9 @@
       // 2. Update Mobile Hub Button
       const mbTxt = document.getElementById('mbRadioBtnTxt');
       if (mbTxt) {
-        mbTxt.innerHTML = this.isPlaying ? `🟢 ${st.icon} ${st.name}` : `📻 Radio du Monde`;
+        mbTxt.innerHTML = this.isPlaying
+          ? `🟢 ${st.icon} ${st.name}`
+          : (lang === 'fr' ? `📻 Radio du Monde` : `📻 World Radio`);
       }
 
       // 3. Update Modal Now-Playing Section
@@ -441,7 +720,6 @@
   };
 
   window.toggleHeaderRadio = function () {
-    // Single-click opens the radio console to pick any vibe/city stream or pause
     window.openRemoRadioModal();
   };
 

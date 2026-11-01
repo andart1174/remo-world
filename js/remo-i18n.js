@@ -323,6 +323,15 @@ const REMO_DICT = {
     wheel_spin_btn: 'SPIN NOW (FREE DAILY)',
     wheel_extra_btn: 'Spin Again (50 🪙)',
     radio_label: '📻 REMO Cyber-Lofi Radio 24/7',
+    radio_modal_title: 'REMO WORLD RADIO™',
+    radio_modal_sub: 'Live World Cities & Chill Vibe Streams',
+    radio_tab_vibes: '🎧 Vibes & Chill (Lofi / Synth)',
+    radio_tab_cities: '🌍 World Cities Live',
+    radio_on_air: '🟢 ON AIR',
+    radio_buffering: '⏳ BUFFERING',
+    radio_paused: '⏸️ PAUSED',
+    radio_play_btn: 'Play Live',
+    radio_pause_btn: 'Pause',
 
     // Auth Modal & IAB
     auth_welcome: 'Welcome to REMO 🌐',
@@ -811,6 +820,15 @@ const REMO_DICT = {
     wheel_spin_btn: 'TOURNER (GRATUIT DU JOUR)',
     wheel_extra_btn: 'Retourner (50 🪙)',
     radio_label: '📻 Radio REMO Cyber-Lofi 24/7',
+    radio_modal_title: 'REMO WORLD RADIO™',
+    radio_modal_sub: 'Flux en direct des villes mondiales & ambiances chill',
+    radio_tab_vibes: '🎧 Ambiances & Chill (Lofi / Synth)',
+    radio_tab_cities: '🌍 Villes du Monde en Direct',
+    radio_on_air: '🟢 EN DIRECT',
+    radio_buffering: '⏳ CONNEXION',
+    radio_paused: '⏸️ EN PAUSE',
+    radio_play_btn: 'Écouter',
+    radio_pause_btn: 'Pause',
 
     // Auth Modal & IAB
     auth_welcome: 'Bienvenue sur REMO 🌐',
