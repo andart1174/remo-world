@@ -403,51 +403,117 @@ function renderPostCardBack(p, city, lang, wx) {
   const serial = (p.id || '').slice(-6).toUpperCase();
   const cosm = (REMO_STORE && REMO_STORE.getUserCosmetics) ? REMO_STORE.getUserCosmetics(p.uid) : { frameClass: '', title_fr: '', title_en: '' };
   const royalTitle = lang === 'fr' ? (cosm.title_fr || '') : (cosm.title_en || '');
-  const lat = (p.lat || city.lat || 45.5017).toFixed(4);
-  const lng = (p.lng || city.lng || -73.5673).toFixed(4);
+  const cityName = getCityName(city, lang);
+
+  // Dynamic collectible scores
+  const likesCount = Array.isArray(p.likes) ? p.likes.length : (typeof p.likes === 'number' ? p.likes : 0);
+  const hypeScore = Math.min(99, Math.max(35, 45 + likesCount * 4));
+  const rarityPct = p.founderAward ? 96 : (p.boosted ? 86 : 72);
+  const rarityLbl = p.founderAward ? 'FOUNDER LEGEND' : (p.boosted ? '4D ULTRA' : '4D HOLO');
+  const tempStr = wx ? `${wx.tempC ?? 20}°C` : '20°C';
+  const mintVal = 10 + likesCount * 2;
+  const citizenLabel = t('post_flip_registered_citizen') || (lang === 'fr' ? 'CITOYEN ENREGISTRÉ' : 'REGISTERED CITIZEN');
+  const certifiedLabel = t('post_flip_certified') || (lang === 'fr' ? '★ CERTIFIÉ REMO EARTH 4D ★' : '★ REMO EARTH 4D CERTIFIED ★');
 
   return `
     <div class="holo-back-shimmer"></div>
     <div class="post-back-stamp-seal">
       <span>REMO EARTH™</span>
       <span style="font-size:0.55rem;margin:2px 0;">AUTHENTICATED</span>
-      <span>${city.code} 4D</span>
+      <span>${city.code || '4D'} 4D</span>
     </div>
-    <div class="post-back-header">
-      <span class="post-back-serial">${t('post_flip_back_title', { num: serial })}</span>
-      <span style="font-size:0.75rem;color:#38bdf8;font-weight:800;">${city.flag} ${getCityName(city, lang)}</span>
+
+    <!-- Header Row: Holographic title & Golden Serial -->
+    <div class="post-back-top-row">
+      <div class="holo-title-pill">🎴 ${lang === 'fr' ? 'CARTE HOLOGRAPHIQUE 4D' : '4D HOLOGRAPHIC CARD'}</div>
+      <div class="holo-serial-badge">#${serial}</div>
     </div>
-    <div class="post-back-body">
-      <div class="post-back-row">
-        <div class="avatar-circle ${cosm.frameClass}" style="width:28px;height:28px;font-size:0.75rem;">${escapeHtmlStr((p.authorName || 'R')[0].toUpperCase())}</div>
-        <b style="color:#fbbf24;">@${escapeHtmlStr(p.authorName)}</b>
-        ${royalTitle ? `<span class="royal-title-pill" style="font-size:0.65rem;">${escapeHtmlStr(royalTitle)}</span>` : ''}
-      </div>
-      <div class="post-back-row">
-        <span>📍 <b>${t('post_flip_coords')}:</b></span>
-        <span style="font-family:monospace;color:#38bdf8;">${lat}°, ${lng}°</span>
-      </div>
-      <div class="post-back-row">
-        <span>🌤️ <b>Atmosphere:</b></span>
-        <span>${wx ? `${wx.icon} ${wx.tempC}°C · ${wx.timeStr}` : '20°C'}</span>
-      </div>
-      ${p.bounty && !p.bounty.claimed ? `
-        <div style="background:rgba(245,158,11,0.18);border:1px dashed #fbbf24;border-radius:8px;padding:6px 10px;font-size:0.75rem;color:#fde68a;">
-          🎁 <b>Active Bounty:</b> +${p.bounty.coins} 🪙
+
+    <!-- Citizen ID Card strip (Registered Citizen city instead of raw GPS) -->
+    <div class="holo-citizen-header-card">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;">
+        <div style="display:flex;align-items:center;gap:7px;">
+          <div class="avatar-circle ${cosm.frameClass}" style="width:28px;height:28px;font-size:0.75rem;">${escapeHtmlStr((p.authorName || 'R')[0].toUpperCase())}</div>
+          <div>
+            <b style="color:#fbbf24;font-size:0.82rem;">@${escapeHtmlStr(p.authorName)}</b>
+            ${royalTitle ? `<span class="royal-title-pill" style="font-size:0.6rem;margin-left:4px;">${escapeHtmlStr(royalTitle)}</span>` : ''}
+          </div>
         </div>
-      ` : ''}
-      ${p.voiceUrl ? `
-        <div class="post-back-row">
-          <span>🎙️ <b>Voice Note:</b> Attached</span>
-        </div>
-      ` : ''}
+        <span class="registered-city-badge">🏛️ ${citizenLabel}: ${city.flag} ${cityName.toUpperCase()}</span>
+      </div>
     </div>
+
+    <!-- Spectacular Colorful Animated Centerpiece -->
+    <div class="holo-prism-centerpiece">
+      <div class="holo-prism-ring">
+        <span class="holo-crest-flag">${city.flag}</span>
+      </div>
+      <div class="holo-crest-cityname">${cityName.toUpperCase()}</div>
+      <div class="holo-crest-allegiance">${certifiedLabel}</div>
+    </div>
+
+    <!-- 4 Colorful Cyberpunk Stat Bars -->
+    <div class="holo-stats-grid">
+      <div class="holo-stat-item">
+        <div class="stat-lbl-row">
+          <span>🔥 Vibe & Hype</span>
+          <b>${hypeScore}%</b>
+        </div>
+        <div class="holo-stat-bar-track">
+          <div class="holo-stat-bar-fill bar-rose" style="width:${hypeScore}%;"></div>
+        </div>
+      </div>
+
+      <div class="holo-stat-item">
+        <div class="stat-lbl-row">
+          <span>⭐ ${t('post_flip_rarity') || (lang === 'fr' ? 'Rareté 4D' : '4D Rarity')}</span>
+          <b style="color:#fbbf24;">${rarityLbl}</b>
+        </div>
+        <div class="holo-stat-bar-track">
+          <div class="holo-stat-bar-fill bar-gold" style="width:${rarityPct}%;"></div>
+        </div>
+      </div>
+
+      <div class="holo-stat-item">
+        <div class="stat-lbl-row">
+          <span>🌤️ ${t('post_flip_climate') || (lang === 'fr' ? 'Climat Live' : 'Live Climate')}</span>
+          <b style="color:#38bdf8;">${tempStr}</b>
+        </div>
+        <div class="holo-stat-bar-track">
+          <div class="holo-stat-bar-fill bar-cyan" style="width:80%;"></div>
+        </div>
+      </div>
+
+      <div class="holo-stat-item">
+        <div class="stat-lbl-row">
+          <span>🪙 ${t('post_flip_mint_val') || (lang === 'fr' ? 'Valeur Mint' : 'Mint Value')}</span>
+          <b style="color:#34d399;">+${mintVal} 🪙</b>
+        </div>
+        <div class="holo-stat-bar-track">
+          <div class="holo-stat-bar-fill bar-emerald" style="width:75%;"></div>
+        </div>
+      </div>
+    </div>
+
+    ${p.bounty && !p.bounty.claimed ? `
+      <div style="background:rgba(245,158,11,0.22);border:1px dashed #fbbf24;border-radius:8px;padding:5px 9px;font-size:0.75rem;color:#fde68a;display:flex;align-items:center;gap:6px;position:relative;z-index:2;">
+        <span>🎁</span> <b>${lang === 'fr' ? 'Prime Active :' : 'Active Bounty:'}</b> +${p.bounty.coins} 🪙
+      </div>
+    ` : ''}
+
+    ${p.voiceUrl ? `
+      <div style="background:rgba(56,189,248,0.15);border:1px solid rgba(56,189,248,0.3);border-radius:8px;padding:4px 8px;font-size:0.72rem;color:#bae6fd;display:flex;align-items:center;gap:6px;position:relative;z-index:2;">
+        <span>🎙️</span> <b>${lang === 'fr' ? 'Note Vocale :' : 'Voice Note:'}</b> ${lang === 'fr' ? 'Enregistrement 4D Inclus' : '4D Audio Included'}
+      </div>
+    ` : ''}
+
+    <!-- Bottom Flip Card Action Buttons -->
     <div class="post-back-actions">
-      <button type="button" class="btn-cyber btn-gold" style="flex:1;font-size:0.75rem;padding:6px 10px;justify-content:center;" onclick="savePostCardToAlbum('${p.id}')">
-        ${t('post_flip_save')}
+      <button type="button" class="btn-cyber btn-gold" style="flex:1;font-size:0.75rem;padding:7px 10px;justify-content:center;" onclick="savePostCardToAlbum('${p.id}')">
+        📕 ${t('post_flip_save')}
       </button>
-      <button type="button" class="btn-ghost" style="font-size:0.75rem;padding:6px 10px;" onclick="flipPost3DCard('${p.id}')">
-        ${t('post_flip_front_btn')}
+      <button type="button" class="btn-ghost" style="font-size:0.75rem;padding:7px 10px;" onclick="flipPost3DCard('${p.id}')">
+        🔄 ${t('post_flip_front_btn')}
       </button>
     </div>
   `;
@@ -522,13 +588,19 @@ function renderStoriesAndBanners() {
     pulseBox.innerHTML = `
       <div>
         <div style="font-size:0.72rem;font-weight:900;color:#38bdf8;">${t('pulse_badge')} · ${dp.hashtag}</div>
-        <div style="font-weight:800;font-size:0.9rem;margin-top:2px;">${ttl}</div>
+        <div class="pulse-title-text" style="font-weight:800;font-size:0.9rem;margin-top:2px;">${ttl}</div>
       </div>
       <button class="btn-cyber" onclick="openCreatePostModal('${dp.hashtag}')">${t('pulse_join_btn')}</button>
     `;
   }
 
   renderWorldWeatherTicker();
+  try {
+    if (localStorage.getItem('remo_genesis_dismissed') === '1') {
+      const gFomo = document.getElementById('genesisFomoBar');
+      if (gFomo) gFomo.style.display = 'none';
+    }
+  } catch (e) {}
 }
 
 function renderWorldWeatherTicker() {
@@ -966,16 +1038,9 @@ function getInterCityDistanceBridge(postCity, lang) {
   const viewerCity = getCityById((u && u.homeCity) ? u.homeCity : 'montreal') || getCityById('montreal');
   if (!viewerCity) return '';
 
+  // In same city, omit redundant bridge bar to streamline feed
   if (postCity.id === viewerCity.id) {
-    const txt = lang === 'fr'
-      ? `🏙️ ${postCity.flag} ${getCityName(postCity, 'fr')} · Même ville en direct 📍`
-      : `🏙️ ${postCity.flag} ${getCityName(postCity, 'en')} · Live in your city 📍`;
-    return `
-      <div class="city-distance-bridge">
-        <span>${txt}</span>
-        <button type="button" class="bridge-ticket-btn" onclick="openBoardingPassModal('${viewerCity.id}', 'chisinau')" title="${lang === 'fr' ? 'Générer Billet 4D' : 'Generate 4D Boarding Pass'}">🎫 ${lang === 'fr' ? 'Billet 4D' : '4D Ticket'}</button>
-      </div>
-    `;
+    return '';
   }
 
   const fnHaversine = (typeof haversineKm === 'function')
@@ -1131,23 +1196,23 @@ function renderSocialFeed(searchQuery = '') {
         </div>
 
         <div class="post-media-wrap" id="post_media_${p.id}" ondblclick="handleMediaDoubleTap(event, '${p.id}', this)" ontouchstart="handleTouchDoubleTap(event, '${p.id}', this)">
-          <div class="post-badges-top">
-            ${sealed ? `<span class="pbadge capsule">${t('capsule_locked_badge')}${xray ? ' · 👁️ X-RAY' : ''}</span>` : (p.wasTimeCapsule ? `<span class="pbadge unsealed">${t('capsule_unsealed_badge')}</span>` : '')}
-            ${p.duetOf || p.mediaType === 'city_versus' ? `<span class="pbadge duet">${t('post_duet_badge')}</span>` : ''}
-            ${p.pinned ? `<span class="pbadge pinned">${t('post_pinned_badge')}</span>` : ''}
-            ${p.founderAward ? `<span class="pbadge founder">${t('post_founder_award_badge')}</span>` : ''}
-            ${p.boosted ? `<span class="pbadge boost">${t('post_boosted_badge')}</span>` : ''}
-            ${p.bounty && !p.bounty.claimed ? `<span class="pbadge boost" style="background:#f59e0b;color:#000;">🎁 +${p.bounty.coins} 🪙</span>` : ''}
-            ${!hiddenByCapsule && p.mediaType === 'html_app' ? `<span class="pbadge html">${t('post_html_badge')}</span>` : ''}
-            ${!hiddenByCapsule && p.mediaType === 'video' ? `<span class="pbadge vid60">${t('post_video60_badge')} · ${formatDurationMMSS(p.videoDuration || 60)}</span>` : ''}
-            ${!hiddenByCapsule && p.mediaType === 'before_after' ? `<span class="pbadge html">${t('post_slider_badge')}</span>` : ''}
-            ${p.verifiedGps ? `<span class="pbadge gps">${t('post_verified_gps')}</span>` : ''}
-            ${p.mintedCard ? `<span class="pbadge mint">${t('post_minted_badge')}</span>` : ''}
-            ${p.isSecretSpot ? `<span class="pbadge secret-spot">🗺️ ${lang === 'fr' ? 'LIEU SECRET' : 'SECRET SPOT'}</span>` : ''}
-          </div>
           <div class="post-flip-container" id="post_flip_${p.id}">
             <div class="post-flip-inner">
               <div class="post-face-front">
+                <div class="post-badges-top">
+                  ${sealed ? `<span class="pbadge capsule">${t('capsule_locked_badge')}${xray ? ' · 👁️ X-RAY' : ''}</span>` : (p.wasTimeCapsule ? `<span class="pbadge unsealed">${t('capsule_unsealed_badge')}</span>` : '')}
+                  ${p.duetOf || p.mediaType === 'city_versus' ? `<span class="pbadge duet">${t('post_duet_badge')}</span>` : ''}
+                  ${p.pinned ? `<span class="pbadge pinned">${t('post_pinned_badge')}</span>` : ''}
+                  ${p.founderAward ? `<span class="pbadge founder">${t('post_founder_award_badge')}</span>` : ''}
+                  ${p.boosted ? `<span class="pbadge boost">${t('post_boosted_badge')}</span>` : ''}
+                  ${p.bounty && !p.bounty.claimed ? `<span class="pbadge boost" style="background:#f59e0b;color:#000;">🎁 +${p.bounty.coins} 🪙</span>` : ''}
+                  ${!hiddenByCapsule && p.mediaType === 'html_app' ? `<span class="pbadge html">${t('post_html_badge')}</span>` : ''}
+                  ${!hiddenByCapsule && p.mediaType === 'video' ? `<span class="pbadge vid60">${t('post_video60_badge')} · ${formatDurationMMSS(p.videoDuration || 60)}</span>` : ''}
+                  ${!hiddenByCapsule && p.mediaType === 'before_after' ? `<span class="pbadge html">${t('post_slider_badge')}</span>` : ''}
+                  ${p.verifiedGps ? `<span class="pbadge gps">${t('post_verified_gps')}</span>` : ''}
+                  ${p.mintedCard ? `<span class="pbadge mint">${t('post_minted_badge')}</span>` : ''}
+                  ${p.isSecretSpot ? `<span class="pbadge secret-spot">🗺️ ${lang === 'fr' ? 'LIEU SECRET' : 'SECRET SPOT'}</span>` : ''}
+                </div>
                 ${renderPostMediaStage(p, city, lang)}
               </div>
               <div class="post-face-back">
@@ -5664,3 +5729,14 @@ window.claimPostFeedBounty = claimPostFeedBounty;
 window.handleVersusMediaSelect = handleVersusMediaSelect;
 window.toggleCustomCapsuleMinutesInp = toggleCustomCapsuleMinutesInp;
 
+
+
+function dismissGenesisFomoBar(ev) {
+  if (ev) ev.stopPropagation();
+  const el = document.getElementById('genesisFomoBar');
+  if (el) el.style.display = 'none';
+  try {
+    localStorage.setItem('remo_genesis_dismissed', '1');
+  } catch (e) {}
+}
+window.dismissGenesisFomoBar = dismissGenesisFomoBar;

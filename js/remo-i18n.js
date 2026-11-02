@@ -573,6 +573,11 @@ const REMO_DICT = {
     post_flip_saved_toast: '🎴 Saved to your 4D Album (+10 XP)!',
     post_flip_front_btn: '🔄 Flip to Front',
     post_flip_coords: 'Landmark GPS Coordinates',
+    post_flip_registered_citizen: 'REGISTERED CITIZEN',
+    post_flip_rarity: '4D Rarity',
+    post_flip_climate: 'Live Climate',
+    post_flip_mint_val: 'Mint Value',
+    post_flip_certified: '★ REMO EARTH 4D CERTIFIED ★',
 
     // ⚔️ City Versus Duel
     create_tab_versus: '⚔️ City Versus Duel',
@@ -1172,6 +1177,11 @@ const REMO_DICT = {
     post_flip_saved_toast: '🎴 Ajouté à votre Album 4D (+10 XP) !',
     post_flip_front_btn: '🔄 Retourner la Carte',
     post_flip_coords: 'Coordonnées GPS du Lieu',
+    post_flip_registered_citizen: 'CITOYEN ENREGISTRÉ',
+    post_flip_rarity: 'Rareté 4D',
+    post_flip_climate: 'Climat Live',
+    post_flip_mint_val: 'Valeur Mint',
+    post_flip_certified: '★ CERTIFIÉ REMO EARTH 4D ★',
 
     // ⚔️ City Versus Duel
     create_tab_versus: '⚔️ Duel de Villes',
