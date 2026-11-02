@@ -25,6 +25,7 @@ let cam60Chunks = [];
 let cam60Timer = null;
 let pendingRemixParent = null;
 let pendingDuetParent = null;
+let pendingVersusMedia = { left: '', right: '' };
 let activeDmPartnerUid = 'u_elena_kiv';
 let pendingCommentVoiceKey = '';
 let commentVoiceRecorder = null;
@@ -231,6 +232,252 @@ function renderRightSidebarWidgets() {
       </div>
     `;
   }
+}
+
+
+/* ══════════════════════════════════════════════════════════════
+   🎴 3D FLIP-CARD, CITY VERSUS DUEL & FEED BOUNTY HELPERS
+   ══════════════════════════════════════════════════════════════ */
+function handleTouchDoubleTap(ev, postId, wrapEl) {
+  const now = Date.now();
+  if (wrapEl._lastTouchTime && (now - wrapEl._lastTouchTime) < 340) {
+    wrapEl._lastTouchTime = 0;
+    handleMediaDoubleTap(ev, postId, wrapEl);
+  } else {
+    wrapEl._lastTouchTime = now;
+  }
+}
+
+function flipPost3DCard(postId) {
+  const container = document.getElementById('post_flip_' + postId);
+  if (!container) return;
+  const inner = container.querySelector('.post-flip-inner');
+  if (inner) {
+    inner.classList.toggle('flipped');
+    RemoAudio.play('hit');
+    RemoAudio.haptic(25);
+  }
+}
+
+function savePostCardToAlbum(postId) {
+  const p = (REMO_STORE.state.posts || []).find((x) => x.id === postId);
+  if (!p) return;
+  const u = REMO_STORE.getCurrentUser();
+  if (u) {
+    if (!Array.isArray(u.ownedCards)) u.ownedCards = [];
+    const cardId = 'card_flex_' + p.id;
+    if (!u.ownedCards.some((c) => c.id === cardId)) {
+      u.ownedCards.push({
+        id: cardId,
+        cityId: p.cityId,
+        rarity: p.mintedCard ? 'Mythic 4D' : 'Legendary Gold',
+        unlockedAt: Date.now(),
+        creator: p.authorName
+      });
+      REMO_STORE.addCoins(u.uid, 10, 10);
+      REMO_STORE.save(true, 'card_save');
+    }
+  }
+  RemoAudio.play('fanfare');
+  spawnRemoCoinsFX(12);
+  remoToast(t('post_flip_saved_toast'), 'fanfare');
+}
+
+function voteCityVersusDuel(postId, choice) {
+  const p = (REMO_STORE.state.posts || []).find((x) => x.id === postId);
+  if (!p || !p.versus) return;
+  const u = REMO_STORE.getCurrentUser() || REMO_STORE.ensureGuestOrCitizen('Citizen', '', 'montreal');
+  const v = p.versus;
+  if (!Array.isArray(v.voters)) v.voters = [];
+  if (v.voters.includes(u.uid)) {
+    remoToast(REMO_I18N.getLang() === 'fr' ? 'Vous avez déjà voté pour ce duel !' : 'You already voted in this duel!');
+    return;
+  }
+
+  v.voters.push(u.uid);
+  if (choice === 'left') {
+    v.leftVotes = (v.leftVotes || 0) + 1;
+    REMO_STORE.addCityScore(v.leftCityId || 'montreal', 25);
+  } else {
+    v.rightVotes = (v.rightVotes || 0) + 1;
+    REMO_STORE.addCityScore(v.rightCityId || 'paris', 25);
+  }
+
+  REMO_STORE.addCoins(u.uid, 5, 5);
+  REMO_STORE.save(true, 'versus_vote');
+  spawnRemoCoinsFX(8);
+  RemoAudio.play('coin');
+
+  const chosenCity = getCityById(choice === 'left' ? v.leftCityId : v.rightCityId);
+  const lang = REMO_I18N.getLang();
+  remoToast(t('versus_voted_toast', { city: getCityName(chosenCity, lang) }), 'coin');
+  renderSocialFeed();
+}
+
+function claimPostFeedBounty(postId) {
+  const p = (REMO_STORE.state.posts || []).find((x) => x.id === postId);
+  if (!p || !p.bounty) return;
+  const b = p.bounty;
+  const lang = REMO_I18N.getLang();
+  if (b.claimed) {
+    remoToast(t('bounty_feed_claimed_by', { user: b.claimedBy || 'Citizen', coins: b.coins }));
+    return;
+  }
+
+  const u = REMO_STORE.getCurrentUser() || REMO_STORE.ensureGuestOrCitizen('Hunter', '', 'montreal');
+  const ans = prompt(t('bounty_feed_prompt', { coins: b.coins }));
+  if (!ans) return;
+
+  const isAdm = REMO_STORE.isAdminUnlocked() || REMO_STORE.isCurrentUserAdmin();
+  const cleanAns = ans.trim().toLowerCase();
+  const expected = (b.answer || '').trim().toLowerCase();
+
+  if (isAdm || cleanAns === expected || (expected && cleanAns.includes(expected))) {
+    b.claimed = true;
+    b.claimedBy = u.name;
+    b.claimedAt = Date.now();
+    REMO_STORE.addCoins(u.uid, b.coins, b.coins);
+    REMO_STORE.save(true, 'bounty_feed_claimed');
+    spawnRemoCoinsFX(20);
+    RemoAudio.play('fanfare');
+    remoToast(t('bounty_feed_success', { coins: b.coins }), 'fanfare');
+    renderSocialFeed();
+  } else {
+    RemoAudio.play('hit');
+    remoToast(t('bounty_feed_wrong'));
+  }
+}
+
+function handleVersusMediaSelect(side, ev) {
+  const file = ev.target.files && ev.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    pendingVersusMedia[side] = e.target.result;
+    const prev = document.getElementById(side === 'left' ? 'versusLeftPreview' : 'versusRightPreview');
+    if (prev) {
+      prev.style.display = 'block';
+      prev.innerHTML = `<img src="${e.target.result}" style="width:100%;height:100%;object-fit:cover;">`;
+    }
+  };
+  reader.readAsDataURL(file);
+}
+
+function toggleCustomCapsuleMinutesInp(val) {
+  const customInp = document.getElementById('createCapsuleCustomMins');
+  if (customInp) {
+    customInp.style.display = val === 'custom' ? 'block' : 'none';
+  }
+}
+
+function renderCityVersusDuelStage(p, lang) {
+  const v = p.versus || {};
+  const cA = getCityById(v.leftCityId || 'montreal') || { flag: '⚜️', code: 'MTL' };
+  const cB = getCityById(v.rightCityId || 'paris') || { flag: '🗼', code: 'PAR' };
+  const leftVotes = Number(v.leftVotes || 0);
+  const rightVotes = Number(v.rightVotes || 0);
+  const total = leftVotes + rightVotes;
+  const pA = total > 0 ? Math.round((leftVotes / total) * 100) : 50;
+  const pB = 100 - pA;
+  const leftSrc = v.leftMedia || generateCityPostVisualDataUrl(cA.id, getCityName(cA, 'en'));
+  const rightSrc = v.rightMedia || generateCityPostVisualDataUrl(cB.id, getCityName(cB, 'en'));
+
+  return `
+    <div class="city-versus-stage">
+      <div class="versus-pane left" onclick="voteCityVersusDuel('${p.id}', 'left')">
+        <img src="${leftSrc}" alt="${getCityName(cA, lang)}">
+        <div class="versus-city-pill left">${cA.flag} ${cA.code} (${pA}%)</div>
+      </div>
+      <div class="versus-bolt-divider">
+        <div class="versus-bolt-badge">⚡</div>
+      </div>
+      <div class="versus-pane right" onclick="voteCityVersusDuel('${p.id}', 'right')">
+        <img src="${rightSrc}" alt="${getCityName(cB, lang)}">
+        <div class="versus-city-pill right">${cB.flag} ${cB.code} (${pB}%)</div>
+      </div>
+    </div>
+  `;
+}
+
+function renderPostCardBack(p, city, lang, wx) {
+  const serial = (p.id || '').slice(-6).toUpperCase();
+  const cosm = (REMO_STORE && REMO_STORE.getUserCosmetics) ? REMO_STORE.getUserCosmetics(p.uid) : { frameClass: '', title_fr: '', title_en: '' };
+  const royalTitle = lang === 'fr' ? (cosm.title_fr || '') : (cosm.title_en || '');
+  const lat = (p.lat || city.lat || 45.5017).toFixed(4);
+  const lng = (p.lng || city.lng || -73.5673).toFixed(4);
+
+  return `
+    <div class="holo-back-shimmer"></div>
+    <div class="post-back-stamp-seal">
+      <span>REMO EARTH™</span>
+      <span style="font-size:0.55rem;margin:2px 0;">AUTHENTICATED</span>
+      <span>${city.code} 4D</span>
+    </div>
+    <div class="post-back-header">
+      <span class="post-back-serial">${t('post_flip_back_title', { num: serial })}</span>
+      <span style="font-size:0.75rem;color:#38bdf8;font-weight:800;">${city.flag} ${getCityName(city, lang)}</span>
+    </div>
+    <div class="post-back-body">
+      <div class="post-back-row">
+        <div class="avatar-circle ${cosm.frameClass}" style="width:28px;height:28px;font-size:0.75rem;">${escapeHtmlStr((p.authorName || 'R')[0].toUpperCase())}</div>
+        <b style="color:#fbbf24;">@${escapeHtmlStr(p.authorName)}</b>
+        ${royalTitle ? `<span class="royal-title-pill" style="font-size:0.65rem;">${escapeHtmlStr(royalTitle)}</span>` : ''}
+      </div>
+      <div class="post-back-row">
+        <span>📍 <b>${t('post_flip_coords')}:</b></span>
+        <span style="font-family:monospace;color:#38bdf8;">${lat}°, ${lng}°</span>
+      </div>
+      <div class="post-back-row">
+        <span>🌤️ <b>Atmosphere:</b></span>
+        <span>${wx ? `${wx.icon} ${wx.tempC}°C · ${wx.timeStr}` : '20°C'}</span>
+      </div>
+      ${p.bounty && !p.bounty.claimed ? `
+        <div style="background:rgba(245,158,11,0.18);border:1px dashed #fbbf24;border-radius:8px;padding:6px 10px;font-size:0.75rem;color:#fde68a;">
+          🎁 <b>Active Bounty:</b> +${p.bounty.coins} 🪙
+        </div>
+      ` : ''}
+      ${p.voiceUrl ? `
+        <div class="post-back-row">
+          <span>🎙️ <b>Voice Note:</b> Attached</span>
+        </div>
+      ` : ''}
+    </div>
+    <div class="post-back-actions">
+      <button type="button" class="btn-cyber btn-gold" style="flex:1;font-size:0.75rem;padding:6px 10px;justify-content:center;" onclick="savePostCardToAlbum('${p.id}')">
+        ${t('post_flip_save')}
+      </button>
+      <button type="button" class="btn-ghost" style="font-size:0.75rem;padding:6px 10px;" onclick="flipPost3DCard('${p.id}')">
+        ${t('post_flip_front_btn')}
+      </button>
+    </div>
+  `;
+}
+
+function renderFeedBountyWidget(p, lang) {
+  if (!p.bounty || !p.bounty.coins) return '';
+  const b = p.bounty;
+  if (b.claimed) {
+    return `
+      <div class="feed-bounty-box" style="background:rgba(16,185,129,0.12);border-color:#10b981;">
+        <span style="font-size:0.78rem;font-weight:800;color:#6ee7b7;">
+          ${t('bounty_feed_claimed_by', { user: escapeHtmlStr(b.claimedBy || 'Citizen'), coins: b.coins })}
+        </span>
+      </div>
+    `;
+  }
+  return `
+    <div class="feed-bounty-box">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span class="feed-bounty-badge">🎁 +${b.coins} 🪙</span>
+        <span style="font-size:0.76rem;color:#cbd5e1;font-weight:700;">
+          ${b.clue ? `💡 "${escapeHtmlStr(b.clue)}"` : t('bounty_feed_badge', { coins: b.coins })}
+        </span>
+      </div>
+      <button type="button" class="btn-cyber btn-gold" style="font-size:0.72rem;padding:4px 10px;" onclick="claimPostFeedBounty('${p.id}')">
+        ${t('bounty_feed_claim_btn')}
+      </button>
+    </div>
+  `;
 }
 
 /* ── 2. STORIES, FLASH DROP TIMER, DAILY PULSE & SOCIAL FEED ── */
@@ -537,6 +784,11 @@ function renderPostMediaStage(p, city, lang) {
     `;
   }
 
+  // 0A. ⚔️ CITY VERSUS DUEL (HEAD-TO-HEAD BATTLE)
+  if (p.mediaType === 'city_versus' && p.versus) {
+    return renderCityVersusDuelStage(p, lang);
+  }
+
   // 0B. 🎭 SPLIT-SCREEN CITY DUET STAGE (50/50 Two World Cities Live Collab!)
   if (p.duetOf && p.duetOf.cityId) {
     const leftCity = getCityById(p.duetOf.cityId);
@@ -767,7 +1019,9 @@ function renderSocialFeed(searchQuery = '') {
   );
 
   if (currentFeedMode === 'duets') {
-    posts = posts.filter((p) => Boolean(p.duetOf));
+    posts = posts.filter((p) => Boolean(p.duetOf || p.mediaType === 'city_versus'));
+  } else if (currentFeedMode === 'bounties') {
+    posts = posts.filter((p) => Boolean(p.bounty));
   } else if (currentFeedMode === 'capsules') {
     posts = posts.filter((p) => p.wasTimeCapsule || Boolean(p.unlockAt));
   } else if (currentFeedMode === 'html') {
@@ -876,13 +1130,14 @@ function renderSocialFeed(searchQuery = '') {
           </div>
         </div>
 
-        <div class="post-media-wrap" id="post_media_${p.id}" ondblclick="handleMediaDoubleTap(event, '${p.id}', this)">
+        <div class="post-media-wrap" id="post_media_${p.id}" ondblclick="handleMediaDoubleTap(event, '${p.id}', this)" ontouchstart="handleTouchDoubleTap(event, '${p.id}', this)">
           <div class="post-badges-top">
             ${sealed ? `<span class="pbadge capsule">${t('capsule_locked_badge')}${xray ? ' · 👁️ X-RAY' : ''}</span>` : (p.wasTimeCapsule ? `<span class="pbadge unsealed">${t('capsule_unsealed_badge')}</span>` : '')}
-            ${p.duetOf ? `<span class="pbadge duet">${t('post_duet_badge')}</span>` : ''}
+            ${p.duetOf || p.mediaType === 'city_versus' ? `<span class="pbadge duet">${t('post_duet_badge')}</span>` : ''}
             ${p.pinned ? `<span class="pbadge pinned">${t('post_pinned_badge')}</span>` : ''}
             ${p.founderAward ? `<span class="pbadge founder">${t('post_founder_award_badge')}</span>` : ''}
             ${p.boosted ? `<span class="pbadge boost">${t('post_boosted_badge')}</span>` : ''}
+            ${p.bounty && !p.bounty.claimed ? `<span class="pbadge boost" style="background:#f59e0b;color:#000;">🎁 +${p.bounty.coins} 🪙</span>` : ''}
             ${!hiddenByCapsule && p.mediaType === 'html_app' ? `<span class="pbadge html">${t('post_html_badge')}</span>` : ''}
             ${!hiddenByCapsule && p.mediaType === 'video' ? `<span class="pbadge vid60">${t('post_video60_badge')} · ${formatDurationMMSS(p.videoDuration || 60)}</span>` : ''}
             ${!hiddenByCapsule && p.mediaType === 'before_after' ? `<span class="pbadge html">${t('post_slider_badge')}</span>` : ''}
@@ -890,7 +1145,16 @@ function renderSocialFeed(searchQuery = '') {
             ${p.mintedCard ? `<span class="pbadge mint">${t('post_minted_badge')}</span>` : ''}
             ${p.isSecretSpot ? `<span class="pbadge secret-spot">🗺️ ${lang === 'fr' ? 'LIEU SECRET' : 'SECRET SPOT'}</span>` : ''}
           </div>
-          ${renderPostMediaStage(p, city, lang)}
+          <div class="post-flip-container" id="post_flip_${p.id}">
+            <div class="post-flip-inner">
+              <div class="post-face-front">
+                ${renderPostMediaStage(p, city, lang)}
+              </div>
+              <div class="post-face-back">
+                ${renderPostCardBack(p, city, lang, wx)}
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- Modern Sleek Post Body -->
@@ -906,6 +1170,9 @@ function renderSocialFeed(searchQuery = '') {
             </button>
             <button type="button" class="pact-btn" onclick="tipPostAuthor('${p.id}')" title="Tip Coins">
               🪙 <span>${p.tipsTotal || 0}</span>
+            </button>
+            <button type="button" class="pact-btn pact-flip-btn" onclick="flipPost3DCard('${p.id}')" title="${t('post_3d_flip')}">
+              🔄 <span>3D</span>
             </button>
             <button type="button" class="pact-btn" onclick="sharePostLink('${p.id}')" title="${lang === 'fr' ? 'Partager le lien' : 'Share link'}">
               🔗
@@ -941,6 +1208,7 @@ function renderSocialFeed(searchQuery = '') {
               ` : ''}
             </div>
           ` : ''}
+          ${renderFeedBountyWidget(p, lang)}
           ${hiddenByCapsule ? '' : renderPostPollWidget(p, lang, u)}
           ${hiddenByCapsule ? '' : renderSecretCapsuleWidget(p, lang, u)}
           ${hiddenByCapsule ? '' : renderViralGoalWidget(p, lang, isAdm)}
@@ -1585,6 +1853,21 @@ function switchCreateStudioTab(tabId) {
   document.querySelectorAll('.studio-pane').forEach((p) => p.classList.remove('active'));
   document.getElementById('studioPane-' + tabId)?.classList.add('active');
   if (tabId !== 'video') stopActiveCam60Stream();
+
+  if (tabId === 'versus') {
+    const leftSel = document.getElementById('createVersusLeftCity');
+    const rightSel = document.getElementById('createVersusRightCity');
+    const cities = getRemoCities();
+    const lang = REMO_I18N.getLang();
+    if (leftSel && (!leftSel.children || !leftSel.children.length)) {
+      leftSel.innerHTML = cities.map((c) => `<option value="${c.id}">${c.flag} ${getCityName(c, lang)}</option>`).join('');
+      leftSel.value = 'montreal';
+    }
+    if (rightSel && (!rightSel.children || !rightSel.children.length)) {
+      rightSel.innerHTML = cities.map((c) => `<option value="${c.id}">${c.flag} ${getCityName(c, lang)}</option>`).join('');
+      rightSel.value = 'paris';
+    }
+  }
 }
 
 function openCreatePostModal(prefillTag = '') {
@@ -2022,6 +2305,8 @@ async function publishNewRemoPost() {
     htmlCode = rawHtml.includes('<html') || rawHtml.includes('<body') || rawHtml.includes('<canvas') || rawHtml.includes('<script')
       ? rawHtml
       : `<!DOCTYPE html><html><body style="margin:0;background:#050816;color:#fff;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;">${rawHtml}</body></html>`;
+  } else if (activeCreateStudioTab === 'versus') {
+    mediaType = 'city_versus';
   }
 
   let voiceKey = pendingPostVoiceDataUrl || '';
@@ -2067,7 +2352,13 @@ async function publishNewRemoPost() {
   let capsuleTeaserEn = '';
   let capsuleTeaserFr = '';
   if (document.getElementById('createTimeCapsuleToggle')?.checked) {
-    const mins = Math.max(1, Number(document.getElementById('createCapsuleMinutesSel')?.value || 1));
+    let mins = 1;
+    const selVal = document.getElementById('createCapsuleMinutesSel')?.value;
+    if (selVal === 'custom') {
+      mins = Math.max(1, Number(document.getElementById('createCapsuleCustomMins')?.value || 45));
+    } else {
+      mins = Math.max(1, Number(selVal || 1));
+    }
     unlockAtTs = Date.now() + mins * 60000;
     wasTimeCapsule = true;
     const rawTeaser = document.getElementById('createCapsuleTeaserInp')?.value.trim()
@@ -2142,6 +2433,33 @@ async function publishNewRemoPost() {
   }
   if (pendingDuetParent && pendingDuetParent.uid && pendingDuetParent.uid !== u.uid) {
     REMO_STORE.addCoins(pendingDuetParent.uid, 10, 10);
+  }
+
+  if (mediaType === 'city_versus') {
+    const lC = document.getElementById('createVersusLeftCity')?.value || 'montreal';
+    const rC = document.getElementById('createVersusRightCity')?.value || 'paris';
+    newPost.versus = {
+      leftCityId: lC,
+      rightCityId: rC,
+      leftMedia: pendingVersusMedia.left || generateCityPostVisualDataUrl(lC, getCityName(getCityById(lC), 'en')),
+      rightMedia: pendingVersusMedia.right || generateCityPostVisualDataUrl(rC, getCityName(getCityById(rC), 'en')),
+      leftVotes: 0,
+      rightVotes: 0,
+      voters: []
+    };
+    pendingVersusMedia = { left: '', right: '' };
+  }
+
+  if (document.getElementById('createFeedBountyToggle')?.checked) {
+    const bountyCoins = Math.max(20, Number(document.getElementById('createFeedBountyCoins')?.value || 50));
+    const bountyAns = document.getElementById('createFeedBountyAnswer')?.value.trim() || 'remo';
+    newPost.bounty = {
+      coins: bountyCoins,
+      answer: bountyAns.toLowerCase(),
+      clue: bountyAns.length > 3 ? `${bountyAns.slice(0, 1)}...${bountyAns.slice(-1)} (${bountyAns.length} letters)` : '',
+      claimed: false,
+      claimedBy: null
+    };
   }
 
   REMO_STORE.state.posts.unshift(newPost);
@@ -5338,4 +5656,11 @@ function dismissWelcomeSplash() {
 
 window.showWelcomeSplashScreen = showWelcomeSplashScreen;
 window.dismissWelcomeSplash = dismissWelcomeSplash;
+window.handleTouchDoubleTap = handleTouchDoubleTap;
+window.flipPost3DCard = flipPost3DCard;
+window.savePostCardToAlbum = savePostCardToAlbum;
+window.voteCityVersusDuel = voteCityVersusDuel;
+window.claimPostFeedBounty = claimPostFeedBounty;
+window.handleVersusMediaSelect = handleVersusMediaSelect;
+window.toggleCustomCapsuleMinutesInp = toggleCustomCapsuleMinutesInp;
 

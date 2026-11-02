@@ -3871,3 +3871,346 @@ button, input, select, textarea {
 
 
 
+
+
+/* ══════════════════════════════════════════════════════════════
+   🎴 3D HOLOGRAPHIC FLIP-CARD POST STAGE (FRONT / BACK)
+   ══════════════════════════════════════════════════════════════ */
+.post-flip-container {
+  perspective: 1200px;
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+.post-flip-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  transition: transform 0.65s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.post-flip-inner.flipped {
+  transform: rotateY(180deg);
+}
+
+.post-face-front,
+.post-face-back {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.post-face-front {
+  transform: rotateY(0deg);
+  z-index: 2;
+}
+
+.post-face-back {
+  transform: rotateY(180deg);
+  background: radial-gradient(circle at 50% 25%, #0f1d38, #030712);
+  border: 2px solid rgba(251, 191, 36, 0.6);
+  box-shadow: inset 0 0 50px rgba(56, 189, 248, 0.18), 0 0 25px rgba(251, 191, 36, 0.25);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 18px;
+  color: #f8fafc;
+  z-index: 1;
+}
+
+.holo-back-shimmer {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, transparent 30%, rgba(255, 255, 255, 0.08) 50%, transparent 70%);
+  background-size: 250% 250%;
+  animation: holoFoilShimmer 4s ease infinite;
+  pointer-events: none;
+}
+
+@keyframes holoFoilShimmer {
+  0% { background-position: 0% 0%; }
+  50% { background-position: 100% 100%; }
+  100% { background-position: 0% 0%; }
+}
+
+.post-back-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid rgba(251, 191, 36, 0.3);
+  padding-bottom: 10px;
+  position: relative;
+  z-index: 2;
+}
+
+.post-back-serial {
+  font-family: 'Orbitron', monospace, sans-serif;
+  font-size: 0.8rem;
+  font-weight: 900;
+  color: #fbbf24;
+  letter-spacing: 0.8px;
+}
+
+.post-back-stamp-seal {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(-12deg);
+  width: 140px;
+  height: 140px;
+  border: 3px dashed rgba(251, 191, 36, 0.28);
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.65rem;
+  font-weight: 900;
+  color: rgba(251, 191, 36, 0.35);
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.post-back-body {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: auto 0;
+}
+
+.post-back-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.84rem;
+  color: #cbd5e1;
+}
+
+.post-back-actions {
+  display: flex;
+  gap: 8px;
+  position: relative;
+  z-index: 2;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   ❤️ DOUBLE-TAP 3D HEART BURST FX
+   ══════════════════════════════════════════════════════════════ */
+.dbl-heart-burst {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0);
+  font-size: 78px;
+  color: #f43f5e;
+  text-shadow: 0 0 30px #f43f5e, 0 0 60px #fb7185;
+  pointer-events: none;
+  z-index: 20;
+  animation: dblHeartPop 0.85s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+@keyframes dblHeartPop {
+  0% { transform: translate(-50%, -50%) scale(0) rotate(-15deg); opacity: 0.9; }
+  45% { transform: translate(-50%, -50%) scale(1.3) rotate(0deg); opacity: 1; }
+  75% { transform: translate(-50%, -50%) scale(1.1) rotate(5deg); opacity: 0.95; }
+  100% { transform: translate(-50%, -50%) scale(0.6) translateY(-40px); opacity: 0; }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   ⚔️ CITY VERSUS DUEL (HEAD-TO-HEAD SPLIT SCREEN)
+   ══════════════════════════════════════════════════════════════ */
+.city-versus-stage {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  position: relative;
+  overflow: hidden;
+  background: #020617;
+}
+
+.versus-pane {
+  flex: 1;
+  position: relative;
+  height: 100%;
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform 0.25s, flex 0.3s;
+}
+
+.versus-pane img,
+.versus-pane video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.versus-pane:hover {
+  filter: brightness(1.08);
+}
+
+.versus-bolt-divider {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 4px;
+  transform: translateX(-50%);
+  background: linear-gradient(180deg, #ec4899, #fbbf24, #38bdf8);
+  box-shadow: 0 0 16px #fbbf24;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.versus-bolt-badge {
+  background: #0f172a;
+  border: 2px solid #fbbf24;
+  color: #fbbf24;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 900;
+  box-shadow: 0 0 16px rgba(251, 191, 36, 0.8);
+  animation: pulseVersus 1.5s infinite alternate;
+}
+
+@keyframes pulseVersus {
+  0% { transform: scale(0.95); }
+  100% { transform: scale(1.15); box-shadow: 0 0 24px #ec4899; }
+}
+
+.versus-city-pill {
+  position: absolute;
+  bottom: 12px;
+  z-index: 6;
+  background: rgba(15, 23, 42, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #fff;
+  font-weight: 800;
+  font-size: 0.74rem;
+  padding: 4px 10px;
+  border-radius: 99px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(10px);
+}
+.versus-city-pill.left { left: 10px; }
+.versus-city-pill.right { right: 10px; }
+
+.versus-vote-bar {
+  display: flex;
+  gap: 8px;
+  padding: 8px 12px;
+  background: rgba(15, 23, 42, 0.85);
+  border-radius: 12px;
+  margin-top: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   🎁 FEED BOUNTY TREASURE CHEST
+   ══════════════════════════════════════════════════════════════ */
+.feed-bounty-box {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.15), rgba(217, 119, 6, 0.08));
+  border: 1px solid rgba(245, 158, 11, 0.5);
+  border-radius: 14px;
+  padding: 10px 14px;
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.feed-bounty-badge {
+  background: linear-gradient(135deg, #f59e0b, #fbbf24);
+  color: #0f172a;
+  font-weight: 900;
+  font-size: 0.76rem;
+  padding: 4px 10px;
+  border-radius: 99px;
+  letter-spacing: 0.5px;
+  box-shadow: 0 0 12px rgba(245, 158, 11, 0.5);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   ⏳ TIME-CAPSULE EXPLOSION ANIMATION
+   ══════════════════════════════════════════════════════════════ */
+@keyframes capsuleExplosionBlast {
+  0% { transform: scale(0.9); filter: brightness(1); }
+  25% { transform: scale(1.08); filter: brightness(2.4); box-shadow: 0 0 70px #ec4899; }
+  50% { transform: scale(0.95); filter: brightness(1.6); }
+  75% { transform: scale(1.02); filter: brightness(1.2); }
+  100% { transform: scale(1); filter: brightness(1); }
+}
+
+.capsule-exploding {
+  animation: capsuleExplosionBlast 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) forwards !important;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   📱 MOBILE & DESKTOP ERGONOMIC REFINEMENTS (FOTO 1, 2, 3)
+   ══════════════════════════════════════════════════════════════ */
+@media (max-width: 860px) {
+  .genesis-fomo-bar {
+    padding: 6px 12px !important;
+    font-size: 0.74rem !important;
+    min-height: auto !important;
+  }
+  .genesis-fomo-inner {
+    gap: 6px !important;
+  }
+  .genesis-fomo-cta {
+    padding: 3px 8px !important;
+    font-size: 0.72rem !important;
+  }
+  .stories-bar {
+    padding: 6px 8px !important;
+    gap: 10px !important;
+  }
+  .pulse-banner {
+    padding: 7px 10px !important;
+    font-size: 0.78rem !important;
+  }
+  .city-distance-bridge {
+    position: absolute;
+    bottom: 12px;
+    left: 12px;
+    z-index: 6;
+    background: rgba(15, 23, 42, 0.84) !important;
+    backdrop-filter: blur(12px);
+    border-radius: 99px !important;
+    padding: 3px 9px !important;
+    margin: 0 !important;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.6);
+    font-size: 0.72rem !important;
+  }
+  .pact-btn {
+    padding: 7px 12px !important;
+    font-size: 0.84rem !important;
+  }
+  .post-actions-bar {
+    gap: 8px !important;
+  }
+}

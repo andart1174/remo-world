@@ -564,7 +564,43 @@ const REMO_DICT = {
     border_stamp_title_globetrotter: '✈️ Globetrotter Vérifié',
     border_stamp_title_ambassador: '🌐 Ambassadeur Mondial',
     border_stamp_verified_badge: 'AUTHENTICATED BORDER ENTRY · IN-PERSON CITIZEN',
-    border_visas_empty: 'No in-person GPS border stamps yet. Travel to a REMO world city and stamp your passport live!'
+    border_visas_empty: 'No in-person GPS border stamps yet. Travel to a REMO world city and stamp your passport live!',
+
+    // 🎴 3D Holographic Flip-Card
+    post_3d_flip: '🔄 3D Flip',
+    post_flip_back_title: '4D HOLOGRAPHIC PASSPORT #{num}',
+    post_flip_save: '🎴 Save to 4D Album (+10 XP)',
+    post_flip_saved_toast: '🎴 Saved to your 4D Album (+10 XP)!',
+    post_flip_front_btn: '🔄 Flip to Front',
+    post_flip_coords: 'Landmark GPS Coordinates',
+
+    // ⚔️ City Versus Duel
+    create_tab_versus: '⚔️ City Versus Duel',
+    versus_duel_title: '⚔️ City Versus Duel (Head-to-Head)',
+    versus_left_city: 'City A (Left)',
+    versus_right_city: 'City B (Right)',
+    versus_upload_left: '📷 Upload Photo / Video A',
+    versus_upload_right: '📷 Upload Photo / Video B',
+    versus_vote_btn: 'Vote {city} (+5 🪙)',
+    versus_voted_toast: '⚡ Voted for {city}! +5 🪙 added to your vault!',
+    filter_versus: '⚔️ City Duels',
+
+    // 🎁 Feed Treasure Bounty
+    bounty_feed_toggle: '🎁 Attach Treasure Bounty (+Coins to First Solver)',
+    bounty_feed_coins: 'Bounty Stake in Coins',
+    bounty_feed_clue: 'Secret Riddle / Solution Word',
+    bounty_feed_badge: '🎁 TREASURE BOUNTY: {coins} 🪙',
+    bounty_feed_claim_btn: '🔓 Solve & Claim Bounty',
+    bounty_feed_claimed_by: '🏆 Bounty Claimed by @{user} (+{coins} 🪙)!',
+    bounty_feed_prompt: 'Enter the secret solution word or riddle answer to unlock {coins} 🪙:',
+    bounty_feed_success: '🎉 BINGO! You unlocked the secret bounty and claimed +{coins} 🪙!',
+    bounty_feed_wrong: '❌ Incorrect solution word. Try again!',
+    filter_bounties: '🎁 Bounties',
+
+    // ⏳ Custom Time-Capsule
+    capsule_custom_mins: 'Custom Minutes',
+    capsule_custom_ph: 'Minutes (e.g. 45)',
+    capsule_exploding_alert: '💥 TIME-CAPSULE UNLOCKED LIVE!'
   },
 
   fr: {
@@ -1127,7 +1163,43 @@ const REMO_DICT = {
     border_stamp_title_globetrotter: '✈️ Globetrotter Vérifié',
     border_stamp_title_ambassador: '🌐 Ambassadeur Mondial',
     border_stamp_verified_badge: 'ENTRÉE FRONTIÈRE AUTHENTIFIÉE · CITOYEN PRÉSENTIEL',
-    border_visas_empty: 'Aucun tampon GPS en présentiel pour le moment. Voyagez dans une ville REMO pour tamponner en direct !'
+    border_visas_empty: 'Aucun tampon GPS en présentiel pour le moment. Voyagez dans une ville REMO pour tamponner en direct !',
+
+    // 🎴 3D Holographic Flip-Card
+    post_3d_flip: '🔄 Rétro 3D',
+    post_flip_back_title: 'PASSEPORT HOLOGRAPHIQUE 4D #{num}',
+    post_flip_save: '🎴 Sauvegarder dans mon Album 4D (+10 XP)',
+    post_flip_saved_toast: '🎴 Ajouté à votre Album 4D (+10 XP) !',
+    post_flip_front_btn: '🔄 Retourner la Carte',
+    post_flip_coords: 'Coordonnées GPS du Lieu',
+
+    // ⚔️ City Versus Duel
+    create_tab_versus: '⚔️ Duel de Villes',
+    versus_duel_title: '⚔️ Duel Face-à-Face entre Villes',
+    versus_left_city: 'Ville A (Gauche)',
+    versus_right_city: 'Ville B (Droite)',
+    versus_upload_left: '📷 Charger Photo / Vidéo A',
+    versus_upload_right: '📷 Charger Photo / Vidéo B',
+    versus_vote_btn: 'Voter {city} (+5 🪙)',
+    versus_voted_toast: '⚡ Vote enregistré pour {city} ! +5 🪙 ajoutés à votre coffre !',
+    filter_versus: '⚔️ Duels Villes',
+
+    // 🎁 Feed Treasure Bounty
+    bounty_feed_toggle: '🎁 Attacher une Prime au Trésor (+Pièces au premier résolveur)',
+    bounty_feed_coins: 'Mise de la Prime en Pièces',
+    bounty_feed_clue: 'Énigme Secrète / Mot Solution',
+    bounty_feed_badge: '🎁 PRIME AU TRÉSOR : {coins} 🪙',
+    bounty_feed_claim_btn: '🔓 Résoudre & Réclamer',
+    bounty_feed_claimed_by: '🏆 Prime remportée par @{user} (+{coins} 🪙) !',
+    bounty_feed_prompt: 'Entrez le mot secret ou la réponse à l’énigme pour débloquer {coins} 🪙 :',
+    bounty_feed_success: '🎉 BINGO ! Vous avez percé le secret et remporté +{coins} 🪙 !',
+    bounty_feed_wrong: '❌ Mot secret incorrect. Réessayez !',
+    filter_bounties: '🎁 Primes',
+
+    // ⏳ Custom Time-Capsule
+    capsule_custom_mins: 'Minutes Personnalisées',
+    capsule_custom_ph: 'Minutes (ex: 45)',
+    capsule_exploding_alert: '💥 CAPSULE TEMPORELLE OUVERTE EN DIRECT !'
   }
 };
 

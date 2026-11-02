@@ -79,7 +79,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-  <link rel="stylesheet" href="css/remo-core.css?v=50">
+  <link rel="stylesheet" href="css/remo-core.css?v=51">
 </head>
 <body>
 
@@ -241,7 +241,8 @@
 
           <div class="filter-row" id="feedModeChips">
             <button class="fchip active" onclick="setFeedMode('all', this)" data-i18n="filter_all">🌍 All World</button>
-            <button class="fchip" onclick="setFeedMode('duets', this)" data-i18n="filter_duets">🎭 City Duets</button>
+            <button class="fchip" onclick="setFeedMode('duets', this)" data-i18n="filter_duets">⚔️ City Duels</button>
+            <button class="fchip" onclick="setFeedMode('bounties', this)" data-i18n="filter_bounties">🎁 Bounties</button>
             <button class="fchip" onclick="setFeedMode('capsules', this)" data-i18n="filter_capsules">⏳ Time-Capsules</button>
             <button class="fchip" onclick="setFeedMode('html', this)" data-i18n="filter_html">💻 HTML &amp; Mini-Apps</button>
             <button class="fchip" onclick="setFeedMode('videos', this)" data-i18n="filter_videos">🎬 60s Videos</button>
@@ -995,6 +996,7 @@
         <button type="button" class="studio-tab-btn" data-studio-tab="video" onclick="switchCreateStudioTab('video')" data-i18n="create_tab_video">🎬 Video (Max 60s)</button>
         <button type="button" class="studio-tab-btn" data-studio-tab="html" onclick="switchCreateStudioTab('html')" data-i18n="create_tab_html">💻 Live HTML Code</button>
         <button type="button" class="studio-tab-btn" data-studio-tab="art" onclick="switchCreateStudioTab('art')" data-i18n="create_tab_art">🏙️ City Poster</button>
+        <button type="button" class="studio-tab-btn" data-studio-tab="versus" onclick="switchCreateStudioTab('versus')" data-i18n="create_tab_versus">⚔️ City Versus Duel</button>
       </div>
 
       <!-- City & Vibe Row -->
@@ -1111,6 +1113,33 @@
         </div>
       </div>
 
+      <!-- TAB 5: CITY VERSUS DUEL STUDIO (Head-to-Head 50/50 Battle) -->
+      <div class="studio-pane" id="studioPane-versus">
+        <p style="font-size:0.76rem;color:#38bdf8;margin-bottom:10px;" data-i18n="versus_duel_title">⚔️ City Versus Duel (Head-to-Head)</p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+          <!-- Left City -->
+          <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(56,189,248,0.3);border-radius:12px;padding:10px;">
+            <label style="font-size:0.75rem;font-weight:800;color:#38bdf8;margin-bottom:4px;display:block;" data-i18n="versus_left_city">City A (Left)</label>
+            <select id="createVersusLeftCity" class="remo-input" style="margin-bottom:8px;"></select>
+            <label class="btn-cyber" style="cursor:pointer;justify-content:center;font-size:0.75rem;padding:6px;width:100%;">
+              <span>📸 Media A</span>
+              <input type="file" id="createVersusLeftFile" accept="image/*,video/*" style="display:none;" onchange="handleVersusMediaSelect('left', event)">
+            </label>
+            <div id="versusLeftPreview" style="margin-top:6px;height:70px;background:#030712;border-radius:8px;overflow:hidden;display:none;"></div>
+          </div>
+          <!-- Right City -->
+          <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(236,72,153,0.3);border-radius:12px;padding:10px;">
+            <label style="font-size:0.75rem;font-weight:800;color:#f472b6;margin-bottom:4px;display:block;" data-i18n="versus_right_city">City B (Right)</label>
+            <select id="createVersusRightCity" class="remo-input" style="margin-bottom:8px;"></select>
+            <label class="btn-cyber" style="cursor:pointer;justify-content:center;font-size:0.75rem;padding:6px;background:linear-gradient(135deg,#ec4899,#8b5cf6);width:100%;">
+              <span>📸 Media B</span>
+              <input type="file" id="createVersusRightFile" accept="image/*,video/*" style="display:none;" onchange="handleVersusMediaSelect('right', event)">
+            </label>
+            <div id="versusRightPreview" style="margin-top:6px;height:70px;background:#030712;border-radius:8px;overflow:hidden;display:none;"></div>
+          </div>
+        </div>
+      </div>
+
       <!-- #10 REMO Viral Co-Pilot & Instant EN ⇄ FR Bilingual Engine -->
       <div class="copilot-box">
         <div style="font-size:0.76rem;font-weight:900;color:#e879f9;" data-i18n="copilot_title">🪄 REMO Viral Co-Pilot &amp; Instant EN ⇄ FR Studio</div>
@@ -1174,14 +1203,28 @@
           <span data-i18n="capsule_toggle_lbl">⏳ Seal as Live Time-Capsule Mystery Post (Countdown Vault)</span>
         </label>
         <div id="createTimeCapsuleFields" style="display:none;grid-template-columns:155px 1fr;gap:7px;">
-          <select id="createCapsuleMinutesSel" class="remo-input">
-            <option value="1">⏱️ 1 Min (Live Demo)</option>
-            <option value="3">⏱️ 3 Minutes</option>
+          <select id="createCapsuleMinutesSel" class="remo-input" onchange="toggleCustomCapsuleMinutesInp(this.value)">
+            <option value="1">⏱️ 1 Min (Test)</option>
+            <option value="5">⏱️ 5 Minutes</option>
             <option value="15">⏱️ 15 Minutes</option>
+            <option value="30">⏱️ 30 Minutes</option>
             <option value="60">⏱️ 1 Hour</option>
+            <option value="180">⏱️ 3 Hours</option>
+            <option value="720">⏱️ 12 Hours</option>
             <option value="1440">⏱️ 24 Hours</option>
+            <option value="custom">✏️ Custom Minutes...</option>
           </select>
-          <input type="text" id="createCapsuleTeaserInp" class="remo-input" data-i18n-placeholder="capsule_teaser_ph" placeholder="Mystery teaser shown before countdown reaches 00:00:00...">
+          <input type="number" id="createCapsuleCustomMins" class="remo-input" style="display:none;" min="1" max="43200" placeholder="Minutes (ex: 45)">
+          <input type="text" id="createCapsuleTeaserInp" class="remo-input" style="grid-column:1/-1;" data-i18n-placeholder="capsule_teaser_ph" placeholder="Mystery teaser shown before countdown reaches 00:00:00...">
+        </div>
+
+        <label style="display:flex;align-items:center;gap:8px;font-size:0.8rem;font-weight:800;color:#fbbf24;cursor:pointer;">
+          <input type="checkbox" id="createFeedBountyToggle" onchange="document.getElementById('createFeedBountyFields').style.display=this.checked?'grid':'none'">
+          <span data-i18n="bounty_feed_toggle">🎁 Attach Treasure Bounty (+Coins to First Solver)</span>
+        </label>
+        <div id="createFeedBountyFields" style="display:none;grid-template-columns:120px 1fr;gap:7px;">
+          <input type="number" id="createFeedBountyCoins" class="remo-input" min="20" max="1000" step="10" value="50" placeholder="Coins 🪙">
+          <input type="text" id="createFeedBountyAnswer" class="remo-input" data-i18n-placeholder="bounty_feed_clue" placeholder="Secret solution word / riddle answer">
         </div>
 
         <label style="display:flex;align-items:center;gap:8px;font-size:0.8rem;font-weight:800;color:#38bdf8;cursor:pointer;">
@@ -1708,12 +1751,12 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 
   <!-- REMO Modular Engines -->
-  <script src="js/remo-i18n.js?v=50"></script>
-  <script src="js/remo-cities-data.js?v=50"></script>
-  <script src="js/remo-store.js?v=50"></script>
-  <script src="js/remo-card-engine.js?v=50"></script>
-  <script src="js/remo-radar-arena.js?v=50"></script>
-  <script src="js/remo-social-comms.js?v=50"></script>
-  <script src="js/remo-radio-engine.js?v=50"></script>
+  <script src="js/remo-i18n.js?v=51"></script>
+  <script src="js/remo-cities-data.js?v=51"></script>
+  <script src="js/remo-store.js?v=51"></script>
+  <script src="js/remo-card-engine.js?v=51"></script>
+  <script src="js/remo-radar-arena.js?v=51"></script>
+  <script src="js/remo-social-comms.js?v=51"></script>
+  <script src="js/remo-radio-engine.js?v=51"></script>
 </body>
 </html>
