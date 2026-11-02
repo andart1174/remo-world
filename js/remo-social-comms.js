@@ -193,6 +193,7 @@ function syncHeaderAndSidebars() {
     `;
   }
 
+  if (typeof updateUnreadBadges === 'function') updateUnreadBadges();
   renderRightSidebarWidgets();
 }
 
@@ -1377,14 +1378,28 @@ function toggleLikePost(postId) {
   const u = REMO_STORE.getCurrentUser() || REMO_STORE.ensureGuestOrCitizen('Citizen', '', 'montreal');
   const p = REMO_STORE.state.posts.find((x) => x.id === postId);
   if (!p) return;
+  p.likes = p.likes || [];
   const idx = p.likes.indexOf(u.uid);
-  if (idx >= 0) p.likes.splice(idx, 1);
-  else {
+  if (idx >= 0) {
+    p.likes.splice(idx, 1);
+  } else {
     p.likes.push(u.uid);
     RemoAudio.play('click');
     RemoAudio.haptic(15);
     REMO_STORE.addCityScore(p.cityId, 5);
+    if (p.uid && p.uid !== u.uid) {
+      REMO_STORE.addNotification({
+        toUid: p.uid,
+        fromUid: u.uid,
+        fromName: u.name,
+        fromCity: u.homeCity,
+        type: 'like',
+        postId: p.id,
+        text: REMO_I18N.getLang() === 'fr' ? 'a aimé votre publication ❤️' : 'liked your post ❤️'
+      });
+    }
   }
+  REMO_STORE.syncPostToCloud(p);
   REMO_STORE.save(true, 'like');
   renderSocialFeed();
 }
@@ -1416,6 +1431,18 @@ function tipPostAuthor(postId) {
     if (p.uid) REMO_STORE.adminAdjustUserCoins(p.uid, 'add', amt);
     remoToast(lang === 'fr' ? `🪙 +${amt} Pièces offertes à ${p.authorName} !` : `🪙 Tipped ${amt} Coins to ${p.authorName}!`, 'coin');
   }
+  if (p.uid && p.uid !== u.uid) {
+    REMO_STORE.addNotification({
+      toUid: p.uid,
+      fromUid: u.uid,
+      fromName: u.name,
+      fromCity: u.homeCity,
+      type: 'tip',
+      postId: p.id,
+      text: lang === 'fr' ? `vous a offert un pourboire de +${amt} 🪙 !` : `tipped you +${amt} 🪙!`
+    });
+  }
+  REMO_STORE.syncPostToCloud(p);
   REMO_STORE.save(true, 'tip');
   spawnRemoCoinsFX(8);
   syncHeaderAndSidebars();
@@ -1433,6 +1460,7 @@ function boostPost24h(postId) {
   }
   const p = REMO_STORE.state.posts.find((x) => x.id === postId);
   if (p) p.boosted = true;
+  REMO_STORE.syncPostToCloud(p);
   REMO_STORE.save(true, 'boost');
   spawnRemoCoinsFX(6);
   renderSocialFeed();
@@ -1609,10 +1637,24 @@ function submitPostComment() {
     createdAt: Date.now()
   });
 
+  if (p.uid && p.uid !== u.uid) {
+    const cmtPreview = txt ? (txt.length > 50 ? txt.slice(0, 47) + '...' : txt) : (pendingCommentVoiceKey ? '🎤 Note Vocale' : 'Super-Commentaire');
+    REMO_STORE.addNotification({
+      toUid: p.uid,
+      fromUid: u.uid,
+      fromName: u.name,
+      fromCity: u.homeCity,
+      type: 'comment',
+      postId: p.id,
+      text: lang === 'fr' ? `a commenté : "${cmtPreview}"` : `commented: "${cmtPreview}"`
+    });
+  }
+
   if (inp) inp.value = '';
   const tipSel = document.getElementById('commentSuperTipSel');
   if (tipSel) tipSel.value = '0';
   pendingCommentVoiceKey = '';
+  REMO_STORE.syncPostToCloud(p);
   REMO_STORE.save(true, 'comment');
   syncHeaderAndSidebars();
   openCommentsModal(activeCommentPostId);
@@ -1881,11 +1923,25 @@ function unlockSecretCapsule(postId, freeCityPass = false) {
 }
 
 function reactEmojiToPost(postId, emoji) {
+  const u = REMO_STORE.getCurrentUser() || REMO_STORE.ensureGuestOrCitizen('Citizen', '', 'montreal');
   const p = REMO_STORE.state.posts.find((x) => x.id === postId);
   if (!p) return;
   p.reactions = p.reactions || {};
   p.reactions[emoji] = (p.reactions[emoji] || 0) + 1;
   RemoAudio.play('click');
+  if (p.uid && p.uid !== u.uid) {
+    REMO_STORE.addNotification({
+      toUid: p.uid,
+      fromUid: u.uid,
+      fromName: u.name,
+      fromCity: u.homeCity,
+      type: 'reaction',
+      emoji: emoji,
+      postId: p.id,
+      text: REMO_I18N.getLang() === 'fr' ? `a réagi avec ${emoji} à votre publication` : `reacted with ${emoji} to your post`
+    });
+  }
+  REMO_STORE.syncPostToCloud(p);
   REMO_STORE.save(true, 'reaction');
   renderSocialFeed();
 }
@@ -2886,11 +2942,15 @@ function renderDirectMessagesView() {
       const hasUnclaimed = (REMO_STORE.state.directMessages || []).some(
         (d) => d.fromUid === u.uid && d.toUid === me.uid && d.envelopeCoins > 0 && !d.envelopeClaimed
       );
+      const hasUnread = (REMO_STORE.state.directMessages || []).some(
+        (d) => d.fromUid === u.uid && d.toUid === me.uid && !d.read
+      );
       return `
         <button type="button" class="dm-contact-chip ${u.uid === partner.uid ? 'active' : ''}" onclick="selectDmPartner('${u.uid}')">
           <span style="width:8px;height:8px;border-radius:50%;background:#10b981;display:inline-block;"></span>
           <span>${c.flag} @${escapeHtmlStr(u.name)}</span>
           ${hasUnclaimed ? '<span>🧧</span>' : ''}
+          ${hasUnread ? '<span style="background:#ef4444;border-radius:50%;width:8px;height:8px;display:inline-block;box-shadow:0 0 6px #ef4444;"></span>' : ''}
         </button>
       `;
     }).join('');
@@ -2955,6 +3015,27 @@ function renderDirectMessagesView() {
     `;
   }).join('') || `<div style="text-align:center;color:var(--muted);padding:26px;">${lang === 'fr' ? `Démarrez votre conversation privée 1-à-1 avec @${partner.name} !` : `Start your private 1-on-1 conversation with @${partner.name}!`}</div>`;
 
+  // Mark all unread messages from this active partner as read
+  let markedAny = false;
+  (REMO_STORE.state.directMessages || []).forEach((d) => {
+    if (d && d.fromUid === partner.uid && d.toUid === me.uid && !d.read) {
+      d.read = true;
+      markedAny = true;
+      REMO_STORE.syncDmToCloud(d);
+    }
+  });
+  (REMO_STORE.state.notifications || []).forEach((n) => {
+    if (n && n.fromUid === partner.uid && n.toUid === me.uid && n.type === 'message' && !n.read) {
+      n.read = true;
+      markedAny = true;
+      REMO_STORE.syncNotificationToCloud(n);
+    }
+  });
+  if (markedAny) {
+    REMO_STORE.save(false, 'dm_read');
+    if (typeof updateUnreadBadges === 'function') updateUnreadBadges();
+  }
+
   RemoMediaDB.hydrateDom(box);
   box.scrollTop = box.scrollHeight;
   if (typeof initDesktopHorizontalScrollRails === 'function') {
@@ -2966,25 +3047,38 @@ function sendDirectMessage() {
   const inp = document.getElementById('dmInputBox');
   if (!inp || !inp.value.trim()) return;
   const u = REMO_STORE.getCurrentUser() || REMO_STORE.ensureGuestOrCitizen('Citizen', '', 'montreal');
+  const targetUid = activeDmPartnerUid || 'u_admin_founder';
+  const txt = inp.value.trim();
   const newDm = {
     id: 'dm_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
     fromUid: u.uid,
     fromName: u.name,
-    toUid: activeDmPartnerUid || 'u_admin_founder',
-    text: inp.value.trim(),
+    toUid: targetUid,
+    text: txt,
+    read: false,
     ts: Date.now()
   };
   REMO_STORE.state.directMessages.push(newDm);
   inp.value = '';
   RemoAudio.play('click');
+  REMO_STORE.addNotification({
+    toUid: targetUid,
+    fromUid: u.uid,
+    fromName: u.name,
+    fromCity: u.homeCity,
+    type: 'message',
+    text: txt
+  });
   REMO_STORE.save(true, 'dm');
   REMO_STORE.syncDmToCloud(newDm);
   renderDirectMessagesView();
+  if (typeof updateUnreadBadges === 'function') updateUnreadBadges();
 }
 
 async function toggleDmVoiceNote() {
   const lang = REMO_I18N.getLang();
   const u = REMO_STORE.getCurrentUser() || REMO_STORE.ensureGuestOrCitizen('Citizen', '', 'montreal');
+  const targetUid = activeDmPartnerUid || 'u_admin_founder';
   const btn = document.getElementById('btnDmVoiceRec');
 
   if (window._dmRec && window._dmRec.state === 'recording') {
@@ -3006,15 +3100,25 @@ async function toggleDmVoiceNote() {
           id: 'dm_v_' + Date.now(),
           fromUid: u.uid,
           fromName: u.name,
-          toUid: activeDmPartnerUid || 'u_admin_founder',
+          toUid: targetUid,
           text: lang === 'fr' ? '🎙️ Message vocal privé' : '🎙️ Private voice note',
           voiceUrl: audioDataUrl,
+          read: false,
           ts: Date.now()
         };
         REMO_STORE.state.directMessages.push(newDm);
+        REMO_STORE.addNotification({
+          toUid: targetUid,
+          fromUid: u.uid,
+          fromName: u.name,
+          fromCity: u.homeCity,
+          type: 'message',
+          text: lang === 'fr' ? '🎙️ Note Vocale Privée' : '🎙️ Private Voice Note'
+        });
         REMO_STORE.save(true, 'dm_voice');
         REMO_STORE.syncDmToCloud(newDm);
         renderDirectMessagesView();
+        if (typeof updateUnreadBadges === 'function') updateUnreadBadges();
       };
 
       if (window.FileReader) {
@@ -3036,16 +3140,26 @@ async function toggleDmVoiceNote() {
       id: 'dm_v_' + Date.now(),
       fromUid: u.uid,
       fromName: u.name,
-      toUid: activeDmPartnerUid || 'u_admin_founder',
+      toUid: targetUid,
       text: lang === 'fr' ? '🎙️ Onde vocale privée' : '🎙️ Private cyber voice note',
       voiceUrl: RemoAudio.createSynthVoiceWavDataUrl(2.2),
+      read: false,
       ts: Date.now()
     };
     REMO_STORE.state.directMessages.push(newDm);
     RemoAudio.play('roger');
+    REMO_STORE.addNotification({
+      toUid: targetUid,
+      fromUid: u.uid,
+      fromName: u.name,
+      fromCity: u.homeCity,
+      type: 'message',
+      text: lang === 'fr' ? '🎙️ Note Vocale Privée' : '🎙️ Private Voice Note'
+    });
     REMO_STORE.save(true, 'dm_voice');
     REMO_STORE.syncDmToCloud(newDm);
     renderDirectMessagesView();
+    if (typeof updateUnreadBadges === 'function') updateUnreadBadges();
   }
 }
 
@@ -5893,6 +6007,258 @@ document.addEventListener('keydown', (ev) => {
   if (ev.key !== 'Escape') return;
   const lb = document.getElementById('photoLightboxModal');
   if (lb && lb.classList.contains('open')) closePhotoLightboxModal();
+  const nm = document.getElementById('notificationsModal');
+  if (nm && nm.classList.contains('open')) nm.classList.remove('open');
 });
 
 window.buildFittedHtmlSrcdoc = buildFittedHtmlSrcdoc;
+
+/* ════════════════════════════════════════════════════════════════════
+   🔔 REMO PULSE — LIVE NOTIFICATION HUB & HEADS-UP SYSTEM
+   ════════════════════════════════════════════════════════════════════ */
+let currentNotifFilter = 'all';
+let headsUpTimer = null;
+let activeHeadsUpPayload = null;
+
+function updateUnreadBadges() {
+  const u = REMO_STORE.getCurrentUser();
+  const myUid = u ? u.uid : null;
+  const isAdm = REMO_STORE.isCurrentUserAdmin();
+
+  // 1. Unread direct messages
+  const unreadDms = (REMO_STORE.state.directMessages || []).filter((d) =>
+    myUid && (d.toUid === myUid || (isAdm && (d.toUid === 'u_admin_founder' || !d.toUid))) && d.fromUid !== myUid && !d.read
+  );
+  const unreadDmCount = unreadDms.length;
+
+  // 2. Unread general notifications
+  const unreadNotifs = (REMO_STORE.state.notifications || []).filter((n) =>
+    myUid && (n.toUid === myUid || (isAdm && (n.toUid === 'u_admin_founder' || !n.toUid))) && n.fromUid !== myUid && !n.read
+  );
+  const totalUnreadNotifs = unreadNotifs.length + unreadDmCount;
+
+  // Update Header Bell Badge
+  const bellBadge = document.getElementById('hdrNotifBadge');
+  if (bellBadge) {
+    if (totalUnreadNotifs > 0) {
+      bellBadge.textContent = totalUnreadNotifs > 99 ? '99+' : totalUnreadNotifs;
+      bellBadge.style.display = 'inline-flex';
+    } else {
+      bellBadge.style.display = 'none';
+    }
+  }
+
+  // Update Modal Count
+  const modalBadge = document.getElementById('notifModalCountBadge');
+  if (modalBadge) {
+    if (totalUnreadNotifs > 0) {
+      modalBadge.textContent = totalUnreadNotifs;
+      modalBadge.style.display = 'inline-block';
+    } else {
+      modalBadge.style.display = 'none';
+    }
+  }
+
+  // Update Sidebar Messages Badge
+  const sideBadge = document.getElementById('sidebarMsgUnreadBadge');
+  if (sideBadge) {
+    if (unreadDmCount > 0) {
+      sideBadge.textContent = unreadDmCount;
+      sideBadge.style.display = 'inline-block';
+    } else {
+      sideBadge.style.display = 'none';
+    }
+  }
+
+  // Update Mobile Hub Messages Badge & Dot
+  const mbBadge = document.getElementById('mbHubMsgUnreadBadge');
+  if (mbBadge) {
+    if (unreadDmCount > 0) {
+      mbBadge.textContent = unreadDmCount;
+      mbBadge.style.display = 'inline-block';
+    } else {
+      mbBadge.style.display = 'none';
+    }
+  }
+  const mbDot = document.getElementById('mbHubUnreadDot');
+  if (mbDot) {
+    mbDot.style.display = (totalUnreadNotifs > 0) ? 'block' : 'none';
+  }
+}
+window.updateUnreadBadges = updateUnreadBadges;
+
+function toggleNotificationsModal() {
+  const modal = document.getElementById('notificationsModal');
+  if (!modal) return;
+  const isOpen = modal.classList.toggle('open');
+  if (isOpen) {
+    RemoAudio.play('click');
+    renderNotificationsList(currentNotifFilter);
+  }
+}
+window.toggleNotificationsModal = toggleNotificationsModal;
+
+function filterNotifications(filterTab) {
+  currentNotifFilter = filterTab;
+  document.querySelectorAll('.notif-tab').forEach((b) => {
+    b.classList.toggle('active', b.getAttribute('data-notif-filter') === filterTab);
+  });
+  renderNotificationsList(filterTab);
+}
+window.filterNotifications = filterNotifications;
+
+function renderNotificationsList(filterTab = currentNotifFilter) {
+  const box = document.getElementById('notificationsListContainer');
+  if (!box) return;
+  const lang = REMO_I18N.getLang();
+  const u = REMO_STORE.getCurrentUser();
+  const myUid = u ? u.uid : null;
+  const isAdm = REMO_STORE.isCurrentUserAdmin();
+
+  let list = (REMO_STORE.state.notifications || []).filter((n) =>
+    myUid && (n.toUid === myUid || (isAdm && (n.toUid === 'u_admin_founder' || !n.toUid))) && n.fromUid !== myUid
+  );
+
+  if (filterTab !== 'all') {
+    list = list.filter((n) => n.type === filterTab);
+  }
+
+  if (list.length === 0) {
+    box.innerHTML = `
+      <div style="text-align:center;padding:36px 14px;color:var(--muted);font-size:0.84rem;">
+        <div style="font-size:2rem;margin-bottom:8px;">✨</div>
+        <div>${lang === 'fr' ? 'Aucune notification pour le moment.' : 'No notifications yet.'}</div>
+      </div>
+    `;
+    return;
+  }
+
+  box.innerHTML = list.map((n) => {
+    const isUnread = !n.read;
+    const timeAgo = (typeof formatRelativeTime === 'function') ? formatRelativeTime(n.ts, lang) : 'récent';
+    let icon = '🔔';
+    let iconBg = 'rgba(56, 189, 248, 0.15)';
+    if (n.type === 'comment') { icon = '💬'; iconBg = 'rgba(56, 189, 248, 0.2)'; }
+    else if (n.type === 'like') { icon = '❤️'; iconBg = 'rgba(244, 63, 94, 0.2)'; }
+    else if (n.type === 'reaction') { icon = n.emoji || '🔥'; iconBg = 'rgba(251, 191, 36, 0.2)'; }
+    else if (n.type === 'message') { icon = '💌'; iconBg = 'rgba(168, 85, 247, 0.2)'; }
+    else if (n.type === 'tip') { icon = '🪙'; iconBg = 'rgba(234, 179, 8, 0.2)'; }
+
+    return `
+      <div class="notif-card-item ${isUnread ? 'unread' : ''}" onclick="handleNotificationClick('${n.id}')">
+        <div class="notif-card-icon" style="background:${iconBg};">
+          ${icon}
+        </div>
+        <div class="notif-card-content">
+          <div class="notif-card-actor">@${escapeHtmlStr(n.fromName || 'Citizen')}</div>
+          <div class="notif-card-desc">${escapeHtmlStr(n.text || '')}</div>
+        </div>
+        <div class="notif-card-time">${timeAgo}</div>
+      </div>
+    `;
+  }).join('');
+}
+window.renderNotificationsList = renderNotificationsList;
+
+function handleNotificationClick(notifId) {
+  const n = (REMO_STORE.state.notifications || []).find((x) => x.id === notifId);
+  if (!n) return;
+  n.read = true;
+  REMO_STORE.syncNotificationToCloud(n);
+  REMO_STORE.save(false, 'notif_read');
+  updateUnreadBadges();
+  document.getElementById('notificationsModal')?.classList.remove('open');
+
+  if (n.type === 'message' && n.fromUid) {
+    openDirectChatWithUser(n.fromUid);
+  } else if ((n.type === 'comment' || n.type === 'like' || n.type === 'reaction' || n.type === 'tip') && n.postId) {
+    switchRemoView('feed');
+    setTimeout(() => {
+      const el = document.getElementById('postCard_' + n.postId);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        el.style.boxShadow = '0 0 25px rgba(56, 189, 248, 0.8)';
+        setTimeout(() => { el.style.boxShadow = ''; }, 2400);
+      }
+      if (n.type === 'comment') {
+        openCommentsModal(n.postId);
+      }
+    }, 150);
+  }
+}
+window.handleNotificationClick = handleNotificationClick;
+
+function markAllNotificationsAsRead() {
+  REMO_STORE.markAllNotificationsAsRead();
+  RemoAudio.play('click');
+  renderNotificationsList();
+  updateUnreadBadges();
+  remoToast(REMO_I18N.getLang() === 'fr' ? '✓ Toutes les notifications sont lues' : '✓ All notifications marked as read');
+}
+window.markAllNotificationsAsRead = markAllNotificationsAsRead;
+
+function showHeadsUpNotification(opts) {
+  if (!opts) return;
+  activeHeadsUpPayload = opts;
+  const banner = document.getElementById('remoHeadsUpBanner');
+  const avEl = document.getElementById('headsupAvatar');
+  const tEl = document.getElementById('headsupTitle');
+  const bEl = document.getElementById('headsupText');
+  const actBtn = document.getElementById('headsupActionBtn');
+  if (!banner) return;
+
+  const lang = REMO_I18N.getLang();
+  if (avEl) {
+    if (opts.type === 'comment') avEl.textContent = '💬';
+    else if (opts.type === 'like') avEl.textContent = '❤️';
+    else if (opts.type === 'reaction') avEl.textContent = opts.emoji || '🔥';
+    else if (opts.type === 'message') avEl.textContent = '💌';
+    else if (opts.type === 'tip') avEl.textContent = '🪙';
+    else avEl.textContent = '🔔';
+  }
+  if (tEl) tEl.textContent = opts.title || 'REMO';
+  if (bEl) bEl.textContent = opts.text || '';
+  if (actBtn) actBtn.textContent = lang === 'fr' ? 'Voir' : 'View';
+
+  banner.style.display = 'block';
+  setTimeout(() => { banner.classList.add('open'); }, 20);
+
+  if (headsUpTimer) clearTimeout(headsUpTimer);
+  headsUpTimer = setTimeout(() => {
+    closeHeadsUpBanner();
+  }, 5500);
+}
+window.showHeadsUpNotification = showHeadsUpNotification;
+
+function closeHeadsUpBanner() {
+  const banner = document.getElementById('remoHeadsUpBanner');
+  if (!banner) return;
+  banner.classList.remove('open');
+  if (headsUpTimer) clearTimeout(headsUpTimer);
+  setTimeout(() => {
+    banner.style.display = 'none';
+  }, 400);
+}
+window.closeHeadsUpBanner = closeHeadsUpBanner;
+
+function handleHeadsUpClick() {
+  const p = activeHeadsUpPayload;
+  closeHeadsUpBanner();
+  if (!p) return;
+  if (p.actionFn) {
+    p.actionFn();
+    return;
+  }
+  if (p.type === 'message' && p.partnerUid) {
+    openDirectChatWithUser(p.partnerUid);
+  } else if (p.postId) {
+    switchRemoView('feed');
+    setTimeout(() => {
+      const el = document.getElementById('postCard_' + p.postId);
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      if (p.type === 'comment') openCommentsModal(p.postId);
+    }, 150);
+  }
+}
+window.handleHeadsUpClick = handleHeadsUpClick;
+

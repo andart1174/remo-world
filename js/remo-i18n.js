@@ -19,6 +19,16 @@ const REMO_DICT = {
     install_sub: 'Instant mobile & desktop app + Pioneer Badge',
     install_btn: 'Install',
 
+    // 🔔 Notifications Hub
+    notif_title: 'Notifications',
+    notif_mark_read: '✓ Mark all as read',
+    notif_empty: 'No notifications yet ✨',
+    notif_tab_all: 'All',
+    notif_tab_comments: '💬 Comments',
+    notif_tab_likes: '❤️ Likes',
+    notif_tab_messages: '💌 Messages',
+    notif_heads_up_view: 'View',
+
     // Navigation (Desktop Left + Mobile Bottom)
     nav_sec_social: '🌍 Social World',
     nav_sec_explore: '🗺️ Exploration',
@@ -622,6 +632,16 @@ const REMO_DICT = {
     install_app: '📲 Installer REMO (+100 🪙)',
     install_sub: 'Application mobile & PC instantanée + Badge Pionnier',
     install_btn: 'Installer',
+
+    // 🔔 Notifications Hub
+    notif_title: 'Notifications',
+    notif_mark_read: '✓ Tout marquer comme lu',
+    notif_empty: 'Aucune notification pour le moment ✨',
+    notif_tab_all: 'Toutes',
+    notif_tab_comments: '💬 Commentaires',
+    notif_tab_likes: '❤️ J’aimes',
+    notif_tab_messages: '💌 Messages',
+    notif_heads_up_view: 'Voir',
 
     // Navigation
     nav_sec_social: '🌍 Monde Social',

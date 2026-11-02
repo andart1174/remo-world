@@ -4709,3 +4709,204 @@ button, input, select, textarea {
 @media (max-width: 860px) {
   #genesisFomoBar { padding-right: 30px !important; }
 }
+
+/* ════════════════════════════════════════════════════════════════════
+   🔔 REMO PULSE — Notification Hub, Heads-Up Banners & Badges
+   ════════════════════════════════════════════════════════════════════ */
+.notif-bell-btn {
+  position: relative;
+  border-color: rgba(56, 189, 248, 0.4) !important;
+  color: #38bdf8 !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.notif-badge-pill {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  background: #ef4444;
+  color: #ffffff;
+  font-size: 0.66rem;
+  font-weight: 900;
+  padding: 1px 5px;
+  border-radius: 10px;
+  border: 2px solid #040711;
+  min-width: 17px;
+  text-align: center;
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.8);
+  animation: notifPulse 1.8s infinite;
+  pointer-events: none;
+}
+@keyframes notifPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.15); box-shadow: 0 0 14px rgba(239, 68, 68, 1); }
+}
+
+/* Heads-Up Slide-Down Banner */
+.remo-headsup-banner {
+  position: fixed;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%) translateY(-120%);
+  z-index: 100000;
+  max-width: 480px;
+  width: calc(100% - 24px);
+  background: rgba(11, 17, 32, 0.96);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border: 1px solid #38bdf8;
+  border-radius: 16px;
+  box-shadow: 0 20px 45px rgba(0, 0, 0, 0.75), 0 0 25px rgba(56, 189, 248, 0.3);
+  cursor: pointer;
+  opacity: 0;
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.35s ease;
+}
+.remo-headsup-banner.open {
+  transform: translateX(-50%) translateY(0);
+  opacity: 1;
+}
+.headsup-inner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 14px;
+}
+.headsup-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #6366f1, #38bdf8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(56, 189, 248, 0.4);
+}
+.headsup-body {
+  flex: 1;
+  min-width: 0;
+}
+.headsup-title {
+  font-weight: 900;
+  font-size: 0.86rem;
+  color: #fbbf24;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.headsup-text {
+  font-size: 0.8rem;
+  color: #f1f5f9;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 1px;
+}
+.headsup-action-btn {
+  background: linear-gradient(135deg, #38bdf8, #6366f1);
+  color: #ffffff;
+  border: none;
+  font-weight: 800;
+  font-size: 0.76rem;
+  padding: 6px 12px;
+  border-radius: 10px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: transform 0.15s;
+}
+.headsup-action-btn:hover {
+  transform: scale(1.05);
+}
+.headsup-close-btn {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  font-size: 1rem;
+  cursor: pointer;
+  padding: 4px;
+  flex-shrink: 0;
+}
+
+/* Notification Items in Modal */
+.notif-tab {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #94a3b8;
+  padding: 5px 11px;
+  border-radius: 16px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s;
+}
+.notif-tab.active {
+  background: rgba(56, 189, 248, 0.15);
+  border-color: #38bdf8;
+  color: #38bdf8;
+}
+.notif-card-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  cursor: pointer;
+  transition: background 0.18s, border-color 0.18s;
+  position: relative;
+}
+.notif-card-item:hover {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(56, 189, 248, 0.35);
+}
+.notif-card-item.unread {
+  background: rgba(56, 189, 248, 0.08);
+  border-color: rgba(56, 189, 248, 0.3);
+}
+.notif-card-item.unread::before {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #38bdf8;
+  box-shadow: 0 0 6px #38bdf8;
+}
+.notif-card-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  background: rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
+}
+.notif-card-content {
+  flex: 1;
+  min-width: 0;
+}
+.notif-card-actor {
+  font-weight: 800;
+  font-size: 0.84rem;
+  color: #f8fafc;
+}
+.notif-card-desc {
+  font-size: 0.79rem;
+  color: #cbd5e1;
+  line-height: 1.35;
+  margin-top: 1px;
+}
+.notif-card-time {
+  font-size: 0.7rem;
+  color: var(--muted);
+  flex-shrink: 0;
+}

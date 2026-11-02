@@ -79,7 +79,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-  <link rel="stylesheet" href="css/remo-core.css?v=55">
+  <link rel="stylesheet" href="css/remo-core.css?v=56">
 </head>
 <body>
 
@@ -116,6 +116,12 @@
 
       <button class="btn-ghost" id="btnRadioToggle" onclick="toggleHeaderRadio()">📻 Radio</button>
       <button class="btn-ghost" id="btnWishingWellToggle" onclick="openWishingWellModal()" title="Wishing Well" data-i18n="hdr_wishing_well">⛲ Fontaine</button>
+
+      <!-- 🔔 Notifications Bell Hub -->
+      <button class="btn-ghost notif-bell-btn" id="btnHeaderNotif" onclick="toggleNotificationsModal()" title="Notifications" style="position:relative;padding:7px 11px;">
+        <span style="font-size:1.05rem;">🔔</span>
+        <span class="notif-badge-pill" id="hdrNotifBadge" style="display:none;">0</span>
+      </button>
 
       <div class="coin-pill" onclick="openRemoCoin3DModal()" title="REMO Sovereign 3D Coin">
         <span>🪙</span>
@@ -178,6 +184,7 @@
           </button>
           <button class="nav-btn" data-nav-view="messages" onclick="switchRemoView('messages')">
             <span class="nav-ic">💌</span> <span data-i18n="nav_messages">Messages</span>
+            <span class="menu-unread-badge" id="sidebarMsgUnreadBadge" style="display:none;margin-left:auto;background:#ef4444;color:#fff;border-radius:10px;padding:1px 6px;font-size:0.7rem;font-weight:900;">0</span>
           </button>
           <button class="nav-btn" data-nav-view="bottles" onclick="switchRemoView('bottles')">
             <span class="nav-ic">🍾</span> <span data-i18n="nav_bottles">City Bottle</span>
@@ -653,9 +660,10 @@
       <span class="mb-tab-ic">🎴</span>
       <span data-i18n="mb_cards">Cards</span>
     </button>
-    <button class="mb-tab" onclick="document.getElementById('mobileHubModal').classList.add('open')">
+    <button class="mb-tab" onclick="document.getElementById('mobileHubModal').classList.add('open')" style="position:relative;">
       <span class="mb-tab-ic">✨</span>
       <span data-i18n="mb_hub">Hub</span>
+      <span class="mb-unread-dot" id="mbHubUnreadDot" style="display:none;position:absolute;top:4px;right:18px;width:8px;height:8px;border-radius:50%;background:#ef4444;box-shadow:0 0 6px #ef4444;"></span>
     </button>
   </nav>
 
@@ -678,7 +686,7 @@
         <button class="btn-ghost" onclick="switchRemoView('arena')">⚔️ <span data-i18n="nav_arena">City Wars &amp; PvP</span></button>
         <button class="btn-ghost" onclick="switchRemoView('auctions')">🔨 <span data-i18n="nav_auctions">Auctions</span></button>
         <button class="btn-ghost" onclick="switchRemoView('chat')">💬 <span data-i18n="nav_chat">Live Chat</span></button>
-        <button class="btn-ghost" onclick="switchRemoView('messages')">💌 <span data-i18n="nav_messages">Messenger</span></button>
+        <button class="btn-ghost" onclick="switchRemoView('messages')">💌 <span data-i18n="nav_messages">Messenger</span> <span class="menu-unread-badge" id="mbHubMsgUnreadBadge" style="display:none;margin-left:auto;background:#ef4444;color:#fff;border-radius:10px;padding:1px 6px;font-size:0.7rem;font-weight:900;">0</span></button>
         <button class="btn-ghost" onclick="switchRemoView('bottles')" style="border-color:#38bdf8;color:#7dd3fc;">🍾 <span data-i18n="nav_bottles">City Bottle</span></button>
         <button class="btn-ghost" onclick="switchRemoView('wheel')">🎡 <span data-i18n="nav_wheel">Lucky Spin</span></button>
         <button class="btn-ghost" onclick="document.getElementById('mobileHubModal').classList.remove('open');openRemoRadioModal();" style="border-color:#10b981;color:#6ee7b7;"><span id="mbRadioBtnTxt">📻 Radio du Monde</span></button>
@@ -1300,6 +1308,48 @@
     </div>
   </div>
 
+  <!-- ⚡ Heads-Up Live Slide-Down Notification Banner -->
+  <div class="remo-headsup-banner" id="remoHeadsUpBanner" style="display:none;" onclick="handleHeadsUpClick()">
+    <div class="headsup-inner">
+      <div class="headsup-avatar" id="headsupAvatar">🔔</div>
+      <div class="headsup-body">
+        <div class="headsup-title" id="headsupTitle">@Citizen</div>
+        <div class="headsup-text" id="headsupText">Notification text</div>
+      </div>
+      <button type="button" class="headsup-action-btn" id="headsupActionBtn" data-i18n="notif_heads_up_view">Voir</button>
+      <button type="button" class="headsup-close-btn" onclick="event.stopPropagation();closeHeadsUpBanner()">✕</button>
+    </div>
+  </div>
+
+  <!-- 🔔 REMO Pulse - Notifications Hub Modal -->
+  <div class="remo-modal-backdrop" id="notificationsModal" onclick="if(event.target===this)this.classList.remove('open')">
+    <div class="remo-modal" style="max-width:480px;padding:0;overflow:hidden;border-color:rgba(56,189,248,0.4);background:#070b18;">
+      <div class="modal-hdr" style="padding:14px 18px;border-bottom:1px solid rgba(255,255,255,0.08);background:rgba(255,255,255,0.02);">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="font-size:1.2rem;">🔔</span>
+          <b style="font-family:'Orbitron',sans-serif;font-size:0.95rem;color:#f8fafc;" data-i18n="notif_title">Notifications</b>
+          <span id="notifModalCountBadge" class="notif-count-pill" style="font-size:0.72rem;background:#ef4444;color:#fff;border-radius:10px;padding:1px 7px;font-weight:900;display:none;">0</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <button type="button" class="btn-ghost" style="font-size:0.72rem;padding:4px 8px;border-color:rgba(56,189,248,0.4);color:#7dd3fc;" onclick="markAllNotificationsAsRead()" data-i18n="notif_mark_read">✓ Tout marquer comme lu</button>
+          <button class="modal-close" onclick="document.getElementById('notificationsModal').classList.remove('open')">✕</button>
+        </div>
+      </div>
+
+      <!-- Filter tabs: All, Comments, Likes, Messages -->
+      <div class="notif-filter-row" style="display:flex;gap:6px;padding:8px 14px;border-bottom:1px solid rgba(255,255,255,0.05);background:rgba(0,0,0,0.2);overflow-x:auto;">
+        <button type="button" class="notif-tab active" data-notif-filter="all" onclick="filterNotifications('all')" data-i18n="notif_tab_all">Toutes</button>
+        <button type="button" class="notif-tab" data-notif-filter="comment" onclick="filterNotifications('comment')" data-i18n="notif_tab_comments">💬 Commentaires</button>
+        <button type="button" class="notif-tab" data-notif-filter="like" onclick="filterNotifications('like')" data-i18n="notif_tab_likes">❤️ J’aimes</button>
+        <button type="button" class="notif-tab" data-notif-filter="message" onclick="filterNotifications('message')" data-i18n="notif_tab_messages">💌 Messages</button>
+      </div>
+
+      <!-- Notifications List Container -->
+      <div id="notificationsListContainer" style="max-height:420px;overflow-y:auto;padding:8px 12px;display:flex;flex-direction:column;gap:6px;">
+      </div>
+    </div>
+  </div>
+
   <!-- 💬 #3 Super-Comments 2.0 Modal (Voice Replies, 4D Card-Flex & Golden SuperChat Tips) -->
   <div class="remo-modal-backdrop" id="commentsModal" onclick="if(event.target===this)this.classList.remove('open')">
     <div class="remo-modal" style="max-width:560px;">
@@ -1767,12 +1817,12 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 
   <!-- REMO Modular Engines -->
-  <script src="js/remo-i18n.js?v=55"></script>
-  <script src="js/remo-cities-data.js?v=55"></script>
-  <script src="js/remo-store.js?v=55"></script>
-  <script src="js/remo-card-engine.js?v=55"></script>
-  <script src="js/remo-radar-arena.js?v=55"></script>
-  <script src="js/remo-social-comms.js?v=55"></script>
-  <script src="js/remo-radio-engine.js?v=55"></script>
+  <script src="js/remo-i18n.js?v=56"></script>
+  <script src="js/remo-cities-data.js?v=56"></script>
+  <script src="js/remo-store.js?v=56"></script>
+  <script src="js/remo-card-engine.js?v=56"></script>
+  <script src="js/remo-radar-arena.js?v=56"></script>
+  <script src="js/remo-social-comms.js?v=56"></script>
+  <script src="js/remo-radio-engine.js?v=56"></script>
 </body>
 </html>
