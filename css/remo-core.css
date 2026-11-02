@@ -521,7 +521,7 @@ button, input, select, textarea {
 /* ── Desktop 2-Column Balanced Stream (No dark side voids, 2 posts side-by-side) ── */
 .posts-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
   gap: 20px;
   max-width: 1080px;
   margin: 0 auto;
@@ -4479,8 +4479,8 @@ button, input, select, textarea {
 }
 
 .post-card.is-html-app .post-media-wrap {
-  height: 620px !important;
-  max-height: 640px !important;
+  height: clamp(420px, calc(100dvh - 220px), 620px) !important;
+  max-height: 620px !important;
   aspect-ratio: auto !important;
 }
 
@@ -4493,8 +4493,219 @@ button, input, select, textarea {
 
 @media (max-width: 860px) {
   .post-card.is-html-app .post-media-wrap {
-    height: 570px !important;
-    max-height: 590px !important;
+    height: clamp(400px, calc(100dvh - 260px), 600px) !important;
+    max-height: 600px !important;
     aspect-ratio: auto !important;
   }
+}
+
+
+/* ══════════════════════════════════════════════════════════════
+   📐 v55 — PERFECT POST FRAMING (MOBILE + DESKTOP) & TRUE FULLSCREEN
+   ══════════════════════════════════════════════════════════════ */
+.post-card {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+@media (max-width: 860px) {
+  /* Cards must always fill the screen width exactly (no right-side cut-off) */
+  #view-feed.active .posts-grid {
+    align-items: stretch !important;
+    max-width: 100% !important;
+  }
+  #view-feed.active .post-card {
+    width: 100% !important;
+  }
+  /* Instagram-standard 4:5 frame, capped so the post + action bar fit on screen */
+  #view-feed.active .post-media-wrap {
+    aspect-ratio: 4 / 5 !important;
+    max-height: 420px !important;
+  }
+  #view-feed.active .post-media-wrap img,
+  #view-feed.active .post-media-wrap video {
+    max-height: 420px !important;
+  }
+  .post-actions-bar .pact-btn {
+    padding: 6px 4px !important;
+    font-size: 0.74rem !important;
+    gap: 3px !important;
+  }
+  .post-actions-bar .pact-fs-btn {
+    flex: 0 0 32px !important;
+  }
+  .post-actions-bar .pact-more-btn {
+    flex: 0 0 34px !important;
+  }
+}
+
+/* Compact 4D card back so it always fits inside the shorter frames */
+.post-face-back {
+  padding: 12px 14px !important;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.post-face-back::-webkit-scrollbar { display: none; }
+.post-face-back .holo-prism-ring { width: 60px; height: 60px; }
+.post-face-back .holo-crest-flag { font-size: 30px; }
+.post-face-back .holo-crest-cityname { margin-top: 4px; font-size: 0.88rem; }
+.post-face-back .holo-prism-centerpiece { margin: 2px auto 6px; }
+.post-face-back .holo-citizen-header-card { padding: 6px 10px; margin-bottom: 6px; }
+.post-face-back .holo-stats-grid { gap: 6px; margin-bottom: 6px; }
+.post-face-back .post-back-actions { padding-top: 8px; }
+.post-face-back .post-back-actions .btn-cyber,
+.post-face-back .post-back-actions .btn-ghost {
+  font-size: 0.72rem !important;
+  padding: 6px 9px !important;
+  line-height: 1.25;
+}
+.post-face-back .registered-city-badge {
+  white-space: normal;
+  text-align: center;
+}
+
+/* Interactive HTML frame always fills its stage */
+.post-card.is-html-app .post-face-front,
+.post-card.is-html-app .post-flip-container,
+.post-card.is-html-app .post-flip-inner {
+  height: 100%;
+}
+.post-card.is-html-app .html-post-frame {
+  display: block;
+  border-radius: 0 !important;
+}
+
+/* 🖼️ TRUE FULLSCREEN PHOTO LIGHTBOX */
+.remo-fs-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 100000;
+  background: #000;
+  display: none;
+  flex-direction: column;
+}
+.remo-fs-lightbox.open { display: flex; }
+.remo-fs-lightbox .fs-lb-topbar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: calc(10px + env(safe-area-inset-top, 0px)) 14px 22px;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.78), rgba(0, 0, 0, 0));
+  pointer-events: none;
+}
+.remo-fs-lightbox .fs-lb-topbar > * { pointer-events: auto; }
+.remo-fs-lightbox #photoLightboxTitle {
+  font-family: 'Orbitron', sans-serif;
+  color: #38bdf8;
+  font-size: 0.82rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.remo-fs-lightbox .fs-lb-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-shrink: 0;
+}
+.remo-fs-lightbox .fs-lb-actions .btn-cyber {
+  font-size: 0.74rem;
+  padding: 5px 11px;
+}
+.remo-fs-lightbox .fs-lb-close {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(15, 23, 42, 0.75);
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 900;
+  cursor: pointer;
+}
+.remo-fs-lightbox .fs-lb-stage {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+.remo-fs-lightbox #photoLightboxImg {
+  max-width: 100vw;
+  max-height: 100dvh;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  display: block;
+}
+
+/* 🕹️ TRUE FULLSCREEN HTML ARCADE */
+#htmlFullscreenModal {
+  z-index: 100000;
+}
+#htmlFullscreenModal .remo-modal {
+  width: min(1200px, 96vw) !important;
+  max-width: 96vw !important;
+  height: 94dvh !important;
+  max-height: 94dvh !important;
+  overflow: hidden !important;
+  padding: 10px 12px !important;
+}
+#htmlFullscreenModal #htmlFsIframe {
+  min-height: 0;
+}
+#htmlFullscreenModal:fullscreen .remo-modal,
+#htmlFullscreenModal:-webkit-full-screen .remo-modal {
+  width: 100vw !important;
+  max-width: 100vw !important;
+  height: 100vh !important;
+  max-height: 100vh !important;
+  border-radius: 0 !important;
+}
+@media (max-width: 860px) {
+  #htmlFullscreenModal {
+    padding: 0 !important;
+    align-items: stretch !important;
+  }
+  #htmlFullscreenModal .remo-modal {
+    width: 100vw !important;
+    max-width: 100vw !important;
+    height: 100dvh !important;
+    max-height: 100dvh !important;
+    border-radius: 0 !important;
+    border: none !important;
+    padding: calc(8px + env(safe-area-inset-top, 0px)) 8px calc(8px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+  #htmlFullscreenModal .modal-hdr {
+    margin-bottom: 6px !important;
+    padding-bottom: 6px !important;
+  }
+  #htmlFullscreenModal #htmlFsTitle {
+    font-size: 0.72rem;
+  }
+  #htmlFullscreenModal #htmlFsShareBtn {
+    font-size: 0.7rem;
+    padding: 5px 9px;
+  }
+  #htmlFullscreenModal #htmlFsIframe {
+    border-radius: 10px !important;
+  }
+}
+
+/* Genesis bar: dismiss ✕ stays on the same line */
+#genesisFomoBar { display: flex; align-items: center; gap: 6px; }
+#genesisFomoBar .genesis-fomo-inner { flex: 1; min-width: 0; }
+#genesisFomoBar .fomo-close-btn { position: absolute; top: 4px; right: 4px; z-index: 2; }
+@media (max-width: 860px) {
+  #genesisFomoBar { padding-right: 30px !important; }
 }

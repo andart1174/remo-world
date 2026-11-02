@@ -510,10 +510,10 @@ function renderPostCardBack(p, city, lang, wx) {
     <!-- Bottom Flip Card Action Buttons -->
     <div class="post-back-actions">
       <button type="button" class="btn-cyber btn-gold" style="flex:1;font-size:0.75rem;padding:7px 10px;justify-content:center;" onclick="savePostCardToAlbum('${p.id}')">
-        📕 ${t('post_flip_save')}
+        ${t('post_flip_save')}
       </button>
       <button type="button" class="btn-ghost" style="font-size:0.75rem;padding:7px 10px;" onclick="flipPost3DCard('${p.id}')">
-        🔄 ${t('post_flip_front_btn')}
+        ${t('post_flip_front_btn')}
       </button>
     </div>
   `;
@@ -883,13 +883,7 @@ function renderPostMediaStage(p, city, lang) {
 
   // 1. LIVE INTERACTIVE HTML / 3D MINI-APP
   if (p.mediaType === 'html_app' && p.htmlCode) {
-    let cleanCode = p.htmlCode || '';
-    const noScrollStyle = '<style>html,body{scrollbar-width:none!important;margin:0;padding:0;}::-webkit-scrollbar{display:none!important;}</style>';
-    if (cleanCode.includes('</head>')) {
-      cleanCode = cleanCode.replace('</head>', noScrollStyle + '</head>');
-    } else if (cleanCode.includes('<body')) {
-      cleanCode = noScrollStyle + cleanCode;
-    }
+    const cleanCode = buildFittedHtmlSrcdoc(p.htmlCode);
     return `
       <iframe class="html-post-frame" id="htmlFrame_${p.id}" sandbox="allow-scripts" loading="lazy" scrolling="no" srcdoc="${escapeSrcDocAttr(cleanCode)}" style="width:100%;height:100%;border:none;border-radius:12px;background:#050816;overflow:hidden;"></iframe>
     `;
@@ -1715,16 +1709,18 @@ function openHtmlFullscreenModal(postId) {
   const titleEl = document.getElementById('htmlFsTitle');
   const shareBtn = document.getElementById('htmlFsShareBtn');
   if (titleEl) titleEl.textContent = `💻 @${p.authorName} — LIVE HTML ARCADE`;
-  if (iframe) iframe.srcdoc = p.htmlCode;
+  if (iframe) iframe.srcdoc = buildFittedHtmlSrcdoc(p.htmlCode);
   if (shareBtn) {
     shareBtn.onclick = () => {
       sharePostLink(postId);
     };
   }
   modal?.classList.add('open');
+  remoEnterNativeFullscreen(modal);
 }
 
 function closeHtmlFullscreenModal() {
+  remoExitNativeFullscreen();
   const iframe = document.getElementById('htmlFsIframe');
   if (iframe) iframe.srcdoc = '';
   document.getElementById('htmlFullscreenModal')?.classList.remove('open');
@@ -5794,10 +5790,14 @@ function openPhotoLightboxModal(postId) {
   }
   if (img) img.src = resolved;
   if (title) title.textContent = `${city.flag || '📸'} @${p.authorName} — 4D VIEW`;
-  if (modal) modal.classList.add('open');
+  if (modal) {
+    modal.classList.add('open');
+    remoEnterNativeFullscreen(modal);
+  }
 }
 
 function closePhotoLightboxModal() {
+  remoExitNativeFullscreen();
   const modal = document.getElementById('photoLightboxModal');
   if (modal) modal.classList.remove('open');
   const img = document.getElementById('photoLightboxImg');
@@ -5815,3 +5815,84 @@ window.openPostFullscreenMedia = openPostFullscreenMedia;
 window.openPhotoLightboxModal = openPhotoLightboxModal;
 window.closePhotoLightboxModal = closePhotoLightboxModal;
 window.saveCurrentLightboxCard = saveCurrentLightboxCard;
+
+
+/* ══════════════════════════════════════════════════════════════
+   🕹️ HTML MINI-APP AUTO-FIT ENGINE (v55)
+   Scales any user-coded game/app so the WHOLE layout (screen +
+   gamepad buttons) is visible inside its frame — no scrollbars,
+   no cut-off controls. Full-viewport canvas games stay at 1:1.
+   ══════════════════════════════════════════════════════════════ */
+const REMO_HTML_FIT_STYLE = '<style id="remo-fit-style">html,body{scrollbar-width:none!important;-ms-overflow-style:none!important;}html::-webkit-scrollbar,body::-webkit-scrollbar{display:none!important;}</style>';
+const REMO_HTML_FIT_SCRIPT = '<script id="remo-fit-script">(function(){' +
+  'function fit(){var b=document.body,d=document.documentElement;if(!b)return;' +
+  'b.style.transform="";b.style.transformOrigin="";b.style.overflow="";d.style.overflow="";' +
+  'try{window.scrollTo(0,0);}catch(e){}' +
+  'var W=window.innerWidth,H=window.innerHeight;if(!W||!H)return;' +
+  'var L=0,T=0,R=Math.max(d.scrollWidth,b.scrollWidth),B=Math.max(d.scrollHeight,b.scrollHeight);' +
+  'function acc(el,depth){if(!el||el.id==="remo-fit-script")return;var tn=el.tagName;if(tn==="SCRIPT"||tn==="STYLE"||tn==="LINK"||tn==="META")return;' +
+  'var cs=getComputedStyle(el);if(cs.display==="none"||cs.visibility==="hidden"||cs.position==="fixed")return;' +
+  'var r=el.getBoundingClientRect();if(r.width<1||r.height<1)return;' +
+  'L=Math.min(L,r.left);T=Math.min(T,r.top);R=Math.max(R,r.right);B=Math.max(B,r.bottom);' +
+  'if(depth<1){for(var i=0;i<el.children.length&&i<80;i++)acc(el.children[i],depth+1);}}' +
+  'for(var i=0;i<b.children.length;i++)acc(b.children[i],0);' +
+  'var bw=R-L,bh=B-T;if(bw<=W+2&&bh<=H+2)return;' +
+  'var s=Math.min(W/bw,H/bh);var br=b.getBoundingClientRect();' +
+  'var tx=(W-bw*s)/2-br.left-s*(L-br.left);var ty=(H-bh*s)/2-br.top-s*(T-br.top);' +
+  'd.style.overflow="hidden";b.style.overflow="visible";b.style.transformOrigin="0 0";' +
+  'b.style.transform="translate("+tx+"px,"+ty+"px) scale("+s+")";}' +
+  'var tm=null;function later(){clearTimeout(tm);tm=setTimeout(fit,120);}' +
+  'if(document.readyState==="loading"){document.addEventListener("DOMContentLoaded",fit);}else{fit();}' +
+  'window.addEventListener("load",function(){fit();setTimeout(fit,300);setTimeout(fit,1200);});' +
+  'setTimeout(fit,60);setTimeout(fit,700);window.addEventListener("resize",later);' +
+  '})();<\/script>';
+
+function buildFittedHtmlSrcdoc(code) {
+  let html = String(code || '');
+  if (!html) return html;
+  if (html.includes('remo-fit-script')) return html;
+  const scriptTag = REMO_HTML_FIT_SCRIPT;
+  if (/<\/head>/i.test(html)) {
+    html = html.replace(/<\/head>/i, REMO_HTML_FIT_STYLE + '</head>');
+  } else {
+    html = REMO_HTML_FIT_STYLE + html;
+  }
+  const lower = html.toLowerCase();
+  const bodyEnd = lower.lastIndexOf('</body>');
+  if (bodyEnd !== -1) {
+    html = html.slice(0, bodyEnd) + scriptTag + html.slice(bodyEnd);
+  } else {
+    html = html + scriptTag;
+  }
+  return html;
+}
+
+function remoEnterNativeFullscreen(el) {
+  try {
+    if (!el || document.fullscreenElement || document.webkitFullscreenElement) return;
+    const req = el.requestFullscreen || el.webkitRequestFullscreen;
+    if (req) {
+      const res = req.call(el);
+      if (res && typeof res.catch === 'function') res.catch(() => {});
+    }
+  } catch (e) {}
+}
+
+function remoExitNativeFullscreen() {
+  try {
+    if (document.fullscreenElement && document.exitFullscreen) {
+      const res = document.exitFullscreen();
+      if (res && typeof res.catch === 'function') res.catch(() => {});
+    } else if (document.webkitFullscreenElement && document.webkitExitFullscreen) {
+      document.webkitExitFullscreen();
+    }
+  } catch (e) {}
+}
+
+document.addEventListener('keydown', (ev) => {
+  if (ev.key !== 'Escape') return;
+  const lb = document.getElementById('photoLightboxModal');
+  if (lb && lb.classList.contains('open')) closePhotoLightboxModal();
+});
+
+window.buildFittedHtmlSrcdoc = buildFittedHtmlSrcdoc;

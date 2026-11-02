@@ -79,7 +79,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-  <link rel="stylesheet" href="css/remo-core.css?v=54">
+  <link rel="stylesheet" href="css/remo-core.css?v=55">
 </head>
 <body>
 
@@ -1264,19 +1264,17 @@
     </div>
   </div>
 
-  <!-- 🖼️ Universal High-Res Photo & Media Lightbox Modal -->
-  <div class="remo-modal-backdrop" id="photoLightboxModal" onclick="if(event.target===this)closePhotoLightboxModal()">
-    <div class="remo-modal" style="max-width:96vw;width:860px;max-height:92dvh;display:flex;flex-direction:column;padding:12px;background:rgba(6,10,24,0.96);border:1px solid rgba(56,189,248,0.4);border-radius:20px;">
-      <div class="modal-hdr" style="margin-bottom:8px;">
-        <b id="photoLightboxTitle" style="font-family:'Orbitron',sans-serif;color:#38bdf8;font-size:0.86rem;">📷 PHOTO HD</b>
-        <div style="display:flex;gap:8px;align-items:center;">
-          <button type="button" class="btn-cyber btn-gold" id="photoLightboxSaveBtn" onclick="saveCurrentLightboxCard()" style="font-size:0.75rem;padding:4px 10px;">🎴 Album 4D</button>
-          <button type="button" class="modal-close" onclick="closePhotoLightboxModal()">✕</button>
-        </div>
+  <!-- 🖼️ True Fullscreen Photo Lightbox -->
+  <div class="remo-fs-lightbox" id="photoLightboxModal" onclick="if(event.target===this||event.target.classList.contains('fs-lb-stage'))closePhotoLightboxModal()">
+    <div class="fs-lb-topbar">
+      <b id="photoLightboxTitle">📷 PHOTO HD</b>
+      <div class="fs-lb-actions">
+        <button type="button" class="btn-cyber btn-gold" id="photoLightboxSaveBtn" onclick="saveCurrentLightboxCard()">🎴 Album 4D</button>
+        <button type="button" class="fs-lb-close" onclick="closePhotoLightboxModal()" aria-label="Close">✕</button>
       </div>
-      <div style="flex:1;display:flex;align-items:center;justify-content:center;overflow:hidden;border-radius:14px;background:#030712;max-height:75vh;">
-        <img id="photoLightboxImg" src="" alt="Fullscreen Media" style="max-width:100%;max-height:75vh;object-fit:contain;border-radius:12px;">
-      </div>
+    </div>
+    <div class="fs-lb-stage">
+      <img id="photoLightboxImg" src="" alt="Fullscreen Media">
     </div>
   </div>
 
@@ -1769,12 +1767,12 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 
   <!-- REMO Modular Engines -->
-  <script src="js/remo-i18n.js?v=54"></script>
-  <script src="js/remo-cities-data.js?v=54"></script>
-  <script src="js/remo-store.js?v=54"></script>
-  <script src="js/remo-card-engine.js?v=54"></script>
-  <script src="js/remo-radar-arena.js?v=54"></script>
-  <script src="js/remo-social-comms.js?v=54"></script>
-  <script src="js/remo-radio-engine.js?v=54"></script>
+  <script src="js/remo-i18n.js?v=55"></script>
+  <script src="js/remo-cities-data.js?v=55"></script>
+  <script src="js/remo-store.js?v=55"></script>
+  <script src="js/remo-card-engine.js?v=55"></script>
+  <script src="js/remo-radar-arena.js?v=55"></script>
+  <script src="js/remo-social-comms.js?v=55"></script>
+  <script src="js/remo-radio-engine.js?v=55"></script>
 </body>
 </html>
