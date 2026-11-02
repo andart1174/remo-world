@@ -883,8 +883,15 @@ function renderPostMediaStage(p, city, lang) {
 
   // 1. LIVE INTERACTIVE HTML / 3D MINI-APP
   if (p.mediaType === 'html_app' && p.htmlCode) {
+    let cleanCode = p.htmlCode || '';
+    const noScrollStyle = '<style>html,body{scrollbar-width:none!important;margin:0;padding:0;}::-webkit-scrollbar{display:none!important;}</style>';
+    if (cleanCode.includes('</head>')) {
+      cleanCode = cleanCode.replace('</head>', noScrollStyle + '</head>');
+    } else if (cleanCode.includes('<body')) {
+      cleanCode = noScrollStyle + cleanCode;
+    }
     return `
-      <iframe class="html-post-frame" id="htmlFrame_${p.id}" sandbox="allow-scripts" loading="lazy" srcdoc="${escapeSrcDocAttr(p.htmlCode)}" style="width:100%;height:100%;border:none;border-radius:12px;background:#050816;"></iframe>
+      <iframe class="html-post-frame" id="htmlFrame_${p.id}" sandbox="allow-scripts" loading="lazy" scrolling="no" srcdoc="${escapeSrcDocAttr(cleanCode)}" style="width:100%;height:100%;border:none;border-radius:12px;background:#050816;overflow:hidden;"></iframe>
     `;
   }
 
@@ -1166,7 +1173,7 @@ function renderSocialFeed(searchQuery = '') {
       ));
 
     return `
-      <article id="post_card_${p.id}" class="post-card ${p.boosted || p.pinned || sealed ? 'boosted' : ''}" ${interactiveNoTilt ? '' : 'onmousemove="applyHoloTilt(event, this)" onmouseleave="resetHoloTilt(this)"'}>
+      <article id="post_card_${p.id}" class="post-card ${p.boosted || p.pinned || sealed ? 'boosted' : ''} ${p.mediaType === 'html_app' ? 'is-html-app' : ''}" ${interactiveNoTilt ? '' : 'onmousemove="applyHoloTilt(event, this)" onmouseleave="resetHoloTilt(this)"'}>
         <div class="post-head">
           <div class="post-author" style="cursor:pointer;" onclick="openDirectChatWithUser('${p.uid || ''}')" title="💌 Message @${escapeHtmlStr(p.authorName)}">
             <div class="avatar-circle ${cosm.frameClass}">${escapeHtmlStr((p.authorName || 'R')[0].toUpperCase())}</div>
@@ -5737,3 +5744,74 @@ function dismissGenesisFomoBar(ev) {
   } catch (e) {}
 }
 window.dismissGenesisFomoBar = dismissGenesisFomoBar;
+
+
+/* ══════════════════════════════════════════════════════════════
+   ⛶ UNIVERSAL FULLSCREEN & LIGHTBOX CONTROLLERS (v54)
+   ══════════════════════════════════════════════════════════════ */
+let currentLightboxPostId = null;
+
+function openPostFullscreenMedia(postId) {
+  const p = (REMO_STORE.state.posts || []).find((x) => String(x.id) === String(postId));
+  if (!p) {
+    console.warn('Post not found for fullscreen:', postId);
+    return;
+  }
+  if (p.mediaType === 'html_app' && p.htmlCode) {
+    if (typeof openHtmlFullscreenModal === 'function') {
+      openHtmlFullscreenModal(p.id);
+    }
+  } else if (p.mediaType === 'video') {
+    const vid = document.querySelector(`#post_media_${p.id} video`);
+    if (vid) {
+      if (vid.requestFullscreen) vid.requestFullscreen();
+      else if (vid.webkitRequestFullscreen) vid.webkitRequestFullscreen();
+      else if (vid.webkitEnterFullscreen) vid.webkitEnterFullscreen();
+    } else {
+      openPhotoLightboxModal(p.id);
+    }
+  } else {
+    openPhotoLightboxModal(p.id);
+  }
+}
+
+function openPhotoLightboxModal(postId) {
+  const p = (REMO_STORE.state.posts || []).find((x) => String(x.id) === String(postId));
+  if (!p) return;
+  currentLightboxPostId = p.id;
+  const modal = document.getElementById('photoLightboxModal');
+  const img = document.getElementById('photoLightboxImg');
+  const title = document.getElementById('photoLightboxTitle');
+  const city = (typeof getCityById === 'function') ? (getCityById(p.cityId) || { flag: '🌍', name: 'World' }) : { flag: '🌍', name: 'World' };
+  const rawKey = p.mediaUrl || (Array.isArray(p.mediaUrls) ? p.mediaUrls[0] : '');
+  let resolved = '';
+  if (rawKey.startsWith('http') || rawKey.startsWith('data:') || rawKey.startsWith('blob:')) {
+    resolved = rawKey;
+  } else if (typeof RemoMediaDB !== 'undefined' && RemoMediaDB.resolveSyncOrPlaceholder) {
+    resolved = RemoMediaDB.resolveSyncOrPlaceholder(rawKey);
+  } else {
+    resolved = rawKey;
+  }
+  if (img) img.src = resolved;
+  if (title) title.textContent = `${city.flag || '📸'} @${p.authorName} — 4D VIEW`;
+  if (modal) modal.classList.add('open');
+}
+
+function closePhotoLightboxModal() {
+  const modal = document.getElementById('photoLightboxModal');
+  if (modal) modal.classList.remove('open');
+  const img = document.getElementById('photoLightboxImg');
+  if (img) img.src = '';
+  currentLightboxPostId = null;
+}
+
+function saveCurrentLightboxCard() {
+  if (currentLightboxPostId && typeof savePostCardToAlbum === 'function') {
+    savePostCardToAlbum(currentLightboxPostId);
+  }
+}
+
+window.openPostFullscreenMedia = openPostFullscreenMedia;
+window.openPhotoLightboxModal = openPhotoLightboxModal;
+window.closePhotoLightboxModal = closePhotoLightboxModal;
+window.saveCurrentLightboxCard = saveCurrentLightboxCard;

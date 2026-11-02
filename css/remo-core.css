@@ -518,13 +518,15 @@ button, input, select, textarea {
 }
 
 /* ── Desktop Clean Single-Column Stream ── */
+/* ── Desktop 2-Column Balanced Stream (No dark side voids, 2 posts side-by-side) ── */
 .posts-grid {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 20px;
-  max-width: 530px;
+  max-width: 1080px;
   margin: 0 auto;
   width: 100%;
+  align-items: start;
 }
 
 .post-card {
@@ -4467,5 +4469,32 @@ button, input, select, textarea {
   .genesis-fomo-pill {
     padding: 2px 7px !important;
     font-size: 0.65rem !important;
+  }
+}
+
+
+/* Interactive HTML Apps & Mini-Games: Full Height to Show Screen + Gamepad Controls Together */
+.post-card {
+  height: fit-content;
+}
+
+.post-card.is-html-app .post-media-wrap {
+  height: 620px !important;
+  max-height: 640px !important;
+  aspect-ratio: auto !important;
+}
+
+.post-card.is-html-app .html-post-frame {
+  width: 100% !important;
+  height: 100% !important;
+  overflow: hidden !important;
+  border: none !important;
+}
+
+@media (max-width: 860px) {
+  .post-card.is-html-app .post-media-wrap {
+    height: 570px !important;
+    max-height: 590px !important;
+    aspect-ratio: auto !important;
   }
 }
