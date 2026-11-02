@@ -267,7 +267,7 @@ const REMO_DICT = {
     radar_layer_sat: '🛰️ Satellite Hybrid',
     radar_layer_topo: '🏔️ Relief Topo',
     radar_drop_pin: '📌 Drop Live Pin Here',
-    radar_verify_city: '🛂 Stamp GPS City Visa',
+    radar_verify_city: '🛂 4D Sovereign Border Control (GPS)',
 
     // City Wars & Card PvP Arena
     arena_title: '⚔️ City Wars & 3D Card PvP Battle Arena',
@@ -408,8 +408,8 @@ const REMO_DICT = {
     adm_backup_hdr: '📦 Full Network Backup & Restore',
 
     // Urban Geo-Vaults (Real-World AR Treasure Hunts)
-    radar_vaults_btn: '💎 Geo-Vaults',
-    radar_bury_vault_btn: '💎 + Bury Geo-Vault',
+    radar_vaults_btn: '🗺️ 🎁 World Treasure Hunt',
+    radar_bury_vault_btn: '👑 🎁 Plant Secret Chest (God-Mode)',
     vault_address_search_lbl: '🔍 Address / Street / Global Location:',
     vault_btn_find_gps: '🔍 Find GPS',
     vault_modal_title: '💎 World City Geo-Vault — AR Treasure Hunt',
@@ -533,7 +533,7 @@ const REMO_DICT = {
     pred_opt_no: 'NO',
 
     // 🎁 Idea 3: World Treasure Hunt & Admin God-Mode
-    adm_drop_chest_btn: '📍 Plant Secret Chest (God-Mode)',
+    adm_drop_chest_btn: '👑 🎁 Plant Secret Chest (God-Mode)',
     adm_drop_chest_title: '👑 Plant Secret Treasure Chest (Admin God-Mode)',
     adm_drop_chest_sub: 'Drop a real-time secret chest anywhere on Earth. Set loot, clue, and trigger world alert!',
     chest_tier_wood: '🪵 Urban Wooden Chest (100 🪙)',
@@ -830,7 +830,7 @@ const REMO_DICT = {
     radar_layer_sat: '🛰️ Satellite Hybride',
     radar_layer_topo: '🏔️ Relief Topo',
     radar_drop_pin: '📌 Placer une Balise Ici',
-    radar_verify_city: '🛂 Tamponner Visa GPS',
+    radar_verify_city: '🛂 Contrôle de Frontière Souverain (GPS 4D)',
 
     // City Wars & Card PvP Arena
     arena_title: '⚔️ Guerre des Villes & Arène PvP Cartes 3D',
@@ -971,8 +971,8 @@ const REMO_DICT = {
     adm_backup_hdr: '📦 Sauvegarde & Restauration Complète',
 
     // Urban Geo-Vaults (Real-World AR Treasure Hunts)
-    radar_vaults_btn: '💎 Géo-Coffres',
-    radar_bury_vault_btn: '💎 + Déposer un Géo-Coffre',
+    radar_vaults_btn: '🗺️ 🎁 Chasse aux Trésors Mondiale',
+    radar_bury_vault_btn: '👑 🎁 Déposer un Coffre Secret (God-Mode)',
     vault_address_search_lbl: '🔍 Adresse / Rue / Lieu dans le Monde :',
     vault_btn_find_gps: '🔍 Trouver GPS',
     vault_modal_title: '💎 Géo-Coffre Urbain — Chasse aux Trésors AR',
@@ -1096,7 +1096,7 @@ const REMO_DICT = {
     pred_opt_no: 'NON',
 
     // 🎁 Idea 3: World Treasure Hunt & Admin God-Mode
-    adm_drop_chest_btn: '📍 Déposer Coffre Secret (God-Mode)',
+    adm_drop_chest_btn: '👑 🎁 Déposer un Coffre Secret (God-Mode)',
     adm_drop_chest_title: '👑 Déposer un Coffre au Trésor Secret (God-Mode)',
     adm_drop_chest_sub: 'Déposez un coffre secret en temps réel n’importe où sur Terre. Définissez le butin, l’énigme et l’alerte mondiale !',
     chest_tier_wood: '🪵 Coffre en Bois Urbain (100 🪙)',

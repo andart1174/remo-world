@@ -79,7 +79,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-  <link rel="stylesheet" href="css/remo-core.css?v=49">
+  <link rel="stylesheet" href="css/remo-core.css?v=50">
 </head>
 <body>
 
@@ -274,11 +274,11 @@
               <p style="font-size:0.82rem;color:var(--muted);margin-top:3px;" data-i18n="radar_subtitle"></p>
             </div>
             <div style="display:flex;gap:8px;flex-wrap:wrap;">
-              <button class="btn-cyber btn-gold" id="btnRadarBuryVault" style="display:none;" onclick="openBuryGeoVaultModal()" data-i18n="radar_bury_vault_btn">💎 + Bury Geo-Vault</button>
-              <button class="btn-cyber" style="background:linear-gradient(135deg,#06b6d4,#3b82f6);" onclick="locateNearestGeoVault()" data-i18n="radar_vaults_btn">💎 Geo-Vaults (<span id="radarVaultsBadge">6</span>)</button>
+              <button class="btn-cyber btn-gold" id="btnRadarBuryVault" style="display:none;background:linear-gradient(135deg,#f59e0b,#fbbf24);color:#0f172a;font-weight:900;box-shadow:0 0 16px rgba(245,158,11,0.5);" onclick="openBuryGeoVaultModal()" data-i18n="radar_bury_vault_btn">👑 🎁 Plant Secret Chest (God-Mode)</button>
+              <button class="btn-cyber" style="background:linear-gradient(135deg,#06b6d4,#3b82f6);font-weight:900;box-shadow:0 0 16px rgba(6,182,212,0.4);" onclick="locateNearestGeoVault()" data-i18n="radar_vaults_btn">🗺️ 🎁 World Treasure Hunt (<span id="radarVaultsBadge">6</span>)</button>
               <button class="btn-cyber" style="background:linear-gradient(135deg,#10b981,#059669);" onclick="openAddUserCityModal()" data-i18n="add_city_btn">🌍 + Add Missing City (+75 🪙)</button>
               <button class="btn-ghost" onclick="locateMeOnRadar()" data-i18n="radar_near_me">📍 Near Me (GPS)</button>
-              <button class="btn-cyber btn-gold" onclick="verifyPhysicalGpsVisa()" data-i18n="radar_verify_city">🛂 Stamp GPS City Visa</button>
+              <button class="btn-cyber btn-gold" onclick="verifyPhysicalGpsVisa()" data-i18n="radar_verify_city">🛂 4D Sovereign Border Control (GPS)</button>
               <button class="btn-ghost" id="btnRadarDropPin" style="display:none;" onclick="startAdminDropPin()" data-i18n="radar_drop_pin">📌 Drop Live Pin</button>
             </div>
           </div>
@@ -1520,6 +1520,13 @@
       <p style="font-size:0.81rem;color:var(--muted);margin-bottom:12px;" data-i18n="vault_bury_modal_sub"></p>
 
       <form onsubmit="submitBuryGeoVault(event)">
+        <div style="background:rgba(245,158,11,0.12);border:1px dashed #f59e0b;border-radius:12px;padding:10px 14px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+          <div>
+            <div style="font-weight:900;color:#fbbf24;font-size:0.85rem;">👑 God-Mode Quick Drop</div>
+            <div style="font-size:0.75rem;color:#cbd5e1;">Click anywhere on the radar map to pinpoint exact coordinates!</div>
+          </div>
+          <button type="button" class="btn-cyber btn-gold" onclick="startAdminPickChestLocation()" style="font-size:0.78rem;padding:6px 12px;">🎯 Click Location on Map</button>
+        </div>
         <div class="form-field">
           <label data-i18n="adm_drop_chest_title">Chest Tier &amp; Hologram</label>
           <select id="buryVaultTierSel" class="remo-input">
@@ -1701,12 +1708,12 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 
   <!-- REMO Modular Engines -->
-  <script src="js/remo-i18n.js?v=49"></script>
-  <script src="js/remo-cities-data.js?v=49"></script>
-  <script src="js/remo-store.js?v=49"></script>
-  <script src="js/remo-card-engine.js?v=49"></script>
-  <script src="js/remo-radar-arena.js?v=49"></script>
-  <script src="js/remo-social-comms.js?v=49"></script>
-  <script src="js/remo-radio-engine.js?v=49"></script>
+  <script src="js/remo-i18n.js?v=50"></script>
+  <script src="js/remo-cities-data.js?v=50"></script>
+  <script src="js/remo-store.js?v=50"></script>
+  <script src="js/remo-card-engine.js?v=50"></script>
+  <script src="js/remo-radar-arena.js?v=50"></script>
+  <script src="js/remo-social-comms.js?v=50"></script>
+  <script src="js/remo-radio-engine.js?v=50"></script>
 </body>
 </html>

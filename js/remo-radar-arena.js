@@ -82,6 +82,11 @@ function initRemoRadarMap() {
     }
 
     remoMap.on('click', (ev) => {
+      if (window._adminChestPickMode) {
+        window._adminChestPickMode = false;
+        openBuryGeoVaultModalAtCoords(ev.latlng.lat, ev.latlng.lng);
+        return;
+      }
       if (!window._dropPinMode) return;
       window._dropPinMode = false;
       const lang = REMO_I18N.getLang();
@@ -555,10 +560,28 @@ function locateNearestGeoVault() {
     });
   }
 
-  RemoAudio.play('click');
-  remoMap.flyTo([target.lat, target.lng], 15, { duration: 1.4 });
+  RemoAudio.play('coin');
+  remoMap.flyTo([target.lat, target.lng], 16, { duration: 1.3 });
   const lang = REMO_I18N.getLang();
-  remoToast(lang === 'fr' ? `💎 Téléportation vers : ${target.title_fr || target.title_en}` : `💎 Radar lock on: ${target.title_en}`);
+  remoToast(lang === 'fr' 
+    ? `🗺️ 🎁 Coffre Secret ciblé : ${target.title_fr || target.title_en} (+${target.coinsReward} 🪙) !` 
+    : `🗺️ 🎁 Secret Chest targeted: ${target.title_en} (+${target.coinsReward} 🪙)!`, 'coin');
+
+  if (typeof updateRadarSonarHUD === 'function') updateRadarSonarHUD();
+
+  setTimeout(() => {
+    openGeoVaultInspector(target.id);
+  }, 1400);
+}
+
+function startAdminPickChestLocation() {
+  const modal = document.getElementById('buryGeoVaultModal');
+  if (modal) modal.classList.remove('open');
+  window._adminChestPickMode = true;
+  const lang = REMO_I18N.getLang();
+  remoToast(lang === 'fr' 
+    ? '🎯 GOD-MODE ACTIF : Cliquez n’importe où sur le radar pour planter votre coffre secret !' 
+    : '🎯 GOD-MODE ACTIVE: Click anywhere on the radar map to plant your secret chest!', 'fanfare');
 }
 
 function startAdminDropPin() {
@@ -3913,6 +3936,7 @@ window.adminDeleteGeoVault = adminDeleteGeoVault;
 window.adminDeleteRadarPin = adminDeleteRadarPin;
 window.openBuryGeoVaultModal = openBuryGeoVaultModal;
 window.locateNearestGeoVault = locateNearestGeoVault;
+window.startAdminPickChestLocation = startAdminPickChestLocation;
 window.submitBuryGeoVault = submitBuryGeoVault;
 window.detectGpsForBuryVault = detectGpsForBuryVault;
 window.refreshRadarMarkers = refreshRadarMarkers;
