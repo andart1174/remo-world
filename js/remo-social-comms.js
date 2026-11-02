@@ -884,13 +884,7 @@ function renderPostMediaStage(p, city, lang) {
   // 1. LIVE INTERACTIVE HTML / 3D MINI-APP
   if (p.mediaType === 'html_app' && p.htmlCode) {
     return `
-      <iframe class="html-post-frame" id="htmlFrame_${p.id}" sandbox="allow-scripts" loading="lazy" srcdoc="${escapeSrcDocAttr(p.htmlCode)}"></iframe>
-      <div class="html-post-toolbar">
-        <div style="display:flex;gap:6px;align-items:center;">
-          <button type="button" class="html-tool-btn" onclick="openHtmlFullscreenModal('${p.id}')">⛶ ${t('act_fullscreen')}</button>
-          <button type="button" class="html-tool-btn active" style="background:rgba(56,189,248,0.15);border-color:#38bdf8;color:#38bdf8;" onclick="sharePostLink('${p.id}')">🔗 ${lang === 'fr' ? 'Partager le Lien' : 'Share Link'}</button>
-        </div>
-      </div>
+      <iframe class="html-post-frame" id="htmlFrame_${p.id}" sandbox="allow-scripts" loading="lazy" srcdoc="${escapeSrcDocAttr(p.htmlCode)}" style="width:100%;height:100%;border:none;border-radius:12px;background:#050816;"></iframe>
     `;
   }
 
@@ -1206,7 +1200,7 @@ function renderSocialFeed(searchQuery = '') {
                   ${p.founderAward ? `<span class="pbadge founder">${t('post_founder_award_badge')}</span>` : ''}
                   ${p.boosted ? `<span class="pbadge boost">${t('post_boosted_badge')}</span>` : ''}
                   ${p.bounty && !p.bounty.claimed ? `<span class="pbadge boost" style="background:#f59e0b;color:#000;">🎁 +${p.bounty.coins} 🪙</span>` : ''}
-                  ${!hiddenByCapsule && p.mediaType === 'html_app' ? `<span class="pbadge html">${t('post_html_badge')}</span>` : ''}
+                  
                   ${!hiddenByCapsule && p.mediaType === 'video' ? `<span class="pbadge vid60">${t('post_video60_badge')} · ${formatDurationMMSS(p.videoDuration || 60)}</span>` : ''}
                   ${!hiddenByCapsule && p.mediaType === 'before_after' ? `<span class="pbadge html">${t('post_slider_badge')}</span>` : ''}
                   ${p.verifiedGps ? `<span class="pbadge gps">${t('post_verified_gps')}</span>` : ''}
@@ -1238,6 +1232,9 @@ function renderSocialFeed(searchQuery = '') {
             </button>
             <button type="button" class="pact-btn pact-flip-btn" onclick="flipPost3DCard('${p.id}')" title="${t('post_3d_flip')}">
               🔄 <span>3D</span>
+            </button>
+            <button type="button" class="pact-btn pact-fs-btn" onclick="openPostFullscreenMedia('${p.id}')" title="${t('act_fullscreen')}">
+              ⛶
             </button>
             <button type="button" class="pact-btn" onclick="sharePostLink('${p.id}')" title="${lang === 'fr' ? 'Partager le lien' : 'Share link'}">
               🔗
