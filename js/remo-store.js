@@ -2227,6 +2227,7 @@ const REMO_STORE = {
   fbAuth: null,
   deletedPostIds: null,
   deletedUserIds: null,
+  deletedDuelIds: null,
 
   init() {
     try {
@@ -2240,12 +2241,23 @@ const REMO_STORE = {
       this.deletedUserIds = new Set();
     }
     try {
+      this.deletedDuelIds = new Set(JSON.parse(localStorage.getItem('remo_deleted_duels') || '[]'));
+    } catch (e) {
+      this.deletedDuelIds = new Set();
+    }
+    try {
       const raw = localStorage.getItem(this.KEY);
       this.state = raw ? JSON.parse(raw) : createDefaultState();
     } catch (e) {
       this.state = createDefaultState();
     }
     if (!this.state.settings) this.state = createDefaultState();
+    // Strip out deleted city wars / duels
+    if (Array.isArray(this.state.duels)) {
+      this.state.duels = this.state.duels.filter((d) =>
+        d && d.id && (!this.deletedDuelIds || !this.deletedDuelIds.has(d.id))
+      );
+    }
     // Strip out legacy built-in mock posts from previous builds
     const legacyMockIds = new Set(['post_capsule_demo_1', 'post_duet_demo_1', 'post_html_fireworks', 'post_html_racer_kiv', 'post_1', 'post_2', 'post_3', 'post_4', 'post_duet_tokyo_paris', 'post_duet_mtl_chisinau', 'post_capsule_locked', 'post_duo_live_kiv_mtl', 'demo_1']);
     if (Array.isArray(this.state.posts)) {
@@ -2373,6 +2385,9 @@ const REMO_STORE = {
 
   reloadFromDisk() {
     try {
+      try {
+        this.deletedDuelIds = new Set(JSON.parse(localStorage.getItem('remo_deleted_duels') || '[]'));
+      } catch (e) {}
       const raw = localStorage.getItem(this.KEY);
       if (raw) {
         const diskState = JSON.parse(raw);
@@ -2397,6 +2412,11 @@ const REMO_STORE = {
               (!this.deletedPostIds || !this.deletedPostIds.has(p.id)) &&
               !p.id.startsWith('demo') &&
               !p.id.includes('demo')
+            );
+          }
+          if (Array.isArray(diskState.duels)) {
+            diskState.duels = diskState.duels.filter((d) =>
+              d && d.id && (!this.deletedDuelIds || !this.deletedDuelIds.has(d.id))
             );
           }
           if (Array.isArray(diskState.users)) {
@@ -3773,10 +3793,18 @@ const REMO_STORE = {
             if (cVal > lVal) this.state.cityScores[cid] = cVal;
           });
         }
-        if (Array.isArray(data.duels) && data.duels.length > 0) {
+        if (Array.isArray(data.deletedDuelIds)) {
+          if (!this.deletedDuelIds) this.deletedDuelIds = new Set();
+          data.deletedDuelIds.forEach((id) => this.deletedDuelIds.add(id));
+          try {
+            localStorage.setItem('remo_deleted_duels', JSON.stringify([...this.deletedDuelIds]));
+          } catch (e) {}
+        }
+        if (Array.isArray(data.duels)) {
           this.state.duels = Array.isArray(this.state.duels) ? this.state.duels : [];
           data.duels.forEach((cd) => {
             if (!cd || !cd.id) return;
+            if (this.deletedDuelIds && this.deletedDuelIds.has(cd.id)) return;
             const ld = this.state.duels.find((x) => x && x.id === cd.id);
             if (ld) {
               ld.votesA = Math.max(Number(ld.votesA || 0), Number(cd.votesA || 0));
@@ -3787,6 +3815,9 @@ const REMO_STORE = {
               this.state.duels.push(cd);
             }
           });
+        }
+        if (this.deletedDuelIds && this.deletedDuelIds.size > 0 && Array.isArray(this.state.duels)) {
+          this.state.duels = this.state.duels.filter((d) => d && d.id && !this.deletedDuelIds.has(d.id));
         }
       };
       
@@ -3802,6 +3833,7 @@ const REMO_STORE = {
             geoVaults: (this.state.geoVaults || []).slice(0, 35),
             deletedPostIds: [...(this.deletedPostIds || [])].slice(-100),
             deletedUserIds: [...(this.deletedUserIds || [])].slice(-100),
+            deletedDuelIds: [...(this.deletedDuelIds || [])].slice(-100),
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
           }).catch((err) => console.log('Firestore seed status:', err.message));
         } else {
@@ -3829,6 +3861,14 @@ const REMO_STORE = {
               if (!this.deletedUserIds) this.deletedUserIds = new Set();
               data.deletedUserIds.forEach((id) => this.deletedUserIds.add(id));
               this.state.users = (this.state.users || []).filter((u) => !this.deletedUserIds.has(u.uid));
+            }
+            if (Array.isArray(data.deletedDuelIds)) {
+              if (!this.deletedDuelIds) this.deletedDuelIds = new Set();
+              data.deletedDuelIds.forEach((id) => this.deletedDuelIds.add(id));
+              try {
+                localStorage.setItem('remo_deleted_duels', JSON.stringify([...this.deletedDuelIds]));
+              } catch (e) {}
+              this.state.duels = (this.state.duels || []).filter((d) => !this.deletedDuelIds.has(d.id));
             }
             this.save(false, 'cloud_sync');
             window.dispatchEvent(new CustomEvent('remo:stateupdate', { detail: { reason: 'cloud_sync' } }));
@@ -3863,6 +3903,14 @@ const REMO_STORE = {
             if (!this.deletedUserIds) this.deletedUserIds = new Set();
             data.deletedUserIds.forEach((id) => this.deletedUserIds.add(id));
             this.state.users = (this.state.users || []).filter((u) => !this.deletedUserIds.has(u.uid));
+          }
+          if (Array.isArray(data.deletedDuelIds)) {
+            if (!this.deletedDuelIds) this.deletedDuelIds = new Set();
+            data.deletedDuelIds.forEach((id) => this.deletedDuelIds.add(id));
+            try {
+              localStorage.setItem('remo_deleted_duels', JSON.stringify([...this.deletedDuelIds]));
+            } catch (e) {}
+            this.state.duels = (this.state.duels || []).filter((d) => !this.deletedDuelIds.has(d.id));
           }
           this.save(false, 'cloud_live_update');
           window.dispatchEvent(new CustomEvent('remo:stateupdate', { detail: { reason: 'cloud_live_update' } }));
@@ -4220,10 +4268,46 @@ const REMO_STORE = {
     return { success: true, winnersCount: winBets.length, distributed };
   },
 
-  syncToFirestore(reason = 'update') {
+  deleteWar(warId) {
+    if (!warId) return;
+    if (!this.deletedDuelIds) this.deletedDuelIds = new Set();
+    this.deletedDuelIds.add(warId);
+    try {
+      localStorage.setItem('remo_deleted_duels', JSON.stringify([...this.deletedDuelIds]));
+    } catch (e) {}
+    this.state.duels = (this.state.duels || []).filter((w) => w && w.id !== warId);
+    this.save(true, 'war_deleted');
+    this.syncToFirestore('war_deleted', true);
+    window.dispatchEvent(new CustomEvent('remo:stateupdate', { detail: { reason: 'war_deleted', warId } }));
+    if (REMO_LIVE_BUS) {
+      try { REMO_LIVE_BUS.postMessage({ type: 'STATE_UPDATED', reason: 'war_deleted' }); } catch (e) {}
+    }
+  },
+
+  purgeAllWars() {
+    if (!this.deletedDuelIds) this.deletedDuelIds = new Set();
+    (this.state.duels || []).forEach((w) => {
+      if (w && w.id) this.deletedDuelIds.add(w.id);
+    });
+    this.deletedDuelIds.add('war_1');
+    this.deletedDuelIds.add('war_2');
+    this.deletedDuelIds.add('war_3');
+    try {
+      localStorage.setItem('remo_deleted_duels', JSON.stringify([...this.deletedDuelIds]));
+    } catch (e) {}
+    this.state.duels = [];
+    this.save(true, 'purge_all_wars');
+    this.syncToFirestore('purge_all_wars', true);
+    window.dispatchEvent(new CustomEvent('remo:stateupdate', { detail: { reason: 'purge_all_wars' } }));
+    if (REMO_LIVE_BUS) {
+      try { REMO_LIVE_BUS.postMessage({ type: 'STATE_UPDATED', reason: 'purge_all_wars' }); } catch (e) {}
+    }
+  },
+
+  syncToFirestore(reason = 'update', immediate = false) {
     if (!this.fbDb) return;
     clearTimeout(this._fbSyncDebounce);
-    this._fbSyncDebounce = setTimeout(() => {
+    const doSync = () => {
       try {
         const docRef = this.fbDb.collection('remo_ecosystem').doc('live_state');
         docRef.set({
@@ -4236,12 +4320,18 @@ const REMO_STORE = {
           geoVaults: (this.state.geoVaults || []).slice(0, 35),
           deletedPostIds: [...(this.deletedPostIds || [])].slice(-100),
           deletedUserIds: [...(this.deletedUserIds || [])].slice(-100),
+          deletedDuelIds: [...(this.deletedDuelIds || [])].slice(-100),
           updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         }, { merge: true }).catch((err) => {
           console.log('Firestore background sync info:', err.message);
         });
       } catch (e) {}
-    }, 1200);
+    };
+    if (immediate) {
+      doSync();
+    } else {
+      this._fbSyncDebounce = setTimeout(doSync, 1200);
+    }
   }
 };
 

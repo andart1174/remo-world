@@ -269,30 +269,41 @@ function renderRightSidebarWidgets() {
   }
 
   const miniWar = document.getElementById('rightQuickWarBox');
-  if (miniWar && REMO_STORE.state.duels && REMO_STORE.state.duels[0]) {
-    const w = REMO_STORE.state.duels[0];
-    const cA = getCityById(w.cityA), cB = getCityById(w.cityB);
-    const vA = Number(w.votesA || 0), vB = Number(w.votesB || 0);
-    const tot = Math.max(1, vA + vB);
-    const pA = Math.round((vA / tot) * 100);
-    const pB = 100 - pA;
-    miniWar.innerHTML = `
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;margin-bottom:6px;">
-        <b style="font-size:0.82rem;">⚔️ ${cA.flag} ${getCityName(cA, lang)} vs ${cB.flag} ${getCityName(cB, lang)}</b>
-        <button type="button" class="war-backup-btn" style="padding:3px 8px;font-size:0.66rem;" onclick="shareCityWarBackup('${w.id}','${pA >= pB ? 'A' : 'B'}')">${t('war_backup_btn')}</button>
-      </div>
-      <div style="display:flex;justify-content:space-between;font-size:0.72rem;font-weight:800;color:#cbd5e1;">
-        <span>${cA.flag} ${pA}% (${vA.toLocaleString()})</span>
-        <span>${cB.flag} ${pB}% (${vB.toLocaleString()})</span>
-      </div>
-      <div class="war-bar-track" style="height:10px;margin:5px 0;">
-        <div class="war-bar-fill-a" style="width:${pA}%;transition:width 0.18s ease;"></div>
-      </div>
-      <div style="display:flex;gap:6px;margin-top:8px;">
-        <button type="button" class="war-pulse-btn side-a" style="flex:1;padding:7px 6px;font-size:0.69rem;" onclick="voteCityWar('${w.id}','A',event)">${cA.flag} ${t('war_tap_btn')}</button>
-        <button type="button" class="war-pulse-btn side-b" style="flex:1;padding:7px 6px;font-size:0.69rem;" onclick="voteCityWar('${w.id}','B',event)">${cB.flag} ${t('war_tap_btn')}</button>
-      </div>
-    `;
+  if (miniWar) {
+    const activeWars = (REMO_STORE.state.duels || []).filter((w) => w && (!REMO_STORE.deletedDuelIds || !REMO_STORE.deletedDuelIds.has(w.id)));
+    if (activeWars.length > 0) {
+      const w = activeWars[0];
+      const cA = getCityById(w.cityA) || { flag: '🏙️', name_en: w.cityA, name_fr: w.cityA },
+            cB = getCityById(w.cityB) || { flag: '🏙️', name_en: w.cityB, name_fr: w.cityB };
+      const vA = Number(w.votesA || 0), vB = Number(w.votesB || 0);
+      const tot = Math.max(1, vA + vB);
+      const pA = Math.round((vA / tot) * 100);
+      const pB = 100 - pA;
+      miniWar.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;margin-bottom:6px;">
+          <b style="font-size:0.82rem;">⚔️ ${cA.flag} ${getCityName(cA, lang)} vs ${cB.flag} ${getCityName(cB, lang)}</b>
+          <button type="button" class="war-backup-btn" style="padding:3px 8px;font-size:0.66rem;" onclick="shareCityWarBackup('${w.id}','${pA >= pB ? 'A' : 'B'}')">${t('war_backup_btn')}</button>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:0.72rem;font-weight:800;color:#cbd5e1;">
+          <span>${cA.flag} ${pA}% (${vA.toLocaleString()})</span>
+          <span>${cB.flag} ${pB}% (${vB.toLocaleString()})</span>
+        </div>
+        <div class="war-bar-track" style="height:10px;margin:5px 0;">
+          <div class="war-bar-fill-a" style="width:${pA}%;transition:width 0.18s ease;"></div>
+        </div>
+        <div style="display:flex;gap:6px;margin-top:8px;">
+          <button type="button" class="war-pulse-btn side-a" style="flex:1;padding:7px 6px;font-size:0.69rem;" onclick="voteCityWar('${w.id}','A',event)">${cA.flag} ${t('war_tap_btn')}</button>
+          <button type="button" class="war-pulse-btn side-b" style="flex:1;padding:7px 6px;font-size:0.69rem;" onclick="voteCityWar('${w.id}','B',event)">${cB.flag} ${t('war_tap_btn')}</button>
+        </div>
+      `;
+    } else {
+      miniWar.innerHTML = `
+        <div style="text-align:center;padding:12px 6px;color:var(--muted);font-size:0.78rem;">
+          <div style="font-size:1.3rem;margin-bottom:4px;">⚔️</div>
+          <div>${lang === 'fr' ? 'Aucune guerre de villes active' : 'No active city war'}</div>
+        </div>
+      `;
+    }
   }
   if (typeof renderMobileCityWarStrip === 'function') {
     renderMobileCityWarStrip();
@@ -8760,7 +8771,7 @@ window.shareMysteryCityChallenge = shareMysteryCityChallenge;
 function renderMobileCityWarStrip() {
   const strip = document.getElementById('mobileCityWarStrip');
   if (!strip) return;
-  const duels = REMO_STORE.state.duels || [];
+  const duels = (REMO_STORE.state.duels || []).filter((w) => w && (!REMO_STORE.deletedDuelIds || !REMO_STORE.deletedDuelIds.has(w.id)));
   if (!duels.length) {
     strip.innerHTML = '';
     return;

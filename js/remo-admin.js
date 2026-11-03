@@ -488,16 +488,22 @@ function renderAdminWarsAndPulsePanel() {
 
   const wList = document.getElementById('admActiveWarsTable');
   if (wList) {
-    wList.innerHTML = (REMO_STORE.state.duels || []).map((w) => {
-      const cA = getCityById(w.cityA), cB = getCityById(w.cityB);
-      return `
-        <tr>
-          <td><b>${lang === 'fr' ? w.title_fr : w.title_en}</b></td>
-          <td>${cA.flag} ${getCityName(cA, lang)} (${w.votesA}) vs ${cB.flag} ${getCityName(cB, lang)} (${w.votesB})</td>
-          <td><button class="adm-btn rose" style="padding:5px 10px;" onclick="adminDeleteWar('${w.id}')">✕</button></td>
-        </tr>
-      `;
-    }).join('');
+    const activeWars = (REMO_STORE.state.duels || []).filter((w) => w && (!REMO_STORE.deletedDuelIds || !REMO_STORE.deletedDuelIds.has(w.id)));
+    if (!activeWars.length) {
+      wList.innerHTML = `<tr><td colspan="3" style="text-align:center;color:var(--muted);padding:14px;font-size:0.85rem;">${lang === 'fr' ? 'Aucune guerre de villes active. Cliquez sur "Start Live City War" pour en lancer une !' : 'No active city wars. Click "Start Live City War" to launch one!'}</td></tr>`;
+    } else {
+      wList.innerHTML = activeWars.map((w) => {
+        const cA = getCityById(w.cityA) || { flag: '🏙️', name_en: w.cityA, name_fr: w.cityA },
+              cB = getCityById(w.cityB) || { flag: '🏙️', name_en: w.cityB, name_fr: w.cityB };
+        return `
+          <tr>
+            <td><b>${lang === 'fr' ? (w.title_fr || w.title_en) : (w.title_en || w.title_fr)}</b></td>
+            <td>${cA.flag} ${getCityName(cA, lang)} (${w.votesA}) vs ${cB.flag} ${getCityName(cB, lang)} (${w.votesB})</td>
+            <td><button class="adm-btn rose" style="padding:5px 10px;" onclick="adminDeleteWar('${w.id}')">✕</button></td>
+          </tr>
+        `;
+      }).join('');
+    }
   }
 
   const vList = document.getElementById('admActiveVersusTable');
@@ -545,10 +551,11 @@ function adminConcludeVersusFromAdmin(postId) {
 window.adminConcludeVersusFromAdmin = adminConcludeVersusFromAdmin;
 
 function adminDeleteVersusFromAdmin(postId) {
-  REMO_STORE.state.posts = (REMO_STORE.state.posts || []).filter((x) => x && x.id !== postId);
+  const lang = REMO_I18N.getLang();
+  REMO_STORE.deletePostFromCloud(postId);
   REMO_STORE.save(true, 'admin_delete_versus');
   renderAdminWarsAndPulsePanel();
-  admToast('🗑️ Official City Duel deleted!');
+  admToast(lang === 'fr' ? '🗑️ Duel officiel supprimé !' : '🗑️ Official City Duel deleted!');
 }
 window.adminDeleteVersusFromAdmin = adminDeleteVersusFromAdmin;
 
@@ -558,21 +565,45 @@ function adminCreateCityWar() {
   const tFr = document.getElementById('admWarTitleFr')?.value.trim() || tEn;
   const cityA = document.getElementById('admWarCityA')?.value || 'montreal';
   const cityB = document.getElementById('admWarCityB')?.value || 'chisinau';
+  const warId = 'war_' + Date.now();
+  if (REMO_STORE.deletedDuelIds) {
+    REMO_STORE.deletedDuelIds.delete(warId);
+  }
+  REMO_STORE.state.duels = Array.isArray(REMO_STORE.state.duels) ? REMO_STORE.state.duels : [];
   REMO_STORE.state.duels.unshift({
-    id: 'war_' + Date.now(),
-    title_en: tEn, title_fr: tFr,
-    cityA, cityB, votesA: 10, votesB: 10, voters: []
+    id: warId,
+    title_en: tEn,
+    title_fr: tFr,
+    cityA,
+    cityB,
+    votesA: 10,
+    votesB: 10,
+    voters: []
   });
   REMO_STORE.save(true, 'war_created');
+  REMO_STORE.syncToFirestore('war_created', true);
   renderAdminWarsAndPulsePanel();
   admToast(lang === 'fr' ? '⚔️ Nouvelle Guerre des Villes lancée !' : '⚔️ New Live City War launched!');
 }
 
 function adminDeleteWar(warId) {
-  REMO_STORE.state.duels = REMO_STORE.state.duels.filter((w) => w.id !== warId);
-  REMO_STORE.save(true, 'war_deleted');
+  const lang = REMO_I18N.getLang();
+  REMO_STORE.deleteWar(warId);
   renderAdminWarsAndPulsePanel();
+  admToast(lang === 'fr' ? '🗑️ Guerre des villes supprimée !' : '🗑️ City War deleted permanently!');
 }
+
+function adminPurgeAllWars() {
+  const lang = REMO_I18N.getLang();
+  const msg = lang === 'fr'
+    ? 'Supprimer définitivement TOUTES les guerres de villes actives ?'
+    : 'Permanently delete ALL active city wars?';
+  if (!confirm(msg)) return;
+  REMO_STORE.purgeAllWars();
+  renderAdminWarsAndPulsePanel();
+  admToast(lang === 'fr' ? '🗑️ Toutes les guerres ont été supprimées !' : '🗑️ All city wars deleted permanently!');
+}
+window.adminPurgeAllWars = adminPurgeAllWars;
 
 function adminSaveDailyPulse() {
   REMO_STORE.state.settings.dailyPulse = {
@@ -1363,6 +1394,7 @@ window.adminTriggerFlashDrop = adminTriggerFlashDrop;
 window.adminAddNewCity = adminAddNewCity;
 window.adminCreateCityWar = adminCreateCityWar;
 window.adminDeleteWar = adminDeleteWar;
+window.adminPurgeAllWars = adminPurgeAllWars;
 window.adminSaveDailyPulse = adminSaveDailyPulse;
 window.adminSaveEconomyRates = adminSaveEconomyRates;
 window.adminRemoveAuction = adminRemoveAuction;

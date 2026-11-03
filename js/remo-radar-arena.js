@@ -1029,8 +1029,22 @@ function renderArenaWarsOnly() {
   if (!warsBox) return;
   const lang = REMO_I18N.getLang();
   const u = REMO_STORE.getCurrentUser();
+  const activeWars = (REMO_STORE.state.duels || []).filter((w) => w && (!REMO_STORE.deletedDuelIds || !REMO_STORE.deletedDuelIds.has(w.id)));
 
-  warsBox.innerHTML = (REMO_STORE.state.duels || []).map((w) => {
+  if (!activeWars.length) {
+    warsBox.innerHTML = `
+      <div class="war-card" style="text-align:center;padding:34px 20px;">
+        <div style="font-size:2.2rem;margin-bottom:10px;">⚔️</div>
+        <b style="font-size:1.05rem;color:#fff;display:block;margin-bottom:6px;">${lang === 'fr' ? 'Aucune guerre de villes active pour le moment' : 'No active city wars right now'}</b>
+        <p style="color:var(--muted);font-size:0.88rem;max-width:440px;margin:0 auto 14px;line-height:1.5;">
+          ${lang === 'fr' ? 'Toutes les guerres de villes précédentes sont terminées. Revenez très bientôt pour le prochain affrontement officiel ou explorez le Radar !' : 'All previous city wars have concluded. Stay tuned for the next official global clash or explore the 4D Radar!'}
+        </p>
+      </div>
+    `;
+    return;
+  }
+
+  warsBox.innerHTML = activeWars.map((w) => {
     const cA = getCityById(w.cityA), cB = getCityById(w.cityB);
     const vA = Number(w.votesA || 0), vB = Number(w.votesB || 0);
     const tot = Math.max(1, vA + vB);
