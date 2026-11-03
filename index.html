@@ -115,7 +115,7 @@
   <noscript><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"></noscript>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
 
-  <link rel="stylesheet" href="css/remo-core.css?v=61">
+  <link rel="stylesheet" href="css/remo-core.css?v=62">
 </head>
 <body>
 
@@ -1134,7 +1134,7 @@
         <button type="button" class="studio-tab-btn" data-studio-tab="beat" onclick="switchCreateStudioTab('beat')" data-i18n="create_tab_beat">🎛️ Beat Studio</button>
         <button type="button" class="studio-tab-btn" data-studio-tab="html" onclick="switchCreateStudioTab('html')" data-i18n="create_tab_html">💻 Live HTML Code</button>
         <button type="button" class="studio-tab-btn" data-studio-tab="art" onclick="switchCreateStudioTab('art')" data-i18n="create_tab_art">🏙️ City Poster</button>
-        <button type="button" class="studio-tab-btn" data-studio-tab="versus" onclick="switchCreateStudioTab('versus')" data-i18n="create_tab_versus">⚔️ City Versus Duel</button>
+        <button type="button" class="studio-tab-btn" data-studio-tab="versus" id="studioTabVersusBtn" style="display:none;" onclick="switchCreateStudioTab('versus')" data-i18n="create_tab_versus">👑 ⚔️ City Versus Duel</button>
       </div>
 
       <!-- City & Vibe Row -->
@@ -1298,9 +1298,37 @@
         </div>
       </div>
 
-      <!-- TAB 5: CITY VERSUS DUEL STUDIO (Head-to-Head 50/50 Battle) -->
+      <!-- TAB 5: CITY VERSUS DUEL STUDIO (Head-to-Head 50/50 Battle — Admin Only) -->
       <div class="studio-pane" id="studioPane-versus">
-        <p style="font-size:0.76rem;color:#38bdf8;margin-bottom:10px;" data-i18n="versus_duel_title">⚔️ City Versus Duel (Head-to-Head)</p>
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:10px;">
+          <span style="display:inline-flex;align-items:center;gap:6px;background:rgba(251,191,36,0.12);border:1px solid rgba(251,191,36,0.38);border-radius:99px;padding:3px 10px;font-size:0.72rem;font-weight:900;color:#fbbf24;" data-i18n="versus_admin_only_badge">👑 OFFICIAL ADMIN CITY DUEL</span>
+          <span style="font-size:0.72rem;color:#94a3b8;" data-i18n="versus_duel_title">⚔️ City Versus Duel (Head-to-Head)</span>
+        </div>
+
+        <!-- Duration & Category Selectors -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+          <div>
+            <label style="font-size:0.73rem;font-weight:800;color:#fbbf24;display:block;margin-bottom:4px;" data-i18n="versus_duration_lbl">⏱️ Duel Duration</label>
+            <select id="createVersusDuration" class="remo-input" style="padding:6px 8px;font-size:0.8rem;">
+              <option value="24" selected data-i18n="versus_duration_24">⏱️ 24 Hours (1 Day)</option>
+              <option value="48" data-i18n="versus_duration_48">⏱️ 48 Hours (2 Days)</option>
+              <option value="72" data-i18n="versus_duration_72">⏱️ 72 Hours (3 Days)</option>
+              <option value="168" data-i18n="versus_duration_168">⏱️ 7 Days (1 Week)</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:0.73rem;font-weight:800;color:#38bdf8;display:block;margin-bottom:4px;" data-i18n="versus_category_lbl">🎯 Duel Theme / Category</label>
+            <select id="createVersusCategory" class="remo-input" style="padding:6px 8px;font-size:0.8rem;">
+              <option value="general" selected data-i18n="versus_cat_general">⚡ Overall Pulse &amp; Prestige</option>
+              <option value="nightlife" data-i18n="versus_cat_nightlife">🌙 Nightlife &amp; Skyline Lights</option>
+              <option value="food" data-i18n="versus_cat_food">🍽️ Gastronomy &amp; Street Food</option>
+              <option value="culture" data-i18n="versus_cat_culture">🎭 Culture &amp; Heritage</option>
+              <option value="summer" data-i18n="versus_cat_summer">☀️ Summer &amp; Travel Vibes</option>
+              <option value="tech" data-i18n="versus_cat_tech">🚀 Tech &amp; Innovation</option>
+            </select>
+          </div>
+        </div>
+
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
           <!-- Left City -->
           <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(56,189,248,0.3);border-radius:12px;padding:10px;">
@@ -2052,13 +2080,13 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 
   <!-- REMO Modular Engines -->
-  <script src="js/remo-i18n.js?v=61"></script>
-  <script src="js/remo-cities-data.js?v=61"></script>
-  <script src="js/remo-store.js?v=61"></script>
-  <script src="js/remo-card-engine.js?v=61"></script>
-  <script src="js/remo-radar-arena.js?v=61"></script>
-  <script src="js/remo-social-comms.js?v=61"></script>
-  <script src="js/remo-radio-engine.js?v=61"></script>
+  <script src="js/remo-i18n.js?v=62"></script>
+  <script src="js/remo-cities-data.js?v=62"></script>
+  <script src="js/remo-store.js?v=62"></script>
+  <script src="js/remo-card-engine.js?v=62"></script>
+  <script src="js/remo-radar-arena.js?v=62"></script>
+  <script src="js/remo-social-comms.js?v=62"></script>
+  <script src="js/remo-radio-engine.js?v=62"></script>
 
   <noscript>
     <nav aria-label="REMO World Static Directory" style="padding:20px;background:#050816;color:#f8fafc;">

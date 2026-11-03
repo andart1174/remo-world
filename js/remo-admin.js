@@ -499,7 +499,58 @@ function renderAdminWarsAndPulsePanel() {
       `;
     }).join('');
   }
+
+  const vList = document.getElementById('admActiveVersusTable');
+  if (vList) {
+    const versusPosts = (REMO_STORE.state.posts || []).filter((p) => p && p.versus);
+    if (!versusPosts.length) {
+      vList.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:10px;">No official city duels published yet. Use Creator Studio ⚔️ City Versus Duel tab as Admin to launch one!</td></tr>`;
+    } else {
+      const now = Date.now();
+      vList.innerHTML = versusPosts.map((p) => {
+        const v = p.versus;
+        const cA = getCityById(v.leftCityId || 'montreal') || { flag: '⚜️', code: 'MTL' };
+        const cB = getCityById(v.rightCityId || 'paris') || { flag: '🗼', code: 'PAR' };
+        const endsAt = Number(v.endsAt || (p.createdAt ? p.createdAt + 86400000 : now));
+        const isClosed = Boolean(v.closed) || now >= endsAt;
+        const statusStr = isClosed ? '🏆 Closed' : `⏳ Active (${Math.max(0, Math.round((endsAt - now) / 3600000))}h left)`;
+        return `
+          <tr>
+            <td><b>${cA.flag} ${cA.code} (${v.leftVotes || 0}) vs ${cB.flag} ${cB.code} (${v.rightVotes || 0})</b></td>
+            <td><span class="adm-badge ${isClosed ? 'grey' : 'gold'}">${statusStr}</span></td>
+            <td>${(v.voters || []).length} votes</td>
+            <td style="display:flex;gap:6px;">
+              ${!isClosed ? `<button class="adm-btn gold" style="padding:4px 8px;font-size:0.75rem;" onclick="adminConcludeVersusFromAdmin('${p.id}')">👑 Conclude</button>` : ''}
+              <button class="adm-btn rose" style="padding:4px 8px;font-size:0.75rem;" onclick="adminDeleteVersusFromAdmin('${p.id}')">✕ Delete</button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+  }
 }
+
+function adminConcludeVersusFromAdmin(postId) {
+  const p = (REMO_STORE.state.posts || []).find((x) => x && x.id === postId);
+  if (!p || !p.versus) return;
+  p.versus.closed = true;
+  p.versus.endsAt = Date.now() - 1000;
+  const lV = Number(p.versus.leftVotes || 0);
+  const rV = Number(p.versus.rightVotes || 0);
+  p.versus.winnerSide = lV > rV ? 'left' : (rV > lV ? 'right' : 'tie');
+  REMO_STORE.save(true, 'admin_conclude_versus');
+  renderAdminWarsAndPulsePanel();
+  admToast('👑 Official City Duel concluded!');
+}
+window.adminConcludeVersusFromAdmin = adminConcludeVersusFromAdmin;
+
+function adminDeleteVersusFromAdmin(postId) {
+  REMO_STORE.state.posts = (REMO_STORE.state.posts || []).filter((x) => x && x.id !== postId);
+  REMO_STORE.save(true, 'admin_delete_versus');
+  renderAdminWarsAndPulsePanel();
+  admToast('🗑️ Official City Duel deleted!');
+}
+window.adminDeleteVersusFromAdmin = adminDeleteVersusFromAdmin;
 
 function adminCreateCityWar() {
   const lang = REMO_I18N.getLang();

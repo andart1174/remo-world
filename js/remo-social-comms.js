@@ -353,36 +353,108 @@ function savePostCardToAlbum(postId) {
   remoToast(t('post_flip_saved_toast'), 'fanfare');
 }
 
-function voteCityVersusDuel(postId, choice) {
+function voteCityVersusDuel(postId, choice, ev) {
+  if (ev) ev.stopPropagation();
   const p = (REMO_STORE.state.posts || []).find((x) => x.id === postId);
   if (!p || !p.versus) return;
-  const u = REMO_STORE.getCurrentUser() || REMO_STORE.ensureGuestOrCitizen('Citizen', '', 'montreal');
   const v = p.versus;
-  if (!Array.isArray(v.voters)) v.voters = [];
-  if (v.voters.includes(u.uid)) {
-    remoToast(REMO_I18N.getLang() === 'fr' ? 'Vous avez déjà voté pour ce duel !' : 'You already voted in this duel!');
+  const lang = REMO_I18N.getLang();
+
+  const now = Date.now();
+  const endsAt = Number(v.endsAt || (p.createdAt ? p.createdAt + (v.durationHours || 24) * 3600000 : now + 86400000));
+  if (v.closed || now >= endsAt) {
+    v.closed = true;
+    remoToast(t('versus_ended_toast'));
+    renderSocialFeed();
     return;
   }
 
-  v.voters.push(u.uid);
-  if (choice === 'left') {
-    v.leftVotes = (v.leftVotes || 0) + 1;
-    REMO_STORE.addCityScore(v.leftCityId || 'montreal', 25);
-  } else {
-    v.rightVotes = (v.rightVotes || 0) + 1;
-    REMO_STORE.addCityScore(v.rightCityId || 'paris', 25);
+  const u = REMO_STORE.getCurrentUser() || REMO_STORE.ensureGuestOrCitizen('Citizen', '', 'montreal');
+  let voterKey = (u && u.uid) ? u.uid : (localStorage.getItem('remo_guest_vid') || '');
+  if (!voterKey) {
+    voterKey = 'g_' + Date.now().toString(36);
+    localStorage.setItem('remo_guest_vid', voterKey);
   }
 
-  REMO_STORE.addCoins(u.uid, 5, 5);
+  if (!Array.isArray(v.voters)) v.voters = [];
+  if (v.voters.includes(voterKey) || localStorage.getItem('remo_versus_voted_' + p.id)) {
+    remoToast(t('versus_already_voted'));
+    return;
+  }
+
+  v.voters.push(voterKey);
+  if (!v.voterSides) v.voterSides = {};
+  v.voterSides[voterKey] = choice;
+  localStorage.setItem('remo_versus_voted_' + p.id, '1');
+  localStorage.setItem('remo_versus_side_' + p.id, choice);
+
+  if (choice === 'left') {
+    v.leftVotes = (v.leftVotes || 0) + 1;
+    REMO_STORE.addCityScore(v.leftCityId || 'montreal', 50);
+  } else {
+    v.rightVotes = (v.rightVotes || 0) + 1;
+    REMO_STORE.addCityScore(v.rightCityId || 'paris', 50);
+  }
+
+  if (u && u.uid) {
+    REMO_STORE.addCoins(u.uid, 10, 10);
+  }
   REMO_STORE.save(true, 'versus_vote');
-  spawnRemoCoinsFX(8);
+  spawnRemoCoinsFX(10);
   RemoAudio.play('coin');
+  try { if (navigator.vibrate) navigator.vibrate(15); } catch (e) {}
 
   const chosenCity = getCityById(choice === 'left' ? v.leftCityId : v.rightCityId);
-  const lang = REMO_I18N.getLang();
   remoToast(t('versus_voted_toast', { city: getCityName(chosenCity, lang) }), 'coin');
   renderSocialFeed();
 }
+window.voteCityVersusDuel = voteCityVersusDuel;
+
+function claimVersusVictoryBonus(postId, ev) {
+  if (ev) ev.stopPropagation();
+  const p = (REMO_STORE.state.posts || []).find((x) => x.id === postId);
+  if (!p || !p.versus) return;
+  const v = p.versus;
+  const u = REMO_STORE.getCurrentUser() || REMO_STORE.ensureGuestOrCitizen('Citizen', '', 'montreal');
+  const voterKey = (u && u.uid) ? u.uid : (localStorage.getItem('remo_guest_vid') || '');
+
+  if (!Array.isArray(v.claimedBonus)) v.claimedBonus = [];
+  if (v.claimedBonus.includes(voterKey) || localStorage.getItem('remo_versus_claimed_' + p.id)) {
+    remoToast(t('versus_claimed_bonus_lbl'));
+    return;
+  }
+
+  v.claimedBonus.push(voterKey);
+  localStorage.setItem('remo_versus_claimed_' + p.id, '1');
+  if (u && u.uid) {
+    REMO_STORE.addCoins(u.uid, 25, 25);
+  }
+  REMO_STORE.save(true, 'versus_claim_bonus');
+  spawnRemoCoinsFX(20);
+  RemoAudio.play('fanfare');
+  remoToast(t('versus_bonus_claimed_toast'), 'fanfare');
+  renderSocialFeed();
+}
+window.claimVersusVictoryBonus = claimVersusVictoryBonus;
+
+function adminConcludeDuelNow(postId, ev) {
+  if (ev) ev.stopPropagation();
+  if (!REMO_STORE.isAdminUnlocked()) return;
+  const p = (REMO_STORE.state.posts || []).find((x) => x.id === postId);
+  if (!p || !p.versus) return;
+  const v = p.versus;
+  v.closed = true;
+  v.endsAt = Date.now() - 1000;
+  const leftVotes = Number(v.leftVotes || 0);
+  const rightVotes = Number(v.rightVotes || 0);
+  v.winnerSide = leftVotes > rightVotes ? 'left' : (rightVotes > leftVotes ? 'right' : 'tie');
+  if (v.winnerSide === 'left') REMO_STORE.addCityScore(v.leftCityId || 'montreal', 500);
+  else if (v.winnerSide === 'right') REMO_STORE.addCityScore(v.rightCityId || 'paris', 500);
+  REMO_STORE.save(true, 'admin_conclude_duel');
+  renderSocialFeed();
+  remoToast('👑 Official City Duel concluded by Admin!');
+}
+window.adminConcludeDuelNow = adminConcludeDuelNow;
 
 function claimPostFeedBounty(postId) {
   const p = (REMO_STORE.state.posts || []).find((x) => x.id === postId);
@@ -440,10 +512,47 @@ function toggleCustomCapsuleMinutesInp(val) {
   }
 }
 
+function formatVersusCountdown(diffMs, lang) {
+  if (diffMs <= 0) return '00h 00m';
+  const totalMins = Math.floor(diffMs / 60000);
+  const hours = Math.floor(totalMins / 60);
+  const mins = totalMins % 60;
+  if (hours >= 24) {
+    const days = Math.floor(hours / 24);
+    const remH = hours % 24;
+    return lang === 'fr' ? `${days}j ${remH}h` : `${days}d ${remH}h`;
+  }
+  return `${hours}h ${mins}m`;
+}
+
+function getVersusCategoryLabel(catKey, lang) {
+  const mapEn = {
+    general: '⚡ Overall Prestige',
+    nightlife: '🌙 Nightlife & Skyline',
+    food: '🍽️ Gastronomy & Food',
+    culture: '🎭 Culture & Heritage',
+    summer: '☀️ Summer Vibes',
+    tech: '🚀 Tech & Innovation'
+  };
+  const mapFr = {
+    general: '⚡ Prestige Global',
+    nightlife: '🌙 Vie Nocturne & Lumières',
+    food: '🍽️ Gastronomie & Saveurs',
+    culture: '🎭 Culture & Patrimoine',
+    summer: '☀️ Soleil & Voyages',
+    tech: '🚀 Tech & Innovation'
+  };
+  const map = lang === 'fr' ? mapFr : mapEn;
+  return map[catKey] || map.general;
+}
+
 function renderCityVersusDuelStage(p, lang) {
   const v = p.versus || {};
-  const cA = getCityById(v.leftCityId || 'montreal') || { flag: '⚜️', code: 'MTL' };
-  const cB = getCityById(v.rightCityId || 'paris') || { flag: '🗼', code: 'PAR' };
+  const cA = getCityById(v.leftCityId || 'montreal') || { flag: '⚜️', code: 'MTL', id: 'montreal' };
+  const cB = getCityById(v.rightCityId || 'paris') || { flag: '🗼', code: 'PAR', id: 'paris' };
+  const nameA = escapeHtmlStr(getCityName(cA, lang));
+  const nameB = escapeHtmlStr(getCityName(cB, lang));
+
   const leftVotes = Number(v.leftVotes || 0);
   const rightVotes = Number(v.rightVotes || 0);
   const total = leftVotes + rightVotes;
@@ -452,19 +561,110 @@ function renderCityVersusDuelStage(p, lang) {
   const leftSrc = v.leftMedia || generateCityPostVisualDataUrl(cA.id, getCityName(cA, 'en'));
   const rightSrc = v.rightMedia || generateCityPostVisualDataUrl(cB.id, getCityName(cB, 'en'));
 
+  const now = Date.now();
+  const endsAt = Number(v.endsAt || (p.createdAt ? p.createdAt + (v.durationHours || 24) * 3600000 : now + 86400000));
+  const isExpired = Boolean(v.closed) || (now >= endsAt);
+
+  const u = (REMO_STORE && REMO_STORE.getCurrentUser) ? REMO_STORE.getCurrentUser() : null;
+  const voterKey = (u && u.uid) ? u.uid : (localStorage.getItem('remo_guest_vid') || '');
+  const hasVoted = Boolean(
+    (voterKey && Array.isArray(v.voters) && v.voters.includes(voterKey)) ||
+    localStorage.getItem('remo_versus_voted_' + p.id)
+  );
+  const votedSide = (v.voterSides && voterKey && v.voterSides[voterKey]) || localStorage.getItem('remo_versus_side_' + p.id) || '';
+
+  // Auto-close if expired
+  let winnerSide = v.winnerSide || null;
+  if (isExpired && !winnerSide) {
+    winnerSide = leftVotes > rightVotes ? 'left' : (rightVotes > leftVotes ? 'right' : 'tie');
+    v.closed = true;
+    v.winnerSide = winnerSide;
+  }
+
+  const isLeftWinner = isExpired && winnerSide === 'left';
+  const isRightWinner = isExpired && winnerSide === 'right';
+  const isTie = isExpired && winnerSide === 'tie';
+
+  const catLabel = getVersusCategoryLabel(v.category, lang);
+  const diffMs = Math.max(0, endsAt - now);
+  const timeStr = formatVersusCountdown(diffMs, lang);
+
+  const hasClaimedVictory = Boolean(
+    (voterKey && Array.isArray(v.claimedBonus) && v.claimedBonus.includes(voterKey)) ||
+    localStorage.getItem('remo_versus_claimed_' + p.id)
+  );
+  const userWon = isExpired && ((winnerSide === 'left' && votedSide === 'left') || (winnerSide === 'right' && votedSide === 'right'));
+
+  const isAdm = (REMO_STORE && (REMO_STORE.isAdminUnlocked() || REMO_STORE.isCurrentUserAdmin()));
+
+  // Top header bar
+  const topBarHtml = `
+    <div class="versus-stage-topbar">
+      <span class="versus-cat-tag">👑 ${catLabel}</span>
+      <div style="display:flex;align-items:center;gap:6px;">
+        ${!isExpired ? `<span class="versus-timer-tag" data-versus-timer="${p.id}" data-ends="${endsAt}">${escapeHtmlStr(t('versus_time_left', { time: timeStr }))}</span>` : `<span class="versus-timer-tag" style="border-color:#fbbf24;color:#fbbf24;">${escapeHtmlStr(t('versus_ended_badge'))}</span>`}
+        ${isAdm && !isExpired ? `<button type="button" class="btn-ghost" style="padding:2px 7px;font-size:0.68rem;border-color:#fbbf24;color:#fbbf24;background:rgba(0,0,0,0.6);" onclick="adminConcludeDuelNow('${p.id}', event)" title="Admin: Conclude duel now">${escapeHtmlStr(t('versus_conclude_adm_btn'))}</button>` : ''}
+      </div>
+    </div>
+  `;
+
+  // Overlay when duel is ended
+  let winnerOverlayHtml = '';
+  if (isExpired) {
+    let winMsg = '';
+    if (isTie) {
+      winMsg = t('versus_tie_announcement', { cityA: `${cA.flag} ${nameA}`, cityB: `${cB.flag} ${nameB}` });
+    } else {
+      const winCity = winnerSide === 'left' ? cA : cB;
+      const winName = winnerSide === 'left' ? nameA : nameB;
+      winMsg = t('versus_winner_announcement', { city: `${winCity.flag} ${winName}` });
+    }
+
+    winnerOverlayHtml = `
+      <div class="versus-winner-overlay">
+        <div class="versus-winner-card">
+          <div style="font-size:0.75rem;font-weight:900;letter-spacing:1px;color:#fbbf24;margin-bottom:4px;">${escapeHtmlStr(t('versus_ended_badge'))}</div>
+          <div style="font-family:'Orbitron',sans-serif;font-weight:900;font-size:0.98rem;color:#fff;margin-bottom:8px;">${winMsg}</div>
+          <div style="display:flex;justify-content:center;gap:12px;font-size:0.82rem;font-weight:800;color:#e2e8f0;margin-bottom:6px;">
+            <span>${cA.flag} ${cA.code}: <b>${pA}%</b> (${leftVotes})</span>
+            <span style="color:#fbbf24;">•</span>
+            <span>${cB.flag} ${cB.code}: <b>${pB}%</b> (${rightVotes})</span>
+          </div>
+          ${userWon && !hasClaimedVictory ? `
+            <button type="button" class="btn-cyber btn-gold" style="margin-top:6px;padding:6px 14px;font-size:0.78rem;" onclick="claimVersusVictoryBonus('${p.id}', event)">
+              ${escapeHtmlStr(t('versus_claim_bonus_btn'))}
+            </button>
+          ` : (userWon && hasClaimedVictory ? `
+            <div style="font-size:0.75rem;color:#10b981;font-weight:800;margin-top:4px;">${escapeHtmlStr(t('versus_claimed_bonus_lbl'))}</div>
+          ` : '')}
+        </div>
+      </div>
+    `;
+  }
+
+  const leftPillText = votedSide === 'left'
+    ? `✓ ${t('versus_you_voted_side')} · ${cA.flag} ${cA.code} (${pA}%)`
+    : (hasVoted || isExpired ? `${cA.flag} ${cA.code} (${pA}%)` : `🗳️ ${cA.flag} ${cA.code} (${pA}%)`);
+
+  const rightPillText = votedSide === 'right'
+    ? `✓ ${t('versus_you_voted_side')} · ${cB.flag} ${cB.code} (${pB}%)`
+    : (hasVoted || isExpired ? `${cB.flag} ${cB.code} (${pB}%)` : `🗳️ ${cB.flag} ${cB.code} (${pB}%)`);
+
   return `
-    <div class="city-versus-stage">
-      <div class="versus-pane left" onclick="voteCityVersusDuel('${p.id}', 'left')">
-        <img src="${leftSrc}" alt="${getCityName(cA, lang)}">
-        <div class="versus-city-pill left">${cA.flag} ${cA.code} (${pA}%)</div>
+    <div class="city-versus-stage ${isExpired ? 'finished' : ''}">
+      ${topBarHtml}
+      <div class="versus-pane left ${votedSide === 'left' ? 'voted' : ''} ${isLeftWinner ? 'winner' : ''}" onclick="voteCityVersusDuel('${p.id}', 'left', event)">
+        <img src="${leftSrc}" alt="${nameA}">
+        <div class="versus-city-pill left ${votedSide === 'left' ? 'active' : ''}">${leftPillText}</div>
       </div>
       <div class="versus-bolt-divider">
         <div class="versus-bolt-badge">⚡</div>
       </div>
-      <div class="versus-pane right" onclick="voteCityVersusDuel('${p.id}', 'right')">
-        <img src="${rightSrc}" alt="${getCityName(cB, lang)}">
-        <div class="versus-city-pill right">${cB.flag} ${cB.code} (${pB}%)</div>
+      <div class="versus-pane right ${votedSide === 'right' ? 'voted' : ''} ${isRightWinner ? 'winner' : ''}" onclick="voteCityVersusDuel('${p.id}', 'right', event)">
+        <img src="${rightSrc}" alt="${nameB}">
+        <div class="versus-city-pill right ${votedSide === 'right' ? 'active' : ''}">${rightPillText}</div>
       </div>
+      ${winnerOverlayHtml}
     </div>
   `;
 }
@@ -2094,6 +2294,11 @@ function closeCreatePostModal() {
 }
 
 function switchCreateStudioTab(tabId) {
+  const isAdm = REMO_STORE.isAdminUnlocked() || REMO_STORE.isCurrentUserAdmin();
+  if (tabId === 'versus' && !isAdm) {
+    remoToast(REMO_I18N.getLang() === 'fr' ? 'Seul l’administrateur peut publier un Duel Officiel !' : 'Only the administrator can create an Official City Duel!');
+    tabId = 'photo';
+  }
   activeCreateStudioTab = tabId;
   document.querySelectorAll('.studio-tab-btn').forEach((b) => {
     b.classList.toggle('active', b.getAttribute('data-studio-tab') === tabId);
@@ -2178,6 +2383,11 @@ function openCreatePostModal(prefillTag = '') {
   if (admTplBox) admTplBox.style.display = isAdm ? 'block' : 'none';
   const copilotGameBtn = document.getElementById('copilotGameBtn');
   if (copilotGameBtn) copilotGameBtn.style.display = isAdm ? 'inline-flex' : 'none';
+  const versusTabBtn = document.getElementById('studioTabVersusBtn');
+  if (versusTabBtn) versusTabBtn.style.display = isAdm ? 'inline-flex' : 'none';
+  if (!isAdm && activeCreateStudioTab === 'versus') {
+    switchCreateStudioTab('photo');
+  }
 
   const htmlArea = document.getElementById('createHtmlCodeArea');
   if (htmlArea) {
@@ -2603,6 +2813,11 @@ async function publishNewRemoPost() {
       ? rawHtml
       : `<!DOCTYPE html><html><body style="margin:0;background:#050816;color:#fff;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;">${rawHtml}</body></html>`;
   } else if (activeCreateStudioTab === 'versus') {
+    const isAdm = REMO_STORE.isAdminUnlocked() || REMO_STORE.isCurrentUserAdmin();
+    if (!isAdm) {
+      remoToast(lang === 'fr' ? 'Seul l’administrateur peut publier un Duel Officiel !' : 'Only the administrator can publish an Official City Duel!');
+      return;
+    }
     mediaType = 'city_versus';
   }
 
@@ -2744,6 +2959,9 @@ async function publishNewRemoPost() {
   if (mediaType === 'city_versus') {
     const lC = document.getElementById('createVersusLeftCity')?.value || 'montreal';
     const rC = document.getElementById('createVersusRightCity')?.value || 'paris';
+    const durationHours = Math.max(1, Number(document.getElementById('createVersusDuration')?.value || 24));
+    const cat = document.getElementById('createVersusCategory')?.value || 'general';
+    const now = Date.now();
     newPost.versus = {
       leftCityId: lC,
       rightCityId: rC,
@@ -2751,7 +2969,15 @@ async function publishNewRemoPost() {
       rightMedia: pendingVersusMedia.right || generateCityPostVisualDataUrl(rC, getCityName(getCityById(rC), 'en')),
       leftVotes: 0,
       rightVotes: 0,
-      voters: []
+      durationHours,
+      category: cat,
+      createdAt: now,
+      endsAt: now + durationHours * 3600 * 1000,
+      voters: [],
+      voterSides: {},
+      closed: false,
+      winnerSide: null,
+      claimedBonus: []
     };
     pendingVersusMedia = { left: '', right: '' };
   }
@@ -3944,6 +4170,38 @@ function initDesktopHorizontalScrollRails() {
 }
 window.initDesktopHorizontalScrollRails = initDesktopHorizontalScrollRails;
 
+function updateVersusCountdownsUI() {
+  const lang = (typeof REMO_I18N !== 'undefined' && REMO_I18N.getLang) ? REMO_I18N.getLang() : 'en';
+  const now = Date.now();
+  let hasExpiredNeedingRender = false;
+
+  document.querySelectorAll('.versus-timer-tag[data-ends]').forEach((el) => {
+    const endsAt = Number(el.getAttribute('data-ends') || 0);
+    const postId = el.getAttribute('data-versus-timer');
+    if (!endsAt) return;
+    const diff = endsAt - now;
+    if (diff <= 0) {
+      el.textContent = t('versus_ended_badge');
+      el.style.borderColor = '#fbbf24';
+      el.style.color = '#fbbf24';
+      if (postId) {
+        const p = (REMO_STORE.state.posts || []).find((x) => x && x.id === postId);
+        if (p && p.versus && !p.versus.closed) {
+          p.versus.closed = true;
+          hasExpiredNeedingRender = true;
+        }
+      }
+    } else {
+      el.textContent = t('versus_time_left', { time: formatVersusCountdown(diff, lang) });
+    }
+  });
+
+  if (hasExpiredNeedingRender) {
+    renderSocialFeed();
+  }
+}
+window.updateVersusCountdownsUI = updateVersusCountdownsUI;
+
 /* ── 7. BOOTSTRAP & LIVE REAL-TIME LISTENERS ── */
 document.addEventListener('DOMContentLoaded', () => {
   REMO_I18N.applyDOM();
@@ -3951,6 +4209,8 @@ document.addEventListener('DOMContentLoaded', () => {
   renderSocialFeed();
   updateFlashDropCountdownUI();
   setInterval(updateFlashDropCountdownUI, 1000);
+  updateVersusCountdownsUI();
+  setInterval(updateVersusCountdownsUI, 10000);
   initDesktopHorizontalScrollRails();
   setTimeout(initDesktopHorizontalScrollRails, 300);
   setTimeout(initDesktopHorizontalScrollRails, 1200);

@@ -4141,6 +4141,74 @@ button, input, select, textarea {
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
+.versus-stage-topbar {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  right: 8px;
+  z-index: 8;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  pointer-events: none;
+}
+.versus-stage-topbar > * {
+  pointer-events: auto;
+}
+.versus-cat-tag {
+  background: rgba(15, 23, 42, 0.9);
+  border: 1px solid rgba(251, 191, 36, 0.5);
+  color: #fbbf24;
+  font-size: 0.7rem;
+  font-weight: 900;
+  padding: 3px 10px;
+  border-radius: 99px;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
+}
+.versus-timer-tag {
+  background: rgba(15, 23, 42, 0.9);
+  border: 1px solid rgba(56, 189, 248, 0.5);
+  color: #38bdf8;
+  font-size: 0.7rem;
+  font-weight: 800;
+  padding: 3px 10px;
+  border-radius: 99px;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
+}
+.versus-winner-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 7;
+  background: rgba(4, 7, 20, 0.62);
+  backdrop-filter: blur(3px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 16px;
+  text-align: center;
+}
+.versus-winner-card {
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.96), rgba(30, 27, 75, 0.96));
+  border: 2px solid #fbbf24;
+  box-shadow: 0 0 35px rgba(251, 191, 36, 0.45);
+  border-radius: 18px;
+  padding: 14px 20px;
+  max-width: 92%;
+}
+.versus-pane.voted {
+  outline: 3px solid #10b981;
+  outline-offset: -3px;
+}
+.versus-pane.winner {
+  outline: 3px solid #fbbf24;
+  outline-offset: -3px;
+}
+
 /* ══════════════════════════════════════════════════════════════
    🎁 FEED BOUNTY TREASURE CHEST
    ══════════════════════════════════════════════════════════════ */
