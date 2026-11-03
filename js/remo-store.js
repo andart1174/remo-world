@@ -2581,6 +2581,9 @@ const REMO_STORE = {
         envelopeClaimed: Boolean(dm.envelopeClaimed),
         isRoyalAdmin: Boolean(dm.isRoyalAdmin),
         cardOffer: dm.cardOffer || null,
+        isDailyMatch: Boolean(dm.isDailyMatch),
+        dailyMatchKey: dm.dailyMatchKey || '',
+        dailyMatchRewarded: Boolean(dm.dailyMatchRewarded),
         read: Boolean(dm.read),
         ts: Number(dm.ts || Date.now())
       };
@@ -3318,8 +3321,11 @@ const REMO_STORE = {
             // Keep union of likes
             const mergedLikes = Array.from(new Set([...(cp.likes || []), ...(lp.likes || [])]));
             cp.likes = mergedLikes;
-            // Merge reactions
+            // Merge reactions & mystery city guesses
             cp.reactions = Object.assign({}, cp.reactions || {}, lp.reactions || {});
+            if (cp.cityGuesses || lp.cityGuesses) {
+              cp.cityGuesses = Object.assign({}, cp.cityGuesses || {}, lp.cityGuesses || {});
+            }
             // Merge comments
             const cmtMap = new Map();
             (cp.comments || []).forEach((c) => {
@@ -3387,8 +3393,8 @@ const REMO_STORE = {
         });
         isInitialPostsSnap = false;
 
-        const prevSignature = (this.state.posts || []).map((p) => `${p.id}_${p.likes?.length || 0}_${p.comments?.length || 0}_${p.leaderboard?.[0]?.score || 0}_${p.pinned ? 1 : 0}`).join('|');
-        const nextSignature = activePosts.map((p) => `${p.id}_${p.likes?.length || 0}_${p.comments?.length || 0}_${p.leaderboard?.[0]?.score || 0}_${p.pinned ? 1 : 0}`).join('|');
+        const prevSignature = (this.state.posts || []).map((p) => `${p.id}_${p.type || ''}_${p.likes?.length || 0}_${p.comments?.length || 0}_${Object.keys(p.cityGuesses || {}).length}_${p.leaderboard?.[0]?.score || 0}_${p.pinned ? 1 : 0}`).join('|');
+        const nextSignature = activePosts.map((p) => `${p.id}_${p.type || ''}_${p.likes?.length || 0}_${p.comments?.length || 0}_${Object.keys(p.cityGuesses || {}).length}_${p.leaderboard?.[0]?.score || 0}_${p.pinned ? 1 : 0}`).join('|');
         const hasContentChanged = prevSignature !== nextSignature;
 
         this.state.posts = activePosts;
@@ -3413,13 +3419,39 @@ const REMO_STORE = {
         console.warn('Firestore remo_posts sync notice:', err.message);
       });
 
-      // 4. Ecosystem Live State (City Scores, Settings, World Bottles, Auctions & GeoVaults)
+      // 4. Ecosystem Live State (City Scores, Live Duels, Settings, World Bottles, Auctions & GeoVaults)
       const docRef = this.fbDb.collection('remo_ecosystem').doc('live_state');
+      const mergeCloudScoresAndDuels = (data) => {
+        if (data.cityScores && typeof data.cityScores === 'object') {
+          this.state.cityScores = this.state.cityScores || {};
+          Object.keys(data.cityScores).forEach((cid) => {
+            const cVal = Number(data.cityScores[cid] || 0);
+            const lVal = Number(this.state.cityScores[cid] || 0);
+            if (cVal > lVal) this.state.cityScores[cid] = cVal;
+          });
+        }
+        if (Array.isArray(data.duels) && data.duels.length > 0) {
+          this.state.duels = Array.isArray(this.state.duels) ? this.state.duels : [];
+          data.duels.forEach((cd) => {
+            if (!cd || !cd.id) return;
+            const ld = this.state.duels.find((x) => x && x.id === cd.id);
+            if (ld) {
+              ld.votesA = Math.max(Number(ld.votesA || 0), Number(cd.votesA || 0));
+              ld.votesB = Math.max(Number(ld.votesB || 0), Number(cd.votesB || 0));
+              if (cd.title_en && !ld.title_en) ld.title_en = cd.title_en;
+              if (cd.title_fr && !ld.title_fr) ld.title_fr = cd.title_fr;
+            } else {
+              this.state.duels.push(cd);
+            }
+          });
+        }
+      };
       
       docRef.get().then((snap) => {
         if (!snap.exists) {
           docRef.set({
             cityScores: this.state.cityScores || {},
+            duels: (this.state.duels || []).slice(0, 15),
             settings: this.state.settings || {},
             bottles: (this.state.bottles || []).slice(0, 30),
             auctions: (this.state.auctions || []).slice(0, 25),
@@ -3431,7 +3463,7 @@ const REMO_STORE = {
         } else {
           const data = snap.data();
           if (data) {
-            if (data.cityScores) this.state.cityScores = Object.assign(this.state.cityScores || {}, data.cityScores);
+            mergeCloudScoresAndDuels(data);
             if (data.bottles) this.state.bottles = data.bottles;
             if (Array.isArray(data.auctions)) {
               this.state.auctions = data.auctions;
@@ -3457,12 +3489,12 @@ const REMO_STORE = {
         }
       }).catch((err) => console.log('Firestore read status:', err.message));
 
-      // Realtime listener for scores, bottles, auctions & geovaults
+      // Realtime listener for scores, duels, bottles, auctions & geovaults
       docRef.onSnapshot((snap) => {
         if (!snap || !snap.exists || snap.metadata?.hasPendingWrites) return;
         const data = snap.data();
         if (data) {
-          if (data.cityScores) this.state.cityScores = Object.assign(this.state.cityScores || {}, data.cityScores);
+          mergeCloudScoresAndDuels(data);
           if (data.bottles) this.state.bottles = data.bottles;
           if (Array.isArray(data.auctions)) {
             this.state.auctions = data.auctions;
@@ -3846,6 +3878,7 @@ const REMO_STORE = {
         const docRef = this.fbDb.collection('remo_ecosystem').doc('live_state');
         docRef.set({
           cityScores: this.state.cityScores || {},
+          duels: (this.state.duels || []).slice(0, 15),
           settings: this.state.settings || {},
           bottles: (this.state.bottles || []).slice(0, 30),
           auctions: (this.state.auctions || []).slice(0, 25),

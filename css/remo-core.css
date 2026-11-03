@@ -5616,3 +5616,365 @@ button, input, select, textarea {
     grid-template-columns: repeat(2, 1fr);
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   v59 — GUESS MY CITY, LIVE CLICKER WAR, WORLD WINDOW SYNC & DAILY MATCH
+═══════════════════════════════════════════════════════════════════════════ */
+
+/* 🕵️ 1. Guess My City! (Mystery City Post Game) */
+.mystery-masked-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 9px;
+  border-radius: 99px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: #fde047;
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.32), rgba(245, 158, 11, 0.22));
+  border: 1px dashed rgba(251, 191, 36, 0.65);
+  box-shadow: 0 0 12px rgba(168, 85, 247, 0.25);
+}
+
+.mystery-city-box {
+  margin: 10px 14px;
+  padding: 11px 12px;
+  border-radius: 14px;
+  background: linear-gradient(145deg, rgba(30, 27, 75, 0.78), rgba(15, 23, 42, 0.92));
+  border: 1px solid rgba(168, 85, 247, 0.45);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.32), inset 0 0 18px rgba(139, 92, 246, 0.12);
+}
+
+.mystery-city-hdr {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.mystery-city-title {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.75rem;
+  font-weight: 900;
+  color: #fde047;
+  letter-spacing: 0.3px;
+}
+
+.mystery-choice-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 7px;
+}
+
+.mystery-choice-btn {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 7px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  color: #f8fafc;
+  font-size: 0.79rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: transform 0.14s ease, border-color 0.18s ease, background 0.18s ease;
+  text-align: left;
+}
+
+.mystery-choice-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: #a855f7;
+  background: rgba(168, 85, 247, 0.18);
+}
+
+.mystery-choice-btn.correct {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.34), rgba(5, 150, 105, 0.22)) !important;
+  border-color: #34d399 !important;
+  color: #ecfdf5 !important;
+  box-shadow: 0 0 14px rgba(16, 185, 129, 0.4);
+}
+
+.mystery-choice-btn.wrong {
+  background: rgba(239, 68, 68, 0.24) !important;
+  border-color: #f87171 !important;
+  color: #fecaca !important;
+}
+
+.mystery-result-banner {
+  margin-top: 8px;
+  padding: 7px 10px;
+  border-radius: 10px;
+  font-size: 0.77rem;
+  font-weight: 800;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.mystery-result-banner.win {
+  background: rgba(16, 185, 129, 0.16);
+  border: 1px solid rgba(52, 211, 153, 0.45);
+  color: #6ee7b7;
+}
+
+.mystery-result-banner.lose {
+  background: rgba(239, 68, 68, 0.14);
+  border: 1px solid rgba(248, 113, 113, 0.4);
+  color: #fca5a5;
+}
+
+/* ⚡ 2. Live City Clicker Pulse War */
+.war-pulse-btn {
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+  position: relative;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: 11px;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.74rem;
+  font-weight: 900;
+  cursor: pointer;
+  transition: transform 0.06s ease, box-shadow 0.15s ease;
+}
+
+.war-pulse-btn.side-a {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.32), rgba(79, 70, 229, 0.18));
+  border: 1px solid rgba(129, 140, 248, 0.65);
+  color: #e0e7ff;
+}
+
+.war-pulse-btn.side-b {
+  background: linear-gradient(135deg, rgba(236, 72, 153, 0.32), rgba(219, 39, 119, 0.18));
+  border: 1px solid rgba(244, 114, 182, 0.65);
+  color: #fce7f3;
+}
+
+.war-pulse-btn:active {
+  transform: scale(0.92);
+}
+
+.war-backup-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border-radius: 99px;
+  font-size: 0.7rem;
+  font-weight: 800;
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(52, 211, 153, 0.45);
+  color: #6ee7b7;
+  cursor: pointer;
+}
+
+.war-backup-btn:hover {
+  background: rgba(16, 185, 129, 0.26);
+}
+
+.war-tap-spark {
+  position: fixed;
+  pointer-events: none;
+  z-index: 9999;
+  font-family: 'Orbitron', sans-serif;
+  font-weight: 900;
+  font-size: 0.95rem;
+  color: #fde047;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.85), 0 0 12px rgba(251, 191, 36, 0.75);
+  animation: warSparkRise 0.68s cubic-bezier(0.2, 0.8, 0.3, 1) forwards;
+}
+
+@keyframes warSparkRise {
+  0% {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(0.85);
+  }
+  50% {
+    opacity: 1;
+    transform: translate(-50%, -28px) scale(1.18);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -56px) scale(0.95);
+  }
+}
+
+.mobile-war-strip {
+  display: none;
+  margin-bottom: 10px;
+  padding: 9px 12px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.92), rgba(30, 27, 75, 0.85));
+  border: 1px solid rgba(236, 72, 153, 0.38);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.28);
+}
+
+.mobile-war-strip.force-visible {
+  display: block;
+}
+
+@media (max-width: 1120px) {
+  .mobile-war-strip {
+    display: block;
+  }
+}
+
+/* 🪟 3. World Window Sync 9:16 & City Duet Distance Bridge */
+.window-live-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 99px;
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.35px;
+  background: rgba(14, 165, 233, 0.2);
+  border: 1px solid rgba(56, 189, 248, 0.55);
+  color: #7dd3fc;
+}
+
+.duet-distance-ribbon {
+  position: absolute;
+  bottom: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 6;
+  white-space: nowrap;
+  max-width: 94%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 4px 11px;
+  border-radius: 99px;
+  background: rgba(5, 8, 22, 0.86);
+  border: 1px solid rgba(251, 191, 36, 0.6);
+  color: #fde047;
+  font-size: 0.7rem;
+  font-weight: 800;
+  backdrop-filter: blur(6px);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.55);
+}
+
+.window-sync-actions {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+  margin: 8px 14px 4px;
+}
+
+.btn-window-sync {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 11px;
+  border-radius: 99px;
+  font-size: 0.73rem;
+  font-weight: 800;
+  cursor: pointer;
+  background: linear-gradient(135deg, rgba(14, 165, 233, 0.24), rgba(99, 102, 241, 0.24));
+  border: 1px solid rgba(56, 189, 248, 0.55);
+  color: #bae6fd;
+  transition: transform 0.14s ease, border-color 0.14s ease;
+}
+
+.btn-window-sync:hover {
+  transform: translateY(-1px);
+  border-color: #38bdf8;
+}
+
+.btn-window-story {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 11px;
+  border-radius: 99px;
+  font-size: 0.73rem;
+  font-weight: 800;
+  cursor: pointer;
+  background: linear-gradient(135deg, rgba(236, 72, 153, 0.24), rgba(251, 191, 36, 0.2));
+  border: 1px solid rgba(244, 114, 182, 0.55);
+  color: #fbcfe8;
+}
+
+/* 🤝 4. Daily World Match (Connexion Planétaire) */
+.daily-match-card {
+  margin-bottom: 12px;
+  padding: 12px 14px;
+  border-radius: 15px;
+  background: linear-gradient(135deg, rgba(6, 78, 59, 0.42), rgba(15, 23, 42, 0.9));
+  border: 1px solid rgba(52, 211, 153, 0.48);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.28);
+}
+
+.daily-match-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.daily-match-icebreakers {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 9px;
+}
+
+.icebreaker-pill {
+  padding: 6px 11px;
+  border-radius: 99px;
+  background: rgba(56, 189, 248, 0.13);
+  border: 1px solid rgba(56, 189, 248, 0.42);
+  color: #e0f2fe;
+  font-size: 0.74rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.12s ease;
+}
+
+.icebreaker-pill:hover {
+  background: rgba(56, 189, 248, 0.26);
+  transform: translateY(-1px);
+}
+
+.feed-daily-match-pill {
+  margin-bottom: 10px;
+  padding: 8px 13px;
+  border-radius: 13px;
+  background: linear-gradient(90deg, rgba(16, 185, 129, 0.2), rgba(56, 189, 248, 0.18));
+  border: 1px solid rgba(52, 211, 153, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: #d1fae5;
+}
+
+.dm-match-badge {
+  display: inline-block;
+  margin-bottom: 4px;
+  padding: 2px 7px;
+  border-radius: 99px;
+  font-size: 0.64rem;
+  font-weight: 900;
+  letter-spacing: 0.4px;
+  background: rgba(16, 185, 129, 0.22);
+  border: 1px solid rgba(52, 211, 153, 0.5);
+  color: #6ee7b7;
+}

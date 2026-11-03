@@ -1013,42 +1013,71 @@ function updateRadarSonarHUD() {
 }
 
 /* ── 2. CITY WARS & 3-ROUND 3D CARD PVP BATTLE ARENA ── */
+function renderArenaWarsOnly() {
+  const warsBox = document.getElementById('arenaWarsList');
+  if (!warsBox) return;
+  const lang = REMO_I18N.getLang();
+  const u = REMO_STORE.getCurrentUser();
+
+  warsBox.innerHTML = (REMO_STORE.state.duels || []).map((w) => {
+    const cA = getCityById(w.cityA), cB = getCityById(w.cityB);
+    const vA = Number(w.votesA || 0), vB = Number(w.votesB || 0);
+    const tot = Math.max(1, vA + vB);
+    const pctA = Math.round((vA / tot) * 100);
+    const pctB = 100 - pctA;
+    const ttl = lang === 'fr' ? (w.title_fr || w.title_en) : w.title_en;
+    const myTaps = Number(localStorage.getItem('remo_war_taps_' + w.id) || 0);
+    const guestClaimHtml = (!u && myTaps >= 15)
+      ? `<div style="margin-top:8px;padding:6px 10px;border-radius:10px;background:rgba(251,191,36,0.14);border:1px solid rgba(251,191,36,0.45);display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;font-size:0.75rem;color:#fde047;font-weight:800;">
+           <span>${t('war_guest_claim_bar', { taps: myTaps, city: getCityName(cA, lang) })}</span>
+           <button class="btn-cyber btn-gold" style="padding:4px 10px;font-size:0.72rem;" onclick="openAuthModal()">🛂 ${t('btn_sign_in')}</button>
+         </div>`
+      : '';
+    return `
+      <div class="war-card">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
+          <b style="font-size:1rem;color:#fff;">⚔️ ${ttl}</b>
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+            ${myTaps > 0 ? `<span class="city-tag" style="border-color:rgba(251,191,36,0.5);color:#fde047;">⚡ ${t('war_my_taps_lbl', { n: myTaps })}</span>` : ''}
+            <span class="city-tag">+5 🪙 / 25 taps</span>
+          </div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-weight:800;font-size:0.9rem;">
+          <span style="color:#818cf8;">${cA.flag} ${getCityName(cA, lang)} (${pctA}% · ${vA.toLocaleString()})</span>
+          <span style="color:#f472b6;">${cB.flag} ${getCityName(cB, lang)} (${pctB}% · ${vB.toLocaleString()})</span>
+        </div>
+        <div class="war-bar-track">
+          <div class="war-bar-fill-a" style="width:${pctA}%;transition:width 0.18s ease;"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;">
+          <button type="button" class="war-pulse-btn side-a" onclick="voteCityWar('${w.id}','A',event)">
+            ${cA.flag} ${getCityName(cA, lang)} · ${t('war_tap_btn')}
+          </button>
+          <button type="button" class="war-pulse-btn side-b" onclick="voteCityWar('${w.id}','B',event)">
+            ${cB.flag} ${getCityName(cB, lang)} · ${t('war_tap_btn')}
+          </button>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap;">
+          <button type="button" class="war-backup-btn" onclick="shareCityWarBackup('${w.id}','A')">
+            ${t('war_backup_btn')} ${cA.flag}
+          </button>
+          <button type="button" class="war-backup-btn" onclick="shareCityWarBackup('${w.id}','B')">
+            ${t('war_backup_btn')} ${cB.flag}
+          </button>
+        </div>
+        ${guestClaimHtml}
+      </div>
+    `;
+  }).join('');
+}
+
 function renderArenaView() {
   const warsBox = document.getElementById('arenaWarsList');
   const pvpSel = document.getElementById('pvpUserCardSelect');
   const lang = REMO_I18N.getLang();
   if (!warsBox) return;
 
-  warsBox.innerHTML = (REMO_STORE.state.duels || []).map((w) => {
-    const cA = getCityById(w.cityA), cB = getCityById(w.cityB);
-    const tot = Math.max(1, (w.votesA || 0) + (w.votesB || 0));
-    const pctA = Math.round(((w.votesA || 0) / tot) * 100);
-    const pctB = 100 - pctA;
-    const ttl = lang === 'fr' ? (w.title_fr || w.title_en) : w.title_en;
-    return `
-      <div class="war-card">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-          <b style="font-size:1rem;color:#fff;">⚔️ ${ttl}</b>
-          <span class="city-tag">${t('arena_vote_reward')}</span>
-        </div>
-        <div style="display:flex;justify-content:space-between;font-weight:800;font-size:0.9rem;">
-          <span style="color:#f43f5e;">${cA.flag} ${getCityName(cA, lang)} (${pctA}% · ${w.votesA})</span>
-          <span style="color:#38bdf8;">${cB.flag} ${getCityName(cB, lang)} (${pctB}% · ${w.votesB})</span>
-        </div>
-        <div class="war-bar-track">
-          <div class="war-bar-fill-a" style="width:${pctA}%;"></div>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;">
-          <button class="btn-cyber" style="justify-content:center;" onclick="voteCityWar('${w.id}','A')">
-            ${cA.flag} ${lang === 'fr' ? 'Voter' : 'Vote'} ${getCityName(cA, lang)}
-          </button>
-          <button class="btn-ghost" style="justify-content:center;border-color:#38bdf8;" onclick="voteCityWar('${w.id}','B')">
-            ${cB.flag} ${lang === 'fr' ? 'Voter' : 'Vote'} ${getCityName(cB, lang)}
-          </button>
-        </div>
-      </div>
-    `;
-  }).join('');
+  renderArenaWarsOnly();
 
   if (pvpSel) {
     const u = REMO_STORE.getCurrentUser();
@@ -1188,31 +1217,161 @@ function placePredictionBetAction(predId, optId, amount = 5) {
 window.renderCityPredictionsView = renderCityPredictionsView;
 window.placePredictionBetAction = placePredictionBetAction;
 
-function voteCityWar(warId, side) {
+let _warTapTimestamps = [];
+let _warPulseFlushTimer = null;
+
+function spawnWarTapSpark(ev, flag) {
+  try {
+    const el = document.createElement('div');
+    el.className = 'war-tap-spark';
+    el.textContent = `+1 ${flag || '⚡'}`;
+    let x = window.innerWidth / 2;
+    let y = window.innerHeight / 2;
+    if (ev && typeof ev.clientX === 'number' && ev.clientX > 0) {
+      x = ev.clientX + (Math.random() * 24 - 12);
+      y = ev.clientY - 8;
+    } else if (ev && ev.currentTarget && ev.currentTarget.getBoundingClientRect) {
+      const r = ev.currentTarget.getBoundingClientRect();
+      x = r.left + r.width / 2 + (Math.random() * 24 - 12);
+      y = r.top + 6;
+    }
+    el.style.left = `${x}px`;
+    el.style.top = `${y}px`;
+    document.body.appendChild(el);
+    setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, 700);
+  } catch (e) {}
+}
+
+function scheduleWarPulseCloudFlush() {
+  if (_warPulseFlushTimer) return;
+  _warPulseFlushTimer = setTimeout(() => {
+    _warPulseFlushTimer = null;
+    REMO_STORE.save(true, 'war_pulse');
+  }, 3500);
+}
+
+function voteCityWar(warId, side, ev) {
+  const now = Date.now();
+  // Human anti-bot speed cap: max 12 taps per second
+  _warTapTimestamps = _warTapTimestamps.filter((ts) => now - ts < 1000);
+  if (_warTapTimestamps.length >= 12) return;
+  _warTapTimestamps.push(now);
+
   const lang = REMO_I18N.getLang();
-  const voteKey = 'remo_voted_' + warId;
-  if (localStorage.getItem(voteKey)) {
-    remoToast(lang === 'fr' ? 'Vous avez déjà voté dans ce duel !' : 'You already voted in this City War!');
-    return;
-  }
-  const war = REMO_STORE.state.duels.find((d) => d.id === warId);
+  const war = (REMO_STORE.state.duels || []).find((d) => d.id === warId);
   if (!war) return;
-  localStorage.setItem(voteKey, side);
+
+  const cA = getCityById(war.cityA);
+  const cB = getCityById(war.cityB);
+  const chosenCity = side === 'A' ? cA : cB;
+  const otherCity = side === 'A' ? cB : cA;
+
+  const prevA = Number(war.votesA || 0);
+  const prevB = Number(war.votesB || 0);
+  const prevLead = prevA > prevB ? 'A' : (prevB > prevA ? 'B' : 'tie');
+
   if (side === 'A') {
-    war.votesA = (war.votesA || 0) + 1;
-    REMO_STORE.addCityScore(war.cityA, 25);
+    war.votesA = prevA + 1;
+    REMO_STORE.state.cityScores[war.cityA] = (REMO_STORE.state.cityScores[war.cityA] || 1000) + 2;
   } else {
-    war.votesB = (war.votesB || 0) + 1;
-    REMO_STORE.addCityScore(war.cityB, 25);
+    war.votesB = prevB + 1;
+    REMO_STORE.state.cityScores[war.cityB] = (REMO_STORE.state.cityScores[war.cityB] || 1000) + 2;
   }
+
+  try { RemoAudio.play('pop'); } catch (e) {}
+  try { if (navigator.vibrate) navigator.vibrate(10); } catch (e) {}
+  spawnWarTapSpark(ev, chosenCity ? chosenCity.flag : '⚡');
+
+  // Personal tap counter & capped coin rewards
+  const tapKey = 'remo_war_taps_' + warId;
+  const myTaps = Number(localStorage.getItem(tapKey) || 0) + 1;
+  localStorage.setItem(tapKey, String(myTaps));
+  localStorage.setItem('remo_war_last_side_' + warId, side);
+
   const u = REMO_STORE.getCurrentUser();
-  const reward = REMO_STORE.state.settings.rewards.duelVoteReward || 20;
-  if (u) REMO_STORE.addCoins(u.uid, reward, 15);
-  REMO_STORE.save(true, 'war_vote');
-  spawnRemoCoinsFX(6);
-  renderArenaView();
+  const firstVoteKey = 'remo_voted_' + warId;
+  const dayKey = 'remo_war_coins_' + REMO_STORE._getLocalDateKey(0);
+  const earnedToday = Number(localStorage.getItem(dayKey) || 0);
+
+  if (!localStorage.getItem(firstVoteKey)) {
+    localStorage.setItem(firstVoteKey, side);
+    if (u) {
+      REMO_STORE.addCoins(u.uid, 10, 10);
+      localStorage.setItem(dayKey, String(earnedToday + 10));
+    } else {
+      const gCoins = Math.min(25, Number(localStorage.getItem('remo_guest_war_coins') || 0) + 10);
+      localStorage.setItem('remo_guest_war_coins', String(gCoins));
+    }
+  } else if (myTaps % 25 === 0) {
+    if (u && earnedToday < 100) {
+      REMO_STORE.addCoins(u.uid, 5, 8);
+      localStorage.setItem(dayKey, String(earnedToday + 5));
+      spawnRemoCoinsFX(4);
+      remoToast(t('war_milestone_toast', { city: getCityName(chosenCity, lang) }), 'coin');
+    } else if (!u) {
+      const gCoins = Math.min(25, Number(localStorage.getItem('remo_guest_war_coins') || 0) + 5);
+      localStorage.setItem('remo_guest_war_coins', String(gCoins));
+    }
+  }
+
+  // Lead-change overtake alert!
+  const nextA = Number(war.votesA || 0);
+  const nextB = Number(war.votesB || 0);
+  const nextLead = nextA > nextB ? 'A' : (nextB > nextA ? 'B' : 'tie');
+  if (prevLead !== nextLead && nextLead === side) {
+    const tot = Math.max(1, nextA + nextB);
+    const winPct = Math.round(((side === 'A' ? nextA : nextB) / tot) * 100);
+    try { RemoAudio.play('fanfare'); } catch (e) {}
+    remoToast(t('war_overtake_toast', {
+      city: `${chosenCity.flag} ${getCityName(chosenCity, lang)}`,
+      other: getCityName(otherCity, lang),
+      pct: winPct
+    }), 'fanfare');
+  }
+
+  // Instant lightweight UI refresh without touching feed iframes
+  renderArenaWarsOnly();
   if (typeof renderRightSidebarWidgets === 'function') renderRightSidebarWidgets();
-  remoToast(lang === 'fr' ? `⚔️ Vote enregistré (+${reward} 🪙) !` : `⚔️ Vote locked in (+${reward} 🪙)!`, 'coin');
+  if (typeof renderMobileCityWarStrip === 'function') renderMobileCityWarStrip();
+  if (typeof syncHeaderAndSidebars === 'function') syncHeaderAndSidebars();
+
+  scheduleWarPulseCloudFlush();
+}
+
+async function shareCityWarBackup(warId, side) {
+  const lang = REMO_I18N.getLang();
+  const war = (REMO_STORE.state.duels || []).find((d) => d.id === warId) || (REMO_STORE.state.duels || [])[0];
+  if (!war) return;
+  const cA = getCityById(war.cityA);
+  const cB = getCityById(war.cityB);
+  const tot = Math.max(1, Number(war.votesA || 0) + Number(war.votesB || 0));
+  const pctA = Math.round((Number(war.votesA || 0) / tot) * 100);
+  const pctB = 100 - pctA;
+  const myCity = side === 'B' ? cB : cA;
+  const u = REMO_STORE.getCurrentUser();
+  const base = `${window.location.origin}${window.location.pathname}`;
+  const refPart = u && u.referralCode ? `&ref=${encodeURIComponent(u.referralCode)}` : '';
+  const url = `${base}?war=${encodeURIComponent(war.id)}&side=${side === 'B' ? 'B' : 'A'}${refPart}`;
+
+  const msg = t('war_share_backup_text', {
+    cityA: `${cA.flag} ${getCityName(cA, lang)}`,
+    cityB: `${cB.flag} ${getCityName(cB, lang)}`,
+    pctA,
+    pctB,
+    myCity: `${myCity.flag} ${getCityName(myCity, lang)}`
+  });
+
+  if (navigator.share) {
+    try {
+      await navigator.share({ title: 'REMO Live City War', text: msg, url });
+      return;
+    } catch (err) {
+      if (err && err.name === 'AbortError') return;
+    }
+  }
+  copyTextToClipboard(`${msg} ${url}`);
+  const waUrl = `https://wa.me/?text=${encodeURIComponent(msg + ' ' + url)}`;
+  window.open(waUrl, '_blank', 'noopener');
 }
 
 function updatePvPCardPreviews() {
@@ -2596,6 +2755,7 @@ function drawStoryVerticalCanvas(cv, u, lang) {
 }
 
 function exportPassportStory() {
+  window._customStoryShareMeta = null;
   const lang = REMO_I18N.getLang();
   const u = REMO_STORE.getCurrentUser() || REMO_STORE.ensureGuestOrCitizen('REMO Pioneer', '', 'montreal');
   const modal = document.getElementById('storyExportModal');
@@ -2619,11 +2779,14 @@ async function shareStoryCanvasNative() {
   const cv = document.getElementById('citizenStoryCanvasPreview');
   const u = REMO_STORE.getCurrentUser() || { name: 'Pioneer', passportNum: '0001', referralCode: 'REMO-0001' };
   const lang = REMO_I18N.getLang();
-  const inviteUrl = getCitizenInviteUrl(u);
-  const shareTitle = 'REMO World · Official Citizen Passport';
-  const shareText = lang === 'fr'
-    ? `🌐 Rejoins ma ville sur REMO avec mon code ${u.referralCode || ('REMO-' + u.passportNum)} et gagne +100 🪙 de bienvenue !`
-    : `🌐 Join my city on REMO with code ${u.referralCode || ('REMO-' + u.passportNum)} to earn +100 🪙 welcome coins!`;
+  const custom = window._customStoryShareMeta || null;
+  const inviteUrl = (custom && custom.url) ? custom.url : getCitizenInviteUrl(u);
+  const shareTitle = (custom && custom.title) ? custom.title : 'REMO World · Official Citizen Passport';
+  const shareText = (custom && custom.text)
+    ? custom.text
+    : (lang === 'fr'
+      ? `🌐 Rejoins ma ville sur REMO avec mon code ${u.referralCode || ('REMO-' + u.passportNum)} et gagne +100 🪙 de bienvenue !`
+      : `🌐 Join my city on REMO with code ${u.referralCode || ('REMO-' + u.passportNum)} to earn +100 🪙 welcome coins!`);
 
   // Always copy link with fallback and trigger HD PNG download
   copyTextToClipboard(inviteUrl);
@@ -2671,11 +2834,16 @@ function downloadStoryCanvasPNG() {
   const cv = document.getElementById('citizenStoryCanvasPreview');
   const u = REMO_STORE.getCurrentUser() || { passportNum: '0001', referralCode: 'REMO-0001' };
   if (!cv) return;
-  downloadCanvasAsPNG(cv, `REMO_Story_9x16_${u.referralCode || u.passportNum || '0001'}.png`);
+  const custom = window._customStoryShareMeta || null;
+  const fname = (custom && custom.filename)
+    ? custom.filename
+    : `REMO_Story_9x16_${u.referralCode || u.passportNum || '0001'}.png`;
+  downloadCanvasAsPNG(cv, fname);
   remoToast(REMO_I18N.getLang() === 'fr' ? '📥 Story 9:16 HD téléchargée !' : '📥 9:16 HD Story downloaded!', 'coin');
 }
 
 function closeStoryExportModal() {
+  window._customStoryShareMeta = null;
   const m = document.getElementById('storyExportModal');
   if (m) m.classList.remove('open');
 }
@@ -3992,6 +4160,8 @@ window.showWorldChestDropAlert = showWorldChestDropAlert;
 window.trackWorldChestOnRadar = trackWorldChestOnRadar;
 window.openBuryGeoVaultModalAtCoords = openBuryGeoVaultModalAtCoords;
 window.updateRadarSonarHUD = updateRadarSonarHUD;
+window.renderArenaWarsOnly = renderArenaWarsOnly;
+window.shareCityWarBackup = shareCityWarBackup;
 
 if (typeof window !== 'undefined') {
   window.addEventListener('remo:worldchest_dropped', (e) => {

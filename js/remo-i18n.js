@@ -666,7 +666,57 @@ const REMO_DICT = {
     // ⏳ Custom Time-Capsule
     capsule_custom_mins: 'Custom Minutes',
     capsule_custom_ph: 'Minutes (e.g. 45)',
-    capsule_exploding_alert: '💥 TIME-CAPSULE UNLOCKED LIVE!'
+    capsule_exploding_alert: '💥 TIME-CAPSULE UNLOCKED LIVE!',
+
+    // 🗺️ Secret Urban Spot
+    secret_spot_toggle: '🗺️ Mark as Urban Secret Spot (Radar & Treasure Hunt)',
+    secret_spot_title_ph: 'Secret spot name (e.g. Hidden Belvedere, Unmarked Rooftop Café...)',
+    secret_spot_clue_ph: 'Riddle clue to find it (e.g. Look behind the stone archway...)',
+
+    // 🕵️ Guess My City! (v59)
+    filter_mystery: '🕵️ Guess City',
+    guess_toggle_lbl: '🕵️ Hide My City — "Guess My City!" Game (+10 🪙)',
+    guess_masked_city: '🕵️ Mystery City',
+    guess_masked_weather: '🌡️ Masked until guessed',
+    guess_card_back_locked: '🕵️ 3D City Card sealed! Guess the city first to flip & inspect.',
+    guess_prompt_title: '🕵️ GUESS MY CITY! (+10 🪙 First Try)',
+    guess_owner_badge: '🕵️ Mystery Active · {solved}/{total} solved',
+    guess_solved_stats: '🎯 {solved}/{total} citizens guessed right',
+    guess_correct_msg: '🎉 BINGO! It’s {city}! +10 🪙 earned!',
+    guess_wrong_msg: '❌ Oops! You picked {picked} — real city: {city}!',
+    guess_guest_claim_cta: '🎁 Claim your +10 🪙 & Official Citizen Passport!',
+    guess_share_btn: '🕵️ Challenge Friends',
+    guess_share_text: '🕵️ Can you guess which city this photo was taken in? Tap to guess on REMO (+10 🪙):',
+
+    // ⚡ Live City Clicker Pulse War (v59)
+    war_tap_btn: '⚡ TAP +1',
+    war_backup_btn: '📢 Call Backup',
+    war_overtake_toast: '🚨 LEAD CHANGE! {city} just overtook {other} ({pct}%)!',
+    war_milestone_toast: '⚡ 25 Taps for {city}! +5 🪙 Battle Bonus!',
+    war_guest_claim_bar: '🔥 {taps} taps for {city}! Claim Passport to save your +Coins',
+    war_share_backup_text: '🚨 {cityA} vs {cityB} LIVE CLICKER WAR ({pctA}% - {pctB}%)! Tap to defend {myCity} right now (no login needed):',
+    war_mobile_strip_lbl: '⚔️ LIVE WAR',
+    war_my_taps_lbl: 'Your taps: {n}',
+
+    // 🪟 World Window Sync 9:16 (v59)
+    win_pulse_btn: '🪟 Live Window',
+    win_stamp_toggle: '🪟 Stamp Official Live City Time & °C (World Window)',
+    win_sync_duet_btn: '🌍 Sync My Window (+25 🪙)',
+    win_story_916_btn: '📲 Story 9:16',
+    win_badge_live: '🪟 LIVE WORLD WINDOW',
+    win_story_ready_toast: '🪟 9:16 World Window Story ready to share!',
+
+    // 🤝 Daily World Match (v59)
+    match_box_title: '🤝 Daily World Match',
+    match_box_sub: '1 citizen from another city · Reply within 24h = +15 🪙 EACH!',
+    match_feed_pill: '🤝 Daily Match: @{name} ({flag} {city} · {km} km) — Say hi for +15 🪙!',
+    match_ice_1: '☕ Best café or hidden spot in {city}?',
+    match_ice_2: '🌆 What’s the vibe in {city} right now?',
+    match_ice_3: '🎵 One song or artist from {city} I must hear?',
+    match_sent_status: '⏳ Icebreaker sent! Waiting for @{name}’s reply (+15 🪙 each)',
+    match_completed_status: '🎉 World Match Complete! Both earned +15 🪙 today!',
+    match_mutual_toast: '🤝 WORLD MATCH UNLOCKED! You & @{name} both earned +15 🪙!',
+    match_dm_badge: '🤝 DAILY WORLD MATCH'
   },
 
   fr: {
@@ -1331,7 +1381,57 @@ const REMO_DICT = {
     // ⏳ Custom Time-Capsule
     capsule_custom_mins: 'Minutes Personnalisées',
     capsule_custom_ph: 'Minutes (ex: 45)',
-    capsule_exploding_alert: '💥 CAPSULE TEMPORELLE OUVERTE EN DIRECT !'
+    capsule_exploding_alert: '💥 CAPSULE TEMPORELLE OUVERTE EN DIRECT !',
+
+    // 🗺️ Secret Urban Spot
+    secret_spot_toggle: '🗺️ Marquer comme Lieu Secret Urbain (Secret Spot Radar & Chasse)',
+    secret_spot_title_ph: 'Nom du lieu secret (ex: Le Belvédère Caché, Café Secret sans enseigne...)',
+    secret_spot_clue_ph: 'Indice énigme pour le trouver (ex: Cherchez derrière l’arche en pierre...)',
+
+    // 🕵️ Guess My City! (v59)
+    filter_mystery: '🕵️ Devine la Ville',
+    guess_toggle_lbl: '🕵️ Masquer ma Ville — Jeu « Devine ma Ville ! » (+10 🪙)',
+    guess_masked_city: '🕵️ Ville Mystère',
+    guess_masked_weather: '🌡️ Masqué jusqu’au vote',
+    guess_card_back_locked: '🕵️ Carte 3D scellée ! Devinez d’abord la ville pour l’inspecter.',
+    guess_prompt_title: '🕵️ DEVINE MA VILLE ! (+10 🪙 du 1er coup)',
+    guess_owner_badge: '🕵️ Mystère Actif · {solved}/{total} trouvés',
+    guess_solved_stats: '🎯 {solved}/{total} citoyens ont trouvé',
+    guess_correct_msg: '🎉 BINGO ! C’est {city} ! +10 🪙 gagnés !',
+    guess_wrong_msg: '❌ Raté ! Choix : {picked} — vraie ville : {city} !',
+    guess_guest_claim_cta: '🎁 Réclamez vos +10 🪙 & votre Passeport Citoyen !',
+    guess_share_btn: '🕵️ Défier mes Amis',
+    guess_share_text: '🕵️ Peux-tu deviner dans quelle ville cette photo a été prise ? Clique pour jouer sur REMO (+10 🪙) :',
+
+    // ⚡ Live City Clicker Pulse War (v59)
+    war_tap_btn: '⚡ TAPER +1',
+    war_backup_btn: '📢 Renforts',
+    war_overtake_toast: '🚨 PRISE DE TÊTE ! {city} vient de dépasser {other} ({pct}%) !',
+    war_milestone_toast: '⚡ 25 Taps pour {city} ! +5 🪙 Bonus de Combat !',
+    war_guest_claim_bar: '🔥 {taps} taps pour {city} ! Créez votre Passeport pour garder vos +Pièces',
+    war_share_backup_text: '🚨 GUERRE LIVE {cityA} vs {cityB} ({pctA}% - {pctB}%) ! Tape pour défendre {myCity} maintenant (sans inscription) :',
+    war_mobile_strip_lbl: '⚔️ DUEL LIVE',
+    war_my_taps_lbl: 'Vos taps : {n}',
+
+    // 🪟 World Window Sync 9:16 (v59)
+    win_pulse_btn: '🪟 Fenêtre Live',
+    win_stamp_toggle: '🪟 Graver l’Heure & Météo Officielle en Direct (Fenêtre Monde)',
+    win_sync_duet_btn: '🌍 Synchroniser ma Fenêtre (+25 🪙)',
+    win_story_916_btn: '📲 Story 9:16',
+    win_badge_live: '🪟 FENÊTRE MONDE EN DIRECT',
+    win_story_ready_toast: '🪟 Story 9:16 Fenêtre Monde prête à partager !',
+
+    // 🤝 Daily World Match (v59)
+    match_box_title: '🤝 Connexion Planétaire du Jour',
+    match_box_sub: '1 citoyen d’une autre ville · Réponse sous 24h = +15 🪙 CHACUN !',
+    match_feed_pill: '🤝 Connexion du Jour : @{name} ({flag} {city} · {km} km) — Dites salut (+15 🪙) !',
+    match_ice_1: '☕ Meilleur café ou coin secret à {city} ?',
+    match_ice_2: '🌆 Quelle est l’ambiance à {city} en ce moment ?',
+    match_ice_3: '🎵 Un son ou artiste de {city} à écouter absolument ?',
+    match_sent_status: '⏳ Message envoyé ! En attente de @{name} (+15 🪙 chacun)',
+    match_completed_status: '🎉 Connexion Réussie ! +15 🪙 gagnés chacun aujourd’hui !',
+    match_mutual_toast: '🤝 CONNEXION PLANÉTAIRE ! Vous et @{name} gagnez +15 🪙 chacun !',
+    match_dm_badge: '🤝 CONNEXION DU JOUR'
   }
 };
 

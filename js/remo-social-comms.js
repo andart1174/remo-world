@@ -272,18 +272,30 @@ function renderRightSidebarWidgets() {
   if (miniWar && REMO_STORE.state.duels && REMO_STORE.state.duels[0]) {
     const w = REMO_STORE.state.duels[0];
     const cA = getCityById(w.cityA), cB = getCityById(w.cityB);
-    const tot = Math.max(1, w.votesA + w.votesB);
-    const pA = Math.round((w.votesA / tot) * 100);
+    const vA = Number(w.votesA || 0), vB = Number(w.votesB || 0);
+    const tot = Math.max(1, vA + vB);
+    const pA = Math.round((vA / tot) * 100);
+    const pB = 100 - pA;
     miniWar.innerHTML = `
-      <div style="font-weight:800;font-size:0.84rem;margin-bottom:6px;">⚔️ ${cA.flag} ${getCityName(cA, lang)} vs ${cB.flag} ${getCityName(cB, lang)}</div>
-      <div class="war-bar-track" style="height:10px;margin:6px 0;">
-        <div class="war-bar-fill-a" style="width:${pA}%;"></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;margin-bottom:6px;">
+        <b style="font-size:0.82rem;">⚔️ ${cA.flag} ${getCityName(cA, lang)} vs ${cB.flag} ${getCityName(cB, lang)}</b>
+        <button type="button" class="war-backup-btn" style="padding:3px 8px;font-size:0.66rem;" onclick="shareCityWarBackup('${w.id}','${pA >= pB ? 'A' : 'B'}')">${t('war_backup_btn')}</button>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:0.72rem;font-weight:800;color:#cbd5e1;">
+        <span>${cA.flag} ${pA}% (${vA.toLocaleString()})</span>
+        <span>${cB.flag} ${pB}% (${vB.toLocaleString()})</span>
+      </div>
+      <div class="war-bar-track" style="height:10px;margin:5px 0;">
+        <div class="war-bar-fill-a" style="width:${pA}%;transition:width 0.18s ease;"></div>
       </div>
       <div style="display:flex;gap:6px;margin-top:8px;">
-        <button class="pact-btn" style="flex:1;justify-content:center;" onclick="voteCityWar('${w.id}','A')">${cA.flag} ${pA}%</button>
-        <button class="pact-btn" style="flex:1;justify-content:center;" onclick="voteCityWar('${w.id}','B')">${cB.flag} ${100 - pA}%</button>
+        <button type="button" class="war-pulse-btn side-a" style="flex:1;padding:7px 6px;font-size:0.69rem;" onclick="voteCityWar('${w.id}','A',event)">${cA.flag} ${t('war_tap_btn')}</button>
+        <button type="button" class="war-pulse-btn side-b" style="flex:1;padding:7px 6px;font-size:0.69rem;" onclick="voteCityWar('${w.id}','B',event)">${cB.flag} ${t('war_tap_btn')}</button>
       </div>
     `;
+  }
+  if (typeof renderMobileCityWarStrip === 'function') {
+    renderMobileCityWarStrip();
   }
 }
 
@@ -302,6 +314,11 @@ function handleTouchDoubleTap(ev, postId, wrapEl) {
 }
 
 function flipPost3DCard(postId) {
+  const p = (REMO_STORE.state.posts || []).find((x) => x && x.id === postId);
+  if (p && typeof isMysteryCityMaskedForViewer === 'function' && isMysteryCityMaskedForViewer(p, REMO_STORE.getCurrentUser())) {
+    remoToast(t('guess_card_back_locked'));
+    return;
+  }
   const container = document.getElementById('post_flip_' + postId);
   if (!container) return;
   const inner = container.querySelector('.post-flip-inner');
@@ -604,6 +621,12 @@ function renderStoriesAndBanners() {
   if (typeof renderLivePresenceStrip === 'function') {
     renderLivePresenceStrip();
   }
+  if (typeof renderFeedDailyMatchPill === 'function') {
+    renderFeedDailyMatchPill();
+  }
+  if (typeof renderMobileCityWarStrip === 'function') {
+    renderMobileCityWarStrip();
+  }
   if (typeof renderActiveGameChallengeHero === 'function') {
     renderActiveGameChallengeHero();
   }
@@ -638,7 +661,7 @@ function renderStoriesAndBanners() {
     `;
   }
 
-  // Daily Pulse Banner
+  // Daily Pulse Banner + 1-Click Live World Window
   const pulseBox = document.getElementById('dailyPulseBox');
   const dp = REMO_STORE.state.settings.dailyPulse;
   if (pulseBox && dp && dp.active) {
@@ -649,7 +672,10 @@ function renderStoriesAndBanners() {
         <div style="font-size:0.72rem;font-weight:900;color:#38bdf8;">${t('pulse_badge')} · ${dp.hashtag}</div>
         <div class="pulse-title-text" style="font-weight:800;font-size:0.9rem;margin-top:2px;">${ttl}</div>
       </div>
-      <button class="btn-cyber" onclick="openCreatePostModal('${dp.hashtag}')">${t('pulse_join_btn')}</button>
+      <div style="display:flex;gap:7px;flex-wrap:wrap;align-items:center;">
+        <button type="button" class="btn-window-sync" onclick="openLiveWindowCreator('${dp.hashtag}')">${t('win_pulse_btn')}</button>
+        <button type="button" class="btn-cyber" onclick="openCreatePostModal('${dp.hashtag}')">${t('pulse_join_btn')}</button>
+      </div>
     `;
   }
 
@@ -925,8 +951,14 @@ function renderPostMediaStage(p, city, lang) {
     const leftCity = getCityById(p.duetOf.cityId);
     const leftWx = REMO_WEATHER.getCityLiveStatus(leftCity);
     const rightWx = REMO_WEATHER.getCityLiveStatus(city);
+    const duetKm = (typeof computeHaversineKm === 'function' && leftCity.lat != null && city.lat != null)
+      ? Math.round(computeHaversineKm(leftCity.lat, leftCity.lng, city.lat, city.lng))
+      : 0;
+    const ribbonTxt = duetKm > 0
+      ? `${leftCity.flag} ${leftWx.timeStr} ${escapeHtmlStr(leftCity.code)} ⇄ ${city.flag} ${rightWx.timeStr} ${escapeHtmlStr(city.code)} · ${duetKm.toLocaleString()} km`
+      : `${leftCity.flag} ${leftWx.timeStr} ${escapeHtmlStr(leftCity.code)} ⇄ ${city.flag} ${rightWx.timeStr} ${escapeHtmlStr(city.code)}`;
     return `
-      <div class="city-duet-stage">
+      <div class="city-duet-stage" style="position:relative;">
         <div class="duet-pane">
           ${renderSinglePaneMedia(p.duetOf, leftCity, lang)}
           <div class="duet-city-pill left">${leftCity.flag} ${escapeHtmlStr(leftCity.code)} ${leftWx.timeStr} · @${escapeHtmlStr(p.duetOf.authorName || 'Creator')}</div>
@@ -936,6 +968,7 @@ function renderPostMediaStage(p, city, lang) {
           ${renderSinglePaneMedia(p, city, lang)}
           <div class="duet-city-pill right">${city.flag} ${escapeHtmlStr(city.code)} ${rightWx.timeStr} · @${escapeHtmlStr(p.authorName || 'Creator')}</div>
         </div>
+        <div class="duet-distance-ribbon">🌍 ${ribbonTxt}</div>
       </div>
     `;
   }
@@ -1140,6 +1173,8 @@ function renderSocialFeed(searchQuery = '') {
   if (currentFeedMode === 'following') {
     const myFollowing = (u && Array.isArray(u.following)) ? u.following : [];
     posts = posts.filter((p) => p && myFollowing.includes(p.uid));
+  } else if (currentFeedMode === 'mystery') {
+    posts = posts.filter((p) => Boolean(p && p.mysteryCity));
   } else if (currentFeedMode === 'duets') {
     posts = posts.filter((p) => Boolean(p.duetOf || p.mediaType === 'city_versus'));
   } else if (currentFeedMode === 'bounties') {
@@ -1220,13 +1255,16 @@ function renderSocialFeed(searchQuery = '') {
         ? { en: `🔒 ${p.capsuleTeaser_en || teaserTxt}`, fr: `🔒 ${p.capsuleTeaser_fr || teaserTxt}` }
         : buildPostBilingualPair(p);
       const isDualOpen = !!(window._openTranslatedPosts && window._openTranslatedPosts[p.id]);
-      const cityTagLabel = `${city.flag || '🌍'} ${getCityName(city, lang)} · ${wx.icon || '🌤️'} ${wx.tempC ?? 20}°${wx.isSurge ? ' ⚡2X' : ''}`;
       const isPostOwner = Boolean(u && (
         (p.uid && u.uid === p.uid) ||
         (p.authorUid && u.uid === p.authorUid) ||
         (u.email && p.authorEmail && u.email.toLowerCase() === p.authorEmail.toLowerCase()) ||
         (u.name && p.authorName && u.name.trim().toLowerCase() === p.authorName.trim().toLowerCase())
       ));
+      const mysteryMasked = Boolean(p.mysteryCity && !isPostOwner && typeof isMysteryCityMaskedForViewer === 'function' && isMysteryCityMaskedForViewer(p, u));
+      const cityTagLabel = mysteryMasked
+        ? t('guess_masked_city')
+        : `${city.flag || '🌍'} ${getCityName(city, lang)} · ${wx.icon || '🌤️'} ${wx.tempC ?? 20}°${wx.isSurge ? ' ⚡2X' : ''}`;
 
     return `
       <article id="post_card_${p.id}" class="post-card ${p.boosted || p.pinned || sealed ? 'boosted' : ''} ${p.mediaType === 'html_app' ? 'is-html-app' : ''}" ${interactiveNoTilt ? '' : 'onmousemove="applyHoloTilt(event, this)" onmouseleave="resetHoloTilt(this)"'}>
@@ -1238,11 +1276,13 @@ function renderSocialFeed(searchQuery = '') {
                 <div style="font-weight:800;font-size:0.88rem;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
                   <span>${escapeHtmlStr(p.authorName)}</span>
                   ${p.authorVerified ? '<span style="color:#38bdf8;">✓</span>' : ''}
-                  ${isMayor ? `<span class="mayor-tag">${t('mayor_badge')}</span>` : ''}
+                  ${!mysteryMasked && isMayor ? `<span class="mayor-tag">${t('mayor_badge')}</span>` : ''}
                   ${royalTitle ? `<span class="royal-title-pill">${escapeHtmlStr(royalTitle)}</span>` : ''}
                 </div>
                 <div style="font-size:0.72rem;color:var(--muted);margin-top:2px;">
-                  <span>${city.flag} ${getCityName(city, lang)}</span> · <span>🕒 ${wx.timeStr}</span>
+                  ${mysteryMasked
+                    ? `<span class="mystery-masked-tag">${t('guess_masked_city')}</span>`
+                    : `<span>${city.flag} ${getCityName(city, lang)}</span> · <span>🕒 ${wx.timeStr}</span>`}
                   ${p.remixedFromAuthor ? ` · <span style="color:#34d399;">${t('post_remix_from')} @${escapeHtmlStr(p.remixedFromAuthor)}</span>` : ''}
                 </div>
               </div>
@@ -1250,7 +1290,9 @@ function renderSocialFeed(searchQuery = '') {
             ${(!isPostOwner && p.uid) ? `<button type="button" class="post-author-dm-mini" onclick="event.stopPropagation();openDirectChatWithUser('${p.uid || ''}')" title="💌 @${escapeHtmlStr(p.authorName)}">💌</button>` : ''}
           </div>
           <div style="display:flex;align-items:center;gap:8px;">
-            <span class="city-tag" onclick="filterFeedByCityFromMap('${city.id}')">${wx.icon || '🌤️'} ${wx.tempC ?? 20}°${wx.isSurge ? ' ⚡2X' : ''}</span>
+            ${mysteryMasked
+              ? `<span class="city-tag" style="color:#fde047;border-color:rgba(251,191,36,0.45);">🕵️ ???</span>`
+              : `<span class="city-tag" onclick="filterFeedByCityFromMap('${city.id}')">${wx.icon || '🌤️'} ${wx.tempC ?? 20}°${wx.isSurge ? ' ⚡2X' : ''}</span>`}
             <button type="button" class="post-more-dot-btn" onclick="openPostActionsSheet('${p.id}')" title="${lang === 'fr' ? 'Options de la publication' : 'Post options'}">⋯</button>
           </div>
         </div>
@@ -1262,6 +1304,7 @@ function renderSocialFeed(searchQuery = '') {
                 <div class="post-badges-top">
                   ${sealed ? `<span class="pbadge capsule">${t('capsule_locked_badge')}${xray ? ' · 👁️ X-RAY' : ''}</span>` : (p.wasTimeCapsule ? `<span class="pbadge unsealed">${t('capsule_unsealed_badge')}</span>` : '')}
                   ${p.duetOf || p.mediaType === 'city_versus' ? `<span class="pbadge duet">${t('post_duet_badge')}</span>` : ''}
+                  ${p.isWorldWindow || (p.duetOf && p.duetOf.isWorldWindow) ? `<span class="window-live-badge">${t('win_badge_live')}</span>` : ''}
                   ${p.pinned ? `<span class="pbadge pinned">${t('post_pinned_badge')}</span>` : ''}
                   ${p.founderAward ? `<span class="pbadge founder">${t('post_founder_award_badge')}</span>` : ''}
                   ${p.boosted ? `<span class="pbadge boost">${t('post_boosted_badge')}</span>` : ''}
@@ -1269,14 +1312,14 @@ function renderSocialFeed(searchQuery = '') {
                   
                   ${!hiddenByCapsule && p.mediaType === 'video' ? `<span class="pbadge vid60">${t('post_video60_badge')} · ${formatDurationMMSS(p.videoDuration || 60)}</span>` : ''}
                   ${!hiddenByCapsule && p.mediaType === 'before_after' ? `<span class="pbadge html">${t('post_slider_badge')}</span>` : ''}
-                  ${p.verifiedGps ? `<span class="pbadge gps">${t('post_verified_gps')}</span>` : ''}
+                  ${!mysteryMasked && p.verifiedGps ? `<span class="pbadge gps">${t('post_verified_gps')}</span>` : ''}
                   ${p.mintedCard ? `<span class="pbadge mint">${t('post_minted_badge')}</span>` : ''}
                   ${p.isSecretSpot ? `<span class="pbadge secret-spot">🗺️ ${lang === 'fr' ? 'LIEU SECRET' : 'SECRET SPOT'}</span>` : ''}
                 </div>
                 ${renderPostMediaStage(p, city, lang)}
               </div>
               <div class="post-face-back">
-                ${renderPostCardBack(p, city, lang, wx)}
+                ${mysteryMasked ? `<div style="padding:28px;text-align:center;color:#fde047;font-weight:800;">${t('guess_card_back_locked')}</div>` : renderPostCardBack(p, city, lang, wx)}
               </div>
             </div>
           </div>
@@ -1284,7 +1327,9 @@ function renderSocialFeed(searchQuery = '') {
 
         <!-- Modern Sleek Post Body -->
         <div class="post-body">
-          ${getInterCityDistanceBridge(city, lang)}
+          ${mysteryMasked ? '' : getInterCityDistanceBridge(city, lang)}
+          ${!hiddenByCapsule && typeof renderMysteryCityWidget === 'function' ? renderMysteryCityWidget(p, city, lang, u, isPostOwner) : ''}
+          ${!hiddenByCapsule && !mysteryMasked && typeof renderWorldWindowActionsBar === 'function' ? renderWorldWindowActionsBar(p, lang) : ''}
 
           <div class="post-actions-bar">
             <button type="button" class="pact-btn ${liked ? 'liked' : ''}" onclick="toggleLikePost('${p.id}')" title="Like">
@@ -1350,9 +1395,9 @@ function renderSocialFeed(searchQuery = '') {
           <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
             <span style="font-weight:900;font-size:0.98rem;cursor:pointer;" onclick="openCitizenProfileModal('${p.uid || ''}', '${escapeHtmlStr(p.authorName || '')}')">@${escapeHtmlStr(p.authorName)}</span>
             ${(!isPostOwner && p.uid) ? `<button type="button" class="post-author-dm-mini" onclick="event.stopPropagation();openDirectChatWithUser('${p.uid || ''}')">💌</button>` : ''}
-            ${isMayor ? `<span class="mayor-tag">${t('mayor_badge')}</span>` : ''}
+            ${!mysteryMasked && isMayor ? `<span class="mayor-tag">${t('mayor_badge')}</span>` : ''}
             ${royalTitle ? `<span class="royal-title-pill">${escapeHtmlStr(royalTitle)}</span>` : ''}
-            <span class="city-tag" onclick="filterFeedByCityFromMap('${city.id}')">${cityTagLabel}</span>
+            <span class="city-tag" onclick="${mysteryMasked ? '' : `filterFeedByCityFromMap('${city.id}')`}">${cityTagLabel}</span>
             <button type="button" class="translate-pill-btn ${isDualOpen ? 'active' : ''}" onclick="togglePostAutoTranslate('${p.id}')">${t('post_translate_btn')}</button>
           </div>
           <div style="font-size:0.86rem;line-height:1.4;color:#f1f5f9;">${formattedCap}</div>
@@ -1360,6 +1405,7 @@ function renderSocialFeed(searchQuery = '') {
             <div><b style="color:#38bdf8;">🇬🇧</b> ${escapeHtmlStr(dualPair.en)}</div>
             <div><b style="color:#fbbf24;">🇫🇷</b> ${escapeHtmlStr(dualPair.fr)}</div>
           </div>
+          ${!hiddenByCapsule && typeof renderMysteryCityWidget === 'function' ? renderMysteryCityWidget(p, city, lang, u, isPostOwner) : ''}
           ${hiddenByCapsule ? '' : renderPostPollWidget(p, lang, u)}
           ${hiddenByCapsule ? '' : renderSecretCapsuleWidget(p, lang, u)}
           ${hiddenByCapsule ? '' : renderViralGoalWidget(p, lang, isAdm)}
@@ -2146,6 +2192,12 @@ function openCreatePostModal(prefillTag = '') {
   const spotClue = document.getElementById('createSecretSpotClueInp');
   if (spotClue) spotClue.value = '';
 
+  const mysT = document.getElementById('createMysteryCityToggle');
+  if (mysT) mysT.checked = false;
+  const winT = document.getElementById('createWindowStampToggle');
+  if (winT) winT.checked = Boolean(window._prefillWindowStamp);
+  window._prefillWindowStamp = false;
+
   document.getElementById('createMediaPreviewStatus').innerHTML = '';
   switchCreateStudioTab('photo');
   document.getElementById('createModal')?.classList.add('open');
@@ -2451,6 +2503,9 @@ async function publishNewRemoPost() {
     return;
   }
 
+  const isMysteryCity = Boolean(document.getElementById('createMysteryCityToggle')?.checked) && !pendingDuetParent;
+  const wantWindowStamp = Boolean(document.getElementById('createWindowStampToggle')?.checked) && !isMysteryCity;
+
   let mediaType = 'city_art';
   let mediaUrl = '';
   let mediaUrls = [];
@@ -2459,7 +2514,10 @@ async function publishNewRemoPost() {
 
   if (activeCreateStudioTab === 'photo') {
     if (pendingStudioPhotoBlobs.length > 0) {
-      for (const blob of pendingStudioPhotoBlobs) {
+      for (const rawBlob of pendingStudioPhotoBlobs) {
+        const blob = (wantWindowStamp && typeof stampPhotoWithLiveCityWindow === 'function')
+          ? await stampPhotoWithLiveCityWindow(rawBlob, cityId, lang)
+          : rawBlob;
         const url = await uploadMediaToCloudOrDataUrl(blob, 'posts');
         mediaUrls.push(url);
       }
@@ -2600,6 +2658,10 @@ async function publishNewRemoPost() {
     isSecretSpot,
     secretSpotTitle: isSecretSpot ? (rawSpotTitle || (lang === 'fr' ? 'Lieu Secret Urbain' : 'Urban Secret Spot')) : '',
     secretSpotClue: isSecretSpot ? rawSpotClue : '',
+    mysteryCity: isMysteryCity,
+    cityGuesses: {},
+    isWorldWindow: Boolean(wantWindowStamp || (pendingDuetParent && pendingDuetParent.isWorldWindow)),
+    windowStamp: (wantWindowStamp && typeof buildLiveWindowStampMeta === 'function') ? buildLiveWindowStampMeta(cityId) : null,
     wasTimeCapsule,
     unlockAt: unlockAtTs,
     capsuleTeaser_en: capsuleTeaserEn,
@@ -2617,6 +2679,9 @@ async function publishNewRemoPost() {
   };
 
   // Pay +10 Coins Royalty to original HTML creator when Remixing or City-Dueting!
+  if (pendingDuetParent && (wantWindowStamp || pendingDuetParent.isWorldWindow)) {
+    REMO_STORE.addCoins(u.uid, 10, 10);
+  }
   if (pendingRemixParent && pendingRemixParent.authorUid && pendingRemixParent.authorUid !== u.uid) {
     REMO_STORE.addCoins(pendingRemixParent.authorUid, 10, 10);
   }
@@ -3154,6 +3219,10 @@ function renderDirectMessagesView() {
     }
   }
 
+  if (typeof renderDailyWorldMatchBox === 'function') {
+    renderDailyWorldMatchBox(me, lang);
+  }
+
   // Filter by instant search query (scales cleanly to thousands of citizens)
   const q = dmSearchQuery.toLowerCase().replace(/^@/, '');
   let visibleContacts = sortedUsers;
@@ -3242,6 +3311,7 @@ function renderDirectMessagesView() {
 
     return `
       <div class="dm-bubble ${isMine ? 'mine' : ''} ${isJustOpened ? 'just-arrived' : ''}">
+        ${d.isDailyMatch ? `<div class="dm-match-badge">${t('match_dm_badge')}</div>` : ''}
         <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
           <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
             <b style="color:${isMine ? '#7dd3fc' : '#fbbf24'};font-size:0.8rem;">@${escapeHtmlStr(d.fromName || 'Citizen')}</b>
@@ -3343,6 +3413,9 @@ function sendDirectMessage() {
   REMO_STORE.state.directMessages.push(newDm);
   inp.value = '';
   RemoAudio.play('click');
+  if (typeof checkAndRewardMutualDailyMatch === 'function') {
+    checkAndRewardMutualDailyMatch(u, targetUid, newDm);
+  }
   REMO_STORE.save(true, 'dm');
   REMO_STORE.syncDmToCloud(newDm);
   renderDirectMessagesView();
@@ -3382,6 +3455,9 @@ async function toggleDmVoiceNote() {
           ts: Date.now()
         };
         REMO_STORE.state.directMessages.push(newDm);
+        if (typeof checkAndRewardMutualDailyMatch === 'function') {
+          checkAndRewardMutualDailyMatch(u, targetUid, newDm);
+        }
         REMO_STORE.save(true, 'dm_voice');
         REMO_STORE.syncDmToCloud(newDm);
         renderDirectMessagesView();
@@ -3871,6 +3947,29 @@ document.addEventListener('DOMContentLoaded', () => {
       initGameChallengeFromUrlParams(targetPost, params.get('challengeScore'), params.get('challenger') || 'Challenger');
     }
   }
+  if (params.get('war')) {
+    window._activeWarDeepLink = {
+      warId: params.get('war'),
+      side: params.get('side') === 'B' ? 'B' : 'A'
+    };
+    if (typeof renderMobileCityWarStrip === 'function') renderMobileCityWarStrip();
+    setTimeout(() => {
+      const strip = document.getElementById('mobileCityWarStrip');
+      if (strip) {
+        strip.classList.add('force-visible');
+        strip.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }, 350);
+  }
+  if (params.get('guess') && targetPost) {
+    setTimeout(() => {
+      const mBox = document.querySelector(`#post_card_${targetPost} .mystery-city-box`);
+      if (mBox) {
+        mBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        mBox.style.boxShadow = '0 0 28px rgba(168, 85, 247, 0.85)';
+      }
+    }, 850);
+  }
   if (params.get('ref')) {
     const refCode = params.get('ref').trim().toUpperCase();
     const curU = REMO_STORE.getCurrentUser();
@@ -3920,15 +4019,22 @@ window.addEventListener('remo:stateupdate', (ev) => {
   const reason = ev && ev.detail ? ev.detail.reason : '';
   syncHeaderAndSidebars();
 
-  if (reason === 'auth' && typeof flushPendingGuestGameScore === 'function') {
-    flushPendingGuestGameScore();
+  if (reason === 'auth') {
+    if (typeof flushPendingGuestGameScore === 'function') flushPendingGuestGameScore();
+    if (typeof flushPendingGuestV59Rewards === 'function') flushPendingGuestV59Rewards();
   }
   if (window._pendingProfileDeepLink && typeof openCitizenProfileModal === 'function') {
     const opened = openCitizenProfileModal(window._pendingProfileDeepLink, '', true);
     if (opened) window._pendingProfileDeepLink = '';
   }
 
-  // Keep running HTML mini-game iframes & videos uninterrupted when scores or presence update
+  // Keep running HTML mini-game iframes & videos uninterrupted when scores, war taps or presence update
+  if (reason === 'war_pulse') {
+    if (typeof renderRightSidebarWidgets === 'function') renderRightSidebarWidgets();
+    if (typeof renderMobileCityWarStrip === 'function') renderMobileCityWarStrip();
+    if (currentRemoView === 'arena' && typeof renderArenaWarsOnly === 'function') renderArenaWarsOnly();
+    return;
+  }
   if (reason === 'game_score') {
     if (typeof refreshAllGameLeaderboardsDOM === 'function') refreshAllGameLeaderboardsDOM();
     return;
@@ -6419,6 +6525,21 @@ function formatNotificationDesc(n, langOverride) {
       ? (isFr ? `Message privé : "${preview}"` : `Private message: "${preview}"`)
       : (isFr ? 'vous a envoyé un message privé 💌' : 'sent you a private message 💌');
   }
+  if (n.type === 'mystery_solved') {
+    if (n.groupedCount && n.groupedCount > 1) {
+      return isFr
+        ? `🕵️ +${n.groupedCount - 1} autres citoyens ont deviné votre Ville Mystère !`
+        : `🕵️ +${n.groupedCount - 1} other citizens solved your Mystery City!`;
+    }
+    return isFr
+      ? '🕵️ a deviné votre Ville Mystère du 1er coup (+2 🪙) !'
+      : '🕵️ guessed your Mystery City on the 1st try (+2 🪙)!';
+  }
+  if (n.type === 'daily_match') {
+    return isFr
+      ? '🤝 Connexion Planétaire complétée ! +15 🪙 gagnés chacun !'
+      : '🤝 Daily World Match unlocked! +15 🪙 earned each!';
+  }
   return n.text || '';
 }
 window.formatNotificationDesc = formatNotificationDesc;
@@ -6500,30 +6621,33 @@ function buildUnifiedNotificationsList() {
 
   unified.sort((a, b) => (b.ts || 0) - (a.ts || 0));
 
-  // 4. Anti-Spam Wave Shield: automatically group multiple waves into 1 clean summary card when > 2 arrive
-  const unreadWaves = unified.filter((x) => x.type === 'wave' && !x.read);
-  if (unreadWaves.length > 2) {
-    const lead = Object.assign({}, unreadWaves[0], {
-      groupedCount: unreadWaves.length,
-      groupedWaveIds: unreadWaves.map((w) => w.id)
-    });
-    const waveIdSet = new Set(lead.groupedWaveIds);
-    const compacted = [];
-    let insertedLead = false;
-    unified.forEach((item) => {
-      if (waveIdSet.has(item.id)) {
-        if (!insertedLead) {
-          compacted.push(lead);
-          insertedLead = true;
+  // 4. Anti-Spam Shield: automatically group multiple waves or mystery_solved alerts when > 2 arrive
+  let listOut = unified;
+  ['wave', 'mystery_solved'].forEach((gType) => {
+    const unreadGrp = listOut.filter((x) => x.type === gType && !x.read);
+    if (unreadGrp.length > 2) {
+      const lead = Object.assign({}, unreadGrp[0], {
+        groupedCount: unreadGrp.length,
+        groupedWaveIds: unreadGrp.map((w) => w.id)
+      });
+      const idSet = new Set(lead.groupedWaveIds);
+      const compacted = [];
+      let insertedLead = false;
+      listOut.forEach((item) => {
+        if (idSet.has(item.id)) {
+          if (!insertedLead) {
+            compacted.push(lead);
+            insertedLead = true;
+          }
+        } else {
+          compacted.push(item);
         }
-      } else {
-        compacted.push(item);
-      }
-    });
-    return compacted;
-  }
+      });
+      listOut = compacted;
+    }
+  });
 
-  return unified;
+  return listOut;
 }
 
 function updateDynamicTabTitle(unreadSenders, unreadSocial, lang) {
@@ -6846,6 +6970,8 @@ function renderNotificationsList(filterTab = currentNotifFilter) {
     else if (n.type === 'tip') { icon = '🪙'; iconBg = 'rgba(234, 179, 8, 0.2)'; }
     else if (n.type === 'wave') { icon = '👋'; iconBg = 'rgba(16, 185, 129, 0.22)'; }
     else if (n.type === 'follow') { icon = '🌟'; iconBg = 'rgba(99, 102, 241, 0.24)'; }
+    else if (n.type === 'mystery_solved') { icon = '🕵️'; iconBg = 'rgba(168, 85, 247, 0.24)'; }
+    else if (n.type === 'daily_match') { icon = '🤝'; iconBg = 'rgba(16, 185, 129, 0.25)'; }
 
     const canWaveBack = n.type === 'wave' && n.fromUid && !n.groupedCount;
 
@@ -6922,11 +7048,11 @@ function handleNotificationClick(notifId) {
   updateUnreadBadges();
   document.getElementById('notificationsModal')?.classList.remove('open');
 
-  if (item.type === 'message' && item.fromUid) {
+  if ((item.type === 'message' || item.type === 'daily_match') && item.fromUid) {
     openDirectChatWithUser(item.fromUid);
   } else if ((item.type === 'wave' || item.type === 'follow') && item.fromUid) {
     openCitizenProfileModal(item.fromUid, item.fromName || '');
-  } else if ((item.type === 'comment' || item.type === 'like' || item.type === 'reaction' || item.type === 'tip') && item.postId) {
+  } else if ((item.type === 'comment' || item.type === 'like' || item.type === 'reaction' || item.type === 'tip' || item.type === 'mystery_solved') && item.postId) {
     jumpToPostFromNotification(item.postId, item.type === 'comment');
   }
 }
@@ -8056,5 +8182,862 @@ function claimDailyStreakUI() {
   }
 }
 window.claimDailyStreakUI = claimDailyStreakUI;
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   🚀 v59 VIRAL SOCIAL ENGINES (STRICTLY EN / FR):
+   1. 🕵️ Guess My City! (Mystery City Post Game + Zero-Signup WhatsApp Loop)
+   2. ⚡ Mobile City Clicker War Strip + Guest Coin Vault Flush
+   3. 🪟 World Window Sync (Live Photo Time/°C Stamp + 9:16 Dual-City Story)
+   4. 🤝 Daily World Match (Cross-City 1-on-1 Icebreakers + Mutual +15 🪙)
+═══════════════════════════════════════════════════════════════════════════ */
+
+function _v59HashStr(str) {
+  let h = 2166136261;
+  const s = String(str || 'remo');
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
+function _getGuestDeviceVoterId() {
+  let gid = localStorage.getItem('remo_guest_vid');
+  if (!gid) {
+    gid = 'g_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 6);
+    localStorage.setItem('remo_guest_vid', gid);
+  }
+  return gid;
+}
+
+/* ── 1. 🕵️ GUESS MY CITY! (DEVINE MA VILLE !) ── */
+function getViewerMysteryGuess(p, u) {
+  if (!p || !p.id) return '';
+  if (u && u.uid && p.cityGuesses && p.cityGuesses[u.uid]) {
+    return p.cityGuesses[u.uid];
+  }
+  const localPick = localStorage.getItem('remo_guess_' + p.id);
+  if (localPick) return localPick;
+  const gid = localStorage.getItem('remo_guest_vid');
+  if (gid && p.cityGuesses && p.cityGuesses[gid]) {
+    return p.cityGuesses[gid];
+  }
+  return '';
+}
+
+function isMysteryCityMaskedForViewer(p, u) {
+  if (!p || !p.mysteryCity) return false;
+  if (u && (
+    (p.uid && u.uid === p.uid) ||
+    (p.authorUid && u.uid === p.authorUid) ||
+    (u.email && p.authorEmail && u.email.toLowerCase() === p.authorEmail.toLowerCase())
+  )) {
+    return false;
+  }
+  const picked = getViewerMysteryGuess(p, u);
+  return !picked;
+}
+window.isMysteryCityMaskedForViewer = isMysteryCityMaskedForViewer;
+
+function getMysteryCityChoices(p) {
+  const allCities = getRemoCities();
+  const realCity = getCityById(p.cityId) || allCities[0];
+  let pool = allCities.filter((c) => c.id !== realCity.id && c.country_en !== realCity.country_en);
+  if (pool.length < 3) {
+    pool = allCities.filter((c) => c.id !== realCity.id);
+  }
+  // Deterministic selection of 3 decoys based on post ID
+  let seed = _v59HashStr(p.id + '_decoys');
+  const decoys = [];
+  const tempPool = pool.slice();
+  while (decoys.length < 3 && tempPool.length > 0) {
+    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+    const idx = seed % tempPool.length;
+    decoys.push(tempPool.splice(idx, 1)[0]);
+  }
+  const four = [realCity, ...decoys];
+  // Deterministic Fisher-Yates shuffle
+  for (let i = four.length - 1; i > 0; i--) {
+    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+    const j = seed % (i + 1);
+    const tmp = four[i];
+    four[i] = four[j];
+    four[j] = tmp;
+  }
+  return four;
+}
+
+function renderMysteryCityWidget(p, city, lang, u, isPostOwner) {
+  if (!p || !p.mysteryCity) return '';
+  const guessesObj = p.cityGuesses || {};
+  const entries = Object.values(guessesObj);
+  const totalGuesses = entries.length;
+  const solvedCount = entries.filter((cid) => cid === p.cityId).length;
+
+  if (isPostOwner) {
+    return `
+      <div class="mystery-city-box">
+        <div class="mystery-city-hdr" style="margin-bottom:0;">
+          <span class="mystery-city-title">${escapeHtmlStr(t('guess_owner_badge', { solved: solvedCount, total: totalGuesses }))}</span>
+          <button type="button" class="war-backup-btn" onclick="shareMysteryCityChallenge('${p.id}')">${escapeHtmlStr(t('guess_share_btn'))}</button>
+        </div>
+      </div>
+    `;
+  }
+
+  const pickedId = getViewerMysteryGuess(p, u);
+  const options = getMysteryCityChoices(p);
+
+  if (!pickedId) {
+    return `
+      <div class="mystery-city-box">
+        <div class="mystery-city-hdr">
+          <span class="mystery-city-title">${escapeHtmlStr(t('guess_prompt_title'))}</span>
+          <button type="button" class="war-backup-btn" onclick="shareMysteryCityChallenge('${p.id}')">${escapeHtmlStr(t('guess_share_btn'))}</button>
+        </div>
+        ${totalGuesses > 0 ? `<div style="font-size:0.71rem;color:#cbd5e1;margin-bottom:7px;font-weight:700;">${escapeHtmlStr(t('guess_solved_stats', { solved: solvedCount, total: totalGuesses }))}</div>` : ''}
+        <div class="mystery-choice-grid">
+          ${options.map((opt) => `
+            <button type="button" class="mystery-choice-btn" onclick="submitMysteryCityGuess('${p.id}','${opt.id}')">
+              <span>${opt.flag}</span>
+              <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtmlStr(getCityName(opt, lang))}</span>
+            </button>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  const isWin = pickedId === p.cityId;
+  const pickedCity = getCityById(pickedId);
+  const resultText = isWin
+    ? t('guess_correct_msg', { city: `${city.flag} ${getCityName(city, lang)}` })
+    : t('guess_wrong_msg', { picked: getCityName(pickedCity, lang), city: `${city.flag} ${getCityName(city, lang)}` });
+
+  return `
+    <div class="mystery-city-box">
+      <div class="mystery-city-hdr">
+        <span style="font-size:0.73rem;font-weight:800;color:#cbd5e1;">${escapeHtmlStr(t('guess_solved_stats', { solved: solvedCount, total: Math.max(1, totalGuesses) }))}</span>
+        <button type="button" class="war-backup-btn" onclick="shareMysteryCityChallenge('${p.id}')">${escapeHtmlStr(t('guess_share_btn'))}</button>
+      </div>
+      <div class="mystery-choice-grid">
+        ${options.map((opt) => {
+          const cls = opt.id === p.cityId ? 'correct' : (opt.id === pickedId ? 'wrong' : '');
+          return `
+            <button type="button" class="mystery-choice-btn ${cls}" disabled>
+              <span>${opt.flag}</span>
+              <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtmlStr(getCityName(opt, lang))}</span>
+            </button>
+          `;
+        }).join('')}
+      </div>
+      <div class="mystery-result-banner ${isWin ? 'win' : 'lose'}">
+        <span>${escapeHtmlStr(resultText)}</span>
+        ${(!u && isWin) ? `<button type="button" class="btn-cyber btn-gold" style="padding:4px 10px;font-size:0.71rem;" onclick="openAuthModal()">${escapeHtmlStr(t('guess_guest_claim_cta'))}</button>` : ''}
+      </div>
+    </div>
+  `;
+}
+window.renderMysteryCityWidget = renderMysteryCityWidget;
+
+function submitMysteryCityGuess(postId, guessedCityId) {
+  const p = (REMO_STORE.state.posts || []).find((x) => x && x.id === postId);
+  if (!p || !p.mysteryCity) return;
+  const u = REMO_STORE.getCurrentUser();
+  if (getViewerMysteryGuess(p, u)) return;
+
+  const lang = REMO_I18N.getLang();
+  const realCity = getCityById(p.cityId);
+  const pickedCity = getCityById(guessedCityId);
+  const voterKey = (u && u.uid) ? u.uid : _getGuestDeviceVoterId();
+
+  if (!p.cityGuesses || typeof p.cityGuesses !== 'object') p.cityGuesses = {};
+  p.cityGuesses[voterKey] = guessedCityId;
+  localStorage.setItem('remo_guess_' + p.id, guessedCityId);
+
+  const isCorrect = guessedCityId === p.cityId;
+  if (isCorrect) {
+    try { RemoAudio.play('fanfare'); } catch (e) {}
+    spawnRemoCoinsFX(10);
+    if (u) {
+      REMO_STORE.addCoins(u.uid, 10, 8);
+      const solvedSoFar = Object.values(p.cityGuesses).filter((cid) => cid === p.cityId).length;
+      if (p.uid && p.uid !== u.uid && solvedSoFar <= 20) {
+        REMO_STORE.addCoins(p.uid, 2, 2);
+        REMO_STORE.addNotification({
+          toUid: p.uid,
+          fromUid: u.uid,
+          fromName: u.name,
+          fromCity: u.homeCity || 'montreal',
+          type: 'mystery_solved',
+          postId: p.id,
+          text: 'guessed your Mystery City (+2 🪙)!'
+        });
+      }
+    } else {
+      const pending = Math.min(30, Number(localStorage.getItem('remo_guest_mystery_coins') || 0) + 10);
+      localStorage.setItem('remo_guest_mystery_coins', String(pending));
+    }
+    remoToast(t('guess_correct_msg', { city: `${realCity.flag} ${getCityName(realCity, lang)}` }), 'fanfare');
+  } else {
+    try { RemoAudio.play('hit'); } catch (e) {}
+    remoToast(t('guess_wrong_msg', { picked: getCityName(pickedCity, lang), city: `${realCity.flag} ${getCityName(realCity, lang)}` }));
+  }
+
+  REMO_STORE.syncPostToCloud(p);
+  REMO_STORE.save(true, 'mystery_guess');
+  renderSocialFeed();
+  syncHeaderAndSidebars();
+}
+window.submitMysteryCityGuess = submitMysteryCityGuess;
+
+async function shareMysteryCityChallenge(postId) {
+  const u = REMO_STORE.getCurrentUser();
+  const base = `${window.location.origin}${window.location.pathname}`;
+  const refPart = (u && u.referralCode) ? `&ref=${encodeURIComponent(u.referralCode)}` : '';
+  const url = `${base}?post=${encodeURIComponent(postId)}&guess=1${refPart}`;
+  const msg = t('guess_share_text');
+
+  if (navigator.share) {
+    try {
+      await navigator.share({ title: 'REMO · Guess My City!', text: msg, url });
+      return;
+    } catch (err) {
+      if (err && err.name === 'AbortError') return;
+    }
+  }
+  copyTextToClipboard(`${msg} ${url}`);
+  const waUrl = `https://wa.me/?text=${encodeURIComponent(msg + ' ' + url)}`;
+  window.open(waUrl, '_blank', 'noopener');
+}
+window.shareMysteryCityChallenge = shareMysteryCityChallenge;
+
+/* ── 2. ⚡ MOBILE CITY CLICKER WAR STRIP & GUEST COIN FLUSH ── */
+function renderMobileCityWarStrip() {
+  const strip = document.getElementById('mobileCityWarStrip');
+  if (!strip) return;
+  const duels = REMO_STORE.state.duels || [];
+  if (!duels.length) {
+    strip.innerHTML = '';
+    return;
+  }
+  const targetId = window._activeWarDeepLink && window._activeWarDeepLink.warId;
+  const w = (targetId && duels.find((d) => d.id === targetId)) || duels[0];
+  const lang = REMO_I18N.getLang();
+  const cA = getCityById(w.cityA), cB = getCityById(w.cityB);
+  const vA = Number(w.votesA || 0), vB = Number(w.votesB || 0);
+  const tot = Math.max(1, vA + vB);
+  const pA = Math.round((vA / tot) * 100);
+  const pB = 100 - pA;
+  const u = REMO_STORE.getCurrentUser();
+  const myTaps = Number(localStorage.getItem('remo_war_taps_' + w.id) || 0);
+  const prefSide = (window._activeWarDeepLink && window._activeWarDeepLink.side) || (pA >= pB ? 'A' : 'B');
+
+  strip.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:5px;">
+      <div style="font-size:0.76rem;font-weight:900;color:#f8fafc;">
+        <span style="color:#f472b6;">${escapeHtmlStr(t('war_mobile_strip_lbl'))}:</span>
+        ${cA.flag} ${escapeHtmlStr(getCityName(cA, lang))} (${pA}%) vs ${cB.flag} ${escapeHtmlStr(getCityName(cB, lang))} (${pB}%)
+      </div>
+      <button type="button" class="war-backup-btn" style="padding:3px 9px;font-size:0.68rem;" onclick="shareCityWarBackup('${w.id}','${prefSide}')">${escapeHtmlStr(t('war_backup_btn'))}</button>
+    </div>
+    <div class="war-bar-track" style="height:8px;margin:4px 0 7px;">
+      <div class="war-bar-fill-a" style="width:${pA}%;transition:width 0.18s ease;"></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;">
+      <button type="button" class="war-pulse-btn side-a" style="padding:7px 8px;font-size:0.71rem;" onclick="voteCityWar('${w.id}','A',event)">
+        ${cA.flag} ${escapeHtmlStr(getCityName(cA, lang))} · ${escapeHtmlStr(t('war_tap_btn'))}
+      </button>
+      <button type="button" class="war-pulse-btn side-b" style="padding:7px 8px;font-size:0.71rem;" onclick="voteCityWar('${w.id}','B',event)">
+        ${cB.flag} ${escapeHtmlStr(getCityName(cB, lang))} · ${escapeHtmlStr(t('war_tap_btn'))}
+      </button>
+    </div>
+    ${(!u && myTaps >= 15) ? `
+      <div style="margin-top:7px;display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:0.72rem;color:#fde047;font-weight:800;">
+        <span>${escapeHtmlStr(t('war_guest_claim_bar', { taps: myTaps, city: getCityName(prefSide === 'B' ? cB : cA, lang) }))}</span>
+        <button type="button" class="btn-cyber btn-gold" style="padding:3px 9px;font-size:0.68rem;" onclick="openAuthModal()">🛂 ${escapeHtmlStr(t('btn_sign_in'))}</button>
+      </div>
+    ` : ''}
+  `;
+}
+window.renderMobileCityWarStrip = renderMobileCityWarStrip;
+
+function flushPendingGuestV59Rewards() {
+  const u = REMO_STORE.getCurrentUser();
+  if (!u || !u.uid) return;
+  const mCoins = Number(localStorage.getItem('remo_guest_mystery_coins') || 0);
+  const wCoins = Number(localStorage.getItem('remo_guest_war_coins') || 0);
+  const total = mCoins + wCoins;
+  if (total > 0) {
+    localStorage.removeItem('remo_guest_mystery_coins');
+    localStorage.removeItem('remo_guest_war_coins');
+    REMO_STORE.addCoins(u.uid, total, 10);
+    spawnRemoCoinsFX(10);
+    const isFr = REMO_I18N.getLang() === 'fr';
+    remoToast(
+      isFr
+        ? `🎁 +${total} 🪙 de vos défis invités ont été crédités sur votre Passeport !`
+        : `🎁 +${total} 🪙 from your guest challenges credited to your Passport!`,
+      'fanfare'
+    );
+  }
+}
+window.flushPendingGuestV59Rewards = flushPendingGuestV59Rewards;
+
+/* ── 3. 🪟 WORLD WINDOW SYNC & 9:16 DUAL-CITY STORY EXPORTER ── */
+function openLiveWindowCreator(prefillTag = '#WorldWindow') {
+  window._prefillWindowStamp = true;
+  openCreatePostModal(prefillTag);
+  const winT = document.getElementById('createWindowStampToggle');
+  if (winT) winT.checked = true;
+}
+window.openLiveWindowCreator = openLiveWindowCreator;
+
+function startWorldWindowSync(postId) {
+  window._prefillWindowStamp = true;
+  startCityDuetFromPost(postId);
+  const winT = document.getElementById('createWindowStampToggle');
+  if (winT) winT.checked = true;
+}
+window.startWorldWindowSync = startWorldWindowSync;
+
+function buildLiveWindowStampMeta(cityId) {
+  const c = getCityById(cityId);
+  const wx = (typeof REMO_WEATHER !== 'undefined' && REMO_WEATHER.getCityLiveStatus)
+    ? REMO_WEATHER.getCityLiveStatus(c)
+    : { timeStr: '12:00', tempC: 20, icon: '🌤️' };
+  return {
+    cityId: c.id,
+    timeStr: wx.timeStr || '12:00',
+    tempC: wx.tempC ?? 20,
+    icon: wx.icon || '🌤️',
+    stampedAt: Date.now()
+  };
+}
+window.buildLiveWindowStampMeta = buildLiveWindowStampMeta;
+
+function stampPhotoWithLiveCityWindow(blob, cityId, lang) {
+  return new Promise((resolve) => {
+    try {
+      const c = getCityById(cityId);
+      const wx = REMO_WEATHER.getCityLiveStatus(c);
+      const img = new Image();
+      const objUrl = URL.createObjectURL(blob);
+      img.onload = () => {
+        try {
+          URL.revokeObjectURL(objUrl);
+          const maxDim = 1440;
+          let w = img.naturalWidth || img.width || 1080;
+          let h = img.naturalHeight || img.height || 1080;
+          if (w > maxDim || h > maxDim) {
+            const ratio = Math.min(maxDim / w, maxDim / h);
+            w = Math.round(w * ratio);
+            h = Math.round(h * ratio);
+          }
+          const cv = document.createElement('canvas');
+          cv.width = w;
+          cv.height = h;
+          const ctx = cv.getContext('2d');
+          ctx.drawImage(img, 0, 0, w, h);
+
+          // Bottom gradient + holographic live city time & weather bar
+          const barH = Math.max(46, Math.round(h * 0.068));
+          const grad = ctx.createLinearGradient(0, h - barH * 1.9, 0, h);
+          grad.addColorStop(0, 'rgba(5, 8, 22, 0)');
+          grad.addColorStop(1, 'rgba(5, 8, 22, 0.88)');
+          ctx.fillStyle = grad;
+          ctx.fillRect(0, h - barH * 1.9, w, barH * 1.9);
+
+          const padX = Math.round(w * 0.032);
+          const fontPx = Math.max(15, Math.round(barH * 0.42));
+          ctx.font = `900 ${fontPx}px "Orbitron", "Outfit", sans-serif`;
+          ctx.textBaseline = 'middle';
+
+          const stampLine = `🪟 ${c.flag} ${getCityName(c, lang || 'en').toUpperCase()} · 🕒 ${wx.timeStr} · ${wx.icon} ${wx.tempC}°C`;
+          ctx.fillStyle = '#fde047';
+          ctx.fillText(stampLine, padX, h - barH * 0.56);
+
+          ctx.font = `800 ${Math.max(12, Math.round(fontPx * 0.72))}px "Orbitron", sans-serif`;
+          ctx.textAlign = 'right';
+          ctx.fillStyle = '#38bdf8';
+          ctx.fillText('REMOWORLD.COM · LIVE', w - padX, h - barH * 0.56);
+          ctx.textAlign = 'left';
+
+          cv.toBlob((stampedBlob) => {
+            resolve(stampedBlob || blob);
+          }, 'image/jpeg', 0.91);
+        } catch (err) {
+          resolve(blob);
+        }
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(objUrl);
+        resolve(blob);
+      };
+      img.src = objUrl;
+    } catch (e) {
+      resolve(blob);
+    }
+  });
+}
+window.stampPhotoWithLiveCityWindow = stampPhotoWithLiveCityWindow;
+
+function renderWorldWindowActionsBar(p, lang) {
+  if (!p) return '';
+  const isDuet = Boolean(p.duetOf && p.duetOf.cityId);
+  const canSyncDuet = !isDuet && ['image', 'carousel', 'city_art'].includes(p.mediaType);
+  const showStoryBtn = Boolean(isDuet || p.isWorldWindow);
+  if (!canSyncDuet && !showStoryBtn) return '';
+
+  return `
+    <div class="window-sync-actions">
+      ${canSyncDuet ? `<button type="button" class="btn-window-sync" onclick="startWorldWindowSync('${p.id}')">${escapeHtmlStr(t('win_sync_duet_btn'))}</button>` : ''}
+      ${showStoryBtn ? `<button type="button" class="btn-window-story" onclick="exportWorldWindowStory('${p.id}')">${escapeHtmlStr(t('win_story_916_btn'))}</button>` : ''}
+    </div>
+  `;
+}
+window.renderWorldWindowActionsBar = renderWorldWindowActionsBar;
+
+function _loadImageSafeForStory(srcUrl) {
+  return new Promise((resolve) => {
+    if (!srcUrl) { resolve(null); return; }
+    let resolvedSrc = srcUrl;
+    if (String(srcUrl).startsWith('idb://') && typeof RemoMediaDB !== 'undefined') {
+      resolvedSrc = RemoMediaDB.resolveSyncOrPlaceholder(srcUrl) || '';
+    }
+    if (!resolvedSrc) { resolve(null); return; }
+    const img = new Image();
+    if (/^https?:/i.test(resolvedSrc)) img.crossOrigin = 'anonymous';
+    img.onload = () => resolve(img);
+    img.onerror = () => resolve(null);
+    img.src = resolvedSrc;
+  });
+}
+
+function _drawCoverPane(ctx, img, cityObj, lang, x, y, w, h) {
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(x, y, w, h);
+  ctx.clip();
+  if (img && (img.naturalWidth || img.width)) {
+    const iw = img.naturalWidth || img.width;
+    const ih = img.naturalHeight || img.height;
+    const scale = Math.max(w / iw, h / ih);
+    const dw = iw * scale;
+    const dh = ih * scale;
+    ctx.drawImage(img, x + (w - dw) / 2, y + (h - dh) / 2, dw, dh);
+  } else {
+    const g = ctx.createLinearGradient(x, y, x + w, y + h);
+    g.addColorStop(0, '#1e1b4b');
+    g.addColorStop(1, '#0f172a');
+    ctx.fillStyle = g;
+    ctx.fillRect(x, y, w, h);
+    ctx.font = '900 96px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = 'rgba(255,255,255,0.9)';
+    ctx.fillText(cityObj.flag || '🌍', x + w / 2, y + h / 2 - 10);
+    ctx.font = '900 42px "Orbitron", sans-serif';
+    ctx.fillStyle = '#fde047';
+    ctx.fillText(getCityName(cityObj, lang).toUpperCase(), x + w / 2, y + h / 2 + 64);
+  }
+  const overlay = ctx.createLinearGradient(0, y + h - 130, 0, y + h);
+  overlay.addColorStop(0, 'rgba(5,8,20,0)');
+  overlay.addColorStop(1, 'rgba(5,8,20,0.88)');
+  ctx.fillStyle = overlay;
+  ctx.fillRect(x, y + h - 130, w, 130);
+  ctx.restore();
+}
+
+async function exportWorldWindowStory(postId) {
+  const p = (REMO_STORE.state.posts || []).find((x) => x && x.id === postId);
+  if (!p) return;
+  const lang = REMO_I18N.getLang();
+  const cv = document.getElementById('citizenStoryCanvasPreview');
+  const modal = document.getElementById('storyExportModal');
+  if (!cv) return;
+
+  cv.width = 1080;
+  cv.height = 1920;
+  const ctx = cv.getContext('2d');
+
+  // Deep cosmic background
+  const bg = ctx.createLinearGradient(0, 0, 1080, 1920);
+  bg.addColorStop(0, '#050816');
+  bg.addColorStop(0.5, '#0f172a');
+  bg.addColorStop(1, '#050816');
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, 1080, 1920);
+
+  // Header
+  ctx.textAlign = 'center';
+  ctx.font = '900 34px "Orbitron", sans-serif';
+  ctx.fillStyle = '#fbbf24';
+  ctx.fillText('🌐 REMO WORLD · LIVE WINDOW 9:16', 540, 78);
+  ctx.font = '700 22px "Outfit", sans-serif';
+  ctx.fillStyle = '#7dd3fc';
+  ctx.fillText(lang === 'fr' ? 'Deux Villes Connectées au Même Instant' : 'Real Moments Across World Cities', 540, 116);
+
+  const rightCity = getCityById(p.cityId);
+  const rightWx = REMO_WEATHER.getCityLiveStatus(rightCity);
+  const rightImg = await _loadImageSafeForStory(p.mediaUrl || (p.mediaUrls && p.mediaUrls[0]) || '');
+
+  if (p.duetOf && p.duetOf.cityId) {
+    const leftCity = getCityById(p.duetOf.cityId);
+    const leftWx = REMO_WEATHER.getCityLiveStatus(leftCity);
+    const leftImg = await _loadImageSafeForStory(p.duetOf.mediaUrl || (p.duetOf.mediaUrls && p.duetOf.mediaUrls[0]) || '');
+
+    // Top Pane (City A)
+    _drawCoverPane(ctx, leftImg, leftCity, lang, 54, 150, 972, 640);
+    ctx.strokeStyle = 'rgba(56, 189, 248, 0.7)';
+    ctx.lineWidth = 4;
+    ctx.strokeRect(54, 150, 972, 640);
+    ctx.textAlign = 'left';
+    ctx.font = '900 28px "Orbitron", sans-serif';
+    ctx.fillStyle = '#fde047';
+    ctx.fillText(`${leftCity.flag} ${getCityName(leftCity, lang).toUpperCase()} · 🕒 ${leftWx.timeStr} · ${leftWx.tempC}°C`, 82, 758);
+    ctx.textAlign = 'right';
+    ctx.font = '800 24px "Outfit", sans-serif';
+    ctx.fillStyle = '#e2e8f0';
+    ctx.fillText(`@${p.duetOf.authorName || 'Citizen'}`, 998, 758);
+
+    // Center Distance Bridge Ribbon
+    const km = Math.round(computeHaversineKm(leftCity.lat, leftCity.lng, rightCity.lat, rightCity.lng));
+    ctx.fillStyle = '#fbbf24';
+    ctx.fillRect(140, 808, 800, 58);
+    ctx.textAlign = 'center';
+    ctx.font = '900 26px "Orbitron", sans-serif';
+    ctx.fillStyle = '#050816';
+    ctx.fillText(`⚡ ${leftCity.code} ⇄ ${rightCity.code} · ${km.toLocaleString()} KM LIVE SYNC`, 540, 846);
+
+    // Bottom Pane (City B)
+    _drawCoverPane(ctx, rightImg, rightCity, lang, 54, 884, 972, 640);
+    ctx.strokeStyle = 'rgba(244, 114, 182, 0.75)';
+    ctx.lineWidth = 4;
+    ctx.strokeRect(54, 884, 972, 640);
+    ctx.textAlign = 'left';
+    ctx.font = '900 28px "Orbitron", sans-serif';
+    ctx.fillStyle = '#fde047';
+    ctx.fillText(`${rightCity.flag} ${getCityName(rightCity, lang).toUpperCase()} · 🕒 ${rightWx.timeStr} · ${rightWx.tempC}°C`, 82, 1492);
+    ctx.textAlign = 'right';
+    ctx.font = '800 24px "Outfit", sans-serif';
+    ctx.fillStyle = '#e2e8f0';
+    ctx.fillText(`@${p.authorName || 'Citizen'}`, 998, 1492);
+  } else {
+    _drawCoverPane(ctx, rightImg, rightCity, lang, 54, 155, 972, 1360);
+    ctx.strokeStyle = 'rgba(56, 189, 248, 0.75)';
+    ctx.lineWidth = 4;
+    ctx.strokeRect(54, 155, 972, 1360);
+    ctx.textAlign = 'left';
+    ctx.font = '900 30px "Orbitron", sans-serif';
+    ctx.fillStyle = '#fde047';
+    ctx.fillText(`${rightCity.flag} ${getCityName(rightCity, lang).toUpperCase()} · 🕒 ${rightWx.timeStr} · ${rightWx.tempC}°C`, 84, 1480);
+    ctx.textAlign = 'right';
+    ctx.font = '800 25px "Outfit", sans-serif';
+    ctx.fillStyle = '#e2e8f0';
+    ctx.fillText(`@${p.authorName || 'Citizen'}`, 996, 1480);
+  }
+
+  // Bottom QR & Brand Bar
+  const u = REMO_STORE.getCurrentUser();
+  const refPart = (u && u.referralCode) ? `&ref=${encodeURIComponent(u.referralCode)}` : '';
+  const postUrl = `${window.location.origin}${window.location.pathname}?post=${encodeURIComponent(p.id)}${refPart}`;
+
+  ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
+  ctx.strokeStyle = 'rgba(251, 191, 36, 0.55)';
+  ctx.lineWidth = 3;
+  ctx.fillRect(54, 1560, 972, 300);
+  ctx.strokeRect(54, 1560, 972, 300);
+
+  if (typeof RemoQREngine !== 'undefined' && RemoQREngine.toCanvas) {
+    try {
+      const qrCv = RemoQREngine.toCanvas(postUrl, 220);
+      ctx.drawImage(qrCv, 84, 1600, 220, 220);
+    } catch (e) {}
+  }
+
+  ctx.textAlign = 'left';
+  ctx.font = '900 32px "Orbitron", sans-serif';
+  ctx.fillStyle = '#fbbf24';
+  ctx.fillText('REMOWORLD.COM', 340, 1655);
+  ctx.font = '800 24px "Outfit", sans-serif';
+  ctx.fillStyle = '#f8fafc';
+  ctx.fillText(lang === 'fr' ? '🪟 Synchronise la vue de ta ville (+25 🪙)' : '🪟 Sync your city’s live view (+25 🪙)', 340, 1705);
+  ctx.font = '700 21px "Outfit", sans-serif';
+  ctx.fillStyle = '#34d399';
+  ctx.fillText(lang === 'fr' ? '✓ Scanne le QR ou ouvre le lien en direct' : '✓ Scan QR or open live link to join', 340, 1752);
+  ctx.fillStyle = '#38bdf8';
+  ctx.fillText(u && u.referralCode ? `CODE: ${u.referralCode} (+100 🪙)` : 'FREE CITIZEN PASSPORT (+150 🪙)', 340, 1798);
+
+  window._customStoryShareMeta = {
+    url: postUrl,
+    title: 'REMO World · Live World Window 9:16',
+    text: lang === 'fr'
+      ? `🪟 Regarde cette Fenêtre Monde en direct sur REMO et synchronise ta ville (+25 🪙) !`
+      : `🪟 Check out this Live World Window on REMO and sync your city (+25 🪙)!`,
+    filename: `REMO_World_Window_${p.id}.png`
+  };
+
+  if (cv.toBlob) {
+    cv.toBlob((b) => {
+      if (b) {
+        window._cachedStoryBlob = b;
+        try {
+          window._cachedStoryFile = new File([b], `REMO_World_Window_${p.id}.png`, { type: 'image/png' });
+        } catch (e) {
+          window._cachedStoryFile = null;
+        }
+      }
+    }, 'image/png');
+  }
+
+  if (modal) modal.classList.add('open');
+  remoToast(t('win_story_ready_toast'), 'fanfare');
+}
+window.exportWorldWindowStory = exportWorldWindowStory;
+
+/* ── 4. 🤝 DAILY WORLD MATCH (CONNEXION PLANÉTAIRE) ── */
+function getTodayWorldMatch(me) {
+  if (!me || !me.uid) return null;
+  const allUsers = (REMO_STORE.state.users || []).filter((u) =>
+    u && u.uid && u.uid !== me.uid && !u.banned &&
+    (!REMO_STORE.deletedUserIds || !REMO_STORE.deletedUserIds.has(u.uid))
+  );
+  if (allUsers.length === 0) return null;
+
+  const crossCity = allUsers.filter((u) => (u.homeCity || 'montreal') !== (me.homeCity || 'montreal'));
+  const pool = crossCity.length > 0 ? crossCity : allUsers;
+  pool.sort((a, b) => String(a.uid).localeCompare(String(b.uid)));
+
+  const dateKey = REMO_STORE._getLocalDateKey(0);
+  const idx = _v59HashStr(`${dateKey}_${me.uid}`) % pool.length;
+  const partner = pool[idx];
+  const myCity = getCityById(me.homeCity || 'montreal');
+  const partnerCity = getCityById(partner.homeCity || 'paris');
+  const km = Math.round(computeHaversineKm(myCity.lat, myCity.lng, partnerCity.lat, partnerCity.lng));
+  const sortedPair = [me.uid, partner.uid].sort().join('_');
+  const matchKey = `match_${dateKey}_${sortedPair}`;
+
+  return { partner, myCity, partnerCity, km, dateKey, matchKey };
+}
+window.getTodayWorldMatch = getTodayWorldMatch;
+
+function getDailyMatchThreadStatus(meUid, partnerUid, matchKey) {
+  const dms = REMO_STORE.state.directMessages || [];
+  let sentByMe = false;
+  let sentByPartner = false;
+  let rewarded = Boolean(localStorage.getItem('remo_match_rewarded_' + matchKey));
+
+  dms.forEach((d) => {
+    if (!d || d.dailyMatchKey !== matchKey) return;
+    if (d.dailyMatchRewarded) rewarded = true;
+    if (d.fromUid === meUid) sentByMe = true;
+    if (d.fromUid === partnerUid) sentByPartner = true;
+  });
+
+  return { sentByMe, sentByPartner, rewarded };
+}
+
+function openDailyMatchInMessages() {
+  const me = REMO_STORE.getCurrentUser();
+  if (!me) { openAuthModal(); return; }
+  const match = getTodayWorldMatch(me);
+  if (match && match.partner) {
+    activeDmPartnerUid = match.partner.uid;
+  }
+  switchRemoView('messages');
+}
+window.openDailyMatchInMessages = openDailyMatchInMessages;
+
+function dismissFeedDailyMatchPill(ev) {
+  if (ev) ev.stopPropagation();
+  const dateKey = REMO_STORE._getLocalDateKey(0);
+  localStorage.setItem('remo_hide_match_pill_' + dateKey, '1');
+  const pill = document.getElementById('feedDailyMatchPill');
+  if (pill) pill.style.display = 'none';
+}
+window.dismissFeedDailyMatchPill = dismissFeedDailyMatchPill;
+
+function renderFeedDailyMatchPill() {
+  const pill = document.getElementById('feedDailyMatchPill');
+  if (!pill) return;
+  const me = REMO_STORE.getCurrentUser();
+  if (!me) {
+    pill.style.display = 'none';
+    return;
+  }
+  const match = getTodayWorldMatch(me);
+  if (!match) {
+    pill.style.display = 'none';
+    return;
+  }
+  if (localStorage.getItem('remo_hide_match_pill_' + match.dateKey) === '1') {
+    pill.style.display = 'none';
+    return;
+  }
+  const st = getDailyMatchThreadStatus(me.uid, match.partner.uid, match.matchKey);
+  if (st.rewarded || st.sentByMe) {
+    pill.style.display = 'none';
+    return;
+  }
+  const lang = REMO_I18N.getLang();
+  pill.style.display = 'flex';
+  pill.onclick = () => openDailyMatchInMessages();
+  pill.innerHTML = `
+    <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+      ${escapeHtmlStr(t('match_feed_pill', {
+        name: match.partner.name,
+        flag: match.partnerCity.flag,
+        city: getCityName(match.partnerCity, lang),
+        km: match.km.toLocaleString()
+      }))}
+    </span>
+    <button type="button" class="modal-close" style="width:22px;height:22px;font-size:0.7rem;flex-shrink:0;" onclick="dismissFeedDailyMatchPill(event)">✕</button>
+  `;
+}
+window.renderFeedDailyMatchPill = renderFeedDailyMatchPill;
+
+function renderDailyWorldMatchBox(me, lang) {
+  const box = document.getElementById('dailyWorldMatchBox');
+  if (!box) return;
+  if (!me || !me.uid) {
+    box.style.display = 'none';
+    return;
+  }
+  const match = getTodayWorldMatch(me);
+  if (!match) {
+    box.style.display = 'none';
+    return;
+  }
+
+  const pName = match.partner.name;
+  const pCityName = getCityName(match.partnerCity, lang);
+  const st = getDailyMatchThreadStatus(me.uid, match.partner.uid, match.matchKey);
+
+  const ice1 = t('match_ice_1', { city: pCityName });
+  const ice2 = t('match_ice_2', { city: pCityName });
+  const ice3 = t('match_ice_3', { city: pCityName });
+
+  let footerHtml = '';
+  if (st.rewarded) {
+    footerHtml = `<div style="margin-top:8px;font-size:0.76rem;font-weight:800;color:#6ee7b7;">${escapeHtmlStr(t('match_completed_status'))}</div>`;
+  } else if (st.sentByMe && !st.sentByPartner) {
+    footerHtml = `<div style="margin-top:8px;font-size:0.75rem;font-weight:800;color:#fde047;">${escapeHtmlStr(t('match_sent_status', { name: pName }))}</div>`;
+  } else {
+    footerHtml = `
+      <div class="daily-match-icebreakers">
+        <button type="button" class="icebreaker-pill" onclick="sendDailyMatchIcebreaker(1)">${escapeHtmlStr(ice1)}</button>
+        <button type="button" class="icebreaker-pill" onclick="sendDailyMatchIcebreaker(2)">${escapeHtmlStr(ice2)}</button>
+        <button type="button" class="icebreaker-pill" onclick="sendDailyMatchIcebreaker(3)">${escapeHtmlStr(ice3)}</button>
+      </div>
+    `;
+  }
+
+  box.style.display = 'block';
+  box.innerHTML = `
+    <div class="daily-match-top">
+      <div>
+        <div style="font-family:'Orbitron',sans-serif;font-size:0.8rem;font-weight:900;color:#34d399;">
+          ${escapeHtmlStr(t('match_box_title'))} · <span style="color:#fde047;">${match.myCity.flag} ⇄ ${match.partnerCity.flag} ${match.km.toLocaleString()} km</span>
+        </div>
+        <div style="font-size:0.73rem;color:#cbd5e1;margin-top:2px;">${escapeHtmlStr(t('match_box_sub'))}</div>
+      </div>
+      <button type="button" class="btn-ghost" style="padding:5px 11px;font-size:0.75rem;border-color:#34d399;color:#a7f3d0;" onclick="selectDmPartner('${match.partner.uid}')">
+        ${match.partnerCity.flag} @${escapeHtmlStr(pName)}
+      </button>
+    </div>
+    ${footerHtml}
+  `;
+}
+window.renderDailyWorldMatchBox = renderDailyWorldMatchBox;
+
+function sendDailyMatchIcebreaker(iceNum) {
+  const me = REMO_STORE.getCurrentUser();
+  if (!me) { openAuthModal(); return; }
+  const match = getTodayWorldMatch(me);
+  if (!match) return;
+  const lang = REMO_I18N.getLang();
+  const pCityName = getCityName(match.partnerCity, lang);
+
+  const key = iceNum === 2 ? 'match_ice_2' : (iceNum === 3 ? 'match_ice_3' : 'match_ice_1');
+  const txt = t(key, { city: pCityName });
+
+  activeDmPartnerUid = match.partner.uid;
+  const newDm = {
+    id: 'dm_match_' + Date.now() + '_' + Math.random().toString(36).slice(2, 5),
+    fromUid: me.uid,
+    fromName: me.name,
+    fromCity: me.homeCity || 'montreal',
+    toUid: match.partner.uid,
+    text: txt,
+    isDailyMatch: true,
+    dailyMatchKey: match.matchKey,
+    dailyMatchRewarded: false,
+    read: false,
+    ts: Date.now()
+  };
+
+  REMO_STORE.state.directMessages.push(newDm);
+  checkAndRewardMutualDailyMatch(me, match.partner.uid, newDm);
+  try { RemoAudio.play('chime'); } catch (e) {}
+  REMO_STORE.save(true, 'dm');
+  REMO_STORE.syncDmToCloud(newDm);
+  renderDirectMessagesView();
+  renderFeedDailyMatchPill();
+  if (typeof updateUnreadBadges === 'function') updateUnreadBadges();
+}
+window.sendDailyMatchIcebreaker = sendDailyMatchIcebreaker;
+
+function checkAndRewardMutualDailyMatch(sender, receiverUid, replyDm) {
+  if (!sender || !sender.uid || !receiverUid || sender.uid === receiverUid) return false;
+  const now = Date.now();
+  const DAY_MS = 86400000;
+  const allDms = REMO_STORE.state.directMessages || [];
+
+  // Look for an incoming Daily Match message from receiverUid to sender.uid within the last 24h
+  const incomingMatchDm = allDms.find((d) =>
+    d &&
+    d.isDailyMatch &&
+    d.dailyMatchKey &&
+    d.fromUid === receiverUid &&
+    d.toUid === sender.uid &&
+    (now - Number(d.ts || 0) <= DAY_MS)
+  );
+  if (!incomingMatchDm) return false;
+
+  const mKey = incomingMatchDm.dailyMatchKey;
+  const alreadyRewarded = Boolean(localStorage.getItem('remo_match_rewarded_' + mKey)) ||
+    allDms.some((d) => d && d.dailyMatchKey === mKey && d.dailyMatchRewarded);
+  if (alreadyRewarded) return false;
+
+  localStorage.setItem('remo_match_rewarded_' + mKey, '1');
+  incomingMatchDm.dailyMatchRewarded = true;
+  if (replyDm) {
+    replyDm.isDailyMatch = true;
+    replyDm.dailyMatchKey = mKey;
+    replyDm.dailyMatchRewarded = true;
+  }
+
+  REMO_STORE.addCoins(sender.uid, 15, 10);
+  REMO_STORE.addCoins(receiverUid, 15, 10);
+  REMO_STORE.syncDmToCloud(incomingMatchDm);
+
+  const partnerUser = (REMO_STORE.state.users || []).find((u) => u && u.uid === receiverUid);
+  const partnerName = (partnerUser && partnerUser.name) || incomingMatchDm.fromName || 'Citizen';
+
+  REMO_STORE.addNotification({
+    toUid: receiverUid,
+    fromUid: sender.uid,
+    fromName: sender.name,
+    fromCity: sender.homeCity || 'montreal',
+    type: 'daily_match',
+    text: 'Daily World Match unlocked! +15 🪙 each!'
+  });
+
+  try { RemoAudio.play('fanfare'); } catch (e) {}
+  spawnRemoCoinsFX(14);
+  remoToast(t('match_mutual_toast', { name: partnerName }), 'fanfare');
+  return true;
+}
+window.checkAndRewardMutualDailyMatch = checkAndRewardMutualDailyMatch;
 
 

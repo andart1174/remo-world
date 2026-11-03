@@ -79,7 +79,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-  <link rel="stylesheet" href="css/remo-core.css?v=58">
+  <link rel="stylesheet" href="css/remo-core.css?v=59">
 </head>
 <body>
 
@@ -252,6 +252,8 @@
         <div class="feed-top-widgets">
           <div id="newCitizenWelcomeBar" class="new-citizen-welcome-bar" style="display:none;"></div>
           <div id="livePresenceStrip" class="live-presence-strip"></div>
+          <div id="feedDailyMatchPill" class="feed-daily-match-pill" style="display:none;"></div>
+          <div id="mobileCityWarStrip" class="mobile-war-strip"></div>
           <div id="gameChallengeHeroBar" class="game-challenge-hero-bar" style="display:none;"></div>
           <div class="glass-box stories-bar" id="storiesBarEl"></div>
           <div class="weather-ticker-bar" id="worldWeatherTickerBar"></div>
@@ -261,6 +263,7 @@
           <div class="filter-row" id="feedModeChips">
             <button class="fchip active" onclick="setFeedMode('all', this)" data-i18n="filter_all">🌍 All World</button>
             <button class="fchip" onclick="setFeedMode('following', this)" data-i18n="filter_following">👥 Following</button>
+            <button class="fchip" onclick="setFeedMode('mystery', this)" data-i18n="filter_mystery">🕵️ Guess City</button>
             <button class="fchip" onclick="setFeedMode('duets', this)" data-i18n="filter_duets">⚔️ City Duels</button>
             <button class="fchip" onclick="setFeedMode('bounties', this)" data-i18n="filter_bounties">🎁 Bounties</button>
             <button class="fchip" onclick="setFeedMode('capsules', this)" data-i18n="filter_capsules">⏳ Time-Capsules</button>
@@ -492,6 +495,9 @@
 
           <!-- Unread Quick-Jump Bar -->
           <div id="dmUnreadSendersBanner" class="dm-unread-banner" style="display:none;"></div>
+
+          <!-- 🤝 Daily World Match (Connexion Planétaire) -->
+          <div id="dailyWorldMatchBox" class="daily-match-card" style="display:none;"></div>
 
           <!-- Instant Citizen Search Bar -->
           <div class="dm-search-wrap">
@@ -1262,12 +1268,22 @@
 
         <label style="display:flex;align-items:center;gap:8px;font-size:0.8rem;font-weight:800;color:#38bdf8;cursor:pointer;">
           <input type="checkbox" id="createSecretSpotToggle" onchange="document.getElementById('createSecretSpotFields').style.display=this.checked?'grid':'none'">
-          <span>🗺️ Marquer comme Lieu Secret Urbain (Secret Spot Radar &amp; Chasse)</span>
+          <span data-i18n="secret_spot_toggle">🗺️ Mark as Urban Secret Spot (Radar &amp; Treasure Hunt)</span>
         </label>
         <div id="createSecretSpotFields" style="display:none;grid-template-columns:1fr;gap:7px;">
-          <input type="text" id="createSecretSpotTitleInp" class="remo-input" placeholder="Nom du lieu secret (ex: Le Belvédère Caché, Café Secret sans enseigne...)">
-          <input type="text" id="createSecretSpotClueInp" class="remo-input" placeholder="Indice énigme pour le trouver (ex: Cherchez derrière l'arche en pierre...)">
+          <input type="text" id="createSecretSpotTitleInp" class="remo-input" data-i18n-placeholder="secret_spot_title_ph" placeholder="Secret spot name (e.g. Hidden Belvedere, Unmarked Rooftop Café...)">
+          <input type="text" id="createSecretSpotClueInp" class="remo-input" data-i18n-placeholder="secret_spot_clue_ph" placeholder="Riddle clue to find it (e.g. Look behind the stone archway...)">
         </div>
+
+        <label style="display:flex;align-items:center;gap:8px;font-size:0.8rem;font-weight:800;color:#c084fc;cursor:pointer;">
+          <input type="checkbox" id="createMysteryCityToggle">
+          <span data-i18n="guess_toggle_lbl">🕵️ Hide My City — "Guess My City!" Game (+10 🪙)</span>
+        </label>
+
+        <label style="display:flex;align-items:center;gap:8px;font-size:0.8rem;font-weight:800;color:#34d399;cursor:pointer;">
+          <input type="checkbox" id="createWindowStampToggle">
+          <span data-i18n="win_stamp_toggle">🪟 Stamp Official Live City Time &amp; °C (World Window)</span>
+        </label>
       </div>
 
       <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px;">
@@ -1890,12 +1906,12 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 
   <!-- REMO Modular Engines -->
-  <script src="js/remo-i18n.js?v=58"></script>
-  <script src="js/remo-cities-data.js?v=58"></script>
-  <script src="js/remo-store.js?v=58"></script>
-  <script src="js/remo-card-engine.js?v=58"></script>
-  <script src="js/remo-radar-arena.js?v=58"></script>
-  <script src="js/remo-social-comms.js?v=58"></script>
-  <script src="js/remo-radio-engine.js?v=58"></script>
+  <script src="js/remo-i18n.js?v=59"></script>
+  <script src="js/remo-cities-data.js?v=59"></script>
+  <script src="js/remo-store.js?v=59"></script>
+  <script src="js/remo-card-engine.js?v=59"></script>
+  <script src="js/remo-radar-arena.js?v=59"></script>
+  <script src="js/remo-social-comms.js?v=59"></script>
+  <script src="js/remo-radio-engine.js?v=59"></script>
 </body>
 </html>
