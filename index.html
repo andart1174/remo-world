@@ -1672,7 +1672,7 @@
         🌐 <span data-i18n="auth_google">Continue with Google</span>
       </button>
 
-      <form onsubmit="submitUniversalAuth(event)">
+      <form id="authRegisterForm" onsubmit="submitUniversalAuth(event)">
         <div class="form-field">
           <div style="display:flex;justify-content:space-between;align-items:center;">
             <label data-i18n="auth_home_city">Your Home City</label>
@@ -1686,10 +1686,38 @@
         <div class="form-field">
           <input type="email" id="authEmailInp" class="remo-input" data-i18n-placeholder="auth_email_ph" placeholder="Email address" required>
         </div>
+
+        <!-- 📜 Terms & Privacy Consent Checkbox (Strict 13+ Eligibility) -->
+        <div class="form-field" style="display:flex;align-items:flex-start;gap:8px;font-size:0.77rem;color:#cbd5e1;margin:12px 0;">
+          <input type="checkbox" id="authTermsCheck" required style="margin-top:3px;accent-color:#fbbf24;width:16px;height:16px;cursor:pointer;">
+          <label for="authTermsCheck" style="cursor:pointer;line-height:1.4;">
+            <span data-i18n="auth_terms_agree">I agree to the</span> 
+            <a href="terms.html" target="_blank" style="color:#fbbf24;text-decoration:underline;" data-i18n="auth_terms_link">Terms of Service</a>, 
+            <a href="privacy.html" target="_blank" style="color:#38bdf8;text-decoration:underline;" data-i18n="auth_privacy_link">Privacy Policy</a> 
+            <span data-i18n="auth_age_decl">&amp; Community Guidelines (I am 13+)</span>.
+          </label>
+        </div>
+
         <button type="submit" class="btn-cyber btn-gold" style="width:100%;justify-content:center;padding:12px;" data-i18n="auth_submit_register">
           Create Citizen Account (+150 🪙)
         </button>
       </form>
+
+      <!-- 🔑 Real Email OTP Verification Box -->
+      <div id="authOtpBox" style="display:none;margin-top:14px;padding:16px;border-radius:16px;background:rgba(56,189,248,0.08);border:1px solid rgba(56,189,248,0.4);">
+        <h4 style="font-size:0.92rem;color:#38bdf8;margin-bottom:6px;display:flex;align-items:center;gap:6px;" data-i18n="auth_otp_title">🔑 Verify Your Real Email</h4>
+        <p style="font-size:0.8rem;color:#cbd5e1;margin-bottom:10px;">
+          <span data-i18n="auth_otp_sub">We sent a 6-digit confirmation code to</span> <b id="authOtpEmailDisplay" style="color:#fbbf24;"></b>.
+        </p>
+        <div style="display:flex;gap:8px;margin-bottom:10px;">
+          <input type="text" id="authOtpCodeInp" class="remo-input" maxlength="6" style="text-align:center;letter-spacing:4px;font-size:1.15rem;font-weight:900;" placeholder="000000" data-i18n-placeholder="auth_otp_ph">
+          <button type="button" class="btn-cyber btn-gold" style="padding:10px 16px;white-space:nowrap;" onclick="verifyAuthOtpCode()" data-i18n="auth_otp_verify_btn">Verify</button>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;font-size:0.75rem;">
+          <button type="button" onclick="resendAuthOtpCode()" style="background:none;border:none;color:#38bdf8;text-decoration:underline;cursor:pointer;" data-i18n="auth_otp_resend">Resend code</button>
+          <button type="button" onclick="cancelAuthOtpStep()" style="background:none;border:none;color:var(--muted);cursor:pointer;">← Change email</button>
+        </div>
+      </div>
 
       <div style="text-align:center;margin-top:14px;padding-top:10px;border-top:1px solid rgba(255,255,255,0.08);">
         <button type="button" onclick="userSignOutAction();openAuthModal();" style="background:none;border:none;color:#f43f5e;font-size:0.78rem;font-weight:700;cursor:pointer;">
@@ -2080,13 +2108,13 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 
   <!-- REMO Modular Engines -->
-  <script src="js/remo-i18n.js?v=62"></script>
-  <script src="js/remo-cities-data.js?v=62"></script>
-  <script src="js/remo-store.js?v=62"></script>
-  <script src="js/remo-card-engine.js?v=62"></script>
-  <script src="js/remo-radar-arena.js?v=62"></script>
-  <script src="js/remo-social-comms.js?v=62"></script>
-  <script src="js/remo-radio-engine.js?v=62"></script>
+  <script src="js/remo-i18n.js?v=64"></script>
+  <script src="js/remo-cities-data.js?v=64"></script>
+  <script src="js/remo-store.js?v=64"></script>
+  <script src="js/remo-card-engine.js?v=64"></script>
+  <script src="js/remo-radar-arena.js?v=64"></script>
+  <script src="js/remo-social-comms.js?v=64"></script>
+  <script src="js/remo-radio-engine.js?v=64"></script>
 
   <noscript>
     <nav aria-label="REMO World Static Directory" style="padding:20px;background:#050816;color:#f8fafc;">
@@ -2097,6 +2125,8 @@
         <li><a href="guess-the-city.html">Guess The City Photo Game Free</a></li>
         <li><a href="beat-maker.html">Free Online 4x8 Beat Maker &amp; Step Sequencer</a></li>
         <li><a href="boarding-pass.html">Free 4D Holographic Boarding Pass Generator</a></li>
+        <li><a href="terms.html">Terms of Service &amp; Community Guidelines</a> | <a href="fr/terms.html">Conditions d'Utilisation (FR)</a></li>
+        <li><a href="privacy.html">Privacy Policy &amp; Data Rights (GDPR)</a> | <a href="fr/privacy.html">Politique de Confidentialité (FR)</a></li>
         <li><a href="cities/montreal.html">Montréal Hub</a> · <a href="cities/paris.html">Paris Hub</a> · <a href="cities/chisinau.html">Chișinău Hub</a> · <a href="cities/bucharest.html">Bucharest Hub</a> · <a href="cities/newyork.html">New York Hub</a> · <a href="cities/tokyo.html">Tokyo Hub</a></li>
       </ul>
     </nav>

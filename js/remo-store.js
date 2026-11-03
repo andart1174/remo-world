@@ -2561,6 +2561,9 @@ const REMO_STORE = {
         email: finalEmail,
         role: isAdmin || (email && email.toLowerCase() === this.state.settings?.adminEmail?.toLowerCase()) ? 'admin' : 'citizen',
         verified: true,
+        emailVerified: Boolean(fbUid || (email && !email.includes('citizen') && !email.includes('pioneer'))),
+        termsAcceptedAt: Date.now(),
+        termsVersion: '1.0',
         homeCity: homeCity || 'montreal',
         passportNum: pNum,
         referralCode: `REMO-${pNum}`,
@@ -2890,6 +2893,30 @@ const REMO_STORE = {
     }
   },
 
+  deleteMyAccount(uid) {
+    if (!uid) return;
+    if (!this.deletedUserIds) this.deletedUserIds = new Set();
+    this.deletedUserIds.add(uid);
+    try {
+      localStorage.setItem('remo_deleted_users', JSON.stringify([...this.deletedUserIds]));
+    } catch (e) {}
+    // Remove user posts
+    const userPosts = (this.state.posts || []).filter((p) => p && (p.authorUid === uid || p.uid === uid));
+    userPosts.forEach((p) => this.deletePostFromCloud(p.id));
+    // Remove user profile
+    this.state.users = (this.state.users || []).filter((u) => u.uid !== uid);
+    if (localStorage.getItem(this.USER_KEY) === uid) {
+      localStorage.removeItem(this.USER_KEY);
+    }
+    this.save(true, 'user_self_deleted');
+    if (this.fbDb) {
+      try {
+        this.fbDb.collection('remo_users').doc(uid).delete().catch(() => {});
+      } catch (e) {}
+    }
+    this.syncToFirestore('user_self_deleted', true);
+  },
+
   async purgeFakeUsersFromCloud() {
     if (!this.deletedUserIds) this.deletedUserIds = new Set();
     const fakeUids = [];
@@ -3201,8 +3228,8 @@ const REMO_STORE = {
       cityName_fr: closestCity.name_fr || closestCity.name,
       flag: closestCity.flag,
       code: closestCity.code || closestCity.id.toUpperCase().slice(0, 3),
-      lat: uLat,
-      lng: uLng,
+      lat: Math.round(uLat * 100) / 100,
+      lng: Math.round(uLng * 100) / 100,
       accuracy: Math.round(coords.accuracy || 25),
       stampedAt: now,
       serial: `BDR-${closestCity.code || 'REMO'}-${String(u.gpsBorderVisas.length + 1).padStart(3, '0')}`

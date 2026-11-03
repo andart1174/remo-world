@@ -1,0 +1,62 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && (request.auth.uid == userId || request.auth.token.email == resource.data.email);
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && (
+        request.auth.token.email == 'andart1174@gmail.com' ||
+        request.auth.uid == 'u_admin_founder' ||
+        request.auth.token.admin == true
+      );
+    }
+
+    // 1. Social Feed Posts
+    match /remo_posts/{postId} {
+      allow read: if true;
+      allow create: if isAuthenticated() && (
+        request.resource.data.authorUid == request.auth.uid ||
+        request.resource.data.authorId == request.auth.uid ||
+        isAdmin()
+      );
+      allow update, delete: if isAuthenticated() && (
+        resource.data.authorUid == request.auth.uid ||
+        resource.data.authorId == request.auth.uid ||
+        isAdmin()
+      );
+    }
+
+    // 2. Citizen Profiles & Passports
+    match /remo_users/{userId} {
+      allow read: if true;
+      allow create, update: if isOwner(userId) || isAdmin();
+      allow delete: if isOwner(userId) || isAdmin();
+    }
+
+    // 3. Ecosystem Live State (Scores, Duels, Jukebox, Bottles)
+    match /remo_ecosystem/{docId} {
+      allow read: if true;
+      allow write: if isAuthenticated() || isAdmin();
+    }
+
+    // 4. 3D Digital City Cards Pool & Auctions
+    match /remo_cards/{cardId} {
+      allow read: if true;
+      allow write: if isAuthenticated() || isAdmin();
+    }
+
+    // 5. Default Fallback Gatekeeper
+    match /{document=**} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+  }
+}

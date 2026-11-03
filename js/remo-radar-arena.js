@@ -2480,6 +2480,29 @@ function renderPassportView() {
           </div>
         `}
       </div>
+
+      <!-- 🔒 Privacy & Data Rights (GDPR & Law 25 Québec) -->
+      <div class="glass-box" style="margin-top:16px;border-color:rgba(244,63,94,0.35);background:rgba(244,63,94,0.04);">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
+          <div>
+            <h3 style="font-family:'Orbitron',sans-serif;font-size:0.95rem;color:#f43f5e;display:flex;align-items:center;gap:6px;margin-bottom:4px;">
+              <span>🛡️</span> <span>${lang === 'fr' ? 'Confidentialité &amp; Droit à l’Oubli (RGPD / Loi 25)' : 'Privacy &amp; Data Rights (GDPR / Law 25)'}</span>
+            </h3>
+            <p style="font-size:0.78rem;color:#cbd5e1;margin:0;">
+              ${lang === 'fr'
+                ? 'Conformément aux normes internationales, vous pouvez consulter vos droits ou effacer définitivement votre compte et vos données.'
+                : 'Under international privacy regulations, you have full control to view policies or permanently erase your account and data.'}
+            </p>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <a href="terms.html" target="_blank" class="btn-ghost" style="padding:6px 12px;font-size:0.75rem;">📜 ${lang === 'fr' ? 'Conditions' : 'Terms'}</a>
+            <a href="privacy.html" target="_blank" class="btn-ghost" style="padding:6px 12px;font-size:0.75rem;">🔒 ${lang === 'fr' ? 'Confidentialité' : 'Privacy'}</a>
+            <button type="button" class="btn-cyber rose" style="padding:6px 12px;font-size:0.75rem;background:#f43f5e;color:#fff;" onclick="userSelfDeleteAccountAction()">
+              🗑️ ${t('btn_delete_account')}
+            </button>
+          </div>
+        </div>
+      </div>
     `;
   }
 

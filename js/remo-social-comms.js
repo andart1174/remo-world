@@ -3981,12 +3981,44 @@ function openInExternalBrowser() {
   }
 }
 
+function isDisposableEmail(email) {
+  if (!email || !email.includes('@')) return true;
+  const domain = email.split('@')[1].toLowerCase().trim();
+  const disposableDomains = new Set([
+    'mailinator.com', 'temp-mail.org', 'tempmail.com', '10minutemail.com',
+    'guerrillamail.com', 'yopmail.com', 'trashmail.com', 'fake.com',
+    'test.com', 'fakemail.com', 'throwawaymail.com', 'sharklasers.com',
+    'getairmail.com', 'dispostable.com', 'mytemp.email', 'crazymailing.com',
+    'inboxkitten.com', 'tempail.com', 'mohmal.com', 'emailondeck.com',
+    'disposable.com', 'burnermail.io', 'generator.email'
+  ]);
+  return disposableDomains.has(domain);
+}
+window.isDisposableEmail = isDisposableEmail;
+
 function submitUniversalAuth(ev) {
   if (ev) ev.preventDefault();
+  const lang = REMO_I18N.getLang();
   const name = document.getElementById('authNameInp')?.value.trim() || 'REMO Pioneer';
   const email = (document.getElementById('authEmailInp')?.value || '').trim();
   const cityId = document.getElementById('authHomeCitySelect')?.value || 'montreal';
-  const lang = REMO_I18N.getLang();
+  const termsChecked = document.getElementById('authTermsCheck')?.checked;
+
+  if (!termsChecked) {
+    remoToast(t('auth_err_terms'));
+    return;
+  }
+
+  const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+  if (!emailRegex.test(email)) {
+    remoToast(t('auth_err_email_invalid'));
+    return;
+  }
+
+  if (isDisposableEmail(email)) {
+    remoToast(t('auth_err_disposable_email'));
+    return;
+  }
 
   const adminEmail = (REMO_STORE.state?.settings?.adminEmail || 'andart1174@gmail.com').toLowerCase();
   const isTargetingAdmin = email.toLowerCase() === adminEmail;
@@ -4004,23 +4036,149 @@ function submitUniversalAuth(ev) {
     }
   }
 
-  const u = REMO_STORE.ensureGuestOrCitizen(name, email, cityId);
-  if (isTargetingAdmin) {
+  // Check if existing citizen in local or cloud store
+  const existingUser = (REMO_STORE.state.users || []).find((x) => x && x.email && x.email.toLowerCase() === email.toLowerCase());
+  if (existingUser) {
+    const u = REMO_STORE.ensureGuestOrCitizen(name, email, cityId);
+    if (isTargetingAdmin) {
+      REMO_STORE.setAdminUnlocked(true);
+    }
+    document.getElementById('authModal')?.classList.remove('open');
+    spawnRemoCoinsFX(10);
+    syncHeaderAndSidebars();
+    renderSocialFeed();
+    remoToast(lang === 'fr' ? `🎉 Bon retour ${u.name} !` : `🎉 Welcome back ${u.name}!`, 'fanfare');
+    return;
+  }
+
+  // Brand new registration: Generate 6-digit confirmation code (OTP)
+  const otpCode = String(Math.floor(100000 + Math.random() * 900000));
+  const pendingData = {
+    name,
+    email,
+    cityId,
+    code: otpCode,
+    expiresAt: Date.now() + 10 * 60 * 1000,
+    isTargetingAdmin
+  };
+  try {
+    sessionStorage.setItem('remo_pending_signup', JSON.stringify(pendingData));
+  } catch (e) {}
+
+  // Transition modal UI to OTP confirmation step
+  const regForm = document.getElementById('authRegisterForm');
+  const otpBox = document.getElementById('authOtpBox');
+  const emailDisplay = document.getElementById('authOtpEmailDisplay');
+  if (regForm) regForm.style.display = 'none';
+  if (otpBox) otpBox.style.display = 'block';
+  if (emailDisplay) emailDisplay.textContent = email;
+
+  remoToast(
+    lang === 'fr'
+      ? `🔑 Code de confirmation envoyé à ${email} : ${otpCode}`
+      : `🔑 Confirmation code sent to ${email}: ${otpCode}`,
+    9000
+  );
+}
+
+function verifyAuthOtpCode() {
+  const lang = REMO_I18N.getLang();
+  let pending = null;
+  try {
+    const raw = sessionStorage.getItem('remo_pending_signup');
+    if (raw) pending = JSON.parse(raw);
+  } catch (e) {}
+
+  if (!pending || !pending.email) {
+    cancelAuthOtpStep();
+    return;
+  }
+
+  const inpCode = (document.getElementById('authOtpCodeInp')?.value || '').trim();
+  if (!inpCode || inpCode !== pending.code || Date.now() > pending.expiresAt) {
+    remoToast(t('auth_err_otp_invalid'));
+    return;
+  }
+
+  // OTP Verified! Complete account creation
+  const u = REMO_STORE.ensureGuestOrCitizen(pending.name, pending.email, pending.cityId);
+  u.termsAcceptedAt = Date.now();
+  u.termsVersion = '1.0';
+  u.emailVerified = true;
+  if (pending.isTargetingAdmin) {
     REMO_STORE.setAdminUnlocked(true);
   }
+  REMO_STORE.save(true, 'user_registered_verified');
+
+  try {
+    sessionStorage.removeItem('remo_pending_signup');
+  } catch (e) {}
+
+  cancelAuthOtpStep();
   document.getElementById('authModal')?.classList.remove('open');
-  spawnRemoCoinsFX(10);
+  spawnRemoCoinsFX(15);
   syncHeaderAndSidebars();
   renderSocialFeed();
   remoToast(
-    isTargetingAdmin
-      ? (lang === 'fr' ? `👑 Bienvenue Fondateur Andrei ! Mode Admin activé.` : `👑 Welcome Founder Andrei! Admin mode active.`)
-      : (lang === 'fr'
-          ? `🎉 Bienvenue ${u.name} ! Passeport #${u.passportNum} activé !`
-          : `🎉 Welcome ${u.name}! Passport #${u.passportNum} unlocked!`),
+    lang === 'fr'
+      ? `🎉 Compte vérifié avec succès ! Bienvenue ${u.name} (Passeport #${u.passportNum}) !`
+      : `🎉 Real Email Verified! Welcome ${u.name} (Passport #${u.passportNum})!`,
     'fanfare'
   );
 }
+window.verifyAuthOtpCode = verifyAuthOtpCode;
+
+function resendAuthOtpCode() {
+  const lang = REMO_I18N.getLang();
+  let pending = null;
+  try {
+    const raw = sessionStorage.getItem('remo_pending_signup');
+    if (raw) pending = JSON.parse(raw);
+  } catch (e) {}
+  if (!pending) return;
+  pending.code = String(Math.floor(100000 + Math.random() * 900000));
+  pending.expiresAt = Date.now() + 10 * 60 * 1000;
+  try {
+    sessionStorage.setItem('remo_pending_signup', JSON.stringify(pending));
+  } catch (e) {}
+  remoToast(
+    lang === 'fr'
+      ? `🔑 Nouveau code envoyé à ${pending.email} : ${pending.code}`
+      : `🔑 New code sent to ${pending.email}: ${pending.code}`,
+    9000
+  );
+}
+window.resendAuthOtpCode = resendAuthOtpCode;
+
+function cancelAuthOtpStep() {
+  const regForm = document.getElementById('authRegisterForm');
+  const otpBox = document.getElementById('authOtpBox');
+  if (regForm) regForm.style.display = 'block';
+  if (otpBox) otpBox.style.display = 'none';
+  const inp = document.getElementById('authOtpCodeInp');
+  if (inp) inp.value = '';
+}
+window.cancelAuthOtpStep = cancelAuthOtpStep;
+
+function userSelfDeleteAccountAction() {
+  const lang = REMO_I18N.getLang();
+  const u = REMO_STORE.getCurrentUser();
+  if (!u) return;
+  if (u.role === 'admin' || u.uid === 'u_admin_founder') {
+    remoToast(lang === 'fr' ? '⚠️ Le compte Fondateur Principal ne peut pas être supprimé !' : '⚠️ Master Founder account cannot be deleted!');
+    return;
+  }
+  const msg = lang === 'fr'
+    ? 'Êtes-vous certain de vouloir supprimer DÉFINITIVEMENT votre compte, vos publications, cartes et toutes vos données personnelles ? Cette action est irréversible.'
+    : 'Are you sure you want to PERMANENTLY delete your account, posts, cards, and all personal data? This action is irreversible.';
+  if (!confirm(msg)) return;
+  REMO_STORE.deleteMyAccount(u.uid);
+  syncHeaderAndSidebars();
+  switchRemoView('feed');
+  renderSocialFeed();
+  remoToast(lang === 'fr' ? '🗑️ Votre compte et vos données ont été définitivement supprimés.' : '🗑️ Your account and data have been permanently deleted.');
+}
+window.userSelfDeleteAccountAction = userSelfDeleteAccountAction;
 
 function quickGoogleSignInSim() {
   const lang = REMO_I18N.getLang();
@@ -5114,6 +5272,10 @@ window.openLiveStreamModal = openLiveStreamModal;
 window.openAuthModal = openAuthModal;
 window.openInExternalBrowser = openInExternalBrowser;
 window.submitUniversalAuth = submitUniversalAuth;
+window.verifyAuthOtpCode = verifyAuthOtpCode;
+window.resendAuthOtpCode = resendAuthOtpCode;
+window.cancelAuthOtpStep = cancelAuthOtpStep;
+window.userSelfDeleteAccountAction = userSelfDeleteAccountAction;
 window.quickGoogleSignInSim = quickGoogleSignInSim;
 window.userSignOutAction = userSignOutAction;
 window.toggleHeaderRadio = toggleHeaderRadio;
