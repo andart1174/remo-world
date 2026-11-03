@@ -3997,7 +3997,7 @@ function isDisposableEmail(email) {
 }
 window.isDisposableEmail = isDisposableEmail;
 
-function submitUniversalAuth(ev) {
+async function submitUniversalAuth(ev) {
   if (ev) ev.preventDefault();
   const lang = REMO_I18N.getLang();
   const name = document.getElementById('authNameInp')?.value.trim() || 'REMO Pioneer';
@@ -4035,15 +4035,8 @@ function submitUniversalAuth(ev) {
       remoToast(lang === 'fr' ? '❌ Code PIN Admin incorrect ! Connexion refusée.' : '❌ Invalid Admin PIN! Access denied.');
       return;
     }
-  }
-
-  // Check if existing citizen in local or cloud store
-  const existingUser = (REMO_STORE.state.users || []).find((x) => x && x.email && x.email.toLowerCase() === email.toLowerCase());
-  if (existingUser) {
-    const u = REMO_STORE.ensureGuestOrCitizen(name, email, cityId);
-    if (isTargetingAdmin) {
-      REMO_STORE.setAdminUnlocked(true);
-    }
+    const u = REMO_STORE.ensureGuestOrCitizen(name, email, cityId, true);
+    REMO_STORE.setAdminUnlocked(true);
     document.getElementById('authModal')?.classList.remove('open');
     spawnRemoCoinsFX(10);
     syncHeaderAndSidebars();
@@ -4052,49 +4045,78 @@ function submitUniversalAuth(ev) {
     return;
   }
 
-  // Brand new registration: Generate 6-digit confirmation code (OTP)
-  const otpCode = String(Math.floor(100000 + Math.random() * 900000));
   const pendingData = {
     name,
     email,
     cityId,
-    code: otpCode,
-    expiresAt: Date.now() + 10 * 60 * 1000,
-    isTargetingAdmin
+    expiresAt: Date.now() + 30 * 60 * 1000,
+    isTargetingAdmin: false
   };
   try {
     sessionStorage.setItem('remo_pending_signup', JSON.stringify(pendingData));
+    localStorage.setItem('remo_pending_signup', JSON.stringify(pendingData));
   } catch (e) {}
 
-  // 1. Dispatch real email via Netlify Serverless Function (if RESEND_API_KEY / BREVO_API_KEY configured)
-  try {
-    fetch('/.netlify/functions/send-email-otp', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, name, code: otpCode, lang })
-    }).then((r) => r.json()).then((res) => {
-      if (res && res.success) {
-        console.log('[REMO Mailer]: Confirmation email dispatched to', email);
-      }
-    }).catch(() => {});
-  } catch (e) {}
-
-  // 2. Dispatch real email via Firebase Authentication Email Link
-  if (REMO_STORE.fbAuth && typeof REMO_STORE.fbAuth.sendSignInLinkToEmail === 'function') {
-    const actionCodeSettings = {
-      url: window.location.origin + window.location.pathname + '?emailAuth=1',
-      handleCodeInApp: true
-    };
-    REMO_STORE.fbAuth.sendSignInLinkToEmail(email, actionCodeSettings)
-      .then(() => {
-        try { localStorage.setItem('remo_email_for_signin', email); } catch (e) {}
-      })
-      .catch((err) => {
-        console.warn('Firebase email auth dispatch notice:', err.message);
-      });
+  if (!REMO_STORE.fbAuth && typeof REMO_STORE.initFirebaseIfConfigured === 'function') {
+    REMO_STORE.initFirebaseIfConfigured();
   }
 
-  // Transition modal UI to OTP confirmation step
+  if (!REMO_STORE.fbAuth) {
+    remoToast(lang === 'fr' ? '⏳ Connexion au serveur Firebase en cours, veuillez réessayer...' : '⏳ Connecting to Firebase Auth server, please retry...');
+    return;
+  }
+
+  const autoKey = 'Remo4D#Auth!' + email.toLowerCase().trim();
+  let fbUser = null;
+  let isNewAccount = false;
+
+  try {
+    const cred = await REMO_STORE.fbAuth.createUserWithEmailAndPassword(email, autoKey);
+    fbUser = cred && cred.user;
+    isNewAccount = true;
+    if (fbUser && name) {
+      try { await fbUser.updateProfile({ displayName: name }); } catch (e) {}
+    }
+  } catch (err) {
+    if (err && (err.code === 'auth/email-already-in-use' || String(err.message || '').includes('already-in-use'))) {
+      try {
+        const signInCred = await REMO_STORE.fbAuth.signInWithEmailAndPassword(email, autoKey);
+        fbUser = signInCred && signInCred.user;
+      } catch (signInErr) {
+        remoToast(lang === 'fr' ? '⚠️ Cet email existe déjà. Utilisez Continuer avec Google ou vérifiez votre boîte mail.' : '⚠️ This email is already registered. Use Continue with Google or check your inbox.');
+        return;
+      }
+    } else {
+      remoToast(err.message || t('auth_err_email_invalid'));
+      return;
+    }
+  }
+
+  if (!fbUser) return;
+
+  try {
+    await fbUser.reload();
+    fbUser = REMO_STORE.fbAuth.currentUser || fbUser;
+  } catch (e) {}
+
+  // If this user has ALREADY verified their real email in Firebase, log them in right away!
+  if (fbUser.emailVerified) {
+    completeVerifiedEmailLogin(fbUser, pendingData);
+    return;
+  }
+
+  // Otherwise, dispatch a REAL verification email from Google Firebase to their inbox!
+  try {
+    await fbUser.sendEmailVerification({ url: window.location.origin + '/' });
+  } catch (e) {
+    try {
+      await fbUser.sendEmailVerification();
+    } catch (e2) {
+      console.warn('sendEmailVerification notice:', e2.message);
+    }
+  }
+
+  // Show the Email Verification screen inside the modal
   const regForm = document.getElementById('authRegisterForm');
   const otpBox = document.getElementById('authOtpBox');
   const emailDisplay = document.getElementById('authOtpEmailDisplay');
@@ -4102,112 +4124,150 @@ function submitUniversalAuth(ev) {
   if (otpBox) otpBox.style.display = 'block';
   if (emailDisplay) emailDisplay.textContent = email;
 
-  // Never leak the secret code in the user-facing toast!
   remoToast(
     lang === 'fr'
-      ? `🔑 Un code de confirmation à 6 chiffres a été envoyé à ${email}. Veuillez vérifier votre boîte de réception (et vos spams).`
-      : `🔑 A 6-digit confirmation code was sent to ${email}. Please check your inbox (and spam folder).`,
+      ? `📧 Email officiel de confirmation envoyé à ${email} ! Ouvrez votre boîte mail (ou vos Spams) et cliquez sur le lien.`
+      : `📧 Official verification email sent to ${email}! Open your inbox (or Spam folder) and click the link.`,
     8000
   );
-  console.log('%c[REMO Secure Verification Code]: ' + otpCode, 'color:#38bdf8;font-weight:bold;font-size:12px;');
+
+  // Start automatic 3-second polling so the moment they click the link in Yahoo/Gmail, it activates automatically!
+  startEmailVerificationWatcher();
 }
 
-function verifyAuthOtpCode() {
+function startEmailVerificationWatcher() {
+  if (window._remoEmailVerifyTimer) {
+    clearInterval(window._remoEmailVerifyTimer);
+  }
+  window._remoEmailVerifyTimer = setInterval(async () => {
+    const otpBox = document.getElementById('authOtpBox');
+    if (!otpBox || otpBox.style.display === 'none') {
+      clearInterval(window._remoEmailVerifyTimer);
+      window._remoEmailVerifyTimer = null;
+      return;
+    }
+    const curFb = REMO_STORE.fbAuth && REMO_STORE.fbAuth.currentUser;
+    if (!curFb) return;
+    try {
+      await curFb.reload();
+      const refreshed = REMO_STORE.fbAuth.currentUser;
+      if (refreshed && refreshed.emailVerified) {
+        clearInterval(window._remoEmailVerifyTimer);
+        window._remoEmailVerifyTimer = null;
+        verifyAuthOtpCode();
+      }
+    } catch (e) {}
+  }, 3000);
+}
+
+function completeVerifiedEmailLogin(fbUser, pending) {
   const lang = REMO_I18N.getLang();
-  let pending = null;
-  try {
-    const raw = sessionStorage.getItem('remo_pending_signup');
-    if (raw) pending = JSON.parse(raw);
-  } catch (e) {}
-
-  if (!pending || !pending.email) {
-    cancelAuthOtpStep();
-    return;
+  const u = REMO_STORE.ensureGuestOrCitizen(
+    (pending && pending.name) || fbUser.displayName || 'Citizen',
+    (pending && pending.email) || fbUser.email,
+    (pending && pending.cityId) || 'montreal',
+    false,
+    fbUser.uid
+  );
+  if (u) {
+    u.termsAcceptedAt = Date.now();
+    u.termsVersion = '1.0';
+    u.emailVerified = true;
+    REMO_STORE.save(true, 'user_registered_verified');
   }
-
-  const inpCode = (document.getElementById('authOtpCodeInp')?.value || '').trim();
-  if (!inpCode || inpCode !== pending.code || Date.now() > pending.expiresAt) {
-    remoToast(t('auth_err_otp_invalid'));
-    return;
-  }
-
-  // OTP Verified! Complete account creation
-  const u = REMO_STORE.ensureGuestOrCitizen(pending.name, pending.email, pending.cityId);
-  u.termsAcceptedAt = Date.now();
-  u.termsVersion = '1.0';
-  u.emailVerified = true;
-  if (pending.isTargetingAdmin) {
-    REMO_STORE.setAdminUnlocked(true);
-  }
-  REMO_STORE.save(true, 'user_registered_verified');
 
   try {
     sessionStorage.removeItem('remo_pending_signup');
+    localStorage.removeItem('remo_pending_signup');
   } catch (e) {}
 
-  cancelAuthOtpStep();
+  if (window._remoEmailVerifyTimer) {
+    clearInterval(window._remoEmailVerifyTimer);
+    window._remoEmailVerifyTimer = null;
+  }
+
+  cancelAuthOtpStep(true);
   document.getElementById('authModal')?.classList.remove('open');
   spawnRemoCoinsFX(15);
   syncHeaderAndSidebars();
   renderSocialFeed();
   remoToast(
     lang === 'fr'
-      ? `🎉 Compte vérifié avec succès ! Bienvenue ${u.name} (Passeport #${u.passportNum}) !`
-      : `🎉 Real Email Verified! Welcome ${u.name} (Passport #${u.passportNum})!`,
+      ? `🎉 Email réel vérifié avec succès ! Bienvenue ${u ? u.name : ''} (Passeport #${u ? u.passportNum : '0001'}) !`
+      : `🎉 Real Email Verified! Welcome ${u ? u.name : ''} (Passport #${u ? u.passportNum : '0001'})!`,
     'fanfare'
   );
 }
-window.verifyAuthOtpCode = verifyAuthOtpCode;
 
-function resendAuthOtpCode() {
+async function verifyAuthOtpCode() {
   const lang = REMO_I18N.getLang();
   let pending = null;
   try {
-    const raw = sessionStorage.getItem('remo_pending_signup');
+    const raw = sessionStorage.getItem('remo_pending_signup') || localStorage.getItem('remo_pending_signup');
     if (raw) pending = JSON.parse(raw);
   } catch (e) {}
-  if (!pending) return;
-  pending.code = String(Math.floor(100000 + Math.random() * 900000));
-  pending.expiresAt = Date.now() + 10 * 60 * 1000;
+
+  const curFb = REMO_STORE.fbAuth && REMO_STORE.fbAuth.currentUser;
+  if (!curFb) {
+    remoToast(t('auth_err_otp_invalid'));
+    return;
+  }
+
   try {
-    sessionStorage.setItem('remo_pending_signup', JSON.stringify(pending));
+    await curFb.reload();
   } catch (e) {}
 
-  // Dispatch real email via Netlify Serverless Function
-  try {
-    fetch('/.netlify/functions/send-email-otp', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: pending.email, name: pending.name, code: pending.code, lang })
-    }).catch(() => {});
-  } catch (e) {}
+  const refreshed = REMO_STORE.fbAuth.currentUser || curFb;
+  if (!refreshed.emailVerified) {
+    remoToast(t('auth_err_otp_invalid'));
+    return;
+  }
 
-  // Dispatch via Firebase
-  if (REMO_STORE.fbAuth && typeof REMO_STORE.fbAuth.sendSignInLinkToEmail === 'function') {
-    const actionCodeSettings = {
-      url: window.location.origin + window.location.pathname + '?emailAuth=1',
-      handleCodeInApp: true
-    };
-    REMO_STORE.fbAuth.sendSignInLinkToEmail(pending.email, actionCodeSettings).catch(() => {});
+  completeVerifiedEmailLogin(refreshed, pending);
+}
+window.verifyAuthOtpCode = verifyAuthOtpCode;
+
+async function resendAuthOtpCode() {
+  const lang = REMO_I18N.getLang();
+  const curFb = REMO_STORE.fbAuth && REMO_STORE.fbAuth.currentUser;
+  if (!curFb) return;
+
+  try {
+    await curFb.sendEmailVerification({ url: window.location.origin + '/' });
+  } catch (e) {
+    try {
+      await curFb.sendEmailVerification();
+    } catch (err) {
+      remoToast(
+        lang === 'fr'
+          ? '⏳ Un email a déjà été envoyé récemment. Vérifiez votre dossier Spam ou patientez 1 minute.'
+          : '⏳ An email was already sent recently. Check your Spam folder or wait 1 minute.'
+      );
+      return;
+    }
   }
 
   remoToast(
     lang === 'fr'
-      ? `🔑 Un nouveau code de confirmation a été envoyé à ${pending.email}. Veuillez vérifier vos courriels.`
-      : `🔑 A new confirmation code has been sent to ${pending.email}. Please check your inbox.`,
+      ? `📧 Nouvel email de vérification envoyé à ${curFb.email} ! Vérifiez aussi vos Spams.`
+      : `📧 New verification email sent to ${curFb.email}! Please check your Spam folder too.`,
     8000
   );
-  console.log('%c[REMO Secure Verification Code Resent]: ' + pending.code, 'color:#38bdf8;font-weight:bold;font-size:12px;');
 }
 window.resendAuthOtpCode = resendAuthOtpCode;
 
-function cancelAuthOtpStep() {
+function cancelAuthOtpStep(keepSession = false) {
+  if (window._remoEmailVerifyTimer) {
+    clearInterval(window._remoEmailVerifyTimer);
+    window._remoEmailVerifyTimer = null;
+  }
+  if (!keepSession && REMO_STORE.fbAuth && REMO_STORE.fbAuth.currentUser && !REMO_STORE.fbAuth.currentUser.emailVerified) {
+    try { REMO_STORE.fbAuth.signOut(); } catch (e) {}
+  }
   const regForm = document.getElementById('authRegisterForm');
   const otpBox = document.getElementById('authOtpBox');
   if (regForm) regForm.style.display = 'block';
   if (otpBox) otpBox.style.display = 'none';
-  const inp = document.getElementById('authOtpCodeInp');
-  if (inp) inp.value = '';
 }
 window.cancelAuthOtpStep = cancelAuthOtpStep;
 

@@ -3440,9 +3440,29 @@ const REMO_STORE = {
         this.fbAuth = firebase.auth();
         this.fbAuth.onAuthStateChanged((fbU) => {
           if (fbU) {
+            const isGoogle = Array.isArray(fbU.providerData) && fbU.providerData.some((p) => p && p.providerId === 'google.com');
+            if (!fbU.emailVerified && !isGoogle) {
+              // Do not create or log in Citizen account until real email link is clicked and verified
+              return;
+            }
             const adminEmail = (this.state?.settings?.adminEmail || 'andart1174@gmail.com').toLowerCase();
             const isAdminEmail = (fbU.email || '').toLowerCase() === adminEmail;
-            const u = this.ensureGuestOrCitizen(fbU.displayName || (isAdminEmail ? 'REMO Founder' : 'Citizen'), fbU.email, 'montreal', isAdminEmail, fbU.uid);
+            let pendingName = fbU.displayName || '';
+            let pendingCity = 'montreal';
+            try {
+              const rawPending = sessionStorage.getItem('remo_pending_signup') || localStorage.getItem('remo_pending_signup');
+              if (rawPending) {
+                const parsed = JSON.parse(rawPending);
+                if (parsed && parsed.email && parsed.email.toLowerCase() === (fbU.email || '').toLowerCase()) {
+                  if (parsed.name) pendingName = parsed.name;
+                  if (parsed.cityId) pendingCity = parsed.cityId;
+                }
+              }
+            } catch (e) {}
+            const u = this.ensureGuestOrCitizen(pendingName || (isAdminEmail ? 'REMO Founder' : 'Citizen'), fbU.email, pendingCity, isAdminEmail, fbU.uid);
+            if (u) {
+              u.emailVerified = true;
+            }
             if (isAdminEmail) {
               this.setAdminUnlocked(true);
             }
