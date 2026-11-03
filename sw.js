@@ -3,7 +3,7 @@
    Offline Shell Caching + Native Push & Incoming Call Notifications
    ════════════════════════════════════════════════════════════════════ */
 
-const CACHE_NAME = 'remo-pwa-v57';
+const CACHE_NAME = 'remo-pwa-v58';
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -68,10 +68,14 @@ self.addEventListener('fetch', (event) => {
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const targetUrl = (event.notification.data && event.notification.data.url) || './index.html';
+  const notifData = event.notification.data || {};
+  const targetUrl = notifData.url || './index.html';
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
       for (const client of clientList) {
+        try {
+          client.postMessage({ type: 'REMO_OS_NOTIF_CLICK', data: notifData });
+        } catch (e) {}
         if ('focus' in client) return client.focus();
       }
       if (self.clients.openWindow) return self.clients.openWindow(targetUrl);

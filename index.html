@@ -79,7 +79,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-  <link rel="stylesheet" href="css/remo-core.css?v=57">
+  <link rel="stylesheet" href="css/remo-core.css?v=58">
 </head>
 <body>
 
@@ -121,6 +121,12 @@
       <button class="btn-ghost notif-bell-btn" id="btnHeaderNotif" onclick="toggleNotificationsModal()" title="Notifications" style="position:relative;padding:7px 11px;">
         <span style="font-size:1.05rem;">🔔</span>
         <span class="notif-badge-pill" id="hdrNotifBadge" style="display:none;">0</span>
+      </button>
+
+      <!-- 🔥 Daily Passport Streak Pill -->
+      <button type="button" class="streak-hdr-pill" id="hdrStreakBtn" onclick="openDailyStreakModal()" title="Daily Passport Streak">
+        <span>🔥</span>
+        <span id="hdrStreakVal">1d</span>
       </button>
 
       <div class="coin-pill" onclick="openRemoCoin3DModal()" title="REMO Sovereign 3D Coin">
@@ -244,6 +250,9 @@
       <!-- 1. WORLD SOCIAL FEED (2-Col Holo Grid on PC / Full-Screen TikTok Snap on Mobile) -->
       <div class="remo-view active" id="view-feed">
         <div class="feed-top-widgets">
+          <div id="newCitizenWelcomeBar" class="new-citizen-welcome-bar" style="display:none;"></div>
+          <div id="livePresenceStrip" class="live-presence-strip"></div>
+          <div id="gameChallengeHeroBar" class="game-challenge-hero-bar" style="display:none;"></div>
           <div class="glass-box stories-bar" id="storiesBarEl"></div>
           <div class="weather-ticker-bar" id="worldWeatherTickerBar"></div>
           <div class="flash-banner" id="flashDropBannerEl" style="display:none;"></div>
@@ -251,6 +260,7 @@
 
           <div class="filter-row" id="feedModeChips">
             <button class="fchip active" onclick="setFeedMode('all', this)" data-i18n="filter_all">🌍 All World</button>
+            <button class="fchip" onclick="setFeedMode('following', this)" data-i18n="filter_following">👥 Following</button>
             <button class="fchip" onclick="setFeedMode('duets', this)" data-i18n="filter_duets">⚔️ City Duels</button>
             <button class="fchip" onclick="setFeedMode('bounties', this)" data-i18n="filter_bounties">🎁 Bounties</button>
             <button class="fchip" onclick="setFeedMode('capsules', this)" data-i18n="filter_capsules">⏳ Time-Capsules</button>
@@ -1255,7 +1265,7 @@
           <span>🗺️ Marquer comme Lieu Secret Urbain (Secret Spot Radar &amp; Chasse)</span>
         </label>
         <div id="createSecretSpotFields" style="display:none;grid-template-columns:1fr;gap:7px;">
-          <input type="text" id="createSecretSpotTitleInp" class="remo-input" placeholder="Nom du lieu secret (ex: Le Belvédère Caché, Café Secret fără firmă...)">
+          <input type="text" id="createSecretSpotTitleInp" class="remo-input" placeholder="Nom du lieu secret (ex: Le Belvédère Caché, Café Secret sans enseigne...)">
           <input type="text" id="createSecretSpotClueInp" class="remo-input" placeholder="Indice énigme pour le trouver (ex: Cherchez derrière l'arche en pierre...)">
         </div>
       </div>
@@ -1346,7 +1356,8 @@
           <b style="font-family:'Orbitron',sans-serif;font-size:0.95rem;color:#f8fafc;" data-i18n="notif_title">Notifications</b>
           <span id="notifModalCountBadge" class="notif-count-pill" style="font-size:0.72rem;background:#ef4444;color:#fff;border-radius:10px;padding:1px 7px;font-weight:900;display:none;">0</span>
         </div>
-        <div style="display:flex;align-items:center;gap:8px;">
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+          <button type="button" class="btn-ghost" id="btnPushPermToggle" style="font-size:0.7rem;padding:4px 8px;border-color:rgba(16,185,129,0.45);color:#6ee7b7;" onclick="toggleNativePushAlerts()" data-i18n="push_enable_btn">📲 Enable Alerts</button>
           <button type="button" class="btn-ghost" style="font-size:0.72rem;padding:4px 8px;border-color:rgba(56,189,248,0.4);color:#7dd3fc;" onclick="markAllNotificationsAsRead()" data-i18n="notif_mark_read">✓ Tout marquer comme lu</button>
           <button class="modal-close" onclick="document.getElementById('notificationsModal').classList.remove('open')">✕</button>
         </div>
@@ -1363,6 +1374,52 @@
       <!-- Notifications List Container -->
       <div id="notificationsListContainer" style="max-height:420px;overflow-y:auto;padding:8px 12px;display:flex;flex-direction:column;gap:6px;">
       </div>
+    </div>
+  </div>
+
+  <!-- 🟢 Adaptive Online Citizens Directory Modal (Scales to 100k+ Users) -->
+  <div class="remo-modal-backdrop" id="onlineDirectoryModal" onclick="if(event.target===this)this.classList.remove('open')">
+    <div class="remo-modal" style="max-width:540px;padding:0;overflow:hidden;border-color:rgba(16,185,129,0.45);background:#070b18;">
+      <div class="modal-hdr" style="padding:14px 18px;border-bottom:1px solid rgba(255,255,255,0.08);background:rgba(16,185,129,0.06);">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span class="online-pulse-dot"></span>
+          <b style="font-family:'Orbitron',sans-serif;font-size:0.95rem;color:#f8fafc;" data-i18n="online_dir_title">🟢 Live Citizens Online</b>
+          <span id="onlineDirCountBadge" style="font-size:0.74rem;background:rgba(16,185,129,0.2);border:1px solid rgba(16,185,129,0.5);color:#6ee7b7;border-radius:99px;padding:1px 8px;font-weight:900;">1</span>
+        </div>
+        <button class="modal-close" onclick="document.getElementById('onlineDirectoryModal').classList.remove('open')">✕</button>
+      </div>
+      <div style="padding:12px 16px;border-bottom:1px solid rgba(255,255,255,0.06);background:rgba(0,0,0,0.25);">
+        <input type="text" id="onlineDirSearchInp" class="remo-input" style="width:100%;font-size:0.82rem;padding:8px 12px;" data-i18n-placeholder="online_dir_search_ph" placeholder="🔍 Search online citizen @name or city..." oninput="renderOnlineDirectoryModal()">
+        <div id="onlineDirCityStrip" class="filter-row" style="margin-top:8px;padding-bottom:2px;"></div>
+      </div>
+      <div id="onlineDirListBox" style="max-height:420px;overflow-y:auto;padding:10px 14px;display:flex;flex-direction:column;gap:8px;"></div>
+    </div>
+  </div>
+
+  <!-- 🪪 Clickable Public Citizen Showcase Modal (?u=Name) -->
+  <div class="remo-modal-backdrop" id="publicProfileModal" onclick="if(event.target===this)this.classList.remove('open')">
+    <div class="remo-modal" style="max-width:600px;padding:0;overflow:hidden;border-color:rgba(99,102,241,0.5);background:#070b18;">
+      <div class="modal-hdr" style="padding:13px 18px;border-bottom:1px solid rgba(255,255,255,0.08);background:linear-gradient(90deg,rgba(99,102,241,0.12),rgba(56,189,248,0.08));">
+        <b style="font-family:'Orbitron',sans-serif;font-size:0.9rem;color:#f8fafc;" data-i18n="profile_modal_title">🪪 Official Citizen Showcase</b>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <button type="button" class="btn-ghost" id="btnProfileHeaderShare" style="font-size:0.74rem;padding:4px 10px;border-color:rgba(56,189,248,0.45);color:#7dd3fc;" data-i18n="profile_share_btn">🔗 Bio Link</button>
+          <button class="modal-close" onclick="document.getElementById('publicProfileModal').classList.remove('open')">✕</button>
+        </div>
+      </div>
+      <div id="publicProfileModalBody" style="max-height:78vh;overflow-y:auto;padding:16px 18px;"></div>
+    </div>
+  </div>
+
+  <!-- 🔥 7-Day Daily Passport Streak Modal -->
+  <div class="remo-modal-backdrop" id="dailyStreakModal" onclick="if(event.target===this)this.classList.remove('open')">
+    <div class="remo-modal" style="max-width:520px;border-color:rgba(251,191,36,0.55);background:radial-gradient(circle at top,#17132a 0%,#070b18 70%);">
+      <div class="modal-hdr">
+        <b style="font-family:'Orbitron',sans-serif;font-size:0.98rem;color:#fde047;" data-i18n="streak_modal_title">🔥 Daily Passport Streak</b>
+        <button class="modal-close" onclick="document.getElementById('dailyStreakModal').classList.remove('open')">✕</button>
+      </div>
+      <p style="font-size:0.82rem;color:#cbd5e1;line-height:1.45;margin:4px 0 14px;" data-i18n="streak_modal_sub">Check in every day to stamp your Passport and unlock escalating REMO Coin rewards + a Mythic 4D Card on Day 7!</p>
+      <div id="dailyStreakGridBox" class="streak-grid-7d"></div>
+      <div id="dailyStreakActionBox" style="margin-top:16px;text-align:center;"></div>
     </div>
   </div>
 
@@ -1833,12 +1890,12 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 
   <!-- REMO Modular Engines -->
-  <script src="js/remo-i18n.js?v=57"></script>
-  <script src="js/remo-cities-data.js?v=57"></script>
-  <script src="js/remo-store.js?v=57"></script>
-  <script src="js/remo-card-engine.js?v=57"></script>
-  <script src="js/remo-radar-arena.js?v=57"></script>
-  <script src="js/remo-social-comms.js?v=57"></script>
-  <script src="js/remo-radio-engine.js?v=57"></script>
+  <script src="js/remo-i18n.js?v=58"></script>
+  <script src="js/remo-cities-data.js?v=58"></script>
+  <script src="js/remo-store.js?v=58"></script>
+  <script src="js/remo-card-engine.js?v=58"></script>
+  <script src="js/remo-radar-arena.js?v=58"></script>
+  <script src="js/remo-social-comms.js?v=58"></script>
+  <script src="js/remo-radio-engine.js?v=58"></script>
 </body>
 </html>

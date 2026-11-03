@@ -2209,6 +2209,10 @@ const REMO_STORE = {
         coins: bonus,
         lifetimeCoins: bonus,
         streak: 1,
+        lastStreakClaimDate: '',
+        following: [],
+        joinedAt: Date.now(),
+        lastSeenAt: Date.now(),
         visas: [homeCity || 'montreal'],
         avatarColor: '#6366f1'
       };
@@ -2236,6 +2240,7 @@ const REMO_STORE = {
     this.save(true, 'auth');
     if (u.email && !/^citizen\d+@remo\.world$/i.test(u.email)) {
       this.syncUserToCloud(u);
+      this.pingMyPresence(true);
     }
     return u;
   },
@@ -2257,6 +2262,10 @@ const REMO_STORE = {
         coins: Number(user.coins || 0),
         lifetimeCoins: Number(user.lifetimeCoins || user.coins || 0),
         streak: Number(user.streak || 1),
+        lastStreakClaimDate: user.lastStreakClaimDate || '',
+        following: Array.isArray(user.following) ? user.following : [],
+        joinedAt: Number(user.joinedAt || 0),
+        lastSeenAt: Number(user.lastSeenAt || Date.now()),
         visas: Array.isArray(user.visas) ? user.visas : [user.homeCity || 'montreal'],
         equippedFrame: user.equippedFrame || '',
         equippedTitleId: user.equippedTitleId || '',
@@ -2270,6 +2279,236 @@ const REMO_STORE = {
     } catch (e) {
       console.warn('syncUserToCloud error:', e);
     }
+  },
+
+  /* ── Scalable Live Presence, Follow Graph, Daily Streak & Arcade Leaderboard ── */
+  pingMyPresence(forceNow = false) {
+    const u = this.getCurrentUser();
+    if (!u || !u.uid) return;
+    const now = Date.now();
+    if (!forceNow && this._lastPresencePingTs && (now - this._lastPresencePingTs < 45000)) return;
+    this._lastPresencePingTs = now;
+    u.lastSeenAt = now;
+
+    if (!this.presenceCache) this.presenceCache = new Map();
+    const presDoc = {
+      uid: u.uid,
+      name: u.name || 'Citizen',
+      homeCity: u.homeCity || 'montreal',
+      passportNum: u.passportNum || '0001',
+      joinedAt: Number(u.joinedAt || 0),
+      lastSeenAt: now
+    };
+    this.presenceCache.set(u.uid, presDoc);
+
+    if (this.fbDb && u.email && !/^citizen\d+@remo\.world$/i.test(u.email)) {
+      this.fbDb.collection('remo_presence').doc(u.uid).set(presDoc, { merge: true })
+        .catch(() => {});
+    }
+
+    if (!this._presenceTimerStarted && typeof window !== 'undefined') {
+      this._presenceTimerStarted = true;
+      setInterval(() => {
+        if (typeof document !== 'undefined' && !document.hidden) {
+          this.pingMyPresence(false);
+        }
+      }, 60000);
+      document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) this.pingMyPresence(true);
+      });
+    }
+  },
+
+  getOnlineCitizensList() {
+    const now = Date.now();
+    const ONLINE_WINDOW_MS = 210000; // 3.5 minutes active window
+    const merged = new Map();
+    const curU = this.getCurrentUser();
+    if (curU && curU.uid) {
+      merged.set(curU.uid, {
+        uid: curU.uid,
+        name: curU.name || 'Citizen',
+        homeCity: curU.homeCity || 'montreal',
+        passportNum: curU.passportNum || '0001',
+        joinedAt: Number(curU.joinedAt || 0),
+        lastSeenAt: now
+      });
+    }
+    if (this.presenceCache) {
+      this.presenceCache.forEach((p, uid) => {
+        if (!p || !uid || (this.deletedUserIds && this.deletedUserIds.has(uid))) return;
+        if (now - Number(p.lastSeenAt || 0) <= ONLINE_WINDOW_MS) {
+          const usr = (this.state.users || []).find((x) => x.uid === uid);
+          merged.set(uid, {
+            uid,
+            name: (usr && usr.name) || p.name || 'Citizen',
+            homeCity: (usr && usr.homeCity) || p.homeCity || 'montreal',
+            passportNum: (usr && usr.passportNum) || p.passportNum || '0000',
+            joinedAt: Number((usr && usr.joinedAt) || p.joinedAt || 0),
+            lastSeenAt: Number(p.lastSeenAt || 0)
+          });
+        }
+      });
+    }
+    (this.state.users || []).forEach((usr) => {
+      if (!usr || !usr.uid || merged.has(usr.uid)) return;
+      if (this.deletedUserIds && this.deletedUserIds.has(usr.uid)) return;
+      if (now - Number(usr.lastSeenAt || 0) <= ONLINE_WINDOW_MS) {
+        merged.set(usr.uid, {
+          uid: usr.uid,
+          name: usr.name || 'Citizen',
+          homeCity: usr.homeCity || 'montreal',
+          passportNum: usr.passportNum || '0000',
+          joinedAt: Number(usr.joinedAt || 0),
+          lastSeenAt: Number(usr.lastSeenAt || 0)
+        });
+      }
+    });
+    return Array.from(merged.values()).sort((a, b) => b.lastSeenAt - a.lastSeenAt);
+  },
+
+  isFollowingUser(targetUid) {
+    const me = this.getCurrentUser();
+    if (!me || !targetUid || !Array.isArray(me.following)) return false;
+    return me.following.includes(targetUid);
+  },
+
+  getFollowersCount(targetUid) {
+    if (!targetUid) return 0;
+    return (this.state.users || []).reduce((cnt, u) => {
+      return cnt + (u && Array.isArray(u.following) && u.following.includes(targetUid) ? 1 : 0);
+    }, 0);
+  },
+
+  toggleFollowUser(targetUid) {
+    const me = this.getCurrentUser();
+    if (!me || !targetUid || me.uid === targetUid) return { ok: false };
+    if (!Array.isArray(me.following)) me.following = [];
+    const idx = me.following.indexOf(targetUid);
+    let nowFollowing = false;
+    if (idx >= 0) {
+      me.following.splice(idx, 1);
+      nowFollowing = false;
+    } else {
+      me.following.push(targetUid);
+      nowFollowing = true;
+      const recentFollowNotif = (this.state.notifications || []).some(
+        (n) => n.type === 'follow' && n.fromUid === me.uid && n.toUid === targetUid && (Date.now() - (n.ts || 0) < 86400000)
+      );
+      if (!recentFollowNotif) {
+        this.addNotification({
+          toUid: targetUid,
+          fromUid: me.uid,
+          fromName: me.name,
+          fromCity: me.homeCity || 'montreal',
+          type: 'follow',
+          text: 'started following you 🌟'
+        });
+      }
+    }
+    this.save(true, 'follow_toggle');
+    this.syncUserToCloud(me);
+    return { ok: true, following: nowFollowing };
+  },
+
+  _getLocalDateKey(offsetDays = 0) {
+    const d = new Date();
+    if (offsetDays) d.setDate(d.getDate() + offsetDays);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  },
+
+  getDailyStreakStatus() {
+    const REWARDS = [15, 25, 40, 60, 85, 120, 200];
+    const u = this.getCurrentUser();
+    const todayKey = this._getLocalDateKey(0);
+    const yesterdayKey = this._getLocalDateKey(-1);
+    if (!u) {
+      return { signedIn: false, canClaim: false, currentStreak: 1, cycleDay: 1, todayReward: 15, rewards: REWARDS };
+    }
+    const lastKey = u.lastStreakClaimDate || '';
+    if (lastKey === todayKey) {
+      const cur = Math.max(1, Number(u.streak || 1));
+      const cDay = ((cur - 1) % 7) + 1;
+      return { signedIn: true, canClaim: false, currentStreak: cur, cycleDay: cDay, todayReward: REWARDS[cDay - 1], rewards: REWARDS };
+    }
+    const nextStreak = (lastKey === yesterdayKey) ? (Math.max(1, Number(u.streak || 0)) + 1) : 1;
+    const cycleDay = ((nextStreak - 1) % 7) + 1;
+    return {
+      signedIn: true,
+      canClaim: true,
+      currentStreak: nextStreak,
+      cycleDay,
+      todayReward: REWARDS[cycleDay - 1],
+      rewards: REWARDS
+    };
+  },
+
+  claimDailyStreakReward() {
+    const u = this.getCurrentUser();
+    if (!u) return { ok: false, reason: 'auth' };
+    const st = this.getDailyStreakStatus();
+    if (!st.canClaim) return { ok: false, reason: 'already_claimed', status: st };
+
+    u.streak = st.currentStreak;
+    u.lastStreakClaimDate = this._getLocalDateKey(0);
+    u.coins = (u.coins || 0) + st.todayReward;
+    u.lifetimeCoins = (u.lifetimeCoins || 0) + st.todayReward;
+    this.addCityScore(u.homeCity || 'montreal', 10);
+
+    let mintedCard = null;
+    if (st.cycleDay === 7) {
+      mintedCard = this.mintCardForUser(u.uid, u.homeCity || 'montreal', 'Mythic 4D', true, {
+        subtitle: `7-DAY STREAK CHAMPION`
+      });
+    }
+
+    this.save(true, 'streak_claimed');
+    this.syncUserToCloud(u);
+    return { ok: true, coins: st.todayReward, streak: u.streak, cycleDay: st.cycleDay, mintedCard };
+  },
+
+  submitHtmlGameScore(postId, rawScore) {
+    const score = Math.floor(Number(rawScore || 0));
+    if (!postId || !Number.isFinite(score) || score <= 0) return { ok: false };
+    const u = this.getCurrentUser();
+    if (!u) return { ok: false, needAuth: true, score };
+    const p = (this.state.posts || []).find((x) => x && x.id === postId);
+    if (!p) return { ok: false };
+
+    if (!Array.isArray(p.leaderboard)) p.leaderboard = [];
+    const prevTop = p.leaderboard.length > 0 ? Number(p.leaderboard[0].score || 0) : 0;
+    const existing = p.leaderboard.find((e) => e && e.uid === u.uid);
+    if (existing && Number(existing.score || 0) >= score) {
+      return { ok: false, reason: 'not_higher', best: existing.score };
+    }
+
+    if (existing) {
+      existing.score = score;
+      existing.name = u.name;
+      existing.cityId = u.homeCity || 'montreal';
+      existing.ts = Date.now();
+    } else {
+      p.leaderboard.push({
+        uid: u.uid,
+        name: u.name,
+        cityId: u.homeCity || 'montreal',
+        score,
+        ts: Date.now()
+      });
+    }
+    p.leaderboard.sort((a, b) => (b.score || 0) - (a.score || 0));
+    if (p.leaderboard.length > 10) p.leaderboard = p.leaderboard.slice(0, 10);
+
+    const isNewRecord = score > prevTop;
+    if (isNewRecord) {
+      this.addCoins(u.uid, 15, 10);
+    }
+    this.syncPostToCloud(p);
+    this.save(true, 'game_score');
+    return { ok: true, isNewRecord, score };
   },
 
   deleteUserFromCloud(uid) {
@@ -2859,8 +3098,27 @@ const REMO_STORE = {
         if (typeof renderDirectMessagesView === 'function' && typeof currentRemoView !== 'undefined' && currentRemoView === 'messages') {
           renderDirectMessagesView();
         }
+        if (typeof renderLivePresenceStrip === 'function') renderLivePresenceStrip();
       }, (err) => {
         console.warn('Firestore remo_users sync notice:', err.message);
+      });
+
+      // 1B. Sync & Watch LIVE CITIZEN PRESENCE (Capped at 50 most recent for 100k+ user scalability)
+      this.pingMyPresence(true);
+      this.fbDb.collection('remo_presence').orderBy('lastSeenAt', 'desc').limit(50).onSnapshot((snap) => {
+        if (!snap) return;
+        if (!this.presenceCache) this.presenceCache = new Map();
+        snap.forEach((doc) => {
+          const p = doc.data();
+          if (p && p.uid) {
+            this.presenceCache.set(p.uid, p);
+          }
+        });
+        if (typeof renderLivePresenceStrip === 'function') {
+          renderLivePresenceStrip();
+        }
+      }, (err) => {
+        console.warn('Firestore remo_presence sync notice:', err.message);
       });
 
       // 2. Sync & Watch ALL DIRECT MESSAGES in Real Time
@@ -2904,6 +3162,14 @@ const REMO_STORE = {
                     title: `@${dm.fromName || 'Citizen'}`,
                     text: msgPreview,
                     partnerUid: dm.fromUid
+                  });
+                }
+                if (typeof triggerNativeDeviceNotification === 'function') {
+                  triggerNativeDeviceNotification({
+                    title: `💌 @${dm.fromName || 'Citizen'} • REMO`,
+                    body: msgPreview,
+                    tag: 'remo_dm_' + dm.fromUid,
+                    data: { type: 'message', partnerUid: dm.fromUid, url: './index.html?view=messages' }
                   });
                 }
               }
@@ -2979,6 +3245,14 @@ const REMO_STORE = {
                     postId: n.postId,
                     partnerUid: n.fromUid
                   });
+                  if (typeof triggerNativeDeviceNotification === 'function') {
+                    triggerNativeDeviceNotification({
+                      title: `🔔 @${n.fromName || 'Citizen'} • REMO`,
+                      body: formattedDesc,
+                      tag: 'remo_notif_' + n.id,
+                      data: { type: n.type, postId: n.postId || '', partnerUid: n.fromUid || '', url: n.postId ? `./index.html?post=${n.postId}` : './index.html' }
+                    });
+                  }
                 }
               }
             } else {
@@ -3094,6 +3368,18 @@ const REMO_STORE = {
             (lp.comments || []).forEach((c) => { if (c && c.id && !cmtMap.has(c.id)) cmtMap.set(c.id, c); });
             cp.comments = Array.from(cmtMap.values());
             if ((lp.tipsTotal || 0) > (cp.tipsTotal || 0)) cp.tipsTotal = lp.tipsTotal;
+            // Smart-merge HTML Arcade Leaderboard (keep highest score per citizen)
+            if (Array.isArray(cp.leaderboard) || Array.isArray(lp.leaderboard)) {
+              const lbMap = new Map();
+              [...(cp.leaderboard || []), ...(lp.leaderboard || [])].forEach((entry) => {
+                if (!entry || !entry.uid) return;
+                const prevE = lbMap.get(entry.uid);
+                if (!prevE || Number(entry.score || 0) > Number(prevE.score || 0)) {
+                  lbMap.set(entry.uid, entry);
+                }
+              });
+              cp.leaderboard = Array.from(lbMap.values()).sort((a, b) => (b.score || 0) - (a.score || 0)).slice(0, 10);
+            }
           }
           if (!activePosts.some((m) => m.id === cp.id) && (!this.deletedPostIds || !this.deletedPostIds.has(cp.id))) {
             activePosts.push(cp);
@@ -3101,8 +3387,8 @@ const REMO_STORE = {
         });
         isInitialPostsSnap = false;
 
-        const prevSignature = (this.state.posts || []).map((p) => `${p.id}_${p.likes?.length || 0}_${p.comments?.length || 0}_${p.pinned ? 1 : 0}`).join('|');
-        const nextSignature = activePosts.map((p) => `${p.id}_${p.likes?.length || 0}_${p.comments?.length || 0}_${p.pinned ? 1 : 0}`).join('|');
+        const prevSignature = (this.state.posts || []).map((p) => `${p.id}_${p.likes?.length || 0}_${p.comments?.length || 0}_${p.leaderboard?.[0]?.score || 0}_${p.pinned ? 1 : 0}`).join('|');
+        const nextSignature = activePosts.map((p) => `${p.id}_${p.likes?.length || 0}_${p.comments?.length || 0}_${p.leaderboard?.[0]?.score || 0}_${p.pinned ? 1 : 0}`).join('|');
         const hasContentChanged = prevSignature !== nextSignature;
 
         this.state.posts = activePosts;
@@ -3254,6 +3540,7 @@ const REMO_STORE = {
       text: notif.text || '',
       rawPreview: notif.rawPreview || '',
       tipAmount: Number(notif.tipAmount || 0),
+      distanceKm: Number(notif.distanceKm || 0),
       emoji: notif.emoji || null,
       read: false,
       ts: notif.ts || Date.now()
