@@ -1,0 +1,15 @@
+/admin.html
+  X-Robots-Tag: noindex, nofollow
+
+/widget.html
+  Access-Control-Allow-Origin: *
+  Content-Security-Policy: frame-ancestors *
+  Cache-Control: public, max-age=300
+
+/llms.txt
+  Content-Type: text/plain; charset=utf-8
+  Access-Control-Allow-Origin: *
+
+/llms-full.txt
+  Content-Type: text/plain; charset=utf-8
+  Access-Control-Allow-Origin: *
