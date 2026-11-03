@@ -79,7 +79,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-  <link rel="stylesheet" href="css/remo-core.css?v=56">
+  <link rel="stylesheet" href="css/remo-core.css?v=57">
 </head>
 <body>
 
@@ -186,6 +186,7 @@
             <span class="nav-ic">💌</span> <span data-i18n="nav_messages">Messages</span>
             <span class="menu-unread-badge" id="sidebarMsgUnreadBadge" style="display:none;margin-left:auto;background:#ef4444;color:#fff;border-radius:10px;padding:1px 6px;font-size:0.7rem;font-weight:900;">0</span>
           </button>
+          <div id="sidebarUnreadSenderPills" class="sidebar-sender-pills" style="display:none;"></div>
           <button class="nav-btn" data-nav-view="bottles" onclick="switchRemoView('bottles')">
             <span class="nav-ic">🍾</span> <span data-i18n="nav_bottles">City Bottle</span>
           </button>
@@ -479,8 +480,19 @@
             </div>
           </div>
 
-          <!-- Scrollable 1-on-1 Citizen Contacts Bar -->
+          <!-- Unread Quick-Jump Bar -->
+          <div id="dmUnreadSendersBanner" class="dm-unread-banner" style="display:none;"></div>
+
+          <!-- Instant Citizen Search Bar -->
+          <div class="dm-search-wrap">
+            <input type="text" id="dmCitizenSearchInput" class="remo-input dm-search-input" data-i18n-placeholder="dm_search_ph" placeholder="🔍 Search citizen @name or city..." oninput="onDmSearchInput(this.value)">
+          </div>
+
+          <!-- Scrollable Smart Inbox (Unread -> Recent -> Suggested) -->
           <div class="dm-contacts-strip" id="dmContactsBar"></div>
+
+          <!-- Active Chat Partner Header -->
+          <div id="dmActivePartnerHeader" class="dm-active-partner-hdr"></div>
 
           <!-- Private Conversation Thread -->
           <div id="dmListContainer" style="height:310px;overflow-y:auto;padding:12px;background:rgba(0,0,0,0.32);border-radius:14px;margin-bottom:10px;"></div>
@@ -687,6 +699,7 @@
         <button class="btn-ghost" onclick="switchRemoView('auctions')">🔨 <span data-i18n="nav_auctions">Auctions</span></button>
         <button class="btn-ghost" onclick="switchRemoView('chat')">💬 <span data-i18n="nav_chat">Live Chat</span></button>
         <button class="btn-ghost" onclick="switchRemoView('messages')">💌 <span data-i18n="nav_messages">Messenger</span> <span class="menu-unread-badge" id="mbHubMsgUnreadBadge" style="display:none;margin-left:auto;background:#ef4444;color:#fff;border-radius:10px;padding:1px 6px;font-size:0.7rem;font-weight:900;">0</span></button>
+        <div id="mbHubUnreadSenderPills" class="sidebar-sender-pills" style="display:none;grid-column:1/-1;"></div>
         <button class="btn-ghost" onclick="switchRemoView('bottles')" style="border-color:#38bdf8;color:#7dd3fc;">🍾 <span data-i18n="nav_bottles">City Bottle</span></button>
         <button class="btn-ghost" onclick="switchRemoView('wheel')">🎡 <span data-i18n="nav_wheel">Lucky Spin</span></button>
         <button class="btn-ghost" onclick="document.getElementById('mobileHubModal').classList.remove('open');openRemoRadioModal();" style="border-color:#10b981;color:#6ee7b7;"><span id="mbRadioBtnTxt">📻 Radio du Monde</span></button>
@@ -1321,6 +1334,9 @@
     </div>
   </div>
 
+  <!-- 💬 Persistent Bottom-Right Floating Chat & Alert Bubble -->
+  <div class="remo-floating-bubble" id="remoFloatingAlertBubble" style="display:none;"></div>
+
   <!-- 🔔 REMO Pulse - Notifications Hub Modal -->
   <div class="remo-modal-backdrop" id="notificationsModal" onclick="if(event.target===this)this.classList.remove('open')">
     <div class="remo-modal" style="max-width:480px;padding:0;overflow:hidden;border-color:rgba(56,189,248,0.4);background:#070b18;">
@@ -1817,12 +1833,12 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 
   <!-- REMO Modular Engines -->
-  <script src="js/remo-i18n.js?v=56"></script>
-  <script src="js/remo-cities-data.js?v=56"></script>
-  <script src="js/remo-store.js?v=56"></script>
-  <script src="js/remo-card-engine.js?v=56"></script>
-  <script src="js/remo-radar-arena.js?v=56"></script>
-  <script src="js/remo-social-comms.js?v=56"></script>
-  <script src="js/remo-radio-engine.js?v=56"></script>
+  <script src="js/remo-i18n.js?v=57"></script>
+  <script src="js/remo-cities-data.js?v=57"></script>
+  <script src="js/remo-store.js?v=57"></script>
+  <script src="js/remo-card-engine.js?v=57"></script>
+  <script src="js/remo-radar-arena.js?v=57"></script>
+  <script src="js/remo-social-comms.js?v=57"></script>
+  <script src="js/remo-radio-engine.js?v=57"></script>
 </body>
 </html>

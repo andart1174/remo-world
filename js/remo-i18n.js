@@ -19,7 +19,7 @@ const REMO_DICT = {
     install_sub: 'Instant mobile & desktop app + Pioneer Badge',
     install_btn: 'Install',
 
-    // 🔔 Notifications Hub
+    // 🔔 Notifications Hub & Smart Inbox
     notif_title: 'Notifications',
     notif_mark_read: '✓ Mark all as read',
     notif_empty: 'No notifications yet ✨',
@@ -28,6 +28,14 @@ const REMO_DICT = {
     notif_tab_likes: '❤️ Likes',
     notif_tab_messages: '💌 Messages',
     notif_heads_up_view: 'View',
+    notif_open_btn: 'Open',
+    notif_reply_btn: 'Reply',
+    dm_search_ph: '🔍 Search citizen @name or city...',
+    dm_unread_bar_lbl: '🔴 Unread messages:',
+    dm_active_chat_with: 'Chatting with',
+    dm_new_badge: 'NEW ✨',
+    dm_no_match: 'No citizen matches your search.',
+    dm_view_profile: '👤 Profile',
 
     // Navigation (Desktop Left + Mobile Bottom)
     nav_sec_social: '🌍 Social World',
@@ -633,7 +641,7 @@ const REMO_DICT = {
     install_sub: 'Application mobile & PC instantanée + Badge Pionnier',
     install_btn: 'Installer',
 
-    // 🔔 Notifications Hub
+    // 🔔 Notifications Hub & Smart Inbox
     notif_title: 'Notifications',
     notif_mark_read: '✓ Tout marquer comme lu',
     notif_empty: 'Aucune notification pour le moment ✨',
@@ -642,6 +650,14 @@ const REMO_DICT = {
     notif_tab_likes: '❤️ J’aimes',
     notif_tab_messages: '💌 Messages',
     notif_heads_up_view: 'Voir',
+    notif_open_btn: 'Ouvrir',
+    notif_reply_btn: 'Répondre',
+    dm_search_ph: '🔍 Rechercher un citoyen @nom ou une ville...',
+    dm_unread_bar_lbl: '🔴 Messages non lus :',
+    dm_active_chat_with: 'Conversation avec',
+    dm_new_badge: 'NOUVEAU ✨',
+    dm_no_match: 'Aucun citoyen ne correspond à votre recherche.',
+    dm_view_profile: '👤 Profil',
 
     // Navigation
     nav_sec_social: '🌍 Monde Social',

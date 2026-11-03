@@ -975,7 +975,7 @@ function createDefaultState() {
     },
 
     directMessages: [
-      { id: 'dm1', fromUid: 'u_elena_kiv', fromName: 'Elena_KIV', toUid: 'active', text: 'Hey! Want to trade a Paris card or battle in PvP?', ts: now - 2000000 }
+      { id: 'dm1', fromUid: 'u_elena_kiv', fromName: 'Elena_KIV', toUid: 'active', text: 'Hey! Want to trade a Paris card or battle in PvP?', read: true, ts: now - 2000000 }
     ],
 
     serialCounter: 14,
@@ -1798,6 +1798,9 @@ function upgradeEcosystemState(st) {
   st.directMessages.forEach((d) => {
     if (!d.toUid || d.toUid === 'peer') d.toUid = 'u_admin_founder';
     if (!d.fromUid) d.fromUid = 'u_elena_kiv';
+    if ((d.id === 'dm1' || d.id === 'dm_env_demo_1') && d.read === undefined) {
+      d.read = true;
+    }
   });
   if (!st.directMessages.some((d) => d.id === 'dm_env_demo_1')) {
     st.directMessages.push({
@@ -1809,6 +1812,7 @@ function upgradeEcosystemState(st) {
       text: 'Salut from Chișinău 🇲🇩! Open this Golden Envelope gift inside our private chat!',
       envelopeCoins: 50,
       envelopeClaimed: false,
+      read: true,
       ts: Date.now() - 60000
     });
   }
@@ -2322,16 +2326,23 @@ const REMO_STORE = {
   syncDmToCloud(dm) {
     if (!this.fbDb || !dm || !dm.id) return;
     try {
+      if (dm.read) {
+        if (!this._recentlyReadDmIds) this._recentlyReadDmIds = new Map();
+        this._recentlyReadDmIds.set(dm.id, Date.now());
+      }
       const cleanDm = {
         id: dm.id,
         fromUid: dm.fromUid,
         fromName: dm.fromName || 'Citizen',
+        fromCity: dm.fromCity || '',
         toUid: dm.toUid || 'u_admin_founder',
         text: dm.text || '',
         voiceUrl: dm.voiceUrl || '',
         envelopeCoins: Number(dm.envelopeCoins || 0),
         envelopeClaimed: Boolean(dm.envelopeClaimed),
+        isRoyalAdmin: Boolean(dm.isRoyalAdmin),
         cardOffer: dm.cardOffer || null,
+        read: Boolean(dm.read),
         ts: Number(dm.ts || Date.now())
       };
       this.fbDb.collection('remo_direct_messages').doc(dm.id).set(cleanDm, { merge: true })
@@ -2853,50 +2864,61 @@ const REMO_STORE = {
       });
 
       // 2. Sync & Watch ALL DIRECT MESSAGES in Real Time
+      let isInitialDmSnap = true;
       this.fbDb.collection('remo_direct_messages').orderBy('ts', 'desc').limit(150).onSnapshot((snap) => {
         if (!snap) return;
         let hasNew = false;
         const curU = this.getCurrentUser();
         const myUid = curU ? curU.uid : null;
         const isAdm = this.isCurrentUserAdmin();
+        const lang = (typeof REMO_I18N !== 'undefined' && REMO_I18N.getLang) ? REMO_I18N.getLang() : 'en';
 
         snap.docChanges().forEach((change) => {
           const dm = change.doc.data();
           if (!dm || !dm.id) return;
+          if (dm.id === 'dm1' || dm.id === 'dm_env_demo_1') dm.read = true;
+          const recentlyReadTs = this._recentlyReadDmIds ? (this._recentlyReadDmIds.get(dm.id) || 0) : 0;
+          if (recentlyReadTs && (Date.now() - recentlyReadTs < 15000)) {
+            dm.read = true;
+          }
 
           if (change.type === 'added') {
-            const exists = this.state.directMessages.some((x) => x.id === dm.id);
-            if (!exists) {
+            const existingIdx = this.state.directMessages.findIndex((x) => x.id === dm.id);
+            if (existingIdx < 0) {
               this.state.directMessages.push(dm);
               hasNew = true;
 
-              // Incoming message alert & sound if addressed to me or Admin
+              // Live incoming message alert & sound if addressed to me or Admin
               const isForMe = (myUid && (dm.toUid === myUid || (isAdm && (dm.toUid === 'u_admin_founder' || !dm.toUid)))) && dm.fromUid !== myUid;
-              if (isForMe) {
+              const isFreshLive = !isInitialDmSnap || (Date.now() - (dm.ts || 0) < 35000);
+              if (isForMe && !dm.read && isFreshLive) {
                 try { RemoAudio.play('chime'); } catch (e) {}
-                this.addNotification({
-                  toUid: myUid,
-                  fromUid: dm.fromUid,
-                  fromName: dm.fromName,
-                  type: 'message',
-                  text: dm.text || (dm.voiceUrl ? '🎤 Note Vocale' : '✉️ Message'),
-                  ts: dm.ts || Date.now()
-                });
+                const msgPreview = dm.text || (dm.voiceUrl
+                  ? (lang === 'fr' ? '🎙️ Note vocale privée' : '🎙️ Private voice note')
+                  : (dm.envelopeCoins > 0
+                    ? (lang === 'fr' ? `🧧 Enveloppe +${dm.envelopeCoins} 🪙` : `🧧 +${dm.envelopeCoins} 🪙 Envelope`)
+                    : (lang === 'fr' ? '✉️ Nouveau message privé' : '✉️ New private message')));
                 if (typeof showHeadsUpNotification === 'function') {
                   showHeadsUpNotification({
                     type: 'message',
                     title: `@${dm.fromName || 'Citizen'}`,
-                    text: dm.text || '✉️ Message privé',
+                    text: msgPreview,
                     partnerUid: dm.fromUid
                   });
                 }
-                if (typeof updateUnreadBadges === 'function') updateUnreadBadges();
               }
+            } else {
+              const prev = this.state.directMessages[existingIdx];
+              if (prev.read || recentlyReadTs) dm.read = true;
+              this.state.directMessages[existingIdx] = Object.assign({}, prev, dm);
+              hasNew = true;
             }
           } else if (change.type === 'modified') {
             const idx = this.state.directMessages.findIndex((x) => x.id === dm.id);
             if (idx >= 0) {
-              this.state.directMessages[idx] = dm;
+              const prev = this.state.directMessages[idx];
+              if (recentlyReadTs) dm.read = true;
+              this.state.directMessages[idx] = Object.assign({}, prev, dm);
               hasNew = true;
             }
           } else if (change.type === 'removed') {
@@ -2905,57 +2927,76 @@ const REMO_STORE = {
           }
         });
 
+        this.state.directMessages.sort((a, b) => (a.ts || 0) - (b.ts || 0));
+        isInitialDmSnap = false;
+
         if (hasNew) {
           this.save(false, 'cloud_dms');
           window.dispatchEvent(new CustomEvent('remo:stateupdate', { detail: { reason: 'cloud_dms' } }));
           if (typeof renderDirectMessagesView === 'function' && typeof currentRemoView !== 'undefined' && currentRemoView === 'messages') {
             renderDirectMessagesView();
           }
-          if (typeof updateUnreadBadges === 'function') updateUnreadBadges();
           if (typeof refreshAllAdminPanels === 'function') refreshAllAdminPanels();
+        }
+        if (typeof updateUnreadBadges === 'function') updateUnreadBadges();
+        if (typeof renderNotificationsList === 'function' && document.getElementById('notificationsModal')?.classList.contains('open')) {
+          renderNotificationsList();
         }
       }, (err) => {
         console.warn('Firestore remo_direct_messages sync notice:', err.message);
       });
 
       // 2B. Sync & Watch ALL NOTIFICATIONS in Real Time
+      let isInitialNotifSnap = true;
       this.fbDb.collection('remo_notifications').orderBy('ts', 'desc').limit(80).onSnapshot((snap) => {
         if (!snap) return;
         const curU = this.getCurrentUser();
         const myUid = curU ? curU.uid : null;
         const isAdm = this.isCurrentUserAdmin();
         if (!Array.isArray(this.state.notifications)) this.state.notifications = [];
+        const localReadSet = this.getLocalReadNotifIds();
 
         snap.docChanges().forEach((change) => {
           const n = change.doc.data();
           if (!n || !n.id) return;
+          if (localReadSet.has(n.id)) n.read = true;
           if (change.type === 'added') {
-            const exists = this.state.notifications.some((x) => x.id === n.id);
-            if (!exists) {
+            const idx = this.state.notifications.findIndex((x) => x.id === n.id);
+            if (idx < 0) {
               this.state.notifications.unshift(n);
               const isForMe = myUid && (n.toUid === myUid || (isAdm && (n.toUid === 'u_admin_founder' || !n.toUid))) && n.fromUid !== myUid;
-              if (isForMe && !n.read && (Date.now() - (n.ts || 0) < 180000)) {
+              const isFreshLive = !isInitialNotifSnap || (Date.now() - (n.ts || 0) < 35000);
+              // Direct messages already trigger their own Heads-Up toast from remo_direct_messages
+              if (isForMe && !n.read && n.type !== 'message' && isFreshLive) {
                 try { RemoAudio.play('goldchime'); } catch (e) {}
                 if (typeof showHeadsUpNotification === 'function') {
+                  const formattedDesc = (typeof formatNotificationDesc === 'function') ? formatNotificationDesc(n) : (n.text || '');
                   showHeadsUpNotification({
                     type: n.type,
                     title: `@${n.fromName || 'Citizen'}`,
-                    text: n.text,
+                    text: formattedDesc,
                     emoji: n.emoji,
                     postId: n.postId,
                     partnerUid: n.fromUid
                   });
                 }
               }
+            } else {
+              if (this.state.notifications[idx].read || localReadSet.has(n.id)) n.read = true;
+              this.state.notifications[idx] = Object.assign({}, this.state.notifications[idx], n);
             }
           } else if (change.type === 'modified') {
             const idx = this.state.notifications.findIndex((x) => x.id === n.id);
-            if (idx >= 0) this.state.notifications[idx] = n;
+            if (idx >= 0) {
+              if (localReadSet.has(n.id)) n.read = true;
+              this.state.notifications[idx] = n;
+            }
           } else if (change.type === 'removed') {
             this.state.notifications = this.state.notifications.filter((x) => x.id !== n.id);
           }
         });
 
+        isInitialNotifSnap = false;
         this.state.notifications.sort((a, b) => (b.ts || 0) - (a.ts || 0));
         if (this.state.notifications.length > 80) this.state.notifications = this.state.notifications.slice(0, 80);
         this.save(false, 'cloud_notifs');
@@ -2966,6 +3007,7 @@ const REMO_STORE = {
       });
 
       // 3. Sync & Watch ALL SOCIAL POSTS in Real Time across all devices (Cloud is Authoritative Source of Truth)
+      let isInitialPostsSnap = true;
       this.fbDb.collection('remo_posts').limit(80).onSnapshot((snap) => {
         if (!snap) return;
         const cloudPosts = [];
@@ -2986,6 +3028,8 @@ const REMO_STORE = {
         });
 
         const now = Date.now();
+        const curU = this.getCurrentUser();
+        const myUid = curU ? curU.uid : null;
         // Preserve only freshly created local drafts (< 4000ms old) that haven't hit the cloud yet
         const freshLocal = (this.state.posts || []).filter((lp) =>
           lp && lp.id && !cloudPostIds.has(lp.id) && !this.deletedPostIds?.has(lp.id) && (now - (lp.createdAt || 0) < 4000)
@@ -2996,6 +3040,7 @@ const REMO_STORE = {
         cloudPosts.forEach((cp) => {
           const lp = (this.state.posts || []).find((x) => x && x.id === cp.id);
           if (lp) {
+            const prevCommentIds = new Set((lp.comments || []).map((c) => c && c.id).filter(Boolean));
             // Keep union of likes
             const mergedLikes = Array.from(new Set([...(cp.likes || []), ...(lp.likes || [])]));
             cp.likes = mergedLikes;
@@ -3003,7 +3048,49 @@ const REMO_STORE = {
             cp.reactions = Object.assign({}, cp.reactions || {}, lp.reactions || {});
             // Merge comments
             const cmtMap = new Map();
-            (cp.comments || []).forEach((c) => { if (c && c.id) cmtMap.set(c.id, c); });
+            (cp.comments || []).forEach((c) => {
+              if (c && c.id) {
+                cmtMap.set(c.id, c);
+                // Detect live comment on my post if remo_notifications has not arrived yet
+                if (!isInitialPostsSnap && myUid && cp.uid === myUid && c.uid && c.uid !== myUid && !prevCommentIds.has(c.id) && (now - (c.createdAt || 0) < 120000)) {
+                  const alreadyNotified = (this.state.notifications || []).some(
+                    (n) => n.type === 'comment' && n.postId === cp.id && n.fromUid === c.uid && Math.abs((n.ts || 0) - (c.createdAt || now)) < 15000
+                  );
+                  if (!alreadyNotified) {
+                    const synthId = 'notif_cmt_' + c.id;
+                    if (!this.getLocalReadNotifIds().has(synthId)) {
+                      const snippet = c.text ? (c.text.length > 50 ? c.text.slice(0, 47) + '...' : c.text) : '';
+                      const synthNotif = {
+                        id: synthId,
+                        toUid: myUid,
+                        fromUid: c.uid,
+                        fromName: c.author || 'Citizen',
+                        fromCity: c.cityId || '',
+                        type: 'comment',
+                        postId: cp.id,
+                        rawPreview: snippet,
+                        text: snippet,
+                        read: false,
+                        ts: c.createdAt || now
+                      };
+                      this.state.notifications = this.state.notifications || [];
+                      this.state.notifications.unshift(synthNotif);
+                      try { RemoAudio.play('goldchime'); } catch (e) {}
+                      if (typeof showHeadsUpNotification === 'function') {
+                        const formattedDesc = (typeof formatNotificationDesc === 'function') ? formatNotificationDesc(synthNotif) : snippet;
+                        showHeadsUpNotification({
+                          type: 'comment',
+                          title: `@${c.author || 'Citizen'}`,
+                          text: formattedDesc,
+                          postId: cp.id,
+                          partnerUid: c.uid
+                        });
+                      }
+                    }
+                  }
+                }
+              }
+            });
             (lp.comments || []).forEach((c) => { if (c && c.id && !cmtMap.has(c.id)) cmtMap.set(c.id, c); });
             cp.comments = Array.from(cmtMap.values());
             if ((lp.tipsTotal || 0) > (cp.tipsTotal || 0)) cp.tipsTotal = lp.tipsTotal;
@@ -3012,6 +3099,7 @@ const REMO_STORE = {
             activePosts.push(cp);
           }
         });
+        isInitialPostsSnap = false;
 
         const prevSignature = (this.state.posts || []).map((p) => `${p.id}_${p.likes?.length || 0}_${p.comments?.length || 0}_${p.pinned ? 1 : 0}`).join('|');
         const nextSignature = activePosts.map((p) => `${p.id}_${p.likes?.length || 0}_${p.comments?.length || 0}_${p.pinned ? 1 : 0}`).join('|');
@@ -3030,6 +3118,7 @@ const REMO_STORE = {
           if (typeof renderSocialFeed === 'function' && (typeof currentRemoView === 'undefined' || currentRemoView === 'feed')) {
             renderSocialFeed();
           }
+          if (typeof updateUnreadBadges === 'function') updateUnreadBadges();
           if (typeof refreshAllAdminPanels === 'function') {
             refreshAllAdminPanels();
           }
@@ -3129,6 +3218,27 @@ const REMO_STORE = {
     }
   },
 
+  getLocalReadNotifIds() {
+    if (this._localReadNotifSet) return this._localReadNotifSet;
+    try {
+      const raw = JSON.parse(localStorage.getItem('remo_read_notif_ids') || '[]');
+      this._localReadNotifSet = new Set(Array.isArray(raw) ? raw : []);
+    } catch (e) {
+      this._localReadNotifSet = new Set();
+    }
+    return this._localReadNotifSet;
+  },
+
+  markNotifIdReadLocal(id) {
+    if (!id) return;
+    const set = this.getLocalReadNotifIds();
+    set.add(id);
+    try {
+      const arr = [...set].slice(-250);
+      localStorage.setItem('remo_read_notif_ids', JSON.stringify(arr));
+    } catch (e) {}
+  },
+
   addNotification(notif) {
     if (!notif) return null;
     if (!Array.isArray(this.state.notifications)) this.state.notifications = [];
@@ -3142,6 +3252,8 @@ const REMO_STORE = {
       type: notif.type || 'system', // 'comment', 'like', 'reaction', 'message', 'tip', 'system'
       postId: notif.postId || null,
       text: notif.text || '',
+      rawPreview: notif.rawPreview || '',
+      tipAmount: Number(notif.tipAmount || 0),
       emoji: notif.emoji || null,
       read: false,
       ts: notif.ts || Date.now()
@@ -3176,24 +3288,35 @@ const REMO_STORE = {
     const isAdm = this.isCurrentUserAdmin();
     let changed = false;
     (this.state.notifications || []).forEach((n) => {
-      if ((n.toUid === myUid || (isAdm && n.toUid === 'u_admin_founder')) && !n.read) {
+      if ((n.toUid === myUid || (isAdm && (n.toUid === 'u_admin_founder' || !n.toUid))) && !n.read) {
         n.read = true;
         changed = true;
+        this.markNotifIdReadLocal(n.id);
         this.syncNotificationToCloud(n);
       }
     });
     (this.state.directMessages || []).forEach((d) => {
-      if ((d.toUid === myUid || (isAdm && d.toUid === 'u_admin_founder')) && !d.read) {
+      if ((d.toUid === myUid || (isAdm && (d.toUid === 'u_admin_founder' || !d.toUid))) && !d.read) {
         d.read = true;
         changed = true;
         this.syncDmToCloud(d);
       }
     });
+    // Also mark any backfilled comment IDs on my posts as read locally
+    (this.state.posts || []).forEach((p) => {
+      if (p && (p.uid === myUid || (isAdm && p.uid === 'u_admin_founder'))) {
+        (p.comments || []).forEach((c) => {
+          if (c && c.id && c.uid !== myUid) {
+            this.markNotifIdReadLocal('notif_cmt_' + c.id);
+          }
+        });
+      }
+    });
     if (changed) {
       this.save(true, 'notif_read_all');
-      if (typeof updateUnreadBadges === 'function') updateUnreadBadges();
-      if (typeof renderNotificationsList === 'function') renderNotificationsList();
     }
+    if (typeof updateUnreadBadges === 'function') updateUnreadBadges();
+    if (typeof renderNotificationsList === 'function') renderNotificationsList();
   },
 
   deletePostFromCloud(postId) {

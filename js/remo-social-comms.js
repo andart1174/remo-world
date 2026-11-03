@@ -27,6 +27,9 @@ let pendingRemixParent = null;
 let pendingDuetParent = null;
 let pendingVersusMedia = { left: '', right: '' };
 let activeDmPartnerUid = 'u_elena_kiv';
+let dmSearchQuery = '';
+let _explicitDmPartnerSelected = false;
+const _justReadDmHighlightIds = new Set();
 let pendingCommentVoiceKey = '';
 let commentVoiceRecorder = null;
 let wtRecorder = null;
@@ -65,6 +68,35 @@ function switchRemoView(viewId) {
 
   document.getElementById('mobileHubModal')?.classList.remove('open');
 
+  if (viewId === 'messages') {
+    if (!_explicitDmPartnerSelected) {
+      const me = REMO_STORE.getCurrentUser();
+      const myUid = me ? me.uid : null;
+      const isAdm = REMO_STORE.isCurrentUserAdmin();
+      if (myUid) {
+        const unreadToMe = (REMO_STORE.state.directMessages || [])
+          .filter((d) => isDmAddressedToMe(d, myUid, isAdm) && !d.read)
+          .sort((a, b) => (b.ts || 0) - (a.ts || 0));
+        if (unreadToMe.length > 0 && unreadToMe[0].fromUid) {
+          activeDmPartnerUid = unreadToMe[0].fromUid;
+        } else {
+          // Default to most recent active conversation partner if current default has no unread messages
+          const recentConvo = (REMO_STORE.state.directMessages || [])
+            .filter((d) => d && d.id !== 'dm1' && d.id !== 'dm_env_demo_1' && (isDmAddressedToMe(d, myUid, isAdm) || d.fromUid === myUid))
+            .sort((a, b) => (b.ts || 0) - (a.ts || 0));
+          if (recentConvo.length > 0) {
+            const topMsg = recentConvo[0];
+            const otherUid = topMsg.fromUid === myUid ? topMsg.toUid : topMsg.fromUid;
+            if (otherUid && otherUid !== myUid) {
+              activeDmPartnerUid = otherUid;
+            }
+          }
+        }
+      }
+    }
+    _explicitDmPartnerSelected = false;
+  }
+
   if (viewId === 'feed') renderSocialFeed();
   else if (viewId === 'radar') initRemoRadarMap();
   else if (viewId === 'arena') renderArenaView();
@@ -78,6 +110,10 @@ function switchRemoView(viewId) {
   else if (viewId === 'messages') renderDirectMessagesView();
   else if (viewId === 'bottles') renderWorldBottlesView();
   else if (viewId === 'wheel') renderWheelView();
+
+  if (typeof updateUnreadBadges === 'function') {
+    updateUnreadBadges();
+  }
 
   if (typeof initDesktopHorizontalScrollRails === 'function') {
     setTimeout(initDesktopHorizontalScrollRails, 40);
@@ -157,6 +193,10 @@ function syncHeaderAndSidebars() {
   // User & Coins in Top Header
   const coinEl = document.getElementById('hdrCoinsVal');
   if (coinEl) coinEl.textContent = u ? u.coins.toLocaleString() : '0';
+
+  if (typeof updateUnreadBadges === 'function') {
+    updateUnreadBadges();
+  }
 
   const authBtn = document.getElementById('hdrAuthBtn');
   if (authBtn) {
@@ -1439,6 +1479,7 @@ function tipPostAuthor(postId) {
       fromCity: u.homeCity,
       type: 'tip',
       postId: p.id,
+      tipAmount: amt,
       text: lang === 'fr' ? `vous a offert un pourboire de +${amt} 🪙 !` : `tipped you +${amt} 🪙!`
     });
   }
@@ -1638,7 +1679,7 @@ function submitPostComment() {
   });
 
   if (p.uid && p.uid !== u.uid) {
-    const cmtPreview = txt ? (txt.length > 50 ? txt.slice(0, 47) + '...' : txt) : (pendingCommentVoiceKey ? '🎤 Note Vocale' : 'Super-Commentaire');
+    const cmtPreview = txt ? (txt.length > 50 ? txt.slice(0, 47) + '...' : txt) : (pendingCommentVoiceKey ? '🎤 Voice' : 'Super-Comment');
     REMO_STORE.addNotification({
       toUid: p.uid,
       fromUid: u.uid,
@@ -1646,6 +1687,7 @@ function submitPostComment() {
       fromCity: u.homeCity,
       type: 'comment',
       postId: p.id,
+      rawPreview: cmtPreview,
       text: lang === 'fr' ? `a commenté : "${cmtPreview}"` : `commented: "${cmtPreview}"`
     });
   }
@@ -2900,7 +2942,31 @@ function publishWalkieTalkieTransmission(voiceKey) {
   }
 }
 
-/* ── #5 1-ON-1 PRIVATE MESSENGER 2.0 (AUTO EN ⇄ FR, GIFT ENVELOPES & 4D CARD TRADES) ── */
+/* ── #5 1-ON-1 PRIVATE MESSENGER 2.0 (SMART INBOX, AUTO-JUMP, SEARCH, GIFT ENVELOPES & 4D CARD TRADES) ── */
+function isDmAddressedToMe(d, myUid, isAdmUser) {
+  if (!d || !myUid || !d.fromUid || d.fromUid === myUid) return false;
+  if (isAdmUser && d.fromUid === 'u_admin_founder' && myUid === 'u_admin_founder') return false;
+  if (d.id === 'dm1' || d.id === 'dm_env_demo_1') return false;
+  return d.toUid === myUid || Boolean(isAdmUser && (d.toUid === 'u_admin_founder' || !d.toUid || d.toUid === 'peer'));
+}
+
+function isDmSentByMe(d, myUid, isAdmUser) {
+  if (!d || !myUid) return false;
+  return d.fromUid === myUid || Boolean(isAdmUser && d.fromUid === 'u_admin_founder' && d.toUid !== myUid);
+}
+
+function formatDmSnippet(d, lang) {
+  if (!d) return '';
+  if (d.text && String(d.text).trim()) {
+    const clean = String(d.text).trim();
+    return clean.length > 36 ? clean.slice(0, 34) + '…' : clean;
+  }
+  if (d.voiceUrl) return lang === 'fr' ? '🎙️ Note vocale' : '🎙️ Voice note';
+  if (d.envelopeCoins > 0) return `🧧 +${d.envelopeCoins} 🪙`;
+  if (d.cardOffer) return lang === 'fr' ? '🎴 Offre Carte 4D' : '🎴 4D Card Offer';
+  return lang === 'fr' ? '✉️ Message' : '✉️ Message';
+}
+
 function openDirectChatWithUser(targetUid) {
   const me = REMO_STORE.getCurrentUser();
   if (me && targetUid && targetUid === me.uid) {
@@ -2908,74 +2974,251 @@ function openDirectChatWithUser(targetUid) {
     return;
   }
   if (targetUid && (!me || targetUid !== me.uid)) {
+    _justReadDmHighlightIds.clear();
     activeDmPartnerUid = targetUid;
+    _explicitDmPartnerSelected = true;
   }
   switchRemoView('messages');
 }
 
 function selectDmPartner(uid) {
+  _justReadDmHighlightIds.clear();
   activeDmPartnerUid = uid;
   RemoAudio.play('click');
   renderDirectMessagesView();
 }
 
+function onDmSearchInput(val) {
+  dmSearchQuery = String(val || '').trim();
+  renderDirectMessagesView();
+}
+window.onDmSearchInput = onDmSearchInput;
+
 function renderDirectMessagesView() {
   const box = document.getElementById('dmListContainer');
   const contactsBar = document.getElementById('dmContactsBar');
+  const unreadBanner = document.getElementById('dmUnreadSendersBanner');
+  const activeHdr = document.getElementById('dmActivePartnerHeader');
   const admEnvBtn = document.getElementById('btnDmAdminEnvelope');
   if (!box) return;
 
   const lang = REMO_I18N.getLang();
   const isAdm = REMO_STORE.isAdminUnlocked();
+  const isAdmUser = REMO_STORE.isCurrentUserAdmin();
   if (admEnvBtn) admEnvBtn.style.display = isAdm ? 'inline-flex' : 'none';
 
   const me = REMO_STORE.getCurrentUser() || (REMO_STORE.state.users || [])[0] || { uid: 'u_admin_founder', name: 'Founder Admin', homeCity: 'montreal' };
-  const allUsers = (REMO_STORE.state.users || []).filter((u) => u.uid !== me.uid);
-  if (allUsers.length > 0 && !allUsers.some((u) => u.uid === activeDmPartnerUid)) {
-    activeDmPartnerUid = allUsers[0].uid;
+  const allDms = REMO_STORE.state.directMessages || [];
+
+  // Build complete citizen roster + synthesize any sender/recipient not yet synced in state.users
+  const userMap = new Map();
+  (REMO_STORE.state.users || []).forEach((u) => {
+    if (!u || !u.uid) return;
+    if (u.uid === me.uid) return;
+    if (isAdmUser && u.uid === 'u_admin_founder' && me.uid !== 'u_admin_founder') return;
+    userMap.set(u.uid, u);
+  });
+  allDms.forEach((d) => {
+    if (!d || !d.fromUid || d.fromUid === me.uid) return;
+    if (isAdmUser && d.fromUid === 'u_admin_founder' && me.uid !== 'u_admin_founder') return;
+    if (!userMap.has(d.fromUid)) {
+      userMap.set(d.fromUid, {
+        uid: d.fromUid,
+        name: d.fromName || 'Citizen',
+        homeCity: d.fromCity || 'montreal',
+        passportNum: '----'
+      });
+    }
+  });
+  const allUsers = Array.from(userMap.values());
+
+  // Compute per-partner conversation stats in one fast pass (scales to 100k+ citizens)
+  const statsMap = new Map();
+  allDms.forEach((d) => {
+    if (!d) return;
+    let partnerId = null;
+    const toMe = isDmAddressedToMe(d, me.uid, isAdmUser);
+    const byMe = isDmSentByMe(d, me.uid, isAdmUser);
+    if (toMe) partnerId = d.fromUid;
+    else if (byMe) partnerId = d.toUid;
+    else if (d.id === 'dm_env_demo_1' && d.fromUid === 'u_elena_kiv' && (me.uid === 'u_admin_founder' || isAdmUser)) partnerId = 'u_elena_kiv';
+    if (!partnerId || !userMap.has(partnerId)) return;
+
+    let st = statsMap.get(partnerId);
+    if (!st) {
+      st = { unreadCount: 0, lastMsg: null, lastTs: 0, hasUnclaimed: false };
+      statsMap.set(partnerId, st);
+    }
+    if (toMe && !d.read) {
+      st.unreadCount += 1;
+    }
+    if ((d.fromUid === partnerId) && d.envelopeCoins > 0 && !d.envelopeClaimed && (toMe || d.id === 'dm_env_demo_1')) {
+      st.hasUnclaimed = true;
+    }
+    const ts = Number(d.ts || 0);
+    if (ts >= st.lastTs && d.id !== 'dm1') {
+      st.lastTs = ts;
+      st.lastMsg = d;
+    }
+  });
+
+  if (allUsers.length > 0 && !userMap.has(activeDmPartnerUid)) {
+    // Pick newest unread sender first, or most recent conversation, or first user
+    const best = allUsers.slice().sort((a, b) => {
+      const sa = statsMap.get(a.uid) || { unreadCount: 0, lastTs: 0 };
+      const sb = statsMap.get(b.uid) || { unreadCount: 0, lastTs: 0 };
+      if (sb.unreadCount !== sa.unreadCount) return sb.unreadCount - sa.unreadCount;
+      return sb.lastTs - sa.lastTs;
+    })[0];
+    activeDmPartnerUid = best ? best.uid : allUsers[0].uid;
   }
-  const partner = allUsers.find((u) => u.uid === activeDmPartnerUid) || { uid: 'u_elena_kiv', name: 'Elena KIV', homeCity: 'chisinau' };
+
+  const partner = userMap.get(activeDmPartnerUid) || allUsers[0] || { uid: 'u_elena_kiv', name: 'Elena KIV', homeCity: 'chisinau' };
+  const isMessagesViewActive = (currentRemoView === 'messages');
+
+  // Capture newly opened unread messages from active partner BEFORE marking read so they keep a "NEW ✨" highlight
+  if (isMessagesViewActive) {
+    allDms.forEach((d) => {
+      if (d && d.fromUid === partner.uid && isDmAddressedToMe(d, me.uid, isAdmUser) && !d.read) {
+        _justReadDmHighlightIds.add(d.id);
+      }
+    });
+  }
+
+  // Sort Smart Inbox: 1) Unread Senders -> 2) Unclaimed Gift Envelopes -> 3) Recent Active Chats -> 4) Active Partner -> 5) Others
+  const sortedUsers = allUsers.slice().sort((a, b) => {
+    const sa = statsMap.get(a.uid) || { unreadCount: 0, lastTs: 0, hasUnclaimed: false };
+    const sb = statsMap.get(b.uid) || { unreadCount: 0, lastTs: 0, hasUnclaimed: false };
+    const aUnread = (a.uid === partner.uid && isMessagesViewActive) ? 0 : sa.unreadCount;
+    const bUnread = (b.uid === partner.uid && isMessagesViewActive) ? 0 : sb.unreadCount;
+    if ((bUnread > 0 ? 1 : 0) !== (aUnread > 0 ? 1 : 0)) return bUnread > 0 ? 1 : -1;
+    if (aUnread > 0 && bUnread > 0 && sb.lastTs !== sa.lastTs) return sb.lastTs - sa.lastTs;
+    if ((sb.hasUnclaimed ? 1 : 0) !== (sa.hasUnclaimed ? 1 : 0)) return sb.hasUnclaimed ? 1 : -1;
+    if (a.uid === partner.uid && sa.lastTs === 0 && sb.lastTs === 0) return -1;
+    if (b.uid === partner.uid && sa.lastTs === 0 && sb.lastTs === 0) return 1;
+    if (sb.lastTs !== sa.lastTs) return sb.lastTs - sa.lastTs;
+    return 0;
+  });
+
+  // Render Top Unread Quick-Jump Bar if OTHER citizens still have unread messages
+  if (unreadBanner) {
+    const otherUnreadUsers = sortedUsers.filter((u) => {
+      if (u.uid === partner.uid && isMessagesViewActive) return false;
+      const st = statsMap.get(u.uid);
+      return st && st.unreadCount > 0;
+    });
+    if (otherUnreadUsers.length > 0) {
+      unreadBanner.style.display = 'flex';
+      unreadBanner.innerHTML = `
+        <span class="dm-unread-banner-lbl">${t('dm_unread_bar_lbl')}</span>
+        ${otherUnreadUsers.map((u) => {
+          const c = getCityById(u.homeCity);
+          const cnt = statsMap.get(u.uid)?.unreadCount || 1;
+          return `
+            <button type="button" class="dm-unread-jump-pill" onclick="selectDmPartner('${u.uid}')">
+              <span>${c.flag} @${escapeHtmlStr(u.name)}</span>
+              <span class="dm-chip-unread-count">${cnt}</span>
+            </button>
+          `;
+        }).join('')}
+      `;
+    } else {
+      unreadBanner.style.display = 'none';
+      unreadBanner.innerHTML = '';
+    }
+  }
+
+  // Filter by instant search query (scales cleanly to thousands of citizens)
+  const q = dmSearchQuery.toLowerCase().replace(/^@/, '');
+  let visibleContacts = sortedUsers;
+  if (q) {
+    visibleContacts = sortedUsers.filter((u) => {
+      const c = getCityById(u.homeCity);
+      const nameMatch = String(u.name || '').toLowerCase().includes(q);
+      const cityEnMatch = String(c.name_en || c.name || '').toLowerCase().includes(q);
+      const cityFrMatch = String(c.name_fr || '').toLowerCase().includes(q);
+      const cityIdMatch = String(u.homeCity || '').toLowerCase().includes(q);
+      return nameMatch || cityEnMatch || cityFrMatch || cityIdMatch;
+    }).slice(0, 50);
+  } else {
+    // Always keep active partner + all unread + active conversations + suggested citizens (capped at 35 for instant DOM)
+    visibleContacts = sortedUsers.slice(0, 35);
+    if (partner && partner.uid && !visibleContacts.some((u) => u.uid === partner.uid)) {
+      visibleContacts.unshift(partner);
+    }
+  }
 
   if (contactsBar) {
-    contactsBar.innerHTML = allUsers.map((u) => {
-      const c = getCityById(u.homeCity);
-      const hasUnclaimed = (REMO_STORE.state.directMessages || []).some(
-        (d) => d.fromUid === u.uid && d.toUid === me.uid && d.envelopeCoins > 0 && !d.envelopeClaimed
-      );
-      const hasUnread = (REMO_STORE.state.directMessages || []).some(
-        (d) => d.fromUid === u.uid && d.toUid === me.uid && !d.read
-      );
-      return `
-        <button type="button" class="dm-contact-chip ${u.uid === partner.uid ? 'active' : ''}" onclick="selectDmPartner('${u.uid}')">
-          <span style="width:8px;height:8px;border-radius:50%;background:#10b981;display:inline-block;"></span>
-          <span>${c.flag} @${escapeHtmlStr(u.name)}</span>
-          ${hasUnclaimed ? '<span>🧧</span>' : ''}
-          ${hasUnread ? '<span style="background:#ef4444;border-radius:50%;width:8px;height:8px;display:inline-block;box-shadow:0 0 6px #ef4444;"></span>' : ''}
-        </button>
-      `;
-    }).join('');
+    if (visibleContacts.length === 0) {
+      contactsBar.innerHTML = `<div style="padding:8px 12px;font-size:0.78rem;color:var(--muted);">${t('dm_no_match')}</div>`;
+    } else {
+      contactsBar.innerHTML = visibleContacts.map((u) => {
+        const c = getCityById(u.homeCity);
+        const st = statsMap.get(u.uid) || { unreadCount: 0, lastMsg: null, lastTs: 0, hasUnclaimed: false };
+        const effectiveUnread = (u.uid === partner.uid && isMessagesViewActive) ? 0 : st.unreadCount;
+        const snippet = st.lastMsg
+          ? formatDmSnippet(st.lastMsg, lang)
+          : getCityName(c, lang);
+        const relTime = st.lastTs ? formatNotifTimeAgo(st.lastTs, lang) : '';
+
+        return `
+          <button type="button" class="dm-contact-chip smart-card ${u.uid === partner.uid ? 'active' : ''} ${effectiveUnread > 0 ? 'unread-glow' : ''}" onclick="selectDmPartner('${u.uid}')">
+            <div class="dm-chip-body">
+              <div class="dm-chip-top">
+                <span style="width:7px;height:7px;border-radius:50%;background:${effectiveUnread > 0 ? '#ef4444' : '#10b981'};display:inline-block;flex-shrink:0;"></span>
+                <span>${c.flag} @${escapeHtmlStr(u.name)}</span>
+                ${st.hasUnclaimed ? '<span>🧧</span>' : ''}
+              </div>
+              <div class="dm-chip-snippet">${escapeHtmlStr(snippet)}${relTime ? ` · ${escapeHtmlStr(relTime)}` : ''}</div>
+            </div>
+            ${effectiveUnread > 0 ? `<span class="dm-chip-unread-count">${effectiveUnread}</span>` : ''}
+          </button>
+        `;
+      }).join('');
+    }
+  }
+
+  // Active Partner Header right above thread
+  if (activeHdr) {
+    const pc = getCityById(partner.homeCity);
+    activeHdr.innerHTML = `
+      <div style="display:flex;align-items:center;gap:9px;min-width:0;">
+        <span style="font-size:1.35rem;">${pc.flag}</span>
+        <div style="min-width:0;">
+          <div style="font-size:0.7rem;color:#7dd3fc;font-weight:800;text-transform:uppercase;letter-spacing:0.4px;">${t('dm_active_chat_with')}</div>
+          <div style="font-size:0.92rem;font-weight:900;color:#fbbf24;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+            @${escapeHtmlStr(partner.name)} <span style="font-size:0.75rem;color:#cbd5e1;font-weight:700;">· ${escapeHtmlStr(getCityName(pc, lang))}${partner.passportNum ? ` · #${escapeHtmlStr(partner.passportNum)}` : ''}</span>
+          </div>
+        </div>
+      </div>
+    `;
   }
 
   const autoTrans = Boolean(document.getElementById('dmAutoTranslateChk')?.checked);
-  const dms = (REMO_STORE.state.directMessages || []).filter(
+  const dms = allDms.filter(
     (d) =>
-      (d.fromUid === me.uid && d.toUid === partner.uid) ||
-      (d.fromUid === partner.uid && d.toUid === me.uid) ||
-      (isAdm && (!d.toUid || d.toUid === 'peer'))
+      (isDmSentByMe(d, me.uid, isAdmUser) && d.toUid === partner.uid) ||
+      (d.fromUid === partner.uid && (isDmAddressedToMe(d, me.uid, isAdmUser) || d.toUid === me.uid || (isAdmUser && d.toUid === 'u_admin_founder')))
   );
 
   box.innerHTML = dms.map((d) => {
-    const isMine = d.fromUid === me.uid;
+    const isMine = isDmSentByMe(d, me.uid, isAdmUser);
+    const isJustOpened = !isMine && (_justReadDmHighlightIds.has(d.id) || !d.read);
     const dual = d.text ? REMO_TRANSLATOR.makeBilingualPair(d.text) : null;
     const isInlineAudio = d.voiceUrl && (String(d.voiceUrl).startsWith('data:') || String(d.voiceUrl).startsWith('http') || String(d.voiceUrl).startsWith('blob:'));
     const vUrl = isInlineAudio ? d.voiceUrl : (d.voiceUrl ? RemoMediaDB.resolveSyncOrPlaceholder(d.voiceUrl) : '');
     const vIdb = d.voiceUrl && String(d.voiceUrl).startsWith('idb://') ? `data-idb-src="${d.voiceUrl}"` : '';
     const offerCity = d.cardOffer ? getCityById(d.cardOffer.cityId) : null;
+    const msgTime = d.ts ? formatNotifTimeAgo(d.ts, lang) : '';
 
     return `
-      <div class="dm-bubble ${isMine ? 'mine' : ''}">
+      <div class="dm-bubble ${isMine ? 'mine' : ''} ${isJustOpened ? 'just-arrived' : ''}">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
-          <b style="color:${isMine ? '#7dd3fc' : '#fbbf24'};font-size:0.8rem;">@${escapeHtmlStr(d.fromName || 'Citizen')}</b>
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+            <b style="color:${isMine ? '#7dd3fc' : '#fbbf24'};font-size:0.8rem;">@${escapeHtmlStr(d.fromName || 'Citizen')}</b>
+            ${isJustOpened ? `<span class="dm-new-msg-pill">${t('dm_new_badge')}</span>` : ''}
+            ${msgTime ? `<span style="font-size:0.68rem;color:var(--muted);">${escapeHtmlStr(msgTime)}</span>` : ''}
+          </div>
           ${isAdm ? `<button type="button" class="adm-pbtn danger" style="padding:2px 6px;" onclick="adminDeleteDmInline('${d.id}')">🗑️</button>` : ''}
         </div>
         ${d.text ? `<div style="margin-top:4px;font-size:0.88rem;color:#f8fafc;">${escapeHtmlStr(d.text)}</div>` : ''}
@@ -3015,29 +3258,38 @@ function renderDirectMessagesView() {
     `;
   }).join('') || `<div style="text-align:center;color:var(--muted);padding:26px;">${lang === 'fr' ? `Démarrez votre conversation privée 1-à-1 avec @${partner.name} !` : `Start your private 1-on-1 conversation with @${partner.name}!`}</div>`;
 
-  // Mark all unread messages from this active partner as read
-  let markedAny = false;
-  (REMO_STORE.state.directMessages || []).forEach((d) => {
-    if (d && d.fromUid === partner.uid && d.toUid === me.uid && !d.read) {
-      d.read = true;
-      markedAny = true;
-      REMO_STORE.syncDmToCloud(d);
+  // Mark unread messages from this active partner as read ONLY when Messages view is actually open
+  if (isMessagesViewActive) {
+    let markedAny = false;
+    allDms.forEach((d) => {
+      if (d && d.fromUid === partner.uid && isDmAddressedToMe(d, me.uid, isAdmUser) && !d.read) {
+        d.read = true;
+        markedAny = true;
+        REMO_STORE.syncDmToCloud(d);
+      }
+    });
+    (REMO_STORE.state.notifications || []).forEach((n) => {
+      if (n && n.fromUid === partner.uid && n.type === 'message' && !n.read && (n.toUid === me.uid || (isAdmUser && n.toUid === 'u_admin_founder'))) {
+        n.read = true;
+        markedAny = true;
+        REMO_STORE.markNotifIdReadLocal(n.id);
+        REMO_STORE.syncNotificationToCloud(n);
+      }
+    });
+    if (markedAny) {
+      REMO_STORE.save(false, 'dm_read');
+      if (typeof updateUnreadBadges === 'function') updateUnreadBadges();
     }
-  });
-  (REMO_STORE.state.notifications || []).forEach((n) => {
-    if (n && n.fromUid === partner.uid && n.toUid === me.uid && n.type === 'message' && !n.read) {
-      n.read = true;
-      markedAny = true;
-      REMO_STORE.syncNotificationToCloud(n);
-    }
-  });
-  if (markedAny) {
-    REMO_STORE.save(false, 'dm_read');
-    if (typeof updateUnreadBadges === 'function') updateUnreadBadges();
   }
 
   RemoMediaDB.hydrateDom(box);
   box.scrollTop = box.scrollHeight;
+  if (contactsBar) {
+    const activeChip = contactsBar.querySelector('.dm-contact-chip.active');
+    if (activeChip && typeof activeChip.scrollIntoView === 'function') {
+      try { activeChip.scrollIntoView({ inline: 'nearest', block: 'nearest' }); } catch (e) {}
+    }
+  }
   if (typeof initDesktopHorizontalScrollRails === 'function') {
     setTimeout(initDesktopHorizontalScrollRails, 30);
   }
@@ -3053,6 +3305,7 @@ function sendDirectMessage() {
     id: 'dm_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
     fromUid: u.uid,
     fromName: u.name,
+    fromCity: u.homeCity || '',
     toUid: targetUid,
     text: txt,
     read: false,
@@ -3061,14 +3314,6 @@ function sendDirectMessage() {
   REMO_STORE.state.directMessages.push(newDm);
   inp.value = '';
   RemoAudio.play('click');
-  REMO_STORE.addNotification({
-    toUid: targetUid,
-    fromUid: u.uid,
-    fromName: u.name,
-    fromCity: u.homeCity,
-    type: 'message',
-    text: txt
-  });
   REMO_STORE.save(true, 'dm');
   REMO_STORE.syncDmToCloud(newDm);
   renderDirectMessagesView();
@@ -3100,6 +3345,7 @@ async function toggleDmVoiceNote() {
           id: 'dm_v_' + Date.now(),
           fromUid: u.uid,
           fromName: u.name,
+          fromCity: u.homeCity || '',
           toUid: targetUid,
           text: lang === 'fr' ? '🎙️ Message vocal privé' : '🎙️ Private voice note',
           voiceUrl: audioDataUrl,
@@ -3107,14 +3353,6 @@ async function toggleDmVoiceNote() {
           ts: Date.now()
         };
         REMO_STORE.state.directMessages.push(newDm);
-        REMO_STORE.addNotification({
-          toUid: targetUid,
-          fromUid: u.uid,
-          fromName: u.name,
-          fromCity: u.homeCity,
-          type: 'message',
-          text: lang === 'fr' ? '🎙️ Note Vocale Privée' : '🎙️ Private Voice Note'
-        });
         REMO_STORE.save(true, 'dm_voice');
         REMO_STORE.syncDmToCloud(newDm);
         renderDirectMessagesView();
@@ -3140,6 +3378,7 @@ async function toggleDmVoiceNote() {
       id: 'dm_v_' + Date.now(),
       fromUid: u.uid,
       fromName: u.name,
+      fromCity: u.homeCity || '',
       toUid: targetUid,
       text: lang === 'fr' ? '🎙️ Onde vocale privée' : '🎙️ Private cyber voice note',
       voiceUrl: RemoAudio.createSynthVoiceWavDataUrl(2.2),
@@ -3148,14 +3387,6 @@ async function toggleDmVoiceNote() {
     };
     REMO_STORE.state.directMessages.push(newDm);
     RemoAudio.play('roger');
-    REMO_STORE.addNotification({
-      toUid: targetUid,
-      fromUid: u.uid,
-      fromName: u.name,
-      fromCity: u.homeCity,
-      type: 'message',
-      text: lang === 'fr' ? '🎙️ Note Vocale Privée' : '🎙️ Private Voice Note'
-    });
     REMO_STORE.save(true, 'dm_voice');
     REMO_STORE.syncDmToCloud(newDm);
     renderDirectMessagesView();
@@ -3185,6 +3416,7 @@ function sendDmCoinEnvelopePrompt(isRoyalAdmin = false) {
     id: 'dm_env_' + Date.now(),
     fromUid: u.uid,
     fromName: u.name,
+    fromCity: u.homeCity || '',
     toUid: activeDmPartnerUid || 'u_admin_founder',
     text: isRoyalAdmin
       ? (lang === 'fr' ? '👑 Cadeau Officiel du Fondateur REMO !' : '👑 Official REMO Founder Gift!')
@@ -3192,6 +3424,7 @@ function sendDmCoinEnvelopePrompt(isRoyalAdmin = false) {
     envelopeCoins: amt,
     envelopeClaimed: false,
     isRoyalAdmin: !!isRoyalAdmin,
+    read: false,
     ts: Date.now()
   };
   REMO_STORE.state.directMessages.push(newDm);
@@ -3199,7 +3432,7 @@ function sendDmCoinEnvelopePrompt(isRoyalAdmin = false) {
   REMO_STORE.syncDmToCloud(newDm);
   syncHeaderAndSidebars();
   renderDirectMessagesView();
-  remoToast(`🧧 +${amt} 🪙 Envelope sent!`, 'coin');
+  remoToast(lang === 'fr' ? `🧧 Enveloppe +${amt} 🪙 envoyée !` : `🧧 +${amt} 🪙 Envelope sent!`, 'coin');
 }
 
 function claimDmCoinEnvelope(msgId) {
@@ -3242,6 +3475,7 @@ function sendDmCardTradePrompt() {
     id: 'dm_trd_' + Date.now(),
     fromUid: u.uid,
     fromName: u.name,
+    fromCity: u.homeCity || '',
     toUid: activeDmPartnerUid || 'u_admin_founder',
     text: lang === 'fr' ? '🔄 Offre officielle de Carte 4D dans le chat :' : '🔄 Official 4D City Card offer in chat:',
     cardOffer: {
@@ -3251,13 +3485,14 @@ function sendDmCardTradePrompt() {
       price,
       accepted: false
     },
+    read: false,
     ts: Date.now()
   };
   REMO_STORE.state.directMessages.push(newDm);
   REMO_STORE.save(true, 'dm_card_offer');
   REMO_STORE.syncDmToCloud(newDm);
   renderDirectMessagesView();
-  remoToast('🎴 4D Card Offer sent in chat!', 'coin');
+  remoToast(lang === 'fr' ? '🎴 Offre de Carte 4D envoyée dans le chat !' : '🎴 4D Card Offer sent in chat!', 'coin');
 }
 
 function acceptDmCardTradeOffer(msgId) {
@@ -6014,28 +6249,356 @@ document.addEventListener('keydown', (ev) => {
 window.buildFittedHtmlSrcdoc = buildFittedHtmlSrcdoc;
 
 /* ════════════════════════════════════════════════════════════════════
-   🔔 REMO PULSE — LIVE NOTIFICATION HUB & HEADS-UP SYSTEM
+   🔔 REMO PULSE — SMART NOTIFICATION HUB, SIDEBAR PILLS, FLOATING BUBBLE & TAB TITLE
    ════════════════════════════════════════════════════════════════════ */
 let currentNotifFilter = 'all';
 let headsUpTimer = null;
 let activeHeadsUpPayload = null;
+const _dismissedFloatingAlertIds = new Set();
+let _activeFloatingAlertPayload = null;
+let _tabBlinkTimer = null;
+let _tabBlinkFlip = false;
+const ORIGINAL_REMO_TITLE = (typeof document !== 'undefined' && document.title) ? document.title : 'REMO World 🌐 The 4D City Metaverse & Social Network';
+
+function formatNotifTimeAgo(ts, lang) {
+  const diffSec = Math.max(0, Math.floor((Date.now() - Number(ts || Date.now())) / 1000));
+  const isFr = lang === 'fr';
+  if (diffSec < 45) return isFr ? 'à l’instant' : 'just now';
+  const mins = Math.floor(diffSec / 60);
+  if (mins < 60) return isFr ? `il y a ${mins} min` : `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return isFr ? `il y a ${hrs} h` : `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  return isFr ? `il y a ${days} j` : `${days}d ago`;
+}
+window.formatRelativeTime = formatNotifTimeAgo;
+
+function formatNotificationDesc(n, langOverride) {
+  if (!n) return '';
+  const lang = langOverride || (typeof REMO_I18N !== 'undefined' ? REMO_I18N.getLang() : 'en');
+  const isFr = lang === 'fr';
+  if (n.type === 'like') {
+    return isFr ? 'a aimé votre publication ❤️' : 'liked your post ❤️';
+  }
+  if (n.type === 'reaction') {
+    const em = n.emoji || '🔥';
+    return isFr ? `a réagi avec ${em} à votre publication` : `reacted with ${em} to your post`;
+  }
+  if (n.type === 'tip') {
+    let amt = Number(n.tipAmount || 0);
+    if (!amt && n.text) {
+      const m = String(n.text).match(/\+?(\d+)/);
+      if (m) amt = Number(m[1]);
+    }
+    return amt > 0
+      ? (isFr ? `vous a offert un pourboire de +${amt} 🪙 !` : `tipped you +${amt} 🪙!`)
+      : (isFr ? 'vous a offert des Pièces REMO 🪙 !' : 'tipped you REMO Coins 🪙!');
+  }
+  if (n.type === 'comment') {
+    let snippet = n.rawPreview || '';
+    if (!snippet && n.text) {
+      const qMatch = String(n.text).match(/"([^"]+)"/);
+      snippet = qMatch ? qMatch[1] : String(n.text).replace(/^(a commenté\s*:\s*|commented\s*:\s*)/i, '');
+    }
+    if (snippet === '🎤 Note Vocale' || snippet === '🎤 Voice') {
+      snippet = isFr ? '🎤 Note vocale' : '🎤 Voice reply';
+    } else if (snippet === 'Super-Commentaire' || snippet === 'Super-Comment') {
+      snippet = isFr ? '💎 Super-Commentaire' : '💎 Super-Comment';
+    }
+    return snippet
+      ? (isFr ? `a commenté : "${snippet}"` : `commented: "${snippet}"`)
+      : (isFr ? 'a commenté votre publication 💬' : 'commented on your post 💬');
+  }
+  if (n.type === 'message') {
+    const preview = n.rawPreview || n.text || '';
+    return preview
+      ? (isFr ? `Message privé : "${preview}"` : `Private message: "${preview}"`)
+      : (isFr ? 'vous a envoyé un message privé 💌' : 'sent you a private message 💌');
+  }
+  return n.text || '';
+}
+window.formatNotificationDesc = formatNotificationDesc;
+
+function buildUnifiedNotificationsList() {
+  const u = REMO_STORE.getCurrentUser();
+  const myUid = u ? u.uid : null;
+  if (!myUid) return [];
+  const isAdm = REMO_STORE.isCurrentUserAdmin();
+  const lang = REMO_I18N.getLang();
+  const localReadSet = REMO_STORE.getLocalReadNotifIds();
+  const unified = [];
+
+  // 1. Direct Messages from directMessages (single source of truth for private messages)
+  const myIncomingDms = (REMO_STORE.state.directMessages || [])
+    .filter((d) => isDmAddressedToMe(d, myUid, isAdm))
+    .slice()
+    .sort((a, b) => (b.ts || 0) - (a.ts || 0))
+    .slice(0, 45);
+
+  myIncomingDms.forEach((d) => {
+    const senderObj = (REMO_STORE.state.users || []).find((usr) => usr.uid === d.fromUid);
+    unified.push({
+      id: 'dmnotif_' + d.id,
+      dmId: d.id,
+      toUid: myUid,
+      fromUid: d.fromUid,
+      fromName: d.fromName || (senderObj ? senderObj.name : 'Citizen'),
+      fromCity: d.fromCity || (senderObj ? senderObj.homeCity : ''),
+      type: 'message',
+      rawPreview: formatDmSnippet(d, lang),
+      text: d.text || '',
+      read: Boolean(d.read),
+      ts: Number(d.ts || 0)
+    });
+  });
+
+  // 2. Social & System Notifications (excluding duplicate type === 'message' entries)
+  const socialNotifs = (REMO_STORE.state.notifications || []).filter((n) =>
+    n && n.type !== 'message' &&
+    (n.toUid === myUid || (isAdm && (n.toUid === 'u_admin_founder' || !n.toUid))) &&
+    n.fromUid !== myUid
+  );
+  socialNotifs.forEach((n) => {
+    unified.push(Object.assign({}, n, {
+      read: Boolean(n.read || localReadSet.has(n.id))
+    }));
+  });
+
+  // 3. Backfill comments on my posts that don't yet have a social notification entry
+  (REMO_STORE.state.posts || []).forEach((p) => {
+    if (!p || !(p.uid === myUid || (isAdm && p.uid === 'u_admin_founder'))) return;
+    (p.comments || []).forEach((c) => {
+      if (!c || !c.id || !c.uid || c.uid === myUid) return;
+      const synthId = 'notif_cmt_' + c.id;
+      const alreadyCovered = unified.some((un) =>
+        un.id === synthId ||
+        (un.type === 'comment' && un.postId === p.id && un.fromUid === c.uid && Math.abs((un.ts || 0) - (c.createdAt || 0)) < 20000)
+      );
+      if (!alreadyCovered) {
+        const snippet = c.text ? (c.text.length > 50 ? c.text.slice(0, 47) + '...' : c.text) : (c.voiceUrl ? '🎤 Voice' : 'Super-Comment');
+        unified.push({
+          id: synthId,
+          isSynthetic: true,
+          toUid: myUid,
+          fromUid: c.uid,
+          fromName: c.author || 'Citizen',
+          fromCity: c.cityId || '',
+          type: 'comment',
+          postId: p.id,
+          rawPreview: snippet,
+          text: snippet,
+          read: Boolean(localReadSet.has(synthId)),
+          ts: Number(c.createdAt || p.createdAt || 0)
+        });
+      }
+    });
+  });
+
+  unified.sort((a, b) => (b.ts || 0) - (a.ts || 0));
+  return unified;
+}
+
+function updateDynamicTabTitle(unreadSenders, unreadSocial, lang) {
+  const totalUnread = unreadSenders.reduce((acc, s) => acc + s.count, 0) + unreadSocial.length;
+  if (totalUnread <= 0) {
+    if (_tabBlinkTimer) {
+      clearInterval(_tabBlinkTimer);
+      _tabBlinkTimer = null;
+    }
+    if (typeof document !== 'undefined' && document.title !== ORIGINAL_REMO_TITLE) {
+      document.title = ORIGINAL_REMO_TITLE;
+    }
+    return;
+  }
+
+  const getAlertTitle = () => {
+    const curLang = REMO_I18N.getLang();
+    if (unreadSenders.length > 0) {
+      const top = unreadSenders[0];
+      return curLang === 'fr'
+        ? `🔴 (${totalUnread}) Message de @${top.name} • REMO`
+        : `🔴 (${totalUnread}) Message from @${top.name} • REMO`;
+    }
+    const topSoc = unreadSocial[0];
+    const actor = topSoc ? topSoc.fromName : 'Citizen';
+    return curLang === 'fr'
+      ? `🔔 (${totalUnread}) @${actor} • REMO World`
+      : `🔔 (${totalUnread}) @${actor} • REMO World`;
+  };
+
+  if (typeof document !== 'undefined' && !_tabBlinkFlip) {
+    document.title = getAlertTitle();
+  }
+
+  if (!_tabBlinkTimer) {
+    _tabBlinkTimer = setInterval(() => {
+      if (typeof document === 'undefined') return;
+      _tabBlinkFlip = !_tabBlinkFlip;
+      document.title = _tabBlinkFlip ? ORIGINAL_REMO_TITLE : getAlertTitle();
+    }, 2200);
+  }
+}
+
+function renderSidebarUnreadSenderPills(unreadSenders, lang) {
+  const containers = [
+    document.getElementById('sidebarUnreadSenderPills'),
+    document.getElementById('mbHubUnreadSenderPills')
+  ];
+  containers.forEach((el) => {
+    if (!el) return;
+    if (!unreadSenders || unreadSenders.length === 0) {
+      el.style.display = 'none';
+      el.innerHTML = '';
+      return;
+    }
+    el.style.display = 'flex';
+    el.innerHTML = unreadSenders.slice(0, 3).map((s) => `
+      <button type="button" class="sidebar-sender-pill" onclick="openDirectChatWithUser('${s.uid}')">
+        <span class="sp-dot"></span>
+        <span class="sp-txt">
+          <span class="sp-name">${s.flag} @${escapeHtmlStr(s.name)}:</span>
+          <span class="sp-msg">"${escapeHtmlStr(s.snippet)}"</span>
+        </span>
+        <span class="sp-cnt">${s.count}</span>
+      </button>
+    `).join('');
+  });
+}
+
+function renderFloatingAlertBubble(unreadSenders, unreadSocial, lang) {
+  const bubble = document.getElementById('remoFloatingAlertBubble');
+  if (!bubble) return;
+  const isFr = lang === 'fr';
+
+  // Pick top non-dismissed unread DM sender (if not currently viewing their chat)
+  const candidateDm = unreadSenders.find((s) => {
+    if (currentRemoView === 'messages' && activeDmPartnerUid === s.uid) return false;
+    return !_dismissedFloatingAlertIds.has('dm_sender_' + s.uid + '_' + s.latestDmId);
+  });
+
+  if (candidateDm) {
+    _activeFloatingAlertPayload = {
+      kind: 'dm',
+      dismissKey: 'dm_sender_' + candidateDm.uid + '_' + candidateDm.latestDmId,
+      partnerUid: candidateDm.uid
+    };
+    bubble.className = 'remo-floating-bubble is-dm';
+    bubble.style.display = 'block';
+    bubble.onclick = () => handleFloatingAlertClick();
+    bubble.innerHTML = `
+      <div class="rfb-inner">
+        <div class="rfb-avatar">
+          <span>${candidateDm.flag || '💌'}</span>
+          <span class="rfb-badge">${candidateDm.count}</span>
+        </div>
+        <div class="rfb-body">
+          <div class="rfb-title">💌 @${escapeHtmlStr(candidateDm.name)}</div>
+          <div class="rfb-text">${escapeHtmlStr(candidateDm.snippet)}</div>
+        </div>
+        <button type="button" class="rfb-open-btn" onclick="event.stopPropagation();handleFloatingAlertClick()">${t('notif_reply_btn')}</button>
+        <button type="button" class="rfb-close-btn" onclick="dismissFloatingAlertBubble(event)" title="${isFr ? 'Fermer' : 'Dismiss'}">✕</button>
+      </div>
+    `;
+    return;
+  }
+
+  // Otherwise pick top non-dismissed unread social notification (comment, like, reaction, tip)
+  const candidateSoc = unreadSocial.find((n) => !_dismissedFloatingAlertIds.has('notif_' + n.id));
+  if (candidateSoc) {
+    let icon = '🔔';
+    if (candidateSoc.type === 'comment') icon = '💬';
+    else if (candidateSoc.type === 'like') icon = '❤️';
+    else if (candidateSoc.type === 'reaction') icon = candidateSoc.emoji || '🔥';
+    else if (candidateSoc.type === 'tip') icon = '🪙';
+
+    _activeFloatingAlertPayload = {
+      kind: 'notif',
+      dismissKey: 'notif_' + candidateSoc.id,
+      notifId: candidateSoc.id
+    };
+    bubble.className = 'remo-floating-bubble';
+    bubble.style.display = 'block';
+    bubble.onclick = () => handleFloatingAlertClick();
+    bubble.innerHTML = `
+      <div class="rfb-inner">
+        <div class="rfb-avatar">
+          <span>${icon}</span>
+          <span class="rfb-badge">1</span>
+        </div>
+        <div class="rfb-body">
+          <div class="rfb-title">@${escapeHtmlStr(candidateSoc.fromName || 'Citizen')}</div>
+          <div class="rfb-text">${escapeHtmlStr(formatNotificationDesc(candidateSoc, lang))}</div>
+        </div>
+        <button type="button" class="rfb-open-btn" onclick="event.stopPropagation();handleFloatingAlertClick()">${t('notif_open_btn')}</button>
+        <button type="button" class="rfb-close-btn" onclick="dismissFloatingAlertBubble(event)" title="${isFr ? 'Fermer' : 'Dismiss'}">✕</button>
+      </div>
+    `;
+    return;
+  }
+
+  _activeFloatingAlertPayload = null;
+  bubble.style.display = 'none';
+  bubble.innerHTML = '';
+}
+
+function dismissFloatingAlertBubble(ev) {
+  if (ev) ev.stopPropagation();
+  if (_activeFloatingAlertPayload && _activeFloatingAlertPayload.dismissKey) {
+    _dismissedFloatingAlertIds.add(_activeFloatingAlertPayload.dismissKey);
+  }
+  updateUnreadBadges();
+}
+window.dismissFloatingAlertBubble = dismissFloatingAlertBubble;
+
+function handleFloatingAlertClick() {
+  const p = _activeFloatingAlertPayload;
+  if (!p) return;
+  if (p.dismissKey) _dismissedFloatingAlertIds.add(p.dismissKey);
+  if (p.kind === 'dm' && p.partnerUid) {
+    openDirectChatWithUser(p.partnerUid);
+  } else if (p.kind === 'notif' && p.notifId) {
+    handleNotificationClick(p.notifId);
+  }
+}
+window.handleFloatingAlertClick = handleFloatingAlertClick;
 
 function updateUnreadBadges() {
   const u = REMO_STORE.getCurrentUser();
   const myUid = u ? u.uid : null;
   const isAdm = REMO_STORE.isCurrentUserAdmin();
+  const lang = REMO_I18N.getLang();
 
-  // 1. Unread direct messages
-  const unreadDms = (REMO_STORE.state.directMessages || []).filter((d) =>
-    myUid && (d.toUid === myUid || (isAdm && (d.toUid === 'u_admin_founder' || !d.toUid))) && d.fromUid !== myUid && !d.read
-  );
+  // 1. Group unread Direct Messages by sender (sorted newest first)
+  const unreadDms = (REMO_STORE.state.directMessages || [])
+    .filter((d) => isDmAddressedToMe(d, myUid, isAdm) && !d.read)
+    .sort((a, b) => (b.ts || 0) - (a.ts || 0));
   const unreadDmCount = unreadDms.length;
 
-  // 2. Unread general notifications
-  const unreadNotifs = (REMO_STORE.state.notifications || []).filter((n) =>
-    myUid && (n.toUid === myUid || (isAdm && (n.toUid === 'u_admin_founder' || !n.toUid))) && n.fromUid !== myUid && !n.read
-  );
-  const totalUnreadNotifs = unreadNotifs.length + unreadDmCount;
+  const senderGroupMap = new Map();
+  unreadDms.forEach((d) => {
+    if (!d.fromUid) return;
+    if (!senderGroupMap.has(d.fromUid)) {
+      const usr = (REMO_STORE.state.users || []).find((x) => x.uid === d.fromUid);
+      const cityObj = getCityById(d.fromCity || (usr ? usr.homeCity : 'montreal'));
+      senderGroupMap.set(d.fromUid, {
+        uid: d.fromUid,
+        name: d.fromName || (usr ? usr.name : 'Citizen'),
+        flag: cityObj ? cityObj.flag : '🌍',
+        snippet: formatDmSnippet(d, lang),
+        latestDmId: d.id,
+        latestTs: Number(d.ts || 0),
+        count: 1
+      });
+    } else {
+      senderGroupMap.get(d.fromUid).count += 1;
+    }
+  });
+  const unreadSenders = Array.from(senderGroupMap.values()).sort((a, b) => b.latestTs - a.latestTs);
+
+  // 2. Unified unread social notifications (zero double-counting with DMs)
+  const unifiedList = buildUnifiedNotificationsList();
+  const unreadSocial = unifiedList.filter((n) => n.type !== 'message' && !n.read);
+  const totalUnreadNotifs = unreadDmCount + unreadSocial.length;
 
   // Update Header Bell Badge
   const bellBadge = document.getElementById('hdrNotifBadge');
@@ -6084,6 +6647,15 @@ function updateUnreadBadges() {
   if (mbDot) {
     mbDot.style.display = (totalUnreadNotifs > 0) ? 'block' : 'none';
   }
+
+  // Update Live Sender Preview Pills in Left Sidebar & Mobile Hub
+  renderSidebarUnreadSenderPills(unreadSenders, lang);
+
+  // Update Persistent Bottom-Right Floating Alert Bubble
+  renderFloatingAlertBubble(unreadSenders, unreadSocial, lang);
+
+  // Update Dynamic Blinking Browser Tab Title
+  updateDynamicTabTitle(unreadSenders, unreadSocial, lang);
 }
 window.updateUnreadBadges = updateUnreadBadges;
 
@@ -6111,15 +6683,11 @@ function renderNotificationsList(filterTab = currentNotifFilter) {
   const box = document.getElementById('notificationsListContainer');
   if (!box) return;
   const lang = REMO_I18N.getLang();
-  const u = REMO_STORE.getCurrentUser();
-  const myUid = u ? u.uid : null;
-  const isAdm = REMO_STORE.isCurrentUserAdmin();
 
-  let list = (REMO_STORE.state.notifications || []).filter((n) =>
-    myUid && (n.toUid === myUid || (isAdm && (n.toUid === 'u_admin_founder' || !n.toUid))) && n.fromUid !== myUid
-  );
-
-  if (filterTab !== 'all') {
+  let list = buildUnifiedNotificationsList();
+  if (filterTab === 'like') {
+    list = list.filter((n) => n.type === 'like' || n.type === 'reaction' || n.type === 'tip');
+  } else if (filterTab !== 'all') {
     list = list.filter((n) => n.type === filterTab);
   }
 
@@ -6127,7 +6695,7 @@ function renderNotificationsList(filterTab = currentNotifFilter) {
     box.innerHTML = `
       <div style="text-align:center;padding:36px 14px;color:var(--muted);font-size:0.84rem;">
         <div style="font-size:2rem;margin-bottom:8px;">✨</div>
-        <div>${lang === 'fr' ? 'Aucune notification pour le moment.' : 'No notifications yet.'}</div>
+        <div>${t('notif_empty')}</div>
       </div>
     `;
     return;
@@ -6135,13 +6703,16 @@ function renderNotificationsList(filterTab = currentNotifFilter) {
 
   box.innerHTML = list.map((n) => {
     const isUnread = !n.read;
-    const timeAgo = (typeof formatRelativeTime === 'function') ? formatRelativeTime(n.ts, lang) : 'récent';
+    const timeAgo = formatNotifTimeAgo(n.ts, lang);
+    const usr = (REMO_STORE.state.users || []).find((x) => x.uid === n.fromUid);
+    const cityObj = getCityById(n.fromCity || (usr ? usr.homeCity : 'montreal'));
+    const cityFlag = cityObj ? cityObj.flag : '';
     let icon = '🔔';
     let iconBg = 'rgba(56, 189, 248, 0.15)';
     if (n.type === 'comment') { icon = '💬'; iconBg = 'rgba(56, 189, 248, 0.2)'; }
     else if (n.type === 'like') { icon = '❤️'; iconBg = 'rgba(244, 63, 94, 0.2)'; }
     else if (n.type === 'reaction') { icon = n.emoji || '🔥'; iconBg = 'rgba(251, 191, 36, 0.2)'; }
-    else if (n.type === 'message') { icon = '💌'; iconBg = 'rgba(168, 85, 247, 0.2)'; }
+    else if (n.type === 'message') { icon = '💌'; iconBg = 'rgba(168, 85, 247, 0.24)'; }
     else if (n.type === 'tip') { icon = '🪙'; iconBg = 'rgba(234, 179, 8, 0.2)'; }
 
     return `
@@ -6150,40 +6721,71 @@ function renderNotificationsList(filterTab = currentNotifFilter) {
           ${icon}
         </div>
         <div class="notif-card-content">
-          <div class="notif-card-actor">@${escapeHtmlStr(n.fromName || 'Citizen')}</div>
-          <div class="notif-card-desc">${escapeHtmlStr(n.text || '')}</div>
+          <div class="notif-card-actor">${cityFlag ? cityFlag + ' ' : ''}@${escapeHtmlStr(n.fromName || 'Citizen')}</div>
+          <div class="notif-card-desc">${escapeHtmlStr(formatNotificationDesc(n, lang))}</div>
         </div>
-        <div class="notif-card-time">${timeAgo}</div>
+        <div class="notif-card-time">${escapeHtmlStr(timeAgo)}</div>
       </div>
     `;
   }).join('');
 }
 window.renderNotificationsList = renderNotificationsList;
 
+function jumpToPostFromNotification(postId, shouldOpenComments) {
+  if (!postId) return;
+  // Reset any active feed filter if it would hide the target post
+  if (currentFeedMode !== 'all' || currentFeedCityFilter !== 'all' || currentFeedVibeFilter !== 'all') {
+    currentFeedMode = 'all';
+    currentFeedCityFilter = 'all';
+    currentFeedVibeFilter = 'all';
+    document.querySelectorAll('#feedModeChips .fchip').forEach((b, idx) => b.classList.toggle('active', idx === 0));
+    document.querySelectorAll('#feedVibeChips .fchip').forEach((b, idx) => b.classList.toggle('active', idx === 0));
+  }
+  switchRemoView('feed');
+  setTimeout(() => {
+    const el = document.getElementById('post_card_' + postId);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.style.transition = 'box-shadow 0.35s ease';
+      el.style.boxShadow = '0 0 28px rgba(56, 189, 248, 0.85)';
+      setTimeout(() => { if (el) el.style.boxShadow = ''; }, 2600);
+    }
+    if (shouldOpenComments) {
+      openCommentsModal(postId);
+    }
+  }, 160);
+}
+
 function handleNotificationClick(notifId) {
-  const n = (REMO_STORE.state.notifications || []).find((x) => x.id === notifId);
-  if (!n) return;
-  n.read = true;
-  REMO_STORE.syncNotificationToCloud(n);
+  const unified = buildUnifiedNotificationsList();
+  const item = unified.find((x) => x.id === notifId);
+  if (!item) return;
+
+  REMO_STORE.markNotifIdReadLocal(notifId);
+
+  if (item.dmId) {
+    const dm = (REMO_STORE.state.directMessages || []).find((d) => d.id === item.dmId);
+    if (dm && !dm.read) {
+      _justReadDmHighlightIds.add(dm.id);
+      dm.read = true;
+      REMO_STORE.syncDmToCloud(dm);
+    }
+  } else {
+    const realNotif = (REMO_STORE.state.notifications || []).find((x) => x.id === notifId);
+    if (realNotif) {
+      realNotif.read = true;
+      REMO_STORE.syncNotificationToCloud(realNotif);
+    }
+  }
+
   REMO_STORE.save(false, 'notif_read');
   updateUnreadBadges();
   document.getElementById('notificationsModal')?.classList.remove('open');
 
-  if (n.type === 'message' && n.fromUid) {
-    openDirectChatWithUser(n.fromUid);
-  } else if ((n.type === 'comment' || n.type === 'like' || n.type === 'reaction' || n.type === 'tip') && n.postId) {
-    switchRemoView('feed');
-    setTimeout(() => {
-      const el = document.getElementById('postCard_' + n.postId);
-      if (el) {
-        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        el.style.boxShadow = '0 0 25px rgba(56, 189, 248, 0.8)';
-        setTimeout(() => { el.style.boxShadow = ''; }, 2400);
-      }
-      if (n.type === 'comment') {
-        openCommentsModal(n.postId);
-      }
-    }, 150);
+  if (item.type === 'message' && item.fromUid) {
+    openDirectChatWithUser(item.fromUid);
+  } else if ((item.type === 'comment' || item.type === 'like' || item.type === 'reaction' || item.type === 'tip') && item.postId) {
+    jumpToPostFromNotification(item.postId, item.type === 'comment');
   }
 }
 window.handleNotificationClick = handleNotificationClick;
@@ -6252,13 +6854,15 @@ function handleHeadsUpClick() {
   if (p.type === 'message' && p.partnerUid) {
     openDirectChatWithUser(p.partnerUid);
   } else if (p.postId) {
-    switchRemoView('feed');
-    setTimeout(() => {
-      const el = document.getElementById('postCard_' + p.postId);
-      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      if (p.type === 'comment') openCommentsModal(p.postId);
-    }, 150);
+    jumpToPostFromNotification(p.postId, p.type === 'comment');
   }
 }
 window.handleHeadsUpClick = handleHeadsUpClick;
+
+window.addEventListener('remo:langchange', () => {
+  updateUnreadBadges();
+  if (document.getElementById('notificationsModal')?.classList.contains('open')) {
+    renderNotificationsList(currentNotifFilter);
+  }
+});
 
