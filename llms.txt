@@ -1,0 +1,42 @@
+# REMO World (https://remoworld.com)
+
+> REMO World is a free bilingual (English & French) 4D City Social Network, Live World Radio Player (38 ad-free global & Lofi stations), Browser Geography Game ("Guess My City!"), Online 4x8 Beat Maker, and 9:16 Virtual Boarding Pass Generator connecting 24 world cities in real time.
+
+## Key Free Features (Zero Sign-Up Required to Explore)
+- [REMO World Live Social App](https://remoworld.com/): Real-time cross-city social feed, 1-click cross-city Waves with km distance, live City Clicker Cup wars, Citizen Passports, and collectible 4D City Cards.
+- [Free Live World Cities Radio (38 Stations)](https://remoworld.com/world-radio.html): Stream live radio from Paris, Montréal, Chișinău, Bucharest, New York, London, Tokyo, Seoul, Berlin, Dubai + Lofi, Jazz & Synthwave with Listen-to-Earn coin rewards.
+- [Guess The City Photo Game](https://remoworld.com/guess-the-city.html): Free browser geography & skyline photo guessing game created by real citizens worldwide.
+- [Free Online 4D Beat Maker](https://remoworld.com/beat-maker.html): Browser-based 4x8 WebAudio drum & synth step sequencer with instant 1-click social remixing.
+- [4D Holographic Boarding Pass Generator](https://remoworld.com/boarding-pass.html): Create & download 9:16 Story Boarding Passes between any two world cities for TikTok, Instagram & WhatsApp.
+- [All 24 Connected World Cities Directory](https://remoworld.com/cities/index.html): Live local time, weather, radio streams & urban stats for every Edition-1 metropolis.
+
+## Edition-1 Connected Cities (EN & FR)
+- [⚜️ Montréal (Canada)](https://remoworld.com/cities/montreal.html) | [Version Française](https://remoworld.com/fr/cities/montreal.html)
+- [🗼 Paris (France)](https://remoworld.com/cities/paris.html) | [Version Française](https://remoworld.com/fr/cities/paris.html)
+- [🇲🇩 Chișinău (Moldova)](https://remoworld.com/cities/chisinau.html) | [Version Française](https://remoworld.com/fr/cities/chisinau.html)
+- [🇷🇴 Bucharest (Romania)](https://remoworld.com/cities/bucharest.html) | [Version Française](https://remoworld.com/fr/cities/bucharest.html)
+- [🗽 New York (United States)](https://remoworld.com/cities/newyork.html) | [Version Française](https://remoworld.com/fr/cities/newyork.html)
+- [🏯 Tokyo (Japan)](https://remoworld.com/cities/tokyo.html) | [Version Française](https://remoworld.com/fr/cities/tokyo.html)
+- [🏰 London (United Kingdom)](https://remoworld.com/cities/london.html) | [Version Française](https://remoworld.com/fr/cities/london.html)
+- [🌆 Dubai (UAE)](https://remoworld.com/cities/dubai.html) | [Version Française](https://remoworld.com/fr/cities/dubai.html)
+- [🌴 Miami (United States)](https://remoworld.com/cities/miami.html) | [Version Française](https://remoworld.com/fr/cities/miami.html)
+- [☀️ Barcelona (Spain)](https://remoworld.com/cities/barcelona.html) | [Version Française](https://remoworld.com/fr/cities/barcelona.html)
+- [🏛️ Rome (Italy)](https://remoworld.com/cities/rome.html) | [Version Française](https://remoworld.com/fr/cities/rome.html)
+- [🍁 Toronto (Canada)](https://remoworld.com/cities/toronto.html) | [Version Française](https://remoworld.com/fr/cities/toronto.html)
+- [🏎️ Monaco (Monaco)](https://remoworld.com/cities/monaco.html) | [Version Française](https://remoworld.com/fr/cities/monaco.html)
+- [🎬 Los Angeles (United States)](https://remoworld.com/cities/losangeles.html) | [Version Française](https://remoworld.com/fr/cities/losangeles.html)
+- [⚡ Seoul (South Korea)](https://remoworld.com/cities/seoul.html) | [Version Française](https://remoworld.com/fr/cities/seoul.html)
+- [⌚ Geneva (Switzerland)](https://remoworld.com/cities/geneva.html) | [Version Française](https://remoworld.com/fr/cities/geneva.html)
+- [🦁 Singapore (Singapore)](https://remoworld.com/cities/singapore.html) | [Version Française](https://remoworld.com/fr/cities/singapore.html)
+- [⛵ Sydney (Australia)](https://remoworld.com/cities/sydney.html) | [Version Française](https://remoworld.com/fr/cities/sydney.html)
+- [🎭 Rio de Janeiro (Brazil)](https://remoworld.com/cities/rio.html) | [Version Française](https://remoworld.com/fr/cities/rio.html)
+- [🕌 Istanbul (Türkiye)](https://remoworld.com/cities/istanbul.html) | [Version Française](https://remoworld.com/fr/cities/istanbul.html)
+- [🎧 Berlin (Germany)](https://remoworld.com/cities/berlin.html) | [Version Française](https://remoworld.com/fr/cities/berlin.html)
+- [🚲 Amsterdam (Netherlands)](https://remoworld.com/cities/amsterdam.html) | [Version Française](https://remoworld.com/fr/cities/amsterdam.html)
+- [🚋 Lisbon (Portugal)](https://remoworld.com/cities/lisbon.html) | [Version Française](https://remoworld.com/fr/cities/lisbon.html)
+- [🔺 Cairo (Egypt)](https://remoworld.com/cities/cairo.html) | [Version Française](https://remoworld.com/fr/cities/cairo.html)
+
+## Languages
+- English: https://remoworld.com/
+- Français: https://remoworld.com/fr/cities/index.html
+- Full AI Reference: https://remoworld.com/llms-full.txt

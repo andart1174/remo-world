@@ -3956,8 +3956,12 @@ document.addEventListener('DOMContentLoaded', () => {
   setTimeout(initDesktopHorizontalScrollRails, 1200);
 
 
-  // Check URL parameters (?view=arena, ?city=chisinau, ?verify=..., ?post=...)
+  // Check URL parameters (?view=arena, ?city=chisinau, ?lang=fr, ?open=radio|beatpad|boardingpass|guess, ?verify=..., ?post=...)
   const params = new URLSearchParams(window.location.search);
+  const urlLang = (params.get('lang') || '').toLowerCase();
+  if ((urlLang === 'en' || urlLang === 'fr') && typeof REMO_I18N !== 'undefined' && REMO_I18N.getLang() !== urlLang) {
+    REMO_I18N.setLang(urlLang);
+  }
   const targetPost = params.get('post') || (window.location.hash ? window.location.hash.replace('#post_', '').replace('#', '') : null);
   if (targetPost) {
     const scrollToTargetPost = () => {
@@ -4022,6 +4026,28 @@ document.addEventListener('DOMContentLoaded', () => {
         mBox.style.boxShadow = '0 0 28px rgba(168, 85, 247, 0.85)';
       }
     }, 850);
+  }
+  const openTarget = (params.get('open') || '').trim().toLowerCase();
+  if (openTarget) {
+    setTimeout(() => {
+      if (openTarget === 'radio') {
+        if (typeof window.openRemoRadioModal === 'function') window.openRemoRadioModal();
+        const stParam = (params.get('station') || '').trim();
+        if (stParam && typeof window.selectRadioStation === 'function') window.selectRadioStation(stParam);
+      } else if (openTarget === 'beatpad') {
+        if (typeof openCreatePostModal === 'function') openCreatePostModal('#RemoBeat');
+        if (typeof switchCreateStudioTab === 'function') switchCreateStudioTab('beat');
+      } else if (openTarget === 'boardingpass') {
+        if (typeof openBoardingPassModal === 'function') openBoardingPassModal();
+        const destCity = (params.get('city') || '').trim().toLowerCase();
+        if (destCity && typeof setBoardingPassRoutePreset === 'function') {
+          setBoardingPassRoutePreset(destCity === 'montreal' ? 'paris' : 'montreal', destCity);
+        }
+      } else if (openTarget === 'guess') {
+        const mysteryBtn = document.querySelector('#feedModeChips button[onclick*="mystery"]');
+        if (typeof setFeedMode === 'function') setFeedMode('mystery', mysteryBtn);
+      }
+    }, 280);
   }
   if (params.get('ref')) {
     const refCode = params.get('ref').trim().toUpperCase();
@@ -6226,6 +6252,11 @@ function showWelcomeSplashScreen(force = false) {
   const params = new URLSearchParams(window.location.search);
   const hasWelcomeParam = params.has('welcome') || params.has('onboarding');
   const hasRefParam = params.has('ref');
+  const isDirectSeoEntry = params.get('from') === 'seo' || params.has('open');
+  if (!force && isDirectSeoEntry && !hasWelcomeParam && !hasRefParam) {
+    localStorage.setItem('remo_welcome_splash_seen', '1');
+    return;
+  }
   const alreadySeen = localStorage.getItem('remo_welcome_splash_seen');
 
   if (!force && alreadySeen && !hasWelcomeParam && !hasRefParam) {

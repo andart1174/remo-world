@@ -1,0 +1,276 @@
+# REMO World (https://remoworld.com)
+
+> REMO World is a free bilingual (English & French) 4D City Social Network, Live World Radio Player (38 ad-free global & Lofi stations), Browser Geography Game ("Guess My City!"), Online 4x8 Beat Maker, and 9:16 Virtual Boarding Pass Generator connecting 24 world cities in real time.
+
+## Key Free Features (Zero Sign-Up Required to Explore)
+- [REMO World Live Social App](https://remoworld.com/): Real-time cross-city social feed, 1-click cross-city Waves with km distance, live City Clicker Cup wars, Citizen Passports, and collectible 4D City Cards.
+- [Free Live World Cities Radio (38 Stations)](https://remoworld.com/world-radio.html): Stream live radio from Paris, Montréal, Chișinău, Bucharest, New York, London, Tokyo, Seoul, Berlin, Dubai + Lofi, Jazz & Synthwave with Listen-to-Earn coin rewards.
+- [Guess The City Photo Game](https://remoworld.com/guess-the-city.html): Free browser geography & skyline photo guessing game created by real citizens worldwide.
+- [Free Online 4D Beat Maker](https://remoworld.com/beat-maker.html): Browser-based 4x8 WebAudio drum & synth step sequencer with instant 1-click social remixing.
+- [4D Holographic Boarding Pass Generator](https://remoworld.com/boarding-pass.html): Create & download 9:16 Story Boarding Passes between any two world cities for TikTok, Instagram & WhatsApp.
+- [All 24 Connected World Cities Directory](https://remoworld.com/cities/index.html): Live local time, weather, radio streams & urban stats for every Edition-1 metropolis.
+
+## Edition-1 Connected Cities (EN & FR)
+- [⚜️ Montréal (Canada)](https://remoworld.com/cities/montreal.html) | [Version Française](https://remoworld.com/fr/cities/montreal.html)
+- [🗼 Paris (France)](https://remoworld.com/cities/paris.html) | [Version Française](https://remoworld.com/fr/cities/paris.html)
+- [🇲🇩 Chișinău (Moldova)](https://remoworld.com/cities/chisinau.html) | [Version Française](https://remoworld.com/fr/cities/chisinau.html)
+- [🇷🇴 Bucharest (Romania)](https://remoworld.com/cities/bucharest.html) | [Version Française](https://remoworld.com/fr/cities/bucharest.html)
+- [🗽 New York (United States)](https://remoworld.com/cities/newyork.html) | [Version Française](https://remoworld.com/fr/cities/newyork.html)
+- [🏯 Tokyo (Japan)](https://remoworld.com/cities/tokyo.html) | [Version Française](https://remoworld.com/fr/cities/tokyo.html)
+- [🏰 London (United Kingdom)](https://remoworld.com/cities/london.html) | [Version Française](https://remoworld.com/fr/cities/london.html)
+- [🌆 Dubai (UAE)](https://remoworld.com/cities/dubai.html) | [Version Française](https://remoworld.com/fr/cities/dubai.html)
+- [🌴 Miami (United States)](https://remoworld.com/cities/miami.html) | [Version Française](https://remoworld.com/fr/cities/miami.html)
+- [☀️ Barcelona (Spain)](https://remoworld.com/cities/barcelona.html) | [Version Française](https://remoworld.com/fr/cities/barcelona.html)
+- [🏛️ Rome (Italy)](https://remoworld.com/cities/rome.html) | [Version Française](https://remoworld.com/fr/cities/rome.html)
+- [🍁 Toronto (Canada)](https://remoworld.com/cities/toronto.html) | [Version Française](https://remoworld.com/fr/cities/toronto.html)
+- [🏎️ Monaco (Monaco)](https://remoworld.com/cities/monaco.html) | [Version Française](https://remoworld.com/fr/cities/monaco.html)
+- [🎬 Los Angeles (United States)](https://remoworld.com/cities/losangeles.html) | [Version Française](https://remoworld.com/fr/cities/losangeles.html)
+- [⚡ Seoul (South Korea)](https://remoworld.com/cities/seoul.html) | [Version Française](https://remoworld.com/fr/cities/seoul.html)
+- [⌚ Geneva (Switzerland)](https://remoworld.com/cities/geneva.html) | [Version Française](https://remoworld.com/fr/cities/geneva.html)
+- [🦁 Singapore (Singapore)](https://remoworld.com/cities/singapore.html) | [Version Française](https://remoworld.com/fr/cities/singapore.html)
+- [⛵ Sydney (Australia)](https://remoworld.com/cities/sydney.html) | [Version Française](https://remoworld.com/fr/cities/sydney.html)
+- [🎭 Rio de Janeiro (Brazil)](https://remoworld.com/cities/rio.html) | [Version Française](https://remoworld.com/fr/cities/rio.html)
+- [🕌 Istanbul (Türkiye)](https://remoworld.com/cities/istanbul.html) | [Version Française](https://remoworld.com/fr/cities/istanbul.html)
+- [🎧 Berlin (Germany)](https://remoworld.com/cities/berlin.html) | [Version Française](https://remoworld.com/fr/cities/berlin.html)
+- [🚲 Amsterdam (Netherlands)](https://remoworld.com/cities/amsterdam.html) | [Version Française](https://remoworld.com/fr/cities/amsterdam.html)
+- [🚋 Lisbon (Portugal)](https://remoworld.com/cities/lisbon.html) | [Version Française](https://remoworld.com/fr/cities/lisbon.html)
+- [🔺 Cairo (Egypt)](https://remoworld.com/cities/cairo.html) | [Version Française](https://remoworld.com/fr/cities/cairo.html)
+
+## Languages
+- English: https://remoworld.com/
+- Français: https://remoworld.com/fr/cities/index.html
+- Full AI Reference: https://remoworld.com/llms-full.txt
+
+
+## Complete Radio Directory (38 Live Streams)
+- **Capital Chill UK** (LOFI & CHILL): Downtempo, Chillhop & Chilled Beats 24/7 / Downtempo, Chillhop & Lofi Beats 24/7
+- **SomaFM Groove Salad** (AMBIENT CHILL): Ambient, Downtempo & Chilled Electronica / Ambient, Downtempo & Chillout Électronique
+- **Lush Lofi & Focus** (STUDY LOFI): Mellow beats, dreamy vocals & study flow / Beats doux, voix aériennes & concentration
+- **Rainy Night Jazz & Piano** (NIGHT JAZZ): Velvet midnight jazz, piano & soul 24/7 / Jazz feutré, piano nocturne & soul 24/7
+- **Nightwave Plaza** (VAPORWAVE): Vaporwave, Future Funk & Retro Electronic / Vaporwave, Future Funk & Électro Rétro
+- **Midnight Synthwave Drive** (NIGHTDRIVE): 80s Synthwave, Outrun & Neon Nightdrive / Synthwave 80s, Outrun & Autoroute Néon
+- **DEF CON Cyber Radio** (CYBERPUNK): Cyberpunk, Synth & Underground Hacker Beats / Cyberpunk, Synthé & Beats Underground
+- **Gym Phonk & Bass Boost** (PHONK & GYM): Drift Phonk, Club Bass & High Workout Energy / Drift Phonk, Electro Bass & Haute Énergie
+- **Deep Sunset Lounge** (DEEP LOUNGE): Café Del Mar Sunset & Balearic Lounge / Ambiance Café Del Mar & Sunset Relax
+- **Deep Space Cosmos 4D** (SPACE 4D): Deep ambient space & atmospheric soundscapes / Exploration spatiale & Ambient atmosphérique
+- **Grand Cinema & Classical** (CLASSICAL): Timeless Symphonies, Piano & Prestige Strings / Symphonies, Piano & Musiques de Prestige
+- **Cyber-Lofi REMO (Zero-Fail)** (OFFLINE SYNTH): Live Real-Time Chord Synthesizer (100% Offline) / Synthétiseur d’accords en temps réel (100% Hors-Ligne)
+- **FIP Radio France Paris** (PARIS): Paris • Eclectic Jazz, Chanson & World / Paris • Jazz, Chanson, Électro & Monde
+- **FIP Electro French Touch** (FRENCH TOUCH): Paris • French Touch, House & Chic Electronica / Paris • French Touch, House & Électro Chic
+- **Mouv’ Radio Paris** (PARIS URBAN): Paris • Hip-Hop, Rap, RnB & Urban Beats / Paris • Hip-Hop, Rap, RnB & Urbain
+- **NRJ Paris Hits** (PARIS HITS): Paris • Hit Music Only & Global Top 40 / Paris • Hit Music Only & Top 40 Mondial
+- **Skyrock FM Paris** (SKYROCK): Paris • Leading French Rap & Urban Hits / Paris • Premier sur le Rap & Urbain
+- **CBC Radio One Montréal** (MONTRÉAL): Montréal • Urban Culture & Live Montreal / Montréal • Culture Urbaine & Direct QC
+- **Montréal Francophonie Pop** (MONTRÉAL QC): Montréal • Francophone Pop, Indie & QC Vibes / Montréal • Chanson Franco, Indie & Pop QC
+- **Kiss FM Chișinău** (CHIȘINĂU): Chișinău • Live Top Hits, Dance & Fresh Energy / Chișinău • Hits En Direct, Dance & Énergie
+- **One FM Dance Moldova & RO** (CLUB MD/RO): Chișinău • Non-Stop Dancefloor & Club Hits / Chișinău • Clubbing, Dancefloor & Électro
+- **Magic FM Bucarest** (BUCHAREST): Bucharest • Timeless Classics & Soft Hits / Bucarest • Grands Classiques & Soft Hits
+- **Dance FM 89.5 Bucharest** (DANCE 89.5): Bucharest • House, Deep & Club Mixes 24/7 / Bucarest • House, Deep & Clubbing 24/7
+- **Rock FM Classics** (ROCK FM): Bucharest • Classic Rock Legends & Anthems / Bucarest • Légendes du Rock & Alternative
+- **WNYC 93.9 FM New York** (NEW YORK): New York • Urban Culture, NPR & Indie / New York • Culture Urbaine, Jazz & Indie
+- **NYC Manhattan Groove** (NYC GROOVE): New York • Funk, Soul, Nu-Jazz & Brooklyn Vibes / New York • Funk, Soul, Nu-Jazz & Brooklyn Vibes
+- **Capital FM London** (LONDON): London • The UK’s No.1 Hit Music Station / Londres • Top 40 UK & Hits Mondiaux
+- **Heart Dance London** (UK DANCE): London • Feel-Good Club Classics & Dance / Londres • Club Classics & Feel-Good Dance
+- **Ibiza & Barcelona Sunset House** (IBIZA HOUSE): Barcelona & Ibiza • Balearic Deep House / Barcelone & Ibiza • Deep House & Plage
+- **Berlin Melodic Club** (BERLIN): Berlin • Melodic Techno, House & Club Pulse / Berlin • Melodic Techno, House & Underground
+- **Roma Italia Pop & Dolce Vita** (ROMA): Rome • Italian Pop Hits & Mediterranean Vibes / Rome • Grands Hits Italiens & Pop Méditerranéenne
+- **Tokyo J-Pop & Shibuya Live** (TOKYO): Tokyo • J-Pop, City Pop, Shibuya & Anime Sound / Tokyo • J-Pop, City Pop, Shibuya & Anime
+- **Seoul K-Pop Global 24/7** (SEOUL K-POP): Seoul • Non-Stop K-Pop, K-R&B & Gangnam Hits / Séoul • K-Pop, K-HipHop & Hits de Gangnam
+- **Miami Latin & Reggaeton** (MIAMI LATIN): Miami • Reggaeton, Urban Latin & Ocean Drive / Miami • Reggaeton, Latin Hits & Ocean Drive
+- **Rio Bossa & Ipanema Breeze** (RIO BOSSA): Rio • Bossa Nova, Samba Soul & Ipanema Sunset / Rio • Bossa Nova, Samba Soul & Plage d’Ipanema
+- **Afrobeats & Amapiano Pulse** (AFROBEATS): Lagos & World • Afrobeats, Amapiano & Warm Groove / Lagos & Monde • Afrobeats, Amapiano & Groove
+- **Dubai Desert Lounge & Club** (DUBAI): Dubai • Oriental Deep House & Marina Lounge / Dubaï • Oriental Deep House & Rooftop Lounge
+- **Monaco & Geneva Riviera Pop** (RIVIERA): Monaco & Geneva • Riviera Pop & Chic Classics / Monaco & Genève • Pop Chic & Doux Classiques
+
+## Detailed City Profiles (24 Cities)
+### ⚜️ Montréal / Montréal (MTL) — Canada
+- Tagline (EN): Cyber-Creative Capital & Mount Royal Summit
+- Tagline (FR): Capitale Cyber-Créative & Sommet du Mont-Royal
+- Summary: Bilingual hub of AI innovation, festival lights, geodesic architecture, and iconic midnight gastronomy.
+- Rarity: Mythic 4D | Element: neon | Coordinates: 45.5017, -73.5673
+- Urban Ratings: Culture 95/100, Nightlife 92/100, Tech 96/100, Gastronomy 94/100
+- Direct Hub: https://remoworld.com/cities/montreal.html
+
+### 🗼 Paris / Paris (PAR) — France
+- Tagline (EN): City of Light, Haute Couture & Golden Horizon
+- Tagline (FR): Ville Lumière, Haute Couture & Horizon Doré
+- Summary: Timeless elegance crowned by the Iron Lady, avant-garde galleries, Seine nights, and Michelin artistry.
+- Rarity: Mythic 4D | Element: crystal | Coordinates: 48.8566, 2.3522
+- Urban Ratings: Culture 99/100, Nightlife 90/100, Tech 88/100, Gastronomy 99/100
+- Direct Hub: https://remoworld.com/cities/paris.html
+
+### 🇲🇩 Chișinău / Chișinău (KIV) — Moldova
+- Tagline (EN): Green Capital of Moldova • Triumphal Arch & Wine Vaults
+- Tagline (FR): Capitale Verte de Moldavie • Arc de Triomphe & Caves Royales
+- Summary: Vibrant Eastern European capital famed for its white-stone City Gates, Triumphal Arch, underground wine cities, and rising IT talent.
+- Rarity: Mythic 4D | Element: plasma | Coordinates: 47.0105, 28.8638
+- Urban Ratings: Culture 94/100, Nightlife 89/100, Tech 91/100, Gastronomy 96/100
+- Direct Hub: https://remoworld.com/cities/chisinau.html
+
+### 🇷🇴 Bucharest / Bucarest (BUH) — Romania
+- Tagline (EN): Little Paris of the East & Fiber-Speed Cyber Hub
+- Tagline (FR): Petit Paris de l’Est & Pôle Cyber Ultra-Rapide
+- Summary: Grand Belle Époque boulevards, the neoclassical Athenaeum, Old Town electric nights, and gigabit tech energy.
+- Rarity: Legendary Gold | Element: cyber | Coordinates: 44.4268, 26.1025
+- Urban Ratings: Culture 91/100, Nightlife 95/100, Tech 94/100, Gastronomy 90/100
+- Direct Hub: https://remoworld.com/cities/bucharest.html
+
+### 🗽 New York / New York (NYC) — United States
+- Tagline (EN): The Sleepless Metropolis & Neon Skyline
+- Tagline (FR): La Métropole Qui Ne Dort Jamais
+- Summary: Skyscraper canyons of Manhattan, Times Square voltage, Broadway icons, and global cultural gravity.
+- Rarity: Mythic 4D | Element: neon | Coordinates: 40.7128, -74.006
+- Urban Ratings: Culture 96/100, Nightlife 98/100, Tech 95/100, Gastronomy 95/100
+- Direct Hub: https://remoworld.com/cities/newyork.html
+
+### 🏯 Tokyo / Tokyo (TYO) — Japan
+- Tagline (EN): Hyper-Neon Shibuya & Ancient Shinto Harmony
+- Tagline (FR): Hyper-Néon de Shibuya & Harmonie Millénaire
+- Summary: Where futuristic robotics, holographic crossings, and serene Torii shrines merge in dazzling precision.
+- Rarity: Mythic 4D | Element: cyber | Coordinates: 35.6762, 139.6503
+- Urban Ratings: Culture 97/100, Nightlife 95/100, Tech 99/100, Gastronomy 98/100
+- Direct Hub: https://remoworld.com/cities/tokyo.html
+
+### 🏰 London / Londres (LON) — United Kingdom
+- Tagline (EN): Royal Thames Skyline & Global FinTech Crown
+- Tagline (FR): Horizon Royal de la Tamise & Couronne FinTech
+- Summary: Big Ben chimes beside futuristic glass towers, underground soundwaves, and world-leading museums.
+- Rarity: Legendary Gold | Element: void | Coordinates: 51.5072, -0.1276
+- Urban Ratings: Culture 96/100, Nightlife 92/100, Tech 94/100, Gastronomy 89/100
+- Direct Hub: https://remoworld.com/cities/london.html
+
+### 🌆 Dubai / Dubaï (DXB) — UAE
+- Tagline (EN): Oasis of the Future & Sky-Piercing Spires
+- Tagline (FR): Oasis du Futur & Flèches Célestes
+- Summary: Home to the Burj Khalifa, desert luxury, palm archipelagos, and ultra-modern architectural marvels.
+- Rarity: Legendary Gold | Element: plasma | Coordinates: 25.2048, 55.2708
+- Urban Ratings: Culture 86/100, Nightlife 94/100, Tech 96/100, Gastronomy 92/100
+- Direct Hub: https://remoworld.com/cities/dubai.html
+
+### 🌴 Miami / Miami (MIA) — United States
+- Tagline (EN): Ocean Drive Art Deco & Tropical Neon Nights
+- Tagline (FR): Art Déco d’Ocean Drive & Nuits Néon Tropicales
+- Summary: Turquoise Atlantic waves, pastel neon palms, superyacht marinas, and electric Latin-fusion nights.
+- Rarity: Legendary Gold | Element: plasma | Coordinates: 25.7617, -80.1918
+- Urban Ratings: Culture 88/100, Nightlife 99/100, Tech 85/100, Gastronomy 90/100
+- Direct Hub: https://remoworld.com/cities/miami.html
+
+### ☀️ Barcelona / Barcelone (BCN) — Spain
+- Tagline (EN): Gaudí’s Dreamscape & Mediterranean Pulse
+- Tagline (FR): Rêve de Gaudí & Pulsation Méditerranéenne
+- Summary: Sagrada Família spires, sunlit beaches, Gothic Quarter tapas, and smart-city Mediterranean innovation.
+- Rarity: Epic | Element: plasma | Coordinates: 41.3874, 2.1686
+- Urban Ratings: Culture 96/100, Nightlife 94/100, Tech 87/100, Gastronomy 96/100
+- Direct Hub: https://remoworld.com/cities/barcelona.html
+
+### 🏛️ Rome / Rome (ROM) — Italy
+- Tagline (EN): The Eternal City & Imperial Marble Glory
+- Tagline (FR): La Ville Éternelle & Gloire Impériale
+- Summary: Two millennia of Colosseum grandeur, sunlit piazzas, espresso culture, and immortal artistry.
+- Rarity: Legendary Gold | Element: crystal | Coordinates: 41.9028, 12.4964
+- Urban Ratings: Culture 100/100, Nightlife 86/100, Tech 80/100, Gastronomy 99/100
+- Direct Hub: https://remoworld.com/cities/rome.html
+
+### 🍁 Toronto / Toronto (YYZ) — Canada
+- Tagline (EN): CN Tower Horizon & Multicultural Powerhouse
+- Tagline (FR): Horizon CN Tower & Métropole Multiculturelle
+- Summary: Soaring Lake Ontario skyline, AI research corridors, film festivals, and 200 world cuisines.
+- Rarity: Epic | Element: cyber | Coordinates: 43.6532, -79.3832
+- Urban Ratings: Culture 90/100, Nightlife 88/100, Tech 94/100, Gastronomy 92/100
+- Direct Hub: https://remoworld.com/cities/toronto.html
+
+### 🏎️ Monaco / Monaco (MCM) — Monaco
+- Tagline (EN): Riviera Crown Jewel & Grand Prix Prestige
+- Tagline (FR): Joyau de la Riviera & Prestige Grand Prix
+- Summary: Monte Carlo glamour, cliffside Mediterranean palaces, supercar hairpins, and ultra-rare collector status.
+- Rarity: Mythic 4D | Element: crystal | Coordinates: 43.7384, 7.4246
+- Urban Ratings: Culture 91/100, Nightlife 96/100, Tech 88/100, Gastronomy 97/100
+- Direct Hub: https://remoworld.com/cities/monaco.html
+
+### 🎬 Los Angeles / Los Angeles (LAX) — United States
+- Tagline (EN): Cinema Capital, Sunset Palms & Pacific Glow
+- Tagline (FR): Capitale du Cinéma & Crépuscule du Pacifique
+- Summary: Hollywood hills, Griffith Observatory stars, Venice Beach skate culture, and entertainment studios.
+- Rarity: Legendary Gold | Element: neon | Coordinates: 34.0522, -118.2437
+- Urban Ratings: Culture 93/100, Nightlife 94/100, Tech 91/100, Gastronomy 91/100
+- Direct Hub: https://remoworld.com/cities/losangeles.html
+
+### ⚡ Seoul / Séoul (SEL) — South Korea
+- Tagline (EN): K-Wave Megacity, E-Sports Arena & Royal Palaces
+- Tagline (FR):  Capitale K-Wave, E-Sports & Palais Royaux
+- Summary: 24-hour Hongdae energy, Gangnam futuristic towers, Gyeongbokgung heritage, and hyper-connected culture.
+- Rarity: Legendary Gold | Element: cyber | Coordinates: 37.5665, 126.978
+- Urban Ratings: Culture 95/100, Nightlife 96/100, Tech 99/100, Gastronomy 95/100
+- Direct Hub: https://remoworld.com/cities/seoul.html
+
+### ⌚ Geneva / Genève (GVA) — Switzerland
+- Tagline (EN): Alpine Precision, Jet d’Eau & Quantum Science
+- Tagline (FR): Précision Alpine, Jet d’Eau & Science Quantique
+- Summary: Crystal alpine lake, master horology, diplomatic summits, and particle physics frontier.
+- Rarity: Epic | Element: crystal | Coordinates: 46.2044, 6.1432
+- Urban Ratings: Culture 90/100, Nightlife 80/100, Tech 96/100, Gastronomy 92/100
+- Direct Hub: https://remoworld.com/cities/geneva.html
+
+### 🦁 Singapore / Singapour (SIN) — Singapore
+- Tagline (EN): Solar Supertrees & SkyPark Cyber Garden
+- Tagline (FR): Supertrees Solaires & Jardin Cyber Céleste
+- Summary: Bioluminescent Gardens by the Bay, Marina Bay SkyPark, hawker Michelin stars, and smart island design.
+- Rarity: Legendary Gold | Element: cyber | Coordinates: 1.3521, 103.8198
+- Urban Ratings: Culture 91/100, Nightlife 90/100, Tech 98/100, Gastronomy 97/100
+- Direct Hub: https://remoworld.com/cities/singapore.html
+
+### ⛵ Sydney / Sydney (SYD) — Australia
+- Tagline (EN): Opera Sails, Emerald Harbour & Bondi Surf
+- Tagline (FR): Voiles de l’Opéra, Port Émeraude & Bondi
+- Summary: Iconic white Opera House shells gleaming beside the Harbour Bridge and golden Pacific waves.
+- Rarity: Epic | Element: neon | Coordinates: -33.8688, 151.2093
+- Urban Ratings: Culture 90/100, Nightlife 89/100, Tech 89/100, Gastronomy 91/100
+- Direct Hub: https://remoworld.com/cities/sydney.html
+
+### 🎭 Rio de Janeiro / Rio de Janeiro (RIO) — Brazil
+- Tagline (EN): Corcovado Summit, Copacabana & Carnival Fire
+- Tagline (FR): Sommet du Corcovado, Copacabana & Feu du Carnaval
+- Summary: Dramatic granite peaks, samba rhythms, oceanfront promenades, and unforgettable tropical sunsets.
+- Rarity: Epic | Element: plasma | Coordinates: -22.9068, -43.1729
+- Urban Ratings: Culture 95/100, Nightlife 98/100, Tech 81/100, Gastronomy 90/100
+- Direct Hub: https://remoworld.com/cities/rio.html
+
+### 🕌 Istanbul / Istanbul (IST) — Türkiye
+- Tagline (EN): Where Two Continents Meet Across the Bosphorus
+- Tagline (FR): Là Où Deux Continents Se Rencontrent sur le Bosphore
+- Summary: Majestic domes, Grand Bazaar treasures, Bosphorus ferries at dusk, and bridge between East and West.
+- Rarity: Epic | Element: void | Coordinates: 41.0082, 28.9784
+- Urban Ratings: Culture 98/100, Nightlife 90/100, Tech 85/100, Gastronomy 97/100
+- Direct Hub: https://remoworld.com/cities/istanbul.html
+
+### 🎧 Berlin / Berlin (BER) — Germany
+- Tagline (EN): Brandenburg Heritage & Underground Techno Pulse
+- Tagline (FR): Porte de Brandebourg & Pulsation Techno
+- Summary: Avant-garde street art, legendary clubbing temples, startup factories, and fearless creative freedom.
+- Rarity: Epic | Element: void | Coordinates: 52.52, 13.405
+- Urban Ratings: Culture 94/100, Nightlife 100/100, Tech 92/100, Gastronomy 86/100
+- Direct Hub: https://remoworld.com/cities/berlin.html
+
+### 🚲 Amsterdam / Amsterdam (AMS) — Netherlands
+- Tagline (EN): Golden Canals, Night Bridges & Design Avant-Garde
+- Tagline (FR): Canaux Dorés, Ponts Illuminés & Design
+- Summary: Reflections on historic canals, master art museums, sustainable innovation, and electronic music festivals.
+- Rarity: Rare | Element: neon | Coordinates: 52.3676, 4.9041
+- Urban Ratings: Culture 94/100, Nightlife 93/100, Tech 91/100, Gastronomy 87/100
+- Direct Hub: https://remoworld.com/cities/amsterdam.html
+
+### 🚋 Lisbon / Lisbonne (LIS) — Portugal
+- Tagline (EN): Seven Sunlit Hills, Atlantic Winds & Digital Nomads
+- Tagline (FR): Sept Collines Dorées, Atlantique & Nomades Tech
+- Summary: Yellow vintage trams, azulejo tiles, Tagus river viewpoints, and Europe’s warmest Web & AI summit hub.
+- Rarity: Rare | Element: crystal | Coordinates: 38.7223, -9.1393
+- Urban Ratings: Culture 93/100, Nightlife 90/100, Tech 89/100, Gastronomy 94/100
+- Direct Hub: https://remoworld.com/cities/lisbon.html
+
+### 🔺 Cairo / Le Caire (CAI) — Egypt
+- Tagline (EN): Eternal Giza Pyramids & Golden Nile Horizon
+- Tagline (FR): Pyramides Éternelles de Gizeh & Horizon du Nil
+- Summary: Ancient wonders aligned with the stars beside the bustling Nile metropolis and Grand Egyptian Museum.
+- Rarity: Legendary Gold | Element: void | Coordinates: 30.0444, 31.2357
+- Urban Ratings: Culture 99/100, Nightlife 85/100, Tech 82/100, Gastronomy 90/100
+- Direct Hub: https://remoworld.com/cities/cairo.html

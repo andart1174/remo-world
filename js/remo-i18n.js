@@ -764,7 +764,10 @@ const REMO_DICT = {
     clean_pulse_bar_lbl: '⚡ City Pulse (Weather · Live War · Daily Challenge)',
     clean_pulse_open: 'Show ▾',
     clean_pulse_hide: 'Hide ▴',
-    filter_beats: '🎛️ Beats'
+    filter_beats: '🎛️ Beats',
+    nav_sec_discover: '🌐 Global Directory',
+    nav_city_directory: 'All 24 Cities Guide',
+    nav_free_radio_hub: '38 Live Radios Hub'
   },
 
   fr: {
@@ -1527,7 +1530,10 @@ const REMO_DICT = {
     clean_pulse_bar_lbl: '⚡ Pouls Urbain (Météo · Guerre Live · Défi du Jour)',
     clean_pulse_open: 'Ouvrir ▾',
     clean_pulse_hide: 'Réduire ▴',
-    filter_beats: '🎛️ Beats'
+    filter_beats: '🎛️ Beats',
+    nav_sec_discover: '🌐 Annuaire Mondial',
+    nav_city_directory: 'Guide des 24 Villes',
+    nav_free_radio_hub: 'Hub 38 Radios Live'
   }
 };
 

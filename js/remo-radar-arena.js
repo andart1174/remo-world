@@ -60,7 +60,18 @@ const MAP_TILES = {
 
 function initRemoRadarMap() {
   const el = document.getElementById('remoLeafletMap');
-  if (!el || typeof L === 'undefined') return;
+  if (!el) return;
+  if (typeof L === 'undefined') {
+    if (!window._remoLeafletLoadBound) {
+      window._remoLeafletLoadBound = true;
+      window.addEventListener('load', () => {
+        if (typeof L !== 'undefined' && document.getElementById('view-radar')?.classList.contains('active')) {
+          initRemoRadarMap();
+        }
+      });
+    }
+    return;
+  }
 
   if (!remoMap) {
     const user = REMO_STORE.getCurrentUser();

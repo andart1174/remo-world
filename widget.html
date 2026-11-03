@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>REMO World — Live City Clock, Weather &amp; Radio Widget</title>
+  <meta name="robots" content="noindex, follow">
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:system-ui,-apple-system,sans-serif;background:transparent;color:#f8fafc;overflow:hidden}
+    .wcard{background:linear-gradient(145deg,#090d1f,#161b3a);border:1px solid rgba(56,189,248,0.42);border-radius:16px;padding:12px 14px;height:152px;display:flex;flex-direction:column;justify-content:space-between;box-shadow:0 8px 24px rgba(0,0,0,0.45)}
+    .top{display:flex;align-items:center;justify-content:space-between;gap:8px}
+    .cname{font-weight:900;font-size:0.96rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .sub{font-size:0.72rem;color:#94a3b8}
+    .mid{display:flex;align-items:center;justify-content:space-between;gap:8px;background:rgba(255,255,255,0.05);border-radius:11px;padding:8px 10px}
+    .clk{font-family:monospace;font-size:1.12rem;font-weight:900;color:#fbbf24}
+    .wx{font-size:0.84rem;font-weight:800;color:#38bdf8}
+    .rbtn{padding:6px 12px;border-radius:99px;border:none;font-weight:900;font-size:0.75rem;cursor:pointer;background:linear-gradient(135deg,#0ea5e9,#6366f1);color:#fff}
+    .rbtn.on{background:linear-gradient(135deg,#10b981,#059669)}
+    .bot{display:flex;align-items:center;justify-content:space-between;font-size:0.71rem;color:#cbd5e1}
+    .bot a{color:#fde047;text-decoration:none;font-weight:800}
+    .bot a:hover{text-decoration:underline}
+  </style>
+</head>
+<body>
+  <div class="wcard">
+    <div class="top">
+      <div>
+        <div class="cname" id="wTitle">⚜️ Montréal (MTL)</div>
+        <div class="sub" id="wSub">Canada • Live Radio</div>
+      </div>
+      <button type="button" class="rbtn" id="wPlayBtn">▶️ Radio</button>
+    </div>
+    <div class="mid">
+      <span class="clk" id="wClock">--:--:--</span>
+      <span class="wx" id="wTemp">✨ Live</span>
+    </div>
+    <div class="bot">
+      <span id="wStName">📻 Live Stream</span>
+      <a id="wBacklink" href="https://remoworld.com/cities/montreal.html" target="_blank" rel="noopener">🌐 REMO World ↗</a>
+    </div>
+  </div>
+  <script>
+  (function(){
+    var DB = {"montreal":{"flag":"⚜️","code":"MTL","en":"Montréal","fr":"Montréal","country_en":"Canada","country_fr":"Canada","lat":45.5017,"lng":-73.5673,"tz":"America/Toronto","stream":"https://playerservices.streamtheworld.com/api/livestream-redirect/CBMEFM_CBC.mp3","fallback":"https://27033.live.streamtheworld.com/CBMEFM_CBC_SC","stName":"CBC Radio One Montréal"},"paris":{"flag":"🗼","code":"PAR","en":"Paris","fr":"Paris","country_en":"France","country_fr":"France","lat":48.8566,"lng":2.3522,"tz":"Europe/Paris","stream":"https://icecast.radiofrance.fr/fip-midfi.mp3","fallback":"https://icecast.radiofrance.fr/fipgroove-midfi.mp3","stName":"FIP Radio France Paris"},"chisinau":{"flag":"🇲🇩","code":"KIV","en":"Chișinău","fr":"Chișinău","country_en":"Moldova","country_fr":"Moldavie","lat":47.0105,"lng":28.8638,"tz":"Europe/Chisinau","stream":"https://live.kissfm.ro/kissfm.aacp","fallback":"https://live.magicfm.ro/magicfm.aacp","stName":"Kiss FM Chișinău"},"bucharest":{"flag":"🇷🇴","code":"BUH","en":"Bucharest","fr":"Bucarest","country_en":"Romania","country_fr":"Roumanie","lat":44.4268,"lng":26.1025,"tz":"Europe/Bucharest","stream":"https://live.magicfm.ro/magicfm.aacp","fallback":"https://stream.srg-ssr.ch/m/rsp/mp3_128","stName":"Magic FM Bucarest"},"newyork":{"flag":"🗽","code":"NYC","en":"New York","fr":"New York","country_en":"United States","country_fr":"États-Unis","lat":40.7128,"lng":-74.006,"tz":"America/New_York","stream":"https://fm939.wnyc.org/wnycfm.mp3","fallback":"https://ice1.somafm.com/indiepop-128-mp3","stName":"WNYC 93.9 FM New York"},"tokyo":{"flag":"🏯","code":"TYO","en":"Tokyo","fr":"Tokyo","country_en":"Japan","country_fr":"Japon","lat":35.6762,"lng":139.6503,"tz":"Asia/Tokyo","stream":"https://kathy.torontocast.com:3340/stream","fallback":"https://radio.plaza.one/mp3","stName":"Tokyo J-Pop & Shibuya Live"},"london":{"flag":"🏰","code":"LON","en":"London","fr":"Londres","country_en":"United Kingdom","country_fr":"Royaume-Uni","lat":51.5072,"lng":-0.1276,"tz":"Europe/London","stream":"https://media-ice.musicradio.com/CapitalMP3","fallback":"https://media-ssl.musicradio.com/HeartLondonMP3","stName":"Capital FM London"},"dubai":{"flag":"🌆","code":"DXB","en":"Dubai","fr":"Dubaï","country_en":"UAE","country_fr":"Émirats Arabes Unis","lat":25.2048,"lng":55.2708,"tz":"Asia/Dubai","stream":"https://listen.radioking.com/radio/623812/stream/685903","fallback":"https://ice1.somafm.com/suburbsofgoa-128-mp3","stName":"Dubai Desert Lounge & Club"},"miami":{"flag":"🌴","code":"MIA","en":"Miami","fr":"Miami","country_en":"United States","country_fr":"États-Unis","lat":25.7617,"lng":-80.1918,"tz":"America/New_York","stream":"https://icecast.radiofrance.fr/fipworld-midfi.mp3","fallback":"https://scdn.nrjaudio.fm/audio1/fr/30001/mp3_128.mp3","stName":"Miami Latin & Reggaeton"},"barcelona":{"flag":"☀️","code":"BCN","en":"Barcelona","fr":"Barcelone","country_en":"Spain","country_fr":"Espagne","lat":41.3874,"lng":2.1686,"tz":"Europe/Madrid","stream":"https://radiorecord.hostingradio.ru/deep96.aacp","fallback":"https://ice1.somafm.com/beatblender-128-mp3","stName":"Ibiza & Barcelona Sunset House"},"rome":{"flag":"🏛️","code":"ROM","en":"Rome","fr":"Rome","country_en":"Italy","country_fr":"Italie","lat":41.9028,"lng":12.4964,"tz":"Europe/Rome","stream":"https://icy.unitedradio.it/Subasio.mp3","fallback":"https://stream.srg-ssr.ch/m/rsi_r3/mp3_128","stName":"Roma Italia Pop & Dolce Vita"},"toronto":{"flag":"🍁","code":"YYZ","en":"Toronto","fr":"Toronto","country_en":"Canada","country_fr":"Canada","lat":43.6532,"lng":-79.3832,"tz":"America/Toronto","stream":"https://playerservices.streamtheworld.com/api/livestream-redirect/CBMEFM_CBC.mp3","fallback":"https://27033.live.streamtheworld.com/CBMEFM_CBC_SC","stName":"CBC Radio One Montréal"},"monaco":{"flag":"🏎️","code":"MCM","en":"Monaco","fr":"Monaco","country_en":"Monaco","country_fr":"Monaco","lat":43.7384,"lng":7.4246,"tz":"Europe/Monaco","stream":"https://stream.srg-ssr.ch/m/rsp/mp3_128","fallback":"https://stream.srg-ssr.ch/m/rsj/mp3_128","stName":"Monaco & Geneva Riviera Pop"},"losangeles":{"flag":"🎬","code":"LAX","en":"Los Angeles","fr":"Los Angeles","country_en":"United States","country_fr":"États-Unis","lat":34.0522,"lng":-118.2437,"tz":"America/Los_Angeles","stream":"https://ice1.somafm.com/u80s-128-mp3","fallback":"https://ice2.somafm.com/spacestation-128-mp3","stName":"Midnight Synthwave Drive"},"seoul":{"flag":"⚡","code":"SEL","en":"Seoul","fr":"Séoul","country_en":"South Korea","country_fr":"Corée du Sud","lat":37.5665,"lng":126.978,"tz":"Asia/Seoul","stream":"https://listen.moe/kpop/stream","fallback":"https://kathy.torontocast.com:3340/stream","stName":"Seoul K-Pop Global 24/7"},"geneva":{"flag":"⌚","code":"GVA","en":"Geneva","fr":"Genève","country_en":"Switzerland","country_fr":"Suisse","lat":46.2044,"lng":6.1432,"tz":"Europe/Zurich","stream":"https://stream.srg-ssr.ch/m/rsp/mp3_128","fallback":"https://stream.srg-ssr.ch/m/rsj/mp3_128","stName":"Monaco & Geneva Riviera Pop"},"singapore":{"flag":"🦁","code":"SIN","en":"Singapore","fr":"Singapour","country_en":"Singapore","country_fr":"Singapour","lat":1.3521,"lng":103.8198,"tz":"Asia/Singapore","stream":"https://ice1.somafm.com/groovesalad-128-mp3","fallback":"https://ice2.somafm.com/groovesalad-128-mp3","stName":"SomaFM Groove Salad"},"sydney":{"flag":"⛵","code":"SYD","en":"Sydney","fr":"Sydney","country_en":"Australia","country_fr":"Australie","lat":-33.8688,"lng":151.2093,"tz":"Australia/Sydney","stream":"https://media-ssl.musicradio.com/CapitalChill","fallback":"https://ice1.somafm.com/groovesalad-128-mp3","stName":"Capital Chill UK"},"rio":{"flag":"🎭","code":"RIO","en":"Rio de Janeiro","fr":"Rio de Janeiro","country_en":"Brazil","country_fr":"Brésil","lat":-22.9068,"lng":-43.1729,"tz":"America/Sao_Paulo","stream":"https://ice1.somafm.com/bossa-128-mp3","fallback":"https://icecast.radiofrance.fr/fipworld-midfi.mp3","stName":"Rio Bossa & Ipanema Breeze"},"istanbul":{"flag":"🕌","code":"IST","en":"Istanbul","fr":"Istanbul","country_en":"Türkiye","country_fr":"Turquie","lat":41.0082,"lng":28.9784,"tz":"Europe/Istanbul","stream":"https://listen.radioking.com/radio/623812/stream/685903","fallback":"https://ice1.somafm.com/suburbsofgoa-128-mp3","stName":"Dubai Desert Lounge & Club"},"berlin":{"flag":"🎧","code":"BER","en":"Berlin","fr":"Berlin","country_en":"Germany","country_fr":"Allemagne","lat":52.52,"lng":13.405,"tz":"Europe/Berlin","stream":"https://streams.fluxfm.de/klubradio/mp3-128/audio/","fallback":"https://ice1.somafm.com/cliqhop-128-mp3","stName":"Berlin Melodic Club"},"amsterdam":{"flag":"🚲","code":"AMS","en":"Amsterdam","fr":"Amsterdam","country_en":"Netherlands","country_fr":"Pays-Bas","lat":52.3676,"lng":4.9041,"tz":"Europe/Amsterdam","stream":"https://streams.fluxfm.de/klubradio/mp3-128/audio/","fallback":"https://ice1.somafm.com/cliqhop-128-mp3","stName":"Berlin Melodic Club"},"lisbon":{"flag":"🚋","code":"LIS","en":"Lisbon","fr":"Lisbonne","country_en":"Portugal","country_fr":"Portugal","lat":38.7223,"lng":-9.1393,"tz":"Europe/Lisbon","stream":"https://radiorecord.hostingradio.ru/deep96.aacp","fallback":"https://ice1.somafm.com/beatblender-128-mp3","stName":"Ibiza & Barcelona Sunset House"},"cairo":{"flag":"🔺","code":"CAI","en":"Cairo","fr":"Le Caire","country_en":"Egypt","country_fr":"Égypte","lat":30.0444,"lng":31.2357,"tz":"Africa/Cairo","stream":"https://listen.radioking.com/radio/623812/stream/685903","fallback":"https://ice1.somafm.com/suburbsofgoa-128-mp3","stName":"Dubai Desert Lounge & Club"}};
+    var p = new URLSearchParams(location.search);
+    var cid = (p.get('city') || 'montreal').toLowerCase();
+    var lang = p.get('lang') === 'fr' ? 'fr' : 'en';
+    var c = DB[cid] ? DB[cid] : DB.montreal;
+    if(!DB[cid]) cid = 'montreal';
+    document.documentElement.lang = lang;
+    var name = lang === 'fr' ? c.fr : c.en;
+    var country = lang === 'fr' ? c.country_fr : c.country_en;
+    document.getElementById('wTitle').textContent = c.flag + ' ' + name + ' (' + c.code + ')';
+    document.getElementById('wSub').textContent = country;
+    document.getElementById('wStName').textContent = '📻 ' + c.stName;
+    var link = document.getElementById('wBacklink');
+    link.href = 'https://remoworld.com/' + (lang === 'fr' ? 'fr/' : '') + 'cities/' + cid + '.html';
+    link.textContent = lang === 'fr' ? '🌐 En direct sur REMO ↗' : '🌐 Live on REMO World ↗';
+
+    function tick(){
+      try {
+        document.getElementById('wClock').textContent = new Intl.DateTimeFormat(lang === 'fr' ? 'fr-FR' : 'en-GB', { timeZone: c.tz, hour: '2-digit', minute: '2-digit', second: '2-digit' }).format(new Date());
+      } catch(e){}
+    }
+    tick(); setInterval(tick, 1000);
+
+    fetch('https://api.open-meteo.com/v1/forecast?latitude=' + c.lat + '&longitude=' + c.lng + '&current_weather=true')
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        if(d && d.current_weather) document.getElementById('wTemp').textContent = Math.round(d.current_weather.temperature) + '°C';
+      }).catch(function(){});
+
+    var audio = new Audio(); audio.preload = 'none';
+    var btn = document.getElementById('wPlayBtn');
+    btn.textContent = lang === 'fr' ? '▶️ Radio' : '▶️ Radio';
+    btn.onclick = function(){
+      if(!audio.paused){ audio.pause(); btn.classList.remove('on'); btn.textContent = '▶️ Radio'; return; }
+      btn.classList.add('on'); btn.textContent = '⏸️ Live';
+      var fb = false;
+      audio.onerror = function(){ if(!fb && c.fallback){ fb = true; audio.src = c.fallback; audio.play().catch(function(){}); } };
+      audio.src = c.stream;
+      audio.play().catch(function(){});
+    };
+  })();
+  </script>
+</body>
+</html>
