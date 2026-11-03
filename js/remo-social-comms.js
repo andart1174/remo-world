@@ -973,6 +973,11 @@ function renderPostMediaStage(p, city, lang) {
     `;
   }
 
+  // 0C. 🎛️ REMO BEAT-PAD 4D SEQUENCER LOOP
+  if (p.mediaType === 'beat_loop' && p.beatPattern && typeof renderBeatPostStage === 'function') {
+    return renderBeatPostStage(p, city, lang);
+  }
+
   // 1. LIVE INTERACTIVE HTML / 3D MINI-APP
   if (p.mediaType === 'html_app' && p.htmlCode) {
     const cleanCode = buildFittedHtmlSrcdoc(p.htmlCode, p.id);
@@ -1175,6 +1180,8 @@ function renderSocialFeed(searchQuery = '') {
     posts = posts.filter((p) => p && myFollowing.includes(p.uid));
   } else if (currentFeedMode === 'mystery') {
     posts = posts.filter((p) => Boolean(p && p.mysteryCity));
+  } else if (currentFeedMode === 'beats') {
+    posts = posts.filter((p) => p && p.mediaType === 'beat_loop');
   } else if (currentFeedMode === 'duets') {
     posts = posts.filter((p) => Boolean(p.duetOf || p.mediaType === 'city_versus'));
   } else if (currentFeedMode === 'bounties') {
@@ -1243,7 +1250,7 @@ function renderSocialFeed(searchQuery = '') {
         : (lang === 'fr' ? (p.caption_fr || p.caption_en) : (p.caption_en || p.caption_fr));
       const formattedCap = escapeHtmlStr(rawCap || '').replace(/#([\w\u00C0-\u024F]+)/g, `<span class="hashtag" onclick="renderSocialFeed('#$1')">#$1</span>`);
       const liked = u && (p.likes || []).includes(u.uid);
-      const interactiveNoTilt = hiddenByCapsule || p.mediaType === 'html_app' || p.mediaType === 'before_after';
+      const interactiveNoTilt = hiddenByCapsule || p.mediaType === 'html_app' || p.mediaType === 'before_after' || p.mediaType === 'beat_loop';
       const voiceResolved = p.voiceUrl ? RemoMediaDB.resolveSyncOrPlaceholder(p.voiceUrl) : '';
       const voiceIdbAttr = p.voiceUrl && String(p.voiceUrl).startsWith('idb://') ? `data-idb-src="${p.voiceUrl}"` : '';
       const rxMap = p.reactions || {};
@@ -1311,12 +1318,14 @@ function renderSocialFeed(searchQuery = '') {
                   ${p.bounty && !p.bounty.claimed ? `<span class="pbadge boost" style="background:#f59e0b;color:#000;">🎁 +${p.bounty.coins} 🪙</span>` : ''}
                   
                   ${!hiddenByCapsule && p.mediaType === 'video' ? `<span class="pbadge vid60">${t('post_video60_badge')} · ${formatDurationMMSS(p.videoDuration || 60)}</span>` : ''}
+                  ${!hiddenByCapsule && p.mediaType === 'beat_loop' ? `<span class="pbadge html">${t('beat_badge_live')}</span>` : ''}
                   ${!hiddenByCapsule && p.mediaType === 'before_after' ? `<span class="pbadge html">${t('post_slider_badge')}</span>` : ''}
                   ${!mysteryMasked && p.verifiedGps ? `<span class="pbadge gps">${t('post_verified_gps')}</span>` : ''}
                   ${p.mintedCard ? `<span class="pbadge mint">${t('post_minted_badge')}</span>` : ''}
                   ${p.isSecretSpot ? `<span class="pbadge secret-spot">🗺️ ${lang === 'fr' ? 'LIEU SECRET' : 'SECRET SPOT'}</span>` : ''}
                 </div>
                 ${renderPostMediaStage(p, city, lang)}
+                ${!hiddenByCapsule && p.soundtrackId && typeof renderPostSoundtrackDisc === 'function' ? renderPostSoundtrackDisc(p, lang) : ''}
               </div>
               <div class="post-face-back">
                 ${mysteryMasked ? `<div style="padding:28px;text-align:center;color:#fde047;font-weight:800;">${t('guess_card_back_locked')}</div>` : renderPostCardBack(p, city, lang, wx)}
@@ -2077,6 +2086,10 @@ function stopActiveCam60Stream() {
 
 function closeCreatePostModal() {
   stopActiveCam60Stream();
+  if (window.RemoAudio) {
+    if (window.RemoAudio.activeSoundtrackPostId === 'studio_preview') window.RemoAudio.stopSoundtrackLoop();
+    if (window.RemoAudio.activeBeatTargetId === 'studio_preview') window.RemoAudio.stopBeatPattern();
+  }
   document.getElementById('createModal')?.classList.remove('open');
 }
 
@@ -2088,6 +2101,12 @@ function switchCreateStudioTab(tabId) {
   document.querySelectorAll('.studio-pane').forEach((p) => p.classList.remove('active'));
   document.getElementById('studioPane-' + tabId)?.classList.add('active');
   if (tabId !== 'video') stopActiveCam60Stream();
+  if (tabId !== 'beat' && window.RemoAudio && window.RemoAudio.activeBeatTargetId === 'studio_preview') {
+    window.RemoAudio.stopBeatPattern();
+  }
+  if (tabId === 'beat' && typeof renderBeatStudioMatrix === 'function') {
+    renderBeatStudioMatrix();
+  }
 
   if (tabId === 'versus') {
     const leftSel = document.getElementById('createVersusLeftCity');
@@ -2142,6 +2161,12 @@ function openCreatePostModal(prefillTag = '') {
   if (cmpWrap) cmpWrap.style.display = 'none';
   const cmpChk = document.getElementById('studioCompareToggle');
   if (cmpChk) cmpChk.checked = false;
+  const sndSel = document.getElementById('createPhotoSoundSelect');
+  if (sndSel) sndSel.value = '';
+  if (window.RemoAudio) {
+    if (window.RemoAudio.activeSoundtrackPostId === 'studio_preview') window.RemoAudio.stopSoundtrackLoop();
+    if (window.RemoAudio.activeBeatTargetId === 'studio_preview') window.RemoAudio.stopBeatPattern();
+  }
   const vidPrev = document.getElementById('studioVideo60Preview');
   if (vidPrev) { vidPrev.style.display = 'none'; vidPrev.srcObject = null; vidPrev.src = ''; }
   const timerRow = document.getElementById('video60TimerRow');
@@ -2494,9 +2519,16 @@ function checkGpsForNewPost() {
 
 async function publishNewRemoPost() {
   const lang = REMO_I18N.getLang();
-  const cap = document.getElementById('createCaptionInp')?.value.trim();
   const cityId = document.getElementById('createCitySelect')?.value || 'montreal';
   const vibe = document.getElementById('createVibeSelect')?.value || 'energy';
+  let cap = document.getElementById('createCaptionInp')?.value.trim() || '';
+
+  if (!cap && activeCreateStudioTab === 'beat') {
+    const cObj = getCityById(cityId);
+    cap = lang === 'fr'
+      ? `🎛️ Beat Urbain 4D composé à ${getCityName(cObj, 'fr')} ! #RemoBeat`
+      : `🎛️ 4D City Beat Loop composed in ${getCityName(cObj, 'en')}! #RemoBeat`;
+  }
 
   if (!cap) {
     remoToast(lang === 'fr' ? 'Ajoutez une légende à votre publication !' : 'Please write a caption for your post!');
@@ -2511,8 +2543,11 @@ async function publishNewRemoPost() {
   let mediaUrls = [];
   let htmlCode = '';
   let videoDuration = 0;
+  let beatPatternObj = null;
+  let soundtrackId = '';
 
   if (activeCreateStudioTab === 'photo') {
+    soundtrackId = document.getElementById('createPhotoSoundSelect')?.value || '';
     if (pendingStudioPhotoBlobs.length > 0) {
       for (const rawBlob of pendingStudioPhotoBlobs) {
         const blob = (wantWindowStamp && typeof stampPhotoWithLiveCityWindow === 'function')
@@ -2532,6 +2567,21 @@ async function publishNewRemoPost() {
         mediaType = 'image';
         mediaUrl = mediaUrls[0];
       }
+    }
+  } else if (activeCreateStudioTab === 'beat') {
+    if (typeof getStudioBeatPatternSnapshot === 'function') {
+      beatPatternObj = getStudioBeatPatternSnapshot();
+    }
+    const activeCells = beatPatternObj && Array.isArray(beatPatternObj.rows)
+      ? beatPatternObj.rows.reduce((sum, r) => sum + r.filter(Boolean).length, 0)
+      : 0;
+    if (!activeCells) {
+      remoToast(t('beat_empty_err'));
+      return;
+    }
+    mediaType = 'beat_loop';
+    if (window.RemoAudio && window.RemoAudio.activeBeatTargetId === 'studio_preview') {
+      window.RemoAudio.stopBeatPattern();
     }
   } else if (activeCreateStudioTab === 'video') {
     if (!pendingStudioVideoBlob) {
@@ -2646,6 +2696,8 @@ async function publishNewRemoPost() {
     mediaUrl,
     mediaUrls,
     photoFilter: pendingStudioPhotoFilter || 'flt-none',
+    soundtrackId: soundtrackId || '',
+    beatPattern: beatPatternObj || null,
     videoDuration,
     enforce60sCap: !!window._pendingEnforce60sCap,
     htmlCode,
@@ -3952,6 +4004,7 @@ document.addEventListener('DOMContentLoaded', () => {
       warId: params.get('war'),
       side: params.get('side') === 'B' ? 'B' : 'A'
     };
+    if (typeof openCleanFeedPulseDrawer === 'function') openCleanFeedPulseDrawer(true);
     if (typeof renderMobileCityWarStrip === 'function') renderMobileCityWarStrip();
     setTimeout(() => {
       const strip = document.getElementById('mobileCityWarStrip');
@@ -9039,5 +9092,346 @@ function checkAndRewardMutualDailyMatch(sender, receiverUid, replyDm) {
   return true;
 }
 window.checkAndRewardMutualDailyMatch = checkAndRewardMutualDailyMatch;
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   📻🎛️💿 v60 AUDIO & CLEAN-FEED ENGINES (STRICTLY EN / FR):
+   1. ⚡ Clean Feed Collapsible Pulse Drawer (Zero Screen Clutter)
+   2. 💿 Copyright-Free Photo Soundtracks & Spinning Vinyl Corner Disc
+   3. 🎛️ REMO Beat-Pad 4D Sequencer Studio + Feed Player + 1-Click Remix
+═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── 1. ⚡ CLEAN FEED COLLAPSIBLE PULSE DRAWER ── */
+function openCleanFeedPulseDrawer(forceOpen = true) {
+  const drawer = document.getElementById('cleanFeedPulseDrawer');
+  const arrow = document.getElementById('cleanFeedPulseArrow');
+  if (!drawer) return;
+  drawer.classList.toggle('open', Boolean(forceOpen));
+  if (arrow) {
+    arrow.textContent = forceOpen ? t('clean_pulse_hide') : t('clean_pulse_open');
+    arrow.setAttribute('data-i18n', forceOpen ? 'clean_pulse_hide' : 'clean_pulse_open');
+  }
+  if (forceOpen && typeof initDesktopHorizontalScrollRails === 'function') {
+    setTimeout(initDesktopHorizontalScrollRails, 40);
+  }
+}
+window.openCleanFeedPulseDrawer = openCleanFeedPulseDrawer;
+
+function toggleCleanFeedPulseDrawer() {
+  const drawer = document.getElementById('cleanFeedPulseDrawer');
+  if (!drawer) return;
+  const nextOpen = !drawer.classList.contains('open');
+  openCleanFeedPulseDrawer(nextOpen);
+}
+window.toggleCleanFeedPulseDrawer = toggleCleanFeedPulseDrawer;
+
+/* ── 2. 💿 COPYRIGHT-FREE PHOTO SOUNDTRACKS ── */
+const SOUNDTRACK_I18N_MAP = {
+  lofi_rain: 'sound_lofi_rain',
+  french_cafe: 'sound_french_cafe',
+  shibuya_neon: 'sound_shibuya_neon',
+  sunset_house: 'sound_sunset_house',
+  afro_groove: 'sound_afro_groove',
+  velvet_jazz: 'sound_velvet_jazz',
+  cyber_pulse: 'sound_cyber_pulse',
+  acoustic_breeze: 'sound_acoustic_breeze',
+  city_radio: 'sound_city_radio'
+};
+
+function getSoundtrackDisplayLabel(soundId) {
+  const key = SOUNDTRACK_I18N_MAP[soundId];
+  return key ? t(key) : '💿 REMO Loop';
+}
+
+function previewStudioPhotoSoundtrack(soundId) {
+  if (!window.RemoAudio) return;
+  if (!soundId || soundId === 'city_radio') {
+    window.RemoAudio.stopSoundtrackLoop();
+    return;
+  }
+  window.RemoAudio.playSoundtrackLoop(soundId, 'studio_preview');
+}
+window.previewStudioPhotoSoundtrack = previewStudioPhotoSoundtrack;
+
+function renderPostSoundtrackDisc(p) {
+  if (!p || !p.soundtrackId) return '';
+  let isPlaying = false;
+  if (p.soundtrackId === 'city_radio') {
+    isPlaying = Boolean(window.REMO_RADIO && window.REMO_RADIO.isPlaying);
+  } else if (window.RemoAudio) {
+    isPlaying = window.RemoAudio.activeSoundtrackPostId === p.id;
+  }
+  const shortLabel = getSoundtrackDisplayLabel(p.soundtrackId).replace(/^[^\s]+\s*/, '');
+  return `
+    <button type="button" class="post-sound-disc ${isPlaying ? 'playing' : ''}" data-sound-post="${p.id}" data-sound-id="${escapeHtmlStr(p.soundtrackId)}" onclick="togglePostSoundtrack('${p.id}', event)" title="${escapeHtmlStr(getSoundtrackDisplayLabel(p.soundtrackId))}">
+      <span class="disc-ic">💿</span>
+      <span style="max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtmlStr(shortLabel)}</span>
+    </button>
+  `;
+}
+window.renderPostSoundtrackDisc = renderPostSoundtrackDisc;
+
+function togglePostSoundtrack(postId, ev) {
+  if (ev) ev.stopPropagation();
+  const p = (REMO_STORE.state.posts || []).find((x) => x && x.id === postId);
+  if (!p || !p.soundtrackId) return;
+
+  if (p.soundtrackId === 'city_radio') {
+    if (window.REMO_RADIO) {
+      if (window.REMO_RADIO.isPlaying) {
+        window.REMO_RADIO.pause();
+      } else {
+        const tuned = window.REMO_RADIO.tuneToCity(p.cityId, true);
+        if (!tuned) window.REMO_RADIO.play();
+        remoToast(t('sound_playing_toast', { name: window.REMO_RADIO.currentStation?.name || 'Radio' }), 'coin');
+      }
+      syncActivePostAudioDOM();
+    }
+    return;
+  }
+
+  if (window.RemoAudio) {
+    const started = window.RemoAudio.playSoundtrackLoop(p.soundtrackId, p.id);
+    if (started) {
+      remoToast(t('sound_playing_toast', { name: getSoundtrackDisplayLabel(p.soundtrackId) }), 'coin');
+    }
+    syncActivePostAudioDOM();
+  }
+}
+window.togglePostSoundtrack = togglePostSoundtrack;
+
+/* ── 3. 🎛️ REMO BEAT-PAD 4D STUDIO & FEED PLAYER ── */
+let _studioBeatRows = [
+  [1, 0, 0, 0, 1, 0, 0, 0], // 🥁 Kick
+  [0, 0, 1, 0, 0, 0, 1, 0], // 👏 Clap
+  [1, 0, 0, 1, 0, 1, 0, 0], // 🎸 Bass
+  [1, 0, 1, 0, 1, 1, 0, 1]  // 🎹 Synth
+];
+
+function getStudioBeatPatternSnapshot() {
+  const bpm = Number(document.getElementById('beatStudioBpmSel')?.value || 118);
+  const scale = document.getElementById('beatStudioScaleSel')?.value || 'cyber';
+  return {
+    bpm,
+    scale,
+    rows: _studioBeatRows.map((r) => r.slice(0, 8))
+  };
+}
+window.getStudioBeatPatternSnapshot = getStudioBeatPatternSnapshot;
+
+function renderBeatStudioMatrix() {
+  const box = document.getElementById('studioBeatMatrix');
+  if (!box) return;
+  const rowLabels = ['🥁 Kick', '👏 Clap', '🎸 Bass', '🎹 Synth'];
+  box.innerHTML = rowLabels.map((lbl, rIdx) => `
+    <div class="beat-row-wrap">
+      <div class="beat-row-lbl">${lbl}</div>
+      ${[0, 1, 2, 3, 4, 5, 6, 7].map((cIdx) => {
+        const isOn = Boolean(_studioBeatRows[rIdx] && _studioBeatRows[rIdx][cIdx]);
+        return `<button type="button" class="beat-pad-cell r${rIdx} ${isOn ? 'on' : ''}" data-beat-r="${rIdx}" data-beat-c="${cIdx}" onclick="toggleBeatStudioCell(${rIdx}, ${cIdx})"></button>`;
+      }).join('')}
+    </div>
+  `).join('');
+  syncBeatStudioPlayBtnDOM();
+}
+window.renderBeatStudioMatrix = renderBeatStudioMatrix;
+
+function toggleBeatStudioCell(r, c) {
+  if (!_studioBeatRows[r]) return;
+  _studioBeatRows[r][c] = _studioBeatRows[r][c] ? 0 : 1;
+  if (_studioBeatRows[r][c] && window.RemoAudio) {
+    const scale = document.getElementById('beatStudioScaleSel')?.value || 'cyber';
+    window.RemoAudio.playSingleDrumPad(r, c, scale, 0.9);
+  }
+  renderBeatStudioMatrix();
+  if (window.RemoAudio && window.RemoAudio.activeBeatTargetId === 'studio_preview') {
+    window.RemoAudio.stopBeatPattern(true);
+    toggleBeatStudioPreview();
+  }
+}
+window.toggleBeatStudioCell = toggleBeatStudioCell;
+
+function randomizeBeatStudio() {
+  const presets = [
+    [[1,0,0,0, 1,0,0,0], [0,0,1,0, 0,0,1,0], [1,0,1,1, 0,1,0,1], [1,1,0,1, 1,0,1,1]],
+    [[1,0,0,1, 0,0,1,0], [0,0,1,0, 0,0,1,0], [1,0,0,1, 1,0,1,0], [0,1,1,0, 1,0,1,1]],
+    [[1,0,1,0, 1,0,1,0], [0,0,1,0, 0,0,1,1], [1,1,0,0, 1,1,0,1], [1,0,1,1, 0,1,1,0]],
+    [[1,0,0,0, 0,1,0,0], [0,0,0,0, 1,0,0,0], [1,0,1,0, 0,1,1,0], [1,1,0,1, 1,0,0,1]]
+  ];
+  const pick = presets[Math.floor(Math.random() * presets.length)];
+  _studioBeatRows = pick.map((row) => row.map((v) => (Math.random() < 0.14 ? (v ? 0 : 1) : v)));
+  _studioBeatRows[0][0] = 1; // Always anchor downbeat kick
+  renderBeatStudioMatrix();
+  if (window.RemoAudio) {
+    window.RemoAudio.stopBeatPattern(true);
+  }
+  toggleBeatStudioPreview();
+}
+window.randomizeBeatStudio = randomizeBeatStudio;
+
+function clearBeatStudioGrid() {
+  _studioBeatRows = [
+    [0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0]
+  ];
+  if (window.RemoAudio && window.RemoAudio.activeBeatTargetId === 'studio_preview') {
+    window.RemoAudio.stopBeatPattern();
+  }
+  renderBeatStudioMatrix();
+}
+window.clearBeatStudioGrid = clearBeatStudioGrid;
+
+function highlightStudioPlayhead(stepIdx) {
+  document.querySelectorAll('#studioBeatMatrix .beat-pad-cell').forEach((el) => {
+    const col = Number(el.getAttribute('data-beat-c'));
+    el.classList.toggle('playhead', col === stepIdx);
+  });
+}
+
+function syncBeatStudioPlayBtnDOM() {
+  const btn = document.getElementById('btnBeatStudioPlay');
+  if (!btn) return;
+  const active = Boolean(window.RemoAudio && window.RemoAudio.activeBeatTargetId === 'studio_preview');
+  btn.innerHTML = active ? `${escapeHtmlStr(t('beat_stop_btn'))}` : `▶️ ${escapeHtmlStr(t('beat_play_btn'))}`;
+}
+
+function toggleBeatStudioPreview() {
+  if (!window.RemoAudio) return;
+  const snap = getStudioBeatPatternSnapshot();
+  const started = window.RemoAudio.playBeatPattern(snap, 'studio_preview', highlightStudioPlayhead);
+  if (!started) {
+    highlightStudioPlayhead(-1);
+  }
+  syncBeatStudioPlayBtnDOM();
+}
+window.toggleBeatStudioPreview = toggleBeatStudioPreview;
+
+function onBeatStudioConfigChange() {
+  if (window.RemoAudio && window.RemoAudio.activeBeatTargetId === 'studio_preview') {
+    window.RemoAudio.stopBeatPattern(true);
+    toggleBeatStudioPreview();
+  }
+}
+window.onBeatStudioConfigChange = onBeatStudioConfigChange;
+
+function renderBeatPostStage(p, city, lang) {
+  const pat = p.beatPattern || { bpm: 118, scale: 'cyber', rows: _studioBeatRows };
+  const rows = Array.isArray(pat.rows) ? pat.rows : _studioBeatRows;
+  const isPlaying = Boolean(window.RemoAudio && window.RemoAudio.activeBeatTargetId === p.id);
+  const scaleTag = String(pat.scale || 'cyber').toUpperCase();
+
+  let dotsHtml = '';
+  for (let r = 0; r < 4; r++) {
+    for (let c = 0; c < 8; c++) {
+      const on = Boolean(rows[r] && rows[r][c]);
+      dotsHtml += `<span class="beat-mini-dot r${r} ${on ? 'on' : ''}" data-feed-beat-c="${c}"></span>`;
+    }
+  }
+
+  return `
+    <div class="beat-post-stage" id="beatStage_${p.id}">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:center;">
+        <span style="font-family:'Orbitron',sans-serif;font-size:0.8rem;font-weight:900;color:#fde047;">
+          ${city.flag} ${escapeHtmlStr(getCityName(city, lang))} · ${Number(pat.bpm || 118)} BPM · ${escapeHtmlStr(scaleTag)}
+        </span>
+      </div>
+      <div class="beat-mini-matrix" id="beatMatrix_${p.id}">
+        ${dotsHtml}
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:4px;">
+        <button type="button" class="btn-cyber btn-gold" data-beat-play-btn="${p.id}" style="padding:7px 15px;font-size:0.78rem;" onclick="toggleFeedBeatLoop('${p.id}', event)">
+          ${isPlaying ? escapeHtmlStr(t('beat_stop_btn')) : `▶️ ${escapeHtmlStr(t('beat_play_btn'))}`}
+        </button>
+        <button type="button" class="btn-ghost" style="padding:7px 13px;font-size:0.76rem;border-color:#a78bfa;color:#ddd6fe;" onclick="remixBeatPost('${p.id}', event)">
+          ${escapeHtmlStr(t('beat_remix_btn'))}
+        </button>
+      </div>
+    </div>
+  `;
+}
+window.renderBeatPostStage = renderBeatPostStage;
+
+function toggleFeedBeatLoop(postId, ev) {
+  if (ev) ev.stopPropagation();
+  if (!window.RemoAudio) return;
+  const p = (REMO_STORE.state.posts || []).find((x) => x && x.id === postId);
+  if (!p || !p.beatPattern) return;
+
+  const started = window.RemoAudio.playBeatPattern(p.beatPattern, p.id, (stepIdx) => {
+    document.querySelectorAll(`#beatMatrix_${p.id} .beat-mini-dot`).forEach((el) => {
+      const col = Number(el.getAttribute('data-feed-beat-c'));
+      el.classList.toggle('playhead', col === stepIdx);
+    });
+  });
+
+  if (!started) {
+    document.querySelectorAll(`#beatMatrix_${p.id} .beat-mini-dot`).forEach((el) => el.classList.remove('playhead'));
+  }
+  syncActivePostAudioDOM();
+}
+window.toggleFeedBeatLoop = toggleFeedBeatLoop;
+
+function remixBeatPost(postId, ev) {
+  if (ev) ev.stopPropagation();
+  const p = (REMO_STORE.state.posts || []).find((x) => x && x.id === postId);
+  if (!p || !p.beatPattern) return;
+  const lang = REMO_I18N.getLang();
+
+  openCreatePostModal('#RemoBeat');
+  pendingRemixParent = { authorUid: p.uid || '', authorName: p.authorName || 'Creator' };
+
+  const remixBanner = document.getElementById('createRemixBanner');
+  if (remixBanner) {
+    remixBanner.style.display = 'block';
+    remixBanner.textContent = `🎛️ ${t('post_remix_from')} @${p.authorName} (+10 🪙)`;
+  }
+
+  if (Array.isArray(p.beatPattern.rows) && p.beatPattern.rows.length === 4) {
+    _studioBeatRows = p.beatPattern.rows.map((r) => r.slice(0, 8));
+  }
+  const bpmSel = document.getElementById('beatStudioBpmSel');
+  if (bpmSel && p.beatPattern.bpm) bpmSel.value = String(p.beatPattern.bpm);
+  const scSel = document.getElementById('beatStudioScaleSel');
+  if (scSel && p.beatPattern.scale) scSel.value = String(p.beatPattern.scale);
+
+  const capInp = document.getElementById('createCaptionInp');
+  if (capInp) {
+    capInp.value = lang === 'fr'
+      ? `🎛️ Mon Remix du Beat de @${p.authorName} ! #RemoBeat`
+      : `🎛️ Remixing @${p.authorName}'s City Beat! #RemoBeat`;
+  }
+
+  switchCreateStudioTab('beat');
+}
+window.remixBeatPost = remixBeatPost;
+
+function syncActivePostAudioDOM() {
+  const activeSoundPost = (window.RemoAudio && window.RemoAudio.activeSoundtrackPostId) || '';
+  const activeBeatPost = (window.RemoAudio && window.RemoAudio.activeBeatTargetId) || '';
+  const radioOn = Boolean(window.REMO_RADIO && window.REMO_RADIO.isPlaying);
+
+  document.querySelectorAll('.post-sound-disc[data-sound-post]').forEach((btn) => {
+    const pid = btn.getAttribute('data-sound-post');
+    const sid = btn.getAttribute('data-sound-id');
+    const on = sid === 'city_radio' ? radioOn : (pid === activeSoundPost);
+    btn.classList.toggle('playing', on);
+  });
+
+  document.querySelectorAll('[data-beat-play-btn]').forEach((btn) => {
+    const pid = btn.getAttribute('data-beat-play-btn');
+    const on = pid === activeBeatPost;
+    btn.innerHTML = on ? escapeHtmlStr(t('beat_stop_btn')) : `▶️ ${escapeHtmlStr(t('beat_play_btn'))}`;
+    if (!on) {
+      document.querySelectorAll(`#beatMatrix_${pid} .beat-mini-dot`).forEach((el) => el.classList.remove('playhead'));
+    }
+  });
+
+  syncBeatStudioPlayBtnDOM();
+}
+window.syncActivePostAudioDOM = syncActivePostAudioDOM;
+
+window.addEventListener('remo:postaudiochange', syncActivePostAudioDOM);
+
 
 

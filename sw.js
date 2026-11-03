@@ -3,7 +3,7 @@
    Offline Shell Caching + Native Push & Incoming Call Notifications
    ════════════════════════════════════════════════════════════════════ */
 
-const CACHE_NAME = 'remo-pwa-v59';
+const CACHE_NAME = 'remo-pwa-v60';
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -53,6 +53,21 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
+  let reqUrl;
+  try {
+    reqUrl = new URL(event.request.url);
+  } catch (e) {
+    return;
+  }
+  // Never intercept cross-origin requests (live radio streams, Firebase, map tiles) or streaming audio/video/Range
+  if (
+    reqUrl.origin !== self.location.origin ||
+    event.request.destination === 'audio' ||
+    event.request.destination === 'video' ||
+    event.request.headers.has('range')
+  ) {
+    return;
+  }
   event.respondWith(
     fetch(event.request)
       .then((res) => {

@@ -218,6 +218,295 @@ const RemoAudio = {
       clearInterval(this.radioTimer);
       this.radioTimer = null;
     }
+  },
+
+  /* ── 💿 v60: 8 Copyright-Free Procedural Photo Soundtracks & 4x8 Beat-Pad Synth ── */
+  soundtrackTimer: null,
+  activeSoundtrackId: '',
+  activeSoundtrackPostId: '',
+  beatTimer: null,
+  activeBeatTargetId: '',
+  activeBeatStep: -1,
+  _noiseBuf: null,
+
+  _getNoiseBuffer(ctx) {
+    if (this._noiseBuf) return this._noiseBuf;
+    const len = Math.floor(ctx.sampleRate * 0.18);
+    const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) {
+      data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (ctx.sampleRate * 0.045));
+    }
+    this._noiseBuf = buf;
+    return buf;
+  },
+
+  _notifyExternalAudioState() {
+    const anyActive = Boolean(this.soundtrackTimer || this.beatTimer);
+    if (window.REMO_RADIO && typeof window.REMO_RADIO.setExternalSynthActive === 'function') {
+      window.REMO_RADIO.setExternalSynthActive(anyActive);
+    }
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('remo:postaudiochange', {
+        detail: {
+          soundtrackPostId: this.activeSoundtrackPostId,
+          soundtrackId: this.activeSoundtrackId,
+          beatTargetId: this.activeBeatTargetId
+        }
+      }));
+    }
+  },
+
+  getSoundtrackPresets() {
+    return {
+      lofi_rain: {
+        bpm: 78, wave: 'triangle', hat: true, kickEvery: 4,
+        chords: [[293.66, 349.23, 440, 523.25], [196, 246.94, 349.23, 440], [261.63, 329.63, 392, 493.88], [220, 261.63, 329.63, 392]]
+      },
+      french_cafe: {
+        bpm: 88, wave: 'sine', hat: true, kickEvery: 0,
+        chords: [[174.61, 220, 261.63, 329.63], [164.81, 196, 246.94, 293.66], [146.83, 220, 261.63, 349.23], [130.81, 196, 246.94, 329.63]]
+      },
+      shibuya_neon: {
+        bpm: 112, wave: 'sawtooth', arp: true, hat: true, kickEvery: 2,
+        chords: [[220, 261.63, 329.63, 440], [174.61, 220, 261.63, 349.23], [261.63, 329.63, 392, 523.25], [196, 246.94, 293.66, 392]]
+      },
+      sunset_house: {
+        bpm: 120, wave: 'triangle', hat: true, kickEvery: 2,
+        chords: [[220, 261.63, 329.63, 392], [196, 246.94, 293.66, 392], [174.61, 220, 261.63, 349.23], [164.81, 196, 246.94, 329.63]]
+      },
+      afro_groove: {
+        bpm: 104, wave: 'sine', arp: true, hat: true, kickEvery: 3,
+        chords: [[196, 293.66, 392, 493.88], [220, 329.63, 440, 523.25], [174.61, 261.63, 349.23, 440], [196, 293.66, 392, 440]]
+      },
+      velvet_jazz: {
+        bpm: 72, wave: 'sine', hat: true, kickEvery: 0,
+        chords: [[261.63, 311.13, 392, 466.16], [233.08, 293.66, 349.23, 440], [207.65, 261.63, 311.13, 392], [196, 246.94, 293.66, 349.23]]
+      },
+      cyber_pulse: {
+        bpm: 126, wave: 'sawtooth', arp: true, hat: true, kickEvery: 2,
+        chords: [[146.83, 220, 293.66, 349.23], [130.81, 196, 261.63, 329.63], [116.54, 174.61, 233.08, 293.66], [130.81, 196, 261.63, 392]]
+      },
+      acoustic_breeze: {
+        bpm: 94, wave: 'triangle', arp: true, hat: false, kickEvery: 4,
+        chords: [[261.63, 329.63, 392, 523.25], [196, 293.66, 392, 493.88], [220, 329.63, 440, 523.25], [174.61, 261.63, 349.23, 440]]
+      }
+    };
+  },
+
+  playSoundtrackLoop(loopId, postId = '') {
+    this.stopBeatPattern(true);
+    if (this.soundtrackTimer && this.activeSoundtrackId === loopId && this.activeSoundtrackPostId === postId) {
+      this.stopSoundtrackLoop();
+      return false;
+    }
+    this.stopSoundtrackLoop(true);
+    const presets = this.getSoundtrackPresets();
+    const cfg = presets[loopId] || presets.lofi_rain;
+    const ctx = this.ensureCtx();
+    if (!ctx) return false;
+
+    this.activeSoundtrackId = loopId;
+    this.activeSoundtrackPostId = postId || 'studio_preview';
+
+    let tick = 0;
+    const stepMs = Math.round((60 / cfg.bpm / 2) * 1000);
+    const runTick = () => {
+      if (!this.activeSoundtrackId || !this.ctx) return;
+      try {
+        const now = this.ctx.currentTime;
+        const chord = cfg.chords[Math.floor(tick / 8) % cfg.chords.length];
+        if (tick % 8 === 0) {
+          chord.forEach((freq) => {
+            const osc = this.ctx.createOscillator();
+            const flt = this.ctx.createBiquadFilter();
+            const g = this.ctx.createGain();
+            osc.type = cfg.wave;
+            osc.frequency.setValueAtTime(freq, now);
+            flt.type = 'lowpass';
+            flt.frequency.setValueAtTime(cfg.wave === 'sawtooth' ? 950 : 1800, now);
+            g.gain.setValueAtTime(0.001, now);
+            g.gain.linearRampToValueAtTime(cfg.wave === 'sawtooth' ? 0.025 : 0.042, now + 0.12);
+            g.gain.exponentialRampToValueAtTime(0.0008, now + (stepMs * 7.6) / 1000);
+            osc.connect(flt);
+            flt.connect(g);
+            g.connect(this.ctx.destination);
+            osc.start(now);
+            osc.stop(now + (stepMs * 7.8) / 1000);
+          });
+        }
+        if (cfg.arp) {
+          const arpNote = chord[tick % chord.length] * (tick % 4 === 3 ? 2 : 1);
+          const ao = this.ctx.createOscillator();
+          const ag = this.ctx.createGain();
+          ao.type = 'triangle';
+          ao.frequency.setValueAtTime(arpNote, now);
+          ag.gain.setValueAtTime(0.032, now);
+          ag.gain.exponentialRampToValueAtTime(0.0008, now + 0.22);
+          ao.connect(ag);
+          ag.connect(this.ctx.destination);
+          ao.start(now);
+          ao.stop(now + 0.24);
+        }
+        if (cfg.kickEvery && tick % cfg.kickEvery === 0) {
+          this.playSingleDrumPad(0, tick % 8, 'chill', 0.55);
+        }
+        if (cfg.hat && tick % 2 === 1) {
+          const src = this.ctx.createBufferSource();
+          src.buffer = this._getNoiseBuffer(this.ctx);
+          const hp = this.ctx.createBiquadFilter();
+          hp.type = 'highpass';
+          hp.frequency.setValueAtTime(5200, now);
+          const hg = this.ctx.createGain();
+          hg.gain.setValueAtTime(0.025, now);
+          hg.gain.exponentialRampToValueAtTime(0.001, now + 0.055);
+          src.connect(hp);
+          hp.connect(hg);
+          hg.connect(this.ctx.destination);
+          src.start(now);
+          src.stop(now + 0.06);
+        }
+        tick++;
+      } catch (e) {}
+    };
+
+    runTick();
+    this.soundtrackTimer = setInterval(runTick, stepMs);
+    this._notifyExternalAudioState();
+    return true;
+  },
+
+  stopSoundtrackLoop(silentNotify = false) {
+    if (this.soundtrackTimer) {
+      clearInterval(this.soundtrackTimer);
+      this.soundtrackTimer = null;
+    }
+    this.activeSoundtrackId = '';
+    this.activeSoundtrackPostId = '';
+    if (!silentNotify) this._notifyExternalAudioState();
+  },
+
+  playSingleDrumPad(rowIdx, stepIdx = 0, scaleId = 'cyber', gainMul = 1) {
+    try {
+      const ctx = this.ensureCtx();
+      if (!ctx) return;
+      const now = ctx.currentTime;
+      const scales = {
+        cyber: { bass: [55, 55, 65.41, 73.42, 55, 65.41, 82.41, 73.42], lead: [440, 523.25, 659.25, 587.33, 440, 783.99, 659.25, 523.25] },
+        chill: { bass: [73.42, 73.42, 65.41, 55, 65.41, 73.42, 82.41, 65.41], lead: [293.66, 349.23, 440, 523.25, 392, 349.23, 329.63, 293.66] },
+        house: { bass: [55, 65.41, 73.42, 82.41, 55, 65.41, 98, 82.41], lead: [329.63, 392, 440, 493.88, 587.33, 523.25, 440, 392] },
+        tokyo: { bass: [65.41, 65.41, 82.41, 98, 73.42, 82.41, 110, 98], lead: [523.25, 659.25, 783.99, 987.77, 880, 783.99, 659.25, 587.33] }
+      };
+      const sc = scales[scaleId] || scales.cyber;
+
+      if (rowIdx === 0) {
+        // 🥁 Punchy 808/909 Kick
+        const o = ctx.createOscillator();
+        const g = ctx.createGain();
+        o.type = 'sine';
+        o.frequency.setValueAtTime(152, now);
+        o.frequency.exponentialRampToValueAtTime(38, now + 0.18);
+        g.gain.setValueAtTime(0.34 * gainMul, now);
+        g.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+        o.connect(g);
+        g.connect(ctx.destination);
+        o.start(now);
+        o.stop(now + 0.23);
+      } else if (rowIdx === 1) {
+        // 👏 Crisp Studio Clap / Snare
+        const src = ctx.createBufferSource();
+        src.buffer = this._getNoiseBuffer(ctx);
+        const bp = ctx.createBiquadFilter();
+        bp.type = 'bandpass';
+        bp.frequency.setValueAtTime(1450, now);
+        bp.Q.setValueAtTime(1.2, now);
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(0.24 * gainMul, now);
+        g.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
+        src.connect(bp);
+        bp.connect(g);
+        g.connect(ctx.destination);
+        src.start(now);
+        src.stop(now + 0.15);
+      } else if (rowIdx === 2) {
+        // 🎸 Warm Sub-Bass
+        const freq = sc.bass[stepIdx % sc.bass.length];
+        const o = ctx.createOscillator();
+        const flt = ctx.createBiquadFilter();
+        const g = ctx.createGain();
+        o.type = 'sawtooth';
+        o.frequency.setValueAtTime(freq, now);
+        flt.type = 'lowpass';
+        flt.frequency.setValueAtTime(360, now);
+        g.gain.setValueAtTime(0.22 * gainMul, now);
+        g.gain.exponentialRampToValueAtTime(0.001, now + 0.24);
+        o.connect(flt);
+        flt.connect(g);
+        g.connect(ctx.destination);
+        o.start(now);
+        o.stop(now + 0.25);
+      } else if (rowIdx === 3) {
+        // 🎹 Neon Lead Synth
+        const freq = sc.lead[stepIdx % sc.lead.length];
+        const o = ctx.createOscillator();
+        const g = ctx.createGain();
+        o.type = scaleId === 'chill' ? 'sine' : 'triangle';
+        o.frequency.setValueAtTime(freq, now);
+        g.gain.setValueAtTime(0.16 * gainMul, now);
+        g.gain.exponentialRampToValueAtTime(0.001, now + 0.26);
+        o.connect(g);
+        g.connect(ctx.destination);
+        o.start(now);
+        o.stop(now + 0.27);
+      }
+    } catch (e) {}
+  },
+
+  playBeatPattern(pattern, targetId = 'studio', onStepCb = null) {
+    this.stopSoundtrackLoop(true);
+    if (this.beatTimer && this.activeBeatTargetId === targetId) {
+      this.stopBeatPattern();
+      return false;
+    }
+    this.stopBeatPattern(true);
+    if (!pattern || !Array.isArray(pattern.rows)) return false;
+    const ctx = this.ensureCtx();
+    if (!ctx) return false;
+
+    const bpm = Math.max(70, Math.min(160, Number(pattern.bpm) || 118));
+    const scale = pattern.scale || 'cyber';
+    const stepMs = Math.round((60 / bpm / 2) * 1000);
+    this.activeBeatTargetId = targetId;
+    this.activeBeatStep = 0;
+
+    const runStep = () => {
+      if (!this.activeBeatTargetId) return;
+      const s = this.activeBeatStep % 8;
+      for (let r = 0; r < 4; r++) {
+        if (pattern.rows[r] && pattern.rows[r][s]) {
+          this.playSingleDrumPad(r, s, scale, 1);
+        }
+      }
+      if (typeof onStepCb === 'function') {
+        try { onStepCb(s); } catch (e) {}
+      }
+      this.activeBeatStep = (s + 1) % 8;
+    };
+
+    runStep();
+    this.beatTimer = setInterval(runStep, stepMs);
+    this._notifyExternalAudioState();
+    return true;
+  },
+
+  stopBeatPattern(silentNotify = false) {
+    if (this.beatTimer) {
+      clearInterval(this.beatTimer);
+      this.beatTimer = null;
+    }
+    this.activeBeatTargetId = '';
+    this.activeBeatStep = -1;
+    if (!silentNotify) this._notifyExternalAudioState();
   }
 };
 
@@ -1870,6 +2159,60 @@ function upgradeEcosystemState(st) {
       }
     ];
   }
+
+  // 🏆 v60: Seed Weekly City Jukebox tracks (synced across citizens via live_state)
+  if (!Array.isArray(st.jukeboxTracks) || st.jukeboxTracks.length === 0) {
+    st.jukeboxTracks = [
+      {
+        id: 'jb_mtl_1',
+        title: 'Midnight St-Laurent Groove',
+        artist: 'Kaytranada Vibe · MTL',
+        cityId: 'montreal',
+        url: '',
+        soundPreset: 'sunset_house',
+        addedBy: 'REMO Founder',
+        votes: 14,
+        voters: [],
+        createdAt: Date.now() - 320000
+      },
+      {
+        id: 'jb_par_1',
+        title: 'Nuit Électronique sur Seine',
+        artist: 'French Touch Collective',
+        cityId: 'paris',
+        url: '',
+        soundPreset: 'french_cafe',
+        addedBy: 'Lucas_PAR',
+        votes: 11,
+        voters: [],
+        createdAt: Date.now() - 240000
+      },
+      {
+        id: 'jb_kiv_1',
+        title: 'Chișinău Golden Horizon',
+        artist: 'Carla’s & Dara Pulse',
+        cityId: 'chisinau',
+        url: '',
+        soundPreset: 'cyber_pulse',
+        addedBy: 'Elena_KIV',
+        votes: 10,
+        voters: [],
+        createdAt: Date.now() - 180000
+      },
+      {
+        id: 'jb_tyo_1',
+        title: 'Shibuya Rain 2099',
+        artist: 'Kenji Synth',
+        cityId: 'tokyo',
+        url: '',
+        soundPreset: 'shibuya_neon',
+        addedBy: 'Kenji_TYO',
+        votes: 9,
+        voters: [],
+        createdAt: Date.now() - 120000
+      }
+    ];
+  }
 }
 
 /* ── 4. REMO_STORE Singleton ── */
@@ -3454,6 +3797,7 @@ const REMO_STORE = {
             duels: (this.state.duels || []).slice(0, 15),
             settings: this.state.settings || {},
             bottles: (this.state.bottles || []).slice(0, 30),
+            jukeboxTracks: (this.state.jukeboxTracks || []).slice(0, 30),
             auctions: (this.state.auctions || []).slice(0, 25),
             geoVaults: (this.state.geoVaults || []).slice(0, 35),
             deletedPostIds: [...(this.deletedPostIds || [])].slice(-100),
@@ -3465,6 +3809,9 @@ const REMO_STORE = {
           if (data) {
             mergeCloudScoresAndDuels(data);
             if (data.bottles) this.state.bottles = data.bottles;
+            if (Array.isArray(data.jukeboxTracks) && data.jukeboxTracks.length > 0) {
+              this.state.jukeboxTracks = data.jukeboxTracks;
+            }
             if (Array.isArray(data.auctions)) {
               this.state.auctions = data.auctions;
               if (typeof renderAuctionsView === 'function') renderAuctionsView();
@@ -3496,6 +3843,9 @@ const REMO_STORE = {
         if (data) {
           mergeCloudScoresAndDuels(data);
           if (data.bottles) this.state.bottles = data.bottles;
+          if (Array.isArray(data.jukeboxTracks) && data.jukeboxTracks.length > 0) {
+            this.state.jukeboxTracks = data.jukeboxTracks;
+          }
           if (Array.isArray(data.auctions)) {
             this.state.auctions = data.auctions;
             if (typeof renderAuctionsView === 'function') renderAuctionsView();
@@ -3881,6 +4231,7 @@ const REMO_STORE = {
           duels: (this.state.duels || []).slice(0, 15),
           settings: this.state.settings || {},
           bottles: (this.state.bottles || []).slice(0, 30),
+          jukeboxTracks: (this.state.jukeboxTracks || []).slice(0, 30),
           auctions: (this.state.auctions || []).slice(0, 25),
           geoVaults: (this.state.geoVaults || []).slice(0, 35),
           deletedPostIds: [...(this.deletedPostIds || [])].slice(-100),
