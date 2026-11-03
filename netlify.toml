@@ -1,0 +1,45 @@
+[build.processing]
+  skip_processing = false
+
+[build.processing.html]
+  pretty_urls = false
+
+[[redirects]]
+  from = "/world-radio"
+  to = "/world-radio.html"
+  status = 200
+
+[[redirects]]
+  from = "/fr/world-radio"
+  to = "/fr/world-radio.html"
+  status = 200
+
+[[redirects]]
+  from = "/guess-the-city"
+  to = "/guess-the-city.html"
+  status = 200
+
+[[redirects]]
+  from = "/fr/guess-the-city"
+  to = "/fr/guess-the-city.html"
+  status = 200
+
+[[redirects]]
+  from = "/terms"
+  to = "/terms.html"
+  status = 200
+
+[[redirects]]
+  from = "/fr/terms"
+  to = "/fr/terms.html"
+  status = 200
+
+[[redirects]]
+  from = "/privacy"
+  to = "/privacy.html"
+  status = 200
+
+[[redirects]]
+  from = "/fr/privacy"
+  to = "/fr/privacy.html"
+  status = 200

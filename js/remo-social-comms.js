@@ -136,45 +136,46 @@ function syncHeaderAndSidebars() {
   const hhEl = document.getElementById('hdrHappyHourBadge');
   if (hhEl) hhEl.style.display = st.settings.happyHour2x ? 'inline-flex' : 'none';
 
-  // Admin God-Mode Header Pill & Navigation Links (Strictly visible ONLY for andart1174@gmail.com)
+  // Admin God-Mode Header Pill & Navigation Links (Strictly visible ONLY when verified admin and PIN unlocked)
   const isAdmUser = REMO_STORE.isCurrentUserAdmin();
   const isAdmUnlocked = REMO_STORE.isAdminUnlocked();
+  const showAdminControls = Boolean(isAdmUser && isAdmUnlocked);
 
   const admBtn = document.getElementById('hdrAdminGodBtn');
   if (admBtn) {
-    admBtn.style.display = isAdmUser ? 'inline-flex' : 'none';
+    admBtn.style.display = showAdminControls ? 'inline-flex' : 'none';
     admBtn.classList.toggle('active', isAdmUnlocked);
     admBtn.textContent = isAdmUnlocked ? t('btn_admin_mode_on') : t('btn_admin_mode_off');
   }
 
   const admOfficeHdr = document.getElementById('hdrAdminOfficeLink');
   if (admOfficeHdr) {
-    admOfficeHdr.style.display = isAdmUser ? 'inline-flex' : 'none';
+    admOfficeHdr.style.display = showAdminControls ? 'inline-flex' : 'none';
   }
 
   const sideAdm = document.getElementById('sidebarAdminBox');
   if (sideAdm) {
-    sideAdm.style.display = isAdmUser ? 'block' : 'none';
+    sideAdm.style.display = showAdminControls ? 'block' : 'none';
   }
 
   const mbHubAdmGod = document.getElementById('mbHubAdminGodBtn');
   if (mbHubAdmGod) {
-    mbHubAdmGod.style.display = isAdmUser ? 'inline-flex' : 'none';
+    mbHubAdmGod.style.display = showAdminControls ? 'inline-flex' : 'none';
   }
 
   const mbHubAdmOffice = document.getElementById('mbHubAdminOfficeBtn');
   if (mbHubAdmOffice) {
-    mbHubAdmOffice.style.display = isAdmUser ? 'inline-flex' : 'none';
+    mbHubAdmOffice.style.display = showAdminControls ? 'inline-flex' : 'none';
   }
 
   // Admin-Only Radar Controls (Déposer un Géo-Coffre & Placer une Balise Ici)
   const buryVaultBtn = document.getElementById('btnRadarBuryVault');
   if (buryVaultBtn) {
-    buryVaultBtn.style.display = (isAdmUser || isAdmUnlocked) ? 'inline-flex' : 'none';
+    buryVaultBtn.style.display = showAdminControls ? 'inline-flex' : 'none';
   }
   const dropPinBtn = document.getElementById('btnRadarDropPin');
   if (dropPinBtn) {
-    dropPinBtn.style.display = (isAdmUser || isAdmUnlocked) ? 'inline-flex' : 'none';
+    dropPinBtn.style.display = showAdminControls ? 'inline-flex' : 'none';
   }
 
   // Global Megaphone Broadcast Banner
@@ -212,12 +213,12 @@ function syncHeaderAndSidebars() {
 
   const authBtn = document.getElementById('hdrAuthBtn');
   if (authBtn) {
-    if (u) {
-      const hc = getCityById(u.homeCity);
+    if (u && u.email && u.role !== 'guest' && u.name) {
+      const hc = getCityById(u.homeCity) || { flag: '🌐' };
       authBtn.innerHTML = `${hc.flag} ${u.name}`;
       authBtn.onclick = () => switchRemoView('passport');
     } else {
-      authBtn.textContent = t('btn_sign_in');
+      authBtn.innerHTML = `✨ ${t('btn_sign_in') || 'Sign In'}`;
       authBtn.onclick = () => openAuthModal();
     }
   }
@@ -4237,6 +4238,12 @@ function quickGoogleSignInSim() {
 function userSignOutAction() {
   const lang = REMO_I18N.getLang();
   REMO_STORE.signOut();
+  localStorage.removeItem(REMO_STORE.USER_KEY);
+  localStorage.removeItem(REMO_STORE.ADMIN_MODE_KEY);
+  sessionStorage.removeItem('remo_admin_unlocked');
+  if (typeof firebase !== 'undefined' && firebase.auth) {
+    try { firebase.auth().signOut(); } catch (e) {}
+  }
   syncHeaderAndSidebars();
   renderSocialFeed();
   switchRemoView('feed');

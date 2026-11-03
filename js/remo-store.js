@@ -1156,38 +1156,7 @@ function createDefaultState() {
       { id: 'st_4', author: 'Kenji_Shibuya', cityId: 'tokyo', caption_en: 'Akihabara Card Battle! 🎴', caption_fr: 'Duel de Cartes à Akihabara ! 🎴', createdAt: now - 5100000 }
     ],
 
-    duels: [
-      {
-        id: 'war_1',
-        title_en: 'World Nightlife & Gastronomy Clash',
-        title_fr: 'Choc Mondial Gastronomie & Vie Nocturne',
-        cityA: 'montreal',
-        cityB: 'paris',
-        votesA: 148,
-        votesB: 142,
-        voters: []
-      },
-      {
-        id: 'war_2',
-        title_en: 'Eastern European Capitals Super-Derby',
-        title_fr: 'Super-Derby des Capitales d’Europe de l’Est',
-        cityA: 'chisinau',
-        cityB: 'bucharest',
-        votesA: 136,
-        votesB: 131,
-        voters: []
-      },
-      {
-        id: 'war_3',
-        title_en: 'Hyper-Skylines & Future Tech Megacities',
-        title_fr: 'Mégapoles du Futur & Gratte-Ciels Néon',
-        cityA: 'newyork',
-        cityB: 'tokyo',
-        votesA: 119,
-        votesB: 124,
-        voters: []
-      }
-    ],
+    duels: [],
 
     droppedCardsPool: [
       {
@@ -2252,10 +2221,11 @@ const REMO_STORE = {
       this.state = createDefaultState();
     }
     if (!this.state.settings) this.state = createDefaultState();
-    // Strip out deleted city wars / duels
+    // Strip out deleted city wars / duels and legacy mock wars
+    const legacyMockWarIds = new Set(['war_1', 'war_2', 'war_3']);
     if (Array.isArray(this.state.duels)) {
       this.state.duels = this.state.duels.filter((d) =>
-        d && d.id && (!this.deletedDuelIds || !this.deletedDuelIds.has(d.id))
+        d && d.id && !legacyMockWarIds.has(d.id) && (!this.deletedDuelIds || !this.deletedDuelIds.has(d.id))
       );
     }
     // Strip out legacy built-in mock posts from previous builds
@@ -2304,9 +2274,7 @@ const REMO_STORE = {
     if (!u) return false;
     const adminEmail = (this.state && this.state.settings && this.state.settings.adminEmail) || 'andart1174@gmail.com';
     const emailMatch = Boolean(u.email && u.email.toLowerCase().trim() === adminEmail.toLowerCase().trim());
-    const roleMatch = Boolean(u.role === 'admin');
-    const uidMatch = Boolean(u.uid === 'u_admin_founder');
-    return emailMatch || roleMatch || uidMatch;
+    return emailMatch && (u.role === 'admin' || u.uid === 'u_admin_founder');
   },
 
   isAdminUnlocked() {
@@ -2531,13 +2499,48 @@ const REMO_STORE = {
     // 1. If user already logged in and no specific new email/fbUid is requested, keep current user
     if (!email && !fbUid) {
       const cur = this.getCurrentUser();
-      if (cur) return cur;
-      // If there's an existing registered user, use it
-      if (this.state.users && this.state.users.length > 0) {
-        const u0 = this.state.users[0];
-        localStorage.setItem(this.USER_KEY, u0.uid);
-        return u0;
+      // If current user in storage is u_admin_founder but admin is not unlocked or verified, wipe to protect founder identity
+      if (cur) {
+        if (cur.uid === 'u_admin_founder' && !this.isAdminUnlocked()) {
+          localStorage.removeItem(this.USER_KEY);
+        } else {
+          return cur;
+        }
       }
+      // Never fallback to this.state.users[0]! Create an isolated Guest Explorer session
+      const guestUid = 'u_guest_' + Math.random().toString(36).slice(2, 9);
+      const guestName = (name && name !== 'REMO Founder' && name !== 'Admin Founder') ? name : 'Guest Explorer';
+      const guestUser = {
+        uid: guestUid,
+        fbUid: '',
+        name: guestName,
+        email: '',
+        role: 'guest',
+        verified: false,
+        emailVerified: false,
+        termsAcceptedAt: 0,
+        homeCity: homeCity || 'montreal',
+        passportNum: '0000',
+        referralCode: '',
+        referralsCount: 0,
+        referredBy: '',
+        ownedShopItems: [],
+        equippedFrame: '',
+        equippedTitleId: '',
+        coins: 100,
+        lifetimeCoins: 100,
+        streak: 1,
+        lastStreakClaimDate: '',
+        following: [],
+        joinedAt: Date.now(),
+        lastSeenAt: Date.now(),
+        bio: 'Visiting REMO World',
+        avatarBg: '#38bdf8'
+      };
+      localStorage.setItem(this.USER_KEY, guestUid);
+      if (!Array.isArray(this.state.users)) this.state.users = [];
+      this.state.users.push(guestUser);
+      return guestUser;
     }
 
     let u = email ? this.state.users.find((x) => x.email && x.email.toLowerCase() === email.toLowerCase()) : null;
@@ -2548,7 +2551,7 @@ const REMO_STORE = {
     if (!u) {
       // Only create if we actually have an email or fbUid (real sign-up)
       if (!email && !fbUid) {
-        return this.state.users[0] || null;
+        return null;
       }
       const pNum = String(this.state.users.length + 1).padStart(4, '0');
       const bonus = this.state.settings?.rewards?.signupBonus || 150;
@@ -2986,8 +2989,12 @@ const REMO_STORE = {
 
   signOut() {
     localStorage.removeItem(this.USER_KEY);
+    localStorage.removeItem(this.ADMIN_MODE_KEY);
+    sessionStorage.removeItem('remo_admin_unlocked');
     this.setAdminUnlocked(false);
-    if (this.fbAuth) this.fbAuth.signOut().catch(() => {});
+    if (this.fbAuth) {
+      try { this.fbAuth.signOut().catch(() => {}); } catch (e) {}
+    }
     window.dispatchEvent(new CustomEvent('remo:stateupdate', { detail: { reason: 'auth' } }));
   },
 
@@ -3828,20 +3835,12 @@ const REMO_STORE = {
           } catch (e) {}
         }
         if (Array.isArray(data.duels)) {
-          this.state.duels = Array.isArray(this.state.duels) ? this.state.duels : [];
-          data.duels.forEach((cd) => {
-            if (!cd || !cd.id) return;
-            if (this.deletedDuelIds && this.deletedDuelIds.has(cd.id)) return;
-            const ld = this.state.duels.find((x) => x && x.id === cd.id);
-            if (ld) {
-              ld.votesA = Math.max(Number(ld.votesA || 0), Number(cd.votesA || 0));
-              ld.votesB = Math.max(Number(ld.votesB || 0), Number(cd.votesB || 0));
-              if (cd.title_en && !ld.title_en) ld.title_en = cd.title_en;
-              if (cd.title_fr && !ld.title_fr) ld.title_fr = cd.title_fr;
-            } else {
-              this.state.duels.push(cd);
-            }
-          });
+          const legacyMockWarIds = new Set(['war_1', 'war_2', 'war_3']);
+          // Cloud duels list is authoritative - filter out deleted duels and legacy mocks
+          const cleanCloudDuels = data.duels.filter((cd) =>
+            cd && cd.id && !legacyMockWarIds.has(cd.id) && (!this.deletedDuelIds || !this.deletedDuelIds.has(cd.id))
+          );
+          this.state.duels = cleanCloudDuels;
         }
         if (this.deletedDuelIds && this.deletedDuelIds.size > 0 && Array.isArray(this.state.duels)) {
           this.state.duels = this.state.duels.filter((d) => d && d.id && !this.deletedDuelIds.has(d.id));
