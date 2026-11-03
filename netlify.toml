@@ -4,6 +4,9 @@
 [build.processing.html]
   pretty_urls = false
 
+[functions]
+  directory = "netlify/functions"
+
 [[redirects]]
   from = "/world-radio"
   to = "/world-radio.html"

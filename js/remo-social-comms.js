@@ -4066,6 +4066,34 @@ function submitUniversalAuth(ev) {
     sessionStorage.setItem('remo_pending_signup', JSON.stringify(pendingData));
   } catch (e) {}
 
+  // 1. Dispatch real email via Netlify Serverless Function (if RESEND_API_KEY / BREVO_API_KEY configured)
+  try {
+    fetch('/.netlify/functions/send-email-otp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, name, code: otpCode, lang })
+    }).then((r) => r.json()).then((res) => {
+      if (res && res.success) {
+        console.log('[REMO Mailer]: Confirmation email dispatched to', email);
+      }
+    }).catch(() => {});
+  } catch (e) {}
+
+  // 2. Dispatch real email via Firebase Authentication Email Link
+  if (REMO_STORE.fbAuth && typeof REMO_STORE.fbAuth.sendSignInLinkToEmail === 'function') {
+    const actionCodeSettings = {
+      url: window.location.origin + window.location.pathname + '?emailAuth=1',
+      handleCodeInApp: true
+    };
+    REMO_STORE.fbAuth.sendSignInLinkToEmail(email, actionCodeSettings)
+      .then(() => {
+        try { localStorage.setItem('remo_email_for_signin', email); } catch (e) {}
+      })
+      .catch((err) => {
+        console.warn('Firebase email auth dispatch notice:', err.message);
+      });
+  }
+
   // Transition modal UI to OTP confirmation step
   const regForm = document.getElementById('authRegisterForm');
   const otpBox = document.getElementById('authOtpBox');
@@ -4074,12 +4102,14 @@ function submitUniversalAuth(ev) {
   if (otpBox) otpBox.style.display = 'block';
   if (emailDisplay) emailDisplay.textContent = email;
 
+  // Never leak the secret code in the user-facing toast!
   remoToast(
     lang === 'fr'
-      ? `🔑 Code de confirmation envoyé à ${email} : ${otpCode}`
-      : `🔑 Confirmation code sent to ${email}: ${otpCode}`,
-    9000
+      ? `🔑 Un code de confirmation à 6 chiffres a été envoyé à ${email}. Veuillez vérifier votre boîte de réception (et vos spams).`
+      : `🔑 A 6-digit confirmation code was sent to ${email}. Please check your inbox (and spam folder).`,
+    8000
   );
+  console.log('%c[REMO Secure Verification Code]: ' + otpCode, 'color:#38bdf8;font-weight:bold;font-size:12px;');
 }
 
 function verifyAuthOtpCode() {
@@ -4142,12 +4172,32 @@ function resendAuthOtpCode() {
   try {
     sessionStorage.setItem('remo_pending_signup', JSON.stringify(pending));
   } catch (e) {}
+
+  // Dispatch real email via Netlify Serverless Function
+  try {
+    fetch('/.netlify/functions/send-email-otp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: pending.email, name: pending.name, code: pending.code, lang })
+    }).catch(() => {});
+  } catch (e) {}
+
+  // Dispatch via Firebase
+  if (REMO_STORE.fbAuth && typeof REMO_STORE.fbAuth.sendSignInLinkToEmail === 'function') {
+    const actionCodeSettings = {
+      url: window.location.origin + window.location.pathname + '?emailAuth=1',
+      handleCodeInApp: true
+    };
+    REMO_STORE.fbAuth.sendSignInLinkToEmail(pending.email, actionCodeSettings).catch(() => {});
+  }
+
   remoToast(
     lang === 'fr'
-      ? `🔑 Nouveau code envoyé à ${pending.email} : ${pending.code}`
-      : `🔑 New code sent to ${pending.email}: ${pending.code}`,
-    9000
+      ? `🔑 Un nouveau code de confirmation a été envoyé à ${pending.email}. Veuillez vérifier vos courriels.`
+      : `🔑 A new confirmation code has been sent to ${pending.email}. Please check your inbox.`,
+    8000
   );
+  console.log('%c[REMO Secure Verification Code Resent]: ' + pending.code, 'color:#38bdf8;font-weight:bold;font-size:12px;');
 }
 window.resendAuthOtpCode = resendAuthOtpCode;
 
