@@ -101,6 +101,9 @@ function refreshAllAdminPanels() {
   renderAdminEconomyPanel();
   renderAdminModerationPanel();
   renderAdminCloudPanel();
+  if (typeof renderAdminContestsPanel === 'function') {
+    renderAdminContestsPanel();
+  }
 }
 
 function saveAdminMegaphone() {
@@ -1444,3 +1447,319 @@ window.adminDeleteCity = adminDeleteCity;
 window.adminToggleCityWeatherSurge = adminToggleCityWeatherSurge;
 window.adminUnsealCapsuleFromOffice = adminUnsealCapsuleFromOffice;
 window.adminOnAlloySelectChange = adminOnAlloySelectChange;
+
+
+/* ════════════════════════════════════════════════════════════════════
+   🎤🏆⚽🕵️🎟️⚡ v69: ADMIN VIRAL CONTESTS COMMAND CENTER CONTROLLER
+   ════════════════════════════════════════════════════════════════════ */
+
+let _admPendingEuroAudioUrl = '';
+
+function setContestPillDOM(id, active, statusText) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = statusText;
+  el.style.background = active ? 'rgba(16,185,129,0.22)' : 'rgba(255,255,255,0.08)';
+  el.style.color = active ? '#6ee7b7' : '#94a3b8';
+  el.style.border = active ? '1px solid #10b981' : '1px solid rgba(255,255,255,0.12)';
+}
+
+function renderAdminContestsPanel() {
+  if (!REMO_STORE || !REMO_STORE.state) return;
+  const lang = REMO_I18N.getLang();
+  const vc = REMO_STORE.ensureViralContests();
+  const cities = getRemoCities();
+
+  const populateCitySel = (selId, defVal) => {
+    const sel = document.getElementById(selId);
+    if (!sel) return;
+    const cur = sel.value || defVal || 'montreal';
+    sel.innerHTML = cities.map((c) =>
+      `<option value="${c.id}" ${c.id === cur ? 'selected' : ''}>${c.flag} ${getCityName(c, lang)} (${c.code})</option>`
+    ).join('');
+  };
+
+  populateCitySel('admEuroAddCity', 'montreal');
+  populateCitySel('admMdCity', (vc.mysteryDetective && vc.mysteryDetective.correctCityId) || 'paris');
+  populateCitySel('admFhCity', (vc.flashHunt && vc.flashHunt.targetCityId) || 'montreal');
+
+  // 1. Eurovision Status & Table
+  const ev = vc.eurovision || {};
+  setContestPillDOM('admEuroStatusPill', !!ev.active, ev.active ? `🟢 LIVE (${(ev.entries || []).length} songs)` : '⚪ IDLE');
+  const euroBody = document.getElementById('admEuroEntriesTable');
+  if (euroBody) {
+    const entries = (ev.entries || []).slice().sort((a, b) => Number(b.points || 0) - Number(a.points || 0));
+    euroBody.innerHTML = entries.length === 0
+      ? `<tr><td colspan="4" style="color:var(--muted);text-align:center;">No Eurovision songs added yet.</td></tr>`
+      : entries.map((e, i) => {
+          const c = getCityById(e.cityId);
+          return `
+            <tr>
+              <td><b>#${i + 1}</b> ${c.flag} ${getCityName(c, lang)}</td>
+              <td><b>${e.songTitle}</b> · <span style="color:#7dd3fc;">@${e.artistName}</span></td>
+              <td style="color:#fbbf24;font-weight:900;">${Number(e.points || 0)} PTS (${Number(e.votesCount || 0)} votes)</td>
+              <td>
+                <button class="adm-btn rose" style="padding:4px 9px;font-size:0.75rem;" onclick="REMO_STORE.adminDeleteEurovisionEntry('${e.id}')">✕ Delete</button>
+              </td>
+            </tr>
+          `;
+        }).join('');
+  }
+
+  // 2. Photo Grand Prix Status & Table
+  const pgp = vc.photoGrandPrix || {};
+  setContestPillDOM('admPgpStatusPill', !!pgp.active, pgp.active ? `🟢 LIVE (${(pgp.entries || []).length} entries)` : '⚪ IDLE');
+  const pgpBody = document.getElementById('admPgpEntriesTable');
+  if (pgpBody) {
+    const entries = (pgp.entries || []).slice().sort((a, b) => Number(b.votes || 0) - Number(a.votes || 0));
+    pgpBody.innerHTML = entries.length === 0
+      ? `<tr><td colspan="4" style="color:var(--muted);text-align:center;">No Grand Prix entries yet.</td></tr>`
+      : entries.map((e, i) => {
+          const c = getCityById(e.cityId);
+          return `
+            <tr>
+              <td><b>#${i + 1}</b> ${c.flag} ${getCityName(c, lang)}</td>
+              <td><b>${e.title}</b> · <span style="color:#7dd3fc;">@${e.authorName}</span></td>
+              <td style="color:#fbbf24;font-weight:900;">🔥 ${Number(e.votes || 0)} votes</td>
+              <td>
+                <button class="adm-btn rose" style="padding:4px 9px;font-size:0.75rem;" onclick="REMO_STORE.adminDeletePhotoGrandPrixEntry('${e.id}')">✕ Delete</button>
+              </td>
+            </tr>
+          `;
+        }).join('');
+  }
+
+  // 3. World Cup Bracket Status
+  const wc = vc.worldCupBracket || {};
+  setContestPillDOM('admWcStatusPill', !!wc.active, wc.active ? `🟢 LIVE (Round: ${String(wc.round || 'qf').toUpperCase()})` : '⚪ IDLE');
+
+  // 4. Mystery Detective Status
+  const md = vc.mysteryDetective || {};
+  setContestPillDOM('admMdStatusPill', !!md.active, md.active ? `🟢 LIVE (${(md.winners || []).length}/${md.maxWinners || 15} winners)` : '⚪ IDLE');
+
+  // 5. Golden Raffle Status
+  const gr = vc.goldenRaffle || {};
+  setContestPillDOM('admGrStatusPill', !!gr.active, gr.active ? `🟢 LIVE (${(gr.tickets || []).length} tickets)` : '⚪ IDLE');
+
+  // 6. Flash Hunt Status
+  const fh = vc.flashHunt || {};
+  setContestPillDOM('admFhStatusPill', !!fh.active, fh.active ? `🟢 LIVE (${(fh.claims || []).length}/${fh.maxClaims || 20} claimed)` : '⚪ IDLE');
+}
+
+function handleAdminEuroAudioFile(ev) {
+  const f = ev.target.files && ev.target.files[0];
+  if (!f) return;
+  const rd = new FileReader();
+  rd.onload = async (e) => {
+    const dataUrl = e.target.result;
+    if (window.RemoMediaDB && typeof window.RemoMediaDB.saveDataUrl === 'function') {
+      _admPendingEuroAudioUrl = await window.RemoMediaDB.saveDataUrl(dataUrl);
+    } else {
+      _admPendingEuroAudioUrl = dataUrl;
+    }
+    admToast(`🎵 60s Audio ready: ${f.name}`);
+  };
+  rd.readAsDataURL(f);
+}
+
+function adminStartEurovisionFromOffice() {
+  const title_en = document.getElementById('admEuroTitleEn')?.value || 'Eurovision REMO — World Cities 60s Song Contest';
+  const title_fr = document.getElementById('admEuroTitleFr')?.value || 'Eurovision REMO — Concours Musical 60s des Villes';
+  const prizeCoins = Number(document.getElementById('admEuroPrize')?.value || 5000);
+  const durationHours = Number(document.getElementById('admEuroDuration')?.value || 48);
+  const allowCitizenSubmissions = !!document.getElementById('admEuroAllowCitizens')?.checked;
+  const noSelfCityVote = !!document.getElementById('admEuroNoSelfVote')?.checked;
+
+  REMO_STORE.adminLaunchEurovision({
+    title_en,
+    title_fr,
+    prizeCoins,
+    durationHours,
+    allowCitizenSubmissions,
+    noSelfCityVote,
+    keepEntries: true
+  });
+  RemoAudio.play('fanfare');
+  admToast('🎤 Eurovision REMO is now LIVE across the world!');
+}
+
+function adminAddEurovisionSongFromOffice() {
+  const cityId = document.getElementById('admEuroAddCity')?.value || 'montreal';
+  const songTitle = (document.getElementById('admEuroAddTitle')?.value || '').trim();
+  const artistName = (document.getElementById('admEuroAddArtist')?.value || 'REMO Official').trim();
+  const externalLink = (document.getElementById('admEuroAddLink')?.value || '').trim();
+  const soundPreset = document.getElementById('admEuroAddPreset')?.value || 'shibuya_neon';
+
+  if (!songTitle) {
+    admToast('⚠️ Please enter a Song Title!');
+    return;
+  }
+
+  REMO_STORE.submitEurovisionEntry({
+    cityId,
+    songTitle,
+    artistName,
+    audioUrl: _admPendingEuroAudioUrl,
+    externalLink,
+    soundPreset
+  });
+  _admPendingEuroAudioUrl = '';
+  const titleInp = document.getElementById('admEuroAddTitle');
+  if (titleInp) titleInp.value = '';
+  const linkInp = document.getElementById('admEuroAddLink');
+  if (linkInp) linkInp.value = '';
+  admToast(`🎵 Added "${songTitle}" to Eurovision REMO!`);
+}
+
+function adminConcludeEurovisionFromOffice() {
+  const res = REMO_STORE.adminConcludeEurovision();
+  if (!res.ok) {
+    admToast('⚠️ Add at least 1 song before concluding Eurovision!');
+    return;
+  }
+  RemoAudio.play('fanfare');
+  admToast(`👑 Eurovision Concluded! Winner: "${res.winner.songTitle}" (+${res.prize} 🪙 paid)!`);
+}
+
+function adminResetEurovisionFromOffice() {
+  REMO_STORE.adminStopEurovision();
+  admToast('🗑️ Eurovision REMO stopped and cleared.');
+}
+
+function adminStartPgpFromOffice() {
+  REMO_STORE.adminLaunchPhotoGrandPrix({
+    title_en: document.getElementById('admPgpTitleEn')?.value || 'World Cities Photo & Video Grand Prix',
+    title_fr: document.getElementById('admPgpTitleFr')?.value || 'Grand Prix Photo & Vidéo des Villes',
+    prize1st: Number(document.getElementById('admPgpPrize1')?.value || 3000),
+    prize2nd: Number(document.getElementById('admPgpPrize2')?.value || 1500),
+    prize3rd: Number(document.getElementById('admPgpPrize3')?.value || 750),
+    durationHours: Number(document.getElementById('admPgpHours')?.value || 48),
+    keepEntries: true
+  });
+  RemoAudio.play('fanfare');
+  admToast('📸 Photo & Video Grand Prix is now LIVE!');
+}
+
+function adminConcludePgpFromOffice() {
+  const res = REMO_STORE.adminConcludePhotoGrandPrix();
+  if (!res.ok) {
+    admToast('⚠️ No entries to conclude!');
+    return;
+  }
+  RemoAudio.play('fanfare');
+  admToast('🏆 Top 3 Podium crowned and REMO Coin prizes paid!');
+}
+
+function adminResetPgpFromOffice() {
+  REMO_STORE.adminStopPhotoGrandPrix();
+  admToast('🗑️ Photo & Video Grand Prix stopped.');
+}
+
+function adminStartWorldCupFromOffice() {
+  REMO_STORE.adminLaunchWorldCupBracket({
+    title_en: document.getElementById('admWcTitleEn')?.value || '8-City World Knockout Cup',
+    title_fr: document.getElementById('admWcTitleFr')?.value || 'Coupe du Monde des Villes (8 Villes)',
+    prizePool: Number(document.getElementById('admWcPrizePool')?.value || 5000),
+    roundHours: Number(document.getElementById('admWcRoundHours')?.value || 24)
+  });
+  RemoAudio.play('fanfare');
+  admToast('⚽ 8-City World Knockout Cup Quarter-Finals launched!');
+}
+
+function adminAdvanceWorldCupFromOffice() {
+  const res = REMO_STORE.adminAdvanceWorldCupRound();
+  if (!res.ok) {
+    admToast('⚠️ Launch the World Cup Bracket first!');
+    return;
+  }
+  RemoAudio.play('fanfare');
+  admToast(`⚽ World Cup advanced to: ${String(res.round).toUpperCase()}!`);
+}
+
+function adminResetWorldCupFromOffice() {
+  REMO_STORE.adminStopWorldCupBracket();
+  admToast('🗑️ World Cup Bracket stopped.');
+}
+
+function adminStartMysteryFromOffice() {
+  REMO_STORE.adminLaunchMysteryDetective({
+    correctCityId: document.getElementById('admMdCity')?.value || 'paris',
+    imageUrl: document.getElementById('admMdImage')?.value || '',
+    clue_en: document.getElementById('admMdClueEn')?.value || 'Identify the secret world city from this clue!',
+    clue_fr: document.getElementById('admMdClueFr')?.value || 'Identifiez la ville secrète grâce à cet indice !',
+    rewardCoins: Number(document.getElementById('admMdReward')?.value || 500),
+    maxWinners: Number(document.getElementById('admMdMaxWinners')?.value || 15),
+    durationHours: 24
+  });
+  RemoAudio.play('fanfare');
+  admToast('🕵️ Mystery City Detective is now LIVE!');
+}
+
+function adminResetMysteryFromOffice() {
+  REMO_STORE.adminStopMysteryDetective();
+  admToast('🗑️ Mystery City Detective stopped.');
+}
+
+function adminStartRaffleFromOffice() {
+  REMO_STORE.adminLaunchGoldenRaffle({
+    title_en: document.getElementById('admGrTitleEn')?.value || 'Founder’s Golden Ticket Raffle',
+    title_fr: document.getElementById('admGrTitleFr')?.value || 'Grande Tombola Ticket d’Or du Fondateur',
+    prizeCoins: Number(document.getElementById('admGrPrize')?.value || 2500),
+    winnersCount: Number(document.getElementById('admGrCount')?.value || 3),
+    durationHours: 48
+  });
+  RemoAudio.play('fanfare');
+  admToast('🎟️ Golden Ticket Raffle is now OPEN!');
+}
+
+function adminDrawRaffleFromOffice() {
+  const res = REMO_STORE.adminDrawGoldenRaffleWinners();
+  if (!res.ok) {
+    admToast('⚠️ No tickets claimed yet!');
+    return;
+  }
+  RemoAudio.play('fanfare');
+  admToast(`🎰 Drawn ${res.winners.length} Golden Ticket Winner(s) & paid prizes!`);
+}
+
+function adminResetRaffleFromOffice() {
+  REMO_STORE.adminStopGoldenRaffle();
+  admToast('🗑️ Golden Ticket Raffle stopped.');
+}
+
+function adminStartFlashHuntFromOffice() {
+  REMO_STORE.adminLaunchFlashHunt({
+    targetCityId: document.getElementById('admFhCity')?.value || 'montreal',
+    maxClaims: Number(document.getElementById('admFhMax')?.value || 20),
+    riddle_en: document.getElementById('admFhRiddleEn')?.value || 'Solve the Founder’s riddle and unlock the secret city chest!',
+    riddle_fr: document.getElementById('admFhRiddleFr')?.value || 'Résolvez l’énigme du Fondateur et ouvrez le coffre secret !',
+    rewardCoins: Number(document.getElementById('admFhReward')?.value || 300)
+  });
+  RemoAudio.play('fanfare');
+  admToast('⚡ Founder’s Flash Treasure Hunt is now LIVE!');
+}
+
+function adminResetFlashHuntFromOffice() {
+  REMO_STORE.adminStopFlashHunt();
+  admToast('🗑️ Flash Treasure Hunt stopped.');
+}
+
+window.renderAdminContestsPanel = renderAdminContestsPanel;
+window.handleAdminEuroAudioFile = handleAdminEuroAudioFile;
+window.adminStartEurovisionFromOffice = adminStartEurovisionFromOffice;
+window.adminAddEurovisionSongFromOffice = adminAddEurovisionSongFromOffice;
+window.adminConcludeEurovisionFromOffice = adminConcludeEurovisionFromOffice;
+window.adminResetEurovisionFromOffice = adminResetEurovisionFromOffice;
+window.adminStartPgpFromOffice = adminStartPgpFromOffice;
+window.adminConcludePgpFromOffice = adminConcludePgpFromOffice;
+window.adminResetPgpFromOffice = adminResetPgpFromOffice;
+window.adminStartWorldCupFromOffice = adminStartWorldCupFromOffice;
+window.adminAdvanceWorldCupFromOffice = adminAdvanceWorldCupFromOffice;
+window.adminResetWorldCupFromOffice = adminResetWorldCupFromOffice;
+window.adminStartMysteryFromOffice = adminStartMysteryFromOffice;
+window.adminResetMysteryFromOffice = adminResetMysteryFromOffice;
+window.adminStartRaffleFromOffice = adminStartRaffleFromOffice;
+window.adminDrawRaffleFromOffice = adminDrawRaffleFromOffice;
+window.adminResetRaffleFromOffice = adminResetRaffleFromOffice;
+window.adminStartFlashHuntFromOffice = adminStartFlashHuntFromOffice;
+window.adminResetFlashHuntFromOffice = adminResetFlashHuntFromOffice;

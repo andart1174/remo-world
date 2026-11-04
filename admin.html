@@ -58,6 +58,7 @@
       <button class="adm-tab-btn" data-adm-tab="cards" onclick="switchAdminTab('cards')" data-i18n="adm_tab_cards">🎴 City Card Studio</button>
       <button class="adm-tab-btn" data-adm-tab="cities" onclick="switchAdminTab('cities')" data-i18n="adm_tab_cities">🌍 Cities &amp; Radar</button>
       <button class="adm-tab-btn" data-adm-tab="wars" onclick="switchAdminTab('wars')" data-i18n="adm_tab_wars">⚔️ Wars &amp; Pulse</button>
+      <button class="adm-tab-btn" data-adm-tab="contests" onclick="switchAdminTab('contests')" style="border-color:rgba(251,191,36,0.5);color:#fde047;" data-i18n="adm_tab_contests">🎤 Eurovision &amp; Contests</button>
       <button class="adm-tab-btn" data-adm-tab="economy" onclick="switchAdminTab('economy')" data-i18n="adm_tab_economy">🪙 Bank &amp; Auctions</button>
       <button class="adm-tab-btn" data-adm-tab="moderation" onclick="switchAdminTab('moderation')" data-i18n="adm_tab_moderation">🛡️ Users &amp; Posts</button>
       <button class="adm-tab-btn" data-adm-tab="cloud" onclick="switchAdminTab('cloud')" data-i18n="adm_tab_cloud">☁️ Firebase &amp; Settings</button>
@@ -636,6 +637,164 @@
         </div>
       </section>
 
+      <!-- ══ TAB 8: 🎤🏆⚽🕵️🎟️⚡ EUROVISION REMO & 6 VIRAL CONTESTS COMMAND CENTER ══ -->
+      <section class="adm-panel" id="adm-panel-contests">
+        <!-- 1. 🎤 EUROVISION REMO (World Cities 60s Song Contest) -->
+        <div class="exec-card" style="border-color:#fbbf24;background:linear-gradient(135deg,rgba(15,23,42,0.95),rgba(49,16,68,0.75));">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
+            <h3 style="color:#fde047;margin:0;">🎤 1. Eurovision REMO — World Cities 60s Song Contest</h3>
+            <span id="admEuroStatusPill" style="font-size:0.76rem;font-weight:900;padding:4px 10px;border-radius:99px;background:rgba(255,255,255,0.08);">IDLE</span>
+          </div>
+          <div class="adm-row-2" style="margin-bottom:10px;">
+            <div class="adm-field"><label>Edition Title (EN)</label><input type="text" id="admEuroTitleEn" class="adm-inp" value="Eurovision REMO — World Cities 60s Song Contest"></div>
+            <div class="adm-field"><label>Edition Title (FR)</label><input type="text" id="admEuroTitleFr" class="adm-inp" value="Eurovision REMO — Concours Musical 60s des Villes"></div>
+            <div class="adm-field"><label>Grand Prize (REMO Coins 🪙)</label><input type="number" id="admEuroPrize" class="adm-inp" value="5000"></div>
+            <div class="adm-field">
+              <label>Duration</label>
+              <select id="admEuroDuration" class="adm-inp">
+                <option value="24">24 Hours (1 Day)</option>
+                <option value="48" selected>48 Hours (2 Days)</option>
+                <option value="72">72 Hours (3 Days)</option>
+                <option value="168">7 Days (1 Week)</option>
+              </select>
+            </div>
+          </div>
+          <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:12px;">
+            <label class="check-pill"><input type="checkbox" id="admEuroAllowCitizens" checked> Allow Citizens to Submit 1 Song (60s Audio or Link)</label>
+            <label class="check-pill"><input type="checkbox" id="admEuroNoSelfVote" checked> Official Eurovision Rule (No Voting for Own Home City)</label>
+          </div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;">
+            <button class="adm-btn gold" onclick="adminStartEurovisionFromOffice()">🚀 Launch / Update Eurovision REMO</button>
+            <button class="adm-btn emerald" onclick="adminConcludeEurovisionFromOffice()">👑 Conclude &amp; Pay Winner (+Coins)</button>
+            <button class="adm-btn rose" onclick="adminResetEurovisionFromOffice()">🗑️ Stop / Reset Eurovision</button>
+          </div>
+
+          <!-- Admin Add Official City Song Entry (60s MP3 or External Link) -->
+          <div style="padding:12px;border-radius:12px;background:rgba(0,0,0,0.35);border:1px solid rgba(251,191,36,0.35);margin-bottom:12px;">
+            <div style="font-weight:800;font-size:0.82rem;color:#38bdf8;margin-bottom:8px;">➕ Add Official City Song Entry (Up to 60s Audio OR External Link: YouTube / Suno / SoundCloud)</div>
+            <div class="adm-row-2" style="margin-bottom:8px;">
+              <div class="adm-field"><label>City</label><select id="admEuroAddCity" class="adm-inp"></select></div>
+              <div class="adm-field"><label>Song Title (60s)</label><input type="text" id="admEuroAddTitle" class="adm-inp" placeholder="e.g. Chisinau Golden Horizon"></div>
+              <div class="adm-field"><label>Artist / Creator</label><input type="text" id="admEuroAddArtist" class="adm-inp" value="REMO Official"></div>
+              <div class="adm-field"><label>External Link (YouTube, Suno, SoundCloud...)</label><input type="url" id="admEuroAddLink" class="adm-inp" placeholder="https://..."></div>
+              <div class="adm-field"><label>Upload MP3/Audio (Max 60s, Optional)</label><input type="file" accept="audio/*,video/mp4" class="adm-inp" onchange="handleAdminEuroAudioFile(event)"></div>
+              <div class="adm-field">
+                <label>60s Synth Preset (Backup)</label>
+                <select id="admEuroAddPreset" class="adm-inp">
+                  <option value="shibuya_neon">🌆 Shibuya Neon Synthwave</option>
+                  <option value="sunset_house">🏖️ Ibiza Sunset Deep House</option>
+                  <option value="french_cafe">🥐 Paris Sunset Lounge</option>
+                  <option value="afro_groove">🥁 Warm Afro-Groove Pulse</option>
+                  <option value="cyber_pulse">⚡ Cyber Metropolis Bass</option>
+                  <option value="velvet_jazz">🎷 Velvet Midnight Jazz</option>
+                </select>
+              </div>
+            </div>
+            <button class="adm-btn indigo" onclick="adminAddEurovisionSongFromOffice()">🎵 Add Song to Eurovision Roster</button>
+          </div>
+          <table class="adm-table"><tbody id="admEuroEntriesTable"></tbody></table>
+        </div>
+
+        <!-- 2. 📸 PHOTO & VIDEO GRAND PRIX (Top 3 Podium) -->
+        <div class="exec-card" style="border-color:#38bdf8;">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
+            <h3 style="color:#38bdf8;margin:0;">📸 2. World Cities Photo &amp; Video Grand Prix (🥇 🥈 🥉 Top 3 Podium)</h3>
+            <span id="admPgpStatusPill" style="font-size:0.76rem;font-weight:900;padding:4px 10px;border-radius:99px;background:rgba(255,255,255,0.08);">IDLE</span>
+          </div>
+          <div class="adm-row-2" style="margin-bottom:10px;">
+            <div class="adm-field"><label>Theme Title (EN)</label><input type="text" id="admPgpTitleEn" class="adm-inp" value="Best Night Skyline &amp; Street Vibe"></div>
+            <div class="adm-field"><label>Theme Title (FR)</label><input type="text" id="admPgpTitleFr" class="adm-inp" value="Meilleure Vue Nocturne &amp; Ambiance Urbaine"></div>
+            <div class="adm-field"><label>🥇 1st Place Prize (🪙)</label><input type="number" id="admPgpPrize1" class="adm-inp" value="3000"></div>
+            <div class="adm-field"><label>🥈 2nd Place Prize (🪙)</label><input type="number" id="admPgpPrize2" class="adm-inp" value="1500"></div>
+            <div class="adm-field"><label>🥉 3rd Place Prize (🪙)</label><input type="number" id="admPgpPrize3" class="adm-inp" value="750"></div>
+            <div class="adm-field"><label>Duration (Hours)</label><input type="number" id="admPgpHours" class="adm-inp" value="48"></div>
+          </div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+            <button class="adm-btn gold" onclick="adminStartPgpFromOffice()">🚀 Launch Photo/Video Grand Prix</button>
+            <button class="adm-btn emerald" onclick="adminConcludePgpFromOffice()">🏆 Conclude &amp; Pay Top 3 Podium</button>
+            <button class="adm-btn rose" onclick="adminResetPgpFromOffice()">🗑️ Stop / Reset Grand Prix</button>
+          </div>
+          <table class="adm-table"><tbody id="admPgpEntriesTable"></tbody></table>
+        </div>
+
+        <!-- 3. ⚽ 8-CITY WORLD KNOCKOUT CUP BRACKET -->
+        <div class="exec-card" style="border-color:#10b981;">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
+            <h3 style="color:#34d399;margin:0;">⚽ 3. 8-City World Knockout Cup Bracket (QF ➔ SF ➔ Final)</h3>
+            <span id="admWcStatusPill" style="font-size:0.76rem;font-weight:900;padding:4px 10px;border-radius:99px;background:rgba(255,255,255,0.08);">IDLE</span>
+          </div>
+          <div class="adm-row-2" style="margin-bottom:10px;">
+            <div class="adm-field"><label>Cup Title (EN)</label><input type="text" id="admWcTitleEn" class="adm-inp" value="8-City World Knockout Cup"></div>
+            <div class="adm-field"><label>Cup Title (FR)</label><input type="text" id="admWcTitleFr" class="adm-inp" value="Coupe du Monde des Villes (8 Villes)"></div>
+            <div class="adm-field"><label>Champion City Cup Bonus PTS</label><input type="number" id="admWcPrizePool" class="adm-inp" value="5000"></div>
+            <div class="adm-field"><label>Hours per Round</label><input type="number" id="admWcRoundHours" class="adm-inp" value="24"></div>
+          </div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;">
+            <button class="adm-btn gold" onclick="adminStartWorldCupFromOffice()">🚀 Launch 8-City Quarter-Finals</button>
+            <button class="adm-btn emerald" onclick="adminAdvanceWorldCupFromOffice()">⏩ Advance to Next Round (QF ➔ SF ➔ Final ➔ Champion)</button>
+            <button class="adm-btn rose" onclick="adminResetWorldCupFromOffice()">🗑️ Stop / Reset Bracket</button>
+          </div>
+        </div>
+
+        <!-- 4. 🕵️ MYSTERY CITY DETECTIVE (1-Attempt Secret Landmark Quiz) -->
+        <div class="exec-card" style="border-color:#a855f7;">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
+            <h3 style="color:#c084fc;margin:0;">🕵️ 4. Mystery City Detective (1-Attempt Secret Landmark Quiz)</h3>
+            <span id="admMdStatusPill" style="font-size:0.76rem;font-weight:900;padding:4px 10px;border-radius:99px;background:rgba(255,255,255,0.08);">IDLE</span>
+          </div>
+          <div class="adm-row-2" style="margin-bottom:10px;">
+            <div class="adm-field"><label>Secret Correct City</label><select id="admMdCity" class="adm-inp"></select></div>
+            <div class="adm-field"><label>Mystery Photo URL (Optional)</label><input type="text" id="admMdImage" class="adm-inp" placeholder="https://... or leave empty for clue-only"></div>
+            <div class="adm-field"><label>Secret Clue (EN)</label><input type="text" id="admMdClueEn" class="adm-inp" placeholder="e.g. Famous iron tower on the Champ de Mars..."></div>
+            <div class="adm-field"><label>Secret Clue (FR)</label><input type="text" id="admMdClueFr" class="adm-inp" placeholder="ex: Célèbre tour de fer sur le Champ-de-Mars..."></div>
+            <div class="adm-field"><label>Reward per Winner (🪙)</label><input type="number" id="admMdReward" class="adm-inp" value="500"></div>
+            <div class="adm-field"><label>Max First Winners</label><input type="number" id="admMdMaxWinners" class="adm-inp" value="15"></div>
+          </div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;">
+            <button class="adm-btn gold" onclick="adminStartMysteryFromOffice()">🚀 Launch Mystery City Detective</button>
+            <button class="adm-btn rose" onclick="adminResetMysteryFromOffice()">🗑️ Stop / Reset Mystery</button>
+          </div>
+        </div>
+
+        <!-- 5. 🎟️ FOUNDER'S GOLDEN TICKET RAFFLE -->
+        <div class="exec-card" style="border-color:#f59e0b;">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
+            <h3 style="color:#fbbf24;margin:0;">🎟️ 5. Founder’s Golden Ticket Raffle</h3>
+            <span id="admGrStatusPill" style="font-size:0.76rem;font-weight:900;padding:4px 10px;border-radius:99px;background:rgba(255,255,255,0.08);">IDLE</span>
+          </div>
+          <div class="adm-row-2" style="margin-bottom:10px;">
+            <div class="adm-field"><label>Raffle Title (EN)</label><input type="text" id="admGrTitleEn" class="adm-inp" value="Founder’s Golden Ticket Raffle"></div>
+            <div class="adm-field"><label>Raffle Title (FR)</label><input type="text" id="admGrTitleFr" class="adm-inp" value="Grande Tombola Ticket d’Or du Fondateur"></div>
+            <div class="adm-field"><label>Prize per Winner (🪙)</label><input type="number" id="admGrPrize" class="adm-inp" value="2500"></div>
+            <div class="adm-field"><label>Number of Winners to Draw</label><input type="number" id="admGrCount" class="adm-inp" value="3"></div>
+          </div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;">
+            <button class="adm-btn gold" onclick="adminStartRaffleFromOffice()">🚀 Open Golden Ticket Raffle</button>
+            <button class="adm-btn emerald" onclick="adminDrawRaffleFromOffice()">🎰 Draw Lucky Winner(s) &amp; Pay Coins Now</button>
+            <button class="adm-btn rose" onclick="adminResetRaffleFromOffice()">🗑️ Stop / Reset Raffle</button>
+          </div>
+        </div>
+
+        <!-- 6. ⚡ FOUNDER'S FLASH TREASURE HUNT -->
+        <div class="exec-card" style="border-color:#f43f5e;">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
+            <h3 style="color:#fb7185;margin:0;">⚡ 6. Founder’s Flash Treasure Hunt (First N Citizens)</h3>
+            <span id="admFhStatusPill" style="font-size:0.76rem;font-weight:900;padding:4px 10px;border-radius:99px;background:rgba(255,255,255,0.08);">IDLE</span>
+          </div>
+          <div class="adm-row-2" style="margin-bottom:10px;">
+            <div class="adm-field"><label>Secret Target City</label><select id="admFhCity" class="adm-inp"></select></div>
+            <div class="adm-field"><label>Max Claims (First N Citizens)</label><input type="number" id="admFhMax" class="adm-inp" value="20"></div>
+            <div class="adm-field"><label>Riddle Clue (EN)</label><input type="text" id="admFhRiddleEn" class="adm-inp" placeholder="e.g. The city of Mount Royal and poutine..."></div>
+            <div class="adm-field"><label>Riddle Clue (FR)</label><input type="text" id="admFhRiddleFr" class="adm-inp" placeholder="ex: La métropole du Mont-Royal..."></div>
+            <div class="adm-field"><label>Instant Reward (🪙)</label><input type="number" id="admFhReward" class="adm-inp" value="300"></div>
+          </div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;">
+            <button class="adm-btn gold" onclick="adminStartFlashHuntFromOffice()">🚀 Launch Flash Treasure Hunt</button>
+            <button class="adm-btn rose" onclick="adminResetFlashHuntFromOffice()">🗑️ Stop / Reset Flash Hunt</button>
+          </div>
+        </div>
+      </section>
+
     </main>
   </div>
 
@@ -649,10 +808,10 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 
   <!-- Shared REMO Core + Admin Controller -->
-  <script src="js/remo-i18n.js"></script>
-  <script src="js/remo-cities-data.js"></script>
-  <script src="js/remo-store.js"></script>
-  <script src="js/remo-card-engine.js"></script>
-  <script src="js/remo-admin.js"></script>
+  <script src="js/remo-i18n.js?v=69"></script>
+  <script src="js/remo-cities-data.js?v=69"></script>
+  <script src="js/remo-store.js?v=69"></script>
+  <script src="js/remo-card-engine.js?v=69"></script>
+  <script src="js/remo-admin.js?v=69"></script>
 </body>
 </html>

@@ -809,7 +809,30 @@ const REMO_DICT = {
     filter_beats: '🎛️ Beats',
     nav_sec_discover: '🌐 Global Directory',
     nav_city_directory: 'All 24 Cities Guide',
-    nav_free_radio_hub: '38 Live Radios Hub'
+    nav_free_radio_hub: '38 Live Radios Hub',
+
+    // 🎤🏆⚽🕵️🎟️⚡ v69: Eurovision REMO & 6 Official Admin Viral Contests
+    nav_contests: '🎤 Eurovision & Contests',
+    adm_tab_contests: '🎤 Eurovision & Contests',
+    contests_hub_title: '🎤 Eurovision REMO & Official World Contests',
+    contests_hub_sub: 'Official Founder-Controlled Global Competitions · 1 Vote per Citizen · Real-Time REMO Coin Prizes!',
+    contests_none_active: '👑 No official contest is live right now. The Founder will launch the next global event soon!',
+    euro_badge: '🎤 EUROVISION REMO · 60S WORLD CITIES SONG CONTEST',
+    euro_rule_note: '🎵 Listen up to 60s or open official link · 1 Vote per Citizen = 12 Points (Douze Points!)',
+    euro_submit_btn: '🎤 + Submit My City Song (60s or Link)',
+    euro_vote_btn: '🏆 Vote 12 Points (+15 🪙)',
+    euro_voted_lbl: '✓ 12 Points Cast',
+    euro_play_60s: '▶️ Play 60s Preview',
+    euro_stop_60s: '⏹️ Stop (60s Max)',
+    euro_open_link: '🔗 Open Song Link ↗',
+    euro_no_self_city_err: '🇪🇺 Official Eurovision Rule: You cannot vote for your own Home City! Vote for another city.',
+    pgp_badge: '📸 PHOTO & VIDEO GRAND PRIX · TOP 3 PODIUM',
+    pgp_submit_btn: '📸 + Submit My Entry (+20 🪙)',
+    pgp_vote_btn: '🔥 Vote (+10 🪙)',
+    wc_badge: '⚽ 8-CITY WORLD KNOCKOUT CUP',
+    md_badge: '🕵️ MYSTERY CITY DETECTIVE · 1 ATTEMPT ONLY',
+    gr_badge: '🎟️ FOUNDER’S GOLDEN TICKET RAFFLE',
+    fh_badge: '⚡ FOUNDER’S FLASH TREASURE HUNT'
   },
 
   fr: {
@@ -1617,7 +1640,30 @@ const REMO_DICT = {
     filter_beats: '🎛️ Beats',
     nav_sec_discover: '🌐 Annuaire Mondial',
     nav_city_directory: 'Guide des 24 Villes',
-    nav_free_radio_hub: 'Hub 38 Radios Live'
+    nav_free_radio_hub: 'Hub 38 Radios Live',
+
+    // 🎤🏆⚽🕵️🎟️⚡ v69: Eurovision REMO & 6 Concours Viraux Officiels (FR)
+    nav_contests: '🎤 Eurovision & Concours',
+    adm_tab_contests: '🎤 Eurovision & Concours',
+    contests_hub_title: '🎤 Eurovision REMO & Grands Concours Officiels',
+    contests_hub_sub: 'Compétitions Mondiales Officielles du Fondateur · 1 Vote par Citoyen · Prix en Pièces REMO en Direct !',
+    contests_none_active: '👑 Aucun concours officiel en cours pour le moment. Le Fondateur lancera le prochain événement mondial bientôt !',
+    euro_badge: '🎤 EUROVISION REMO · CONCOURS MUSICAL 60S DES VILLES',
+    euro_rule_note: '🎵 Écoutez 60s max ou ouvrez le lien · 1 Vote par Citoyen = 12 Points (Douze Points !)',
+    euro_submit_btn: '🎤 + Inscrire un Son pour ma Ville (60s ou Lien)',
+    euro_vote_btn: '🏆 Voter 12 Points (+15 🪙)',
+    euro_voted_lbl: '✓ 12 Points Attribués',
+    euro_play_60s: '▶️ Écouter Extrait 60s',
+    euro_stop_60s: '⏹️ Stop (Max 60s)',
+    euro_open_link: '🔗 Ouvrir Lien Musical ↗',
+    euro_no_self_city_err: '🇪🇺 Règle Officielle Eurovision : Vous ne pouvez pas voter pour votre propre Ville ! Votez pour une autre ville.',
+    pgp_badge: '📸 GRAND PRIX PHOTO & VIDÉO · PODIUM TOP 3',
+    pgp_submit_btn: '📸 + Soumettre ma Participation (+20 🪙)',
+    pgp_vote_btn: '🔥 Voter (+10 🪙)',
+    wc_badge: '⚽ COUPE DU MONDE DES VILLES (8 VILLES)',
+    md_badge: '🕵️ DÉTECTIVE VILLE MYSTÈRE · 1 SEUL ESSAI',
+    gr_badge: '🎟️ TOMBOLA TICKET D’OR DU FONDATEUR',
+    fh_badge: '⚡ CHASSE AU TRÉSOR FLASH DU FONDATEUR'
   }
 };
 

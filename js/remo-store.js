@@ -1254,7 +1254,91 @@ function createDefaultState() {
     cityPortfolios: {},
     wishes: getDefaultWishes(now),
     cityPredictions: getDefaultCityPredictions(now),
+    viralContests: getDefaultViralContests(),
     notifications: []
+  };
+}
+
+function getDefaultViralContests() {
+  return {
+    eurovision: {
+      active: false,
+      status: 'idle',
+      title_en: 'Eurovision REMO — World Cities 60s Song Contest',
+      title_fr: 'Eurovision REMO — Concours Musical 60s des Villes',
+      prizeCoins: 5000,
+      endsAt: 0,
+      allowCitizenSubmissions: true,
+      noSelfCityVote: true,
+      entries: [],
+      voters: {},
+      winnerEntryId: '',
+      updatedAt: 0
+    },
+    photoGrandPrix: {
+      active: false,
+      status: 'idle',
+      title_en: 'World Cities Photo & Video Grand Prix',
+      title_fr: 'Grand Prix Photo & Vidéo des Villes',
+      prize1st: 3000,
+      prize2nd: 1500,
+      prize3rd: 750,
+      endsAt: 0,
+      entries: [],
+      voters: {},
+      winnersAwarded: false,
+      updatedAt: 0
+    },
+    worldCupBracket: {
+      active: false,
+      status: 'idle',
+      title_en: '8-City World Knockout Cup',
+      title_fr: 'Coupe du Monde des Villes (8 Villes)',
+      prizePool: 5000,
+      round: 'qf',
+      endsAt: 0,
+      matches: [],
+      championCityId: '',
+      updatedAt: 0
+    },
+    mysteryDetective: {
+      active: false,
+      status: 'idle',
+      imageUrl: '',
+      clue_en: '',
+      clue_fr: '',
+      correctCityId: 'paris',
+      rewardCoins: 500,
+      maxWinners: 15,
+      endsAt: 0,
+      attempts: {},
+      winners: [],
+      updatedAt: 0
+    },
+    goldenRaffle: {
+      active: false,
+      status: 'idle',
+      title_en: 'Founder’s Golden Ticket Raffle',
+      title_fr: 'Grande Tombola Ticket d’Or du Fondateur',
+      prizeCoins: 2500,
+      winnersCount: 3,
+      endsAt: 0,
+      tickets: [],
+      winningTickets: [],
+      updatedAt: 0
+    },
+    flashHunt: {
+      active: false,
+      status: 'idle',
+      riddle_en: '',
+      riddle_fr: '',
+      targetCityId: 'montreal',
+      rewardCoins: 300,
+      maxClaims: 20,
+      claims: [],
+      attempts: {},
+      updatedAt: 0
+    }
   };
 }
 
@@ -2017,6 +2101,19 @@ function upgradeEcosystemState(st) {
 
   if (!Array.isArray(st.cityPredictions) || st.cityPredictions.length === 0) {
     st.cityPredictions = getDefaultCityPredictions();
+  }
+
+  const defContests = getDefaultViralContests();
+  if (!st.viralContests || typeof st.viralContests !== 'object') {
+    st.viralContests = defContests;
+  } else {
+    Object.keys(defContests).forEach((k) => {
+      if (!st.viralContests[k] || typeof st.viralContests[k] !== 'object') {
+        st.viralContests[k] = defContests[k];
+      } else {
+        st.viralContests[k] = Object.assign({}, defContests[k], st.viralContests[k]);
+      }
+    });
   }
 
   // Upgrade every citizen with Referral Codes & VIP Cosmetics
@@ -3865,6 +3962,20 @@ const REMO_STORE = {
         if (this.deletedDuelIds && this.deletedDuelIds.size > 0 && Array.isArray(this.state.duels)) {
           this.state.duels = this.state.duels.filter((d) => d && d.id && !this.deletedDuelIds.has(d.id));
         }
+        if (data.viralContests && typeof data.viralContests === 'object') {
+          this.state.viralContests = this.state.viralContests || getDefaultViralContests();
+          Object.keys(data.viralContests).forEach((k) => {
+            const cObj = data.viralContests[k];
+            if (cObj && typeof cObj === 'object') {
+              const localObj = this.state.viralContests[k] || {};
+              if (Number(cObj.updatedAt || 0) >= Number(localObj.updatedAt || 0)) {
+                this.state.viralContests[k] = Object.assign({}, localObj, cObj);
+              }
+            }
+          });
+          if (typeof renderViralContestsView === 'function') renderViralContestsView();
+          if (typeof renderFeedActiveContestsBanner === 'function') renderFeedActiveContestsBanner();
+        }
       };
       
       docRef.get().then((snap) => {
@@ -3877,6 +3988,7 @@ const REMO_STORE = {
             jukeboxTracks: (this.state.jukeboxTracks || []).slice(0, 30),
             auctions: (this.state.auctions || []).slice(0, 25),
             geoVaults: (this.state.geoVaults || []).slice(0, 35),
+            viralContests: this.state.viralContests || getDefaultViralContests(),
             deletedPostIds: [...(this.deletedPostIds || [])].slice(-100),
             deletedUserIds: [...(this.deletedUserIds || [])].slice(-100),
             deletedDuelIds: [...(this.deletedDuelIds || [])].slice(-100),
@@ -4350,6 +4462,559 @@ const REMO_STORE = {
     }
   },
 
+  /* ══════════════════════════════════════════════════════════════════
+     🎤🏆⚽🕵️🎟️⚡ 6 ADMIN-CONTROLLED VIRAL CONTESTS ENGINE
+     ══════════════════════════════════════════════════════════════════ */
+  ensureViralContests() {
+    if (!this.state.viralContests || typeof this.state.viralContests !== 'object') {
+      this.state.viralContests = getDefaultViralContests();
+    }
+    return this.state.viralContests;
+  },
+
+  _notifyContestUpdate(reason = 'viral_contest_update') {
+    this.save(true, reason);
+    this.syncToFirestore(reason, true);
+    window.dispatchEvent(new CustomEvent('remo:stateupdate', { detail: { reason } }));
+    if (REMO_LIVE_BUS) {
+      try { REMO_LIVE_BUS.postMessage({ type: 'STATE_UPDATED', reason }); } catch (e) {}
+    }
+    if (typeof renderViralContestsView === 'function') renderViralContestsView();
+    if (typeof renderFeedActiveContestsBanner === 'function') renderFeedActiveContestsBanner();
+    if (typeof refreshAllAdminPanels === 'function') refreshAllAdminPanels();
+  },
+
+  // ── 1. 🎤 EUROVISION REMO (World Cities 60s Song Contest) ──
+  adminLaunchEurovision(opts = {}) {
+    const vc = this.ensureViralContests();
+    const hours = Math.max(1, Number(opts.durationHours || 48));
+    const prevEntries = opts.keepEntries && Array.isArray(vc.eurovision.entries) ? vc.eurovision.entries : [];
+    vc.eurovision = {
+      active: true,
+      status: 'open',
+      title_en: (opts.title_en || 'Eurovision REMO — World Cities 60s Song Contest').trim(),
+      title_fr: (opts.title_fr || 'Eurovision REMO — Concours Musical 60s des Villes').trim(),
+      prizeCoins: Math.max(100, Number(opts.prizeCoins || 5000)),
+      endsAt: Date.now() + hours * 3600000,
+      allowCitizenSubmissions: opts.allowCitizenSubmissions !== false,
+      noSelfCityVote: opts.noSelfCityVote !== false,
+      entries: prevEntries,
+      voters: opts.keepEntries ? (vc.eurovision.voters || {}) : {},
+      winnerEntryId: '',
+      updatedAt: Date.now()
+    };
+    this._notifyContestUpdate('eurovision_launched');
+    return vc.eurovision;
+  },
+
+  submitEurovisionEntry(entryData = {}) {
+    const vc = this.ensureViralContests();
+    const ev = vc.eurovision;
+    const u = this.getCurrentUser();
+    const isAdm = this.isCurrentUserAdmin() || this.isAdminUnlocked();
+    if (!isAdm && (!ev.active || ev.status !== 'open')) {
+      return { ok: false, error: 'inactive' };
+    }
+    if (!isAdm && !ev.allowCitizenSubmissions) {
+      return { ok: false, error: 'submissions_closed' };
+    }
+    if (!u && !isAdm) {
+      return { ok: false, error: 'auth_required' };
+    }
+    ev.entries = Array.isArray(ev.entries) ? ev.entries : [];
+    const submitterUid = u ? u.uid : 'u_admin_founder';
+    const submitterName = (entryData.artistName || (u && u.name) || 'REMO Creator').trim();
+    if (!isAdm && ev.entries.some((e) => e && e.uid === submitterUid)) {
+      return { ok: false, error: 'already_submitted' };
+    }
+    const cityId = entryData.cityId || (u && u.homeCity) || 'montreal';
+    const newEntry = {
+      id: 'euro_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+      cityId,
+      songTitle: (entryData.songTitle || 'City Anthem 60s').trim().slice(0, 80),
+      artistName: submitterName.slice(0, 50),
+      uid: submitterUid,
+      audioUrl: (entryData.audioUrl || '').trim(),
+      externalLink: (entryData.externalLink || '').trim(),
+      soundPreset: (entryData.soundPreset || 'shibuya_neon').trim(),
+      points: 0,
+      votesCount: 0,
+      createdAt: Date.now()
+    };
+    ev.entries.push(newEntry);
+    ev.updatedAt = Date.now();
+    if (u && !isAdm) {
+      this.addCoins(u.uid, 25, 20);
+      this.addCityScore(cityId, 20);
+    }
+    this._notifyContestUpdate('eurovision_entry_added');
+    return { ok: true, entry: newEntry };
+  },
+
+  adminDeleteEurovisionEntry(entryId) {
+    const vc = this.ensureViralContests();
+    if (!vc.eurovision || !Array.isArray(vc.eurovision.entries)) return;
+    vc.eurovision.entries = vc.eurovision.entries.filter((e) => e && e.id !== entryId);
+    vc.eurovision.updatedAt = Date.now();
+    this._notifyContestUpdate('eurovision_entry_deleted');
+  },
+
+  voteEurovisionEntry(entryId) {
+    const vc = this.ensureViralContests();
+    const ev = vc.eurovision;
+    const u = this.getCurrentUser();
+    if (!u || u.role === 'guest') return { ok: false, error: 'auth_required' };
+    if (!ev.active || ev.status !== 'open' || (ev.endsAt && Date.now() > ev.endsAt)) {
+      return { ok: false, error: 'ended' };
+    }
+    ev.voters = ev.voters || {};
+    if (ev.voters[u.uid]) {
+      return { ok: false, error: 'already_voted' };
+    }
+    const entry = (ev.entries || []).find((e) => e && e.id === entryId);
+    if (!entry) return { ok: false, error: 'not_found' };
+    if (ev.noSelfCityVote && u.homeCity && entry.cityId === u.homeCity && !this.isCurrentUserAdmin()) {
+      return { ok: false, error: 'self_city_blocked' };
+    }
+    entry.points = Number(entry.points || 0) + 12;
+    entry.votesCount = Number(entry.votesCount || 0) + 1;
+    ev.voters[u.uid] = entryId;
+    ev.updatedAt = Date.now();
+    this.addCoins(u.uid, 15, 15);
+    this.addCityScore(entry.cityId, 12);
+    this._notifyContestUpdate('eurovision_voted');
+    return { ok: true, entry };
+  },
+
+  adminConcludeEurovision() {
+    const vc = this.ensureViralContests();
+    const ev = vc.eurovision;
+    if (!ev || !Array.isArray(ev.entries) || ev.entries.length === 0) {
+      return { ok: false, error: 'no_entries' };
+    }
+    const sorted = ev.entries.slice().sort((a, b) => Number(b.points || 0) - Number(a.points || 0));
+    const winner = sorted[0];
+    ev.status = 'concluded';
+    ev.winnerEntryId = winner.id;
+    ev.updatedAt = Date.now();
+    const prize = Number(ev.prizeCoins || 5000);
+    if (winner.uid) {
+      this.adminAdjustUserCoins(winner.uid, 'add', prize);
+    }
+    this.addCityScore(winner.cityId, 500);
+    this._notifyContestUpdate('eurovision_concluded');
+    return { ok: true, winner, prize };
+  },
+
+  adminStopEurovision() {
+    const vc = this.ensureViralContests();
+    vc.eurovision = Object.assign(getDefaultViralContests().eurovision, { updatedAt: Date.now() });
+    this._notifyContestUpdate('eurovision_stopped');
+  },
+
+  // ── 2. 📸 PHOTO & VIDEO GRAND PRIX (Top 3 Live Podium 🥇🥈🥉) ──
+  adminLaunchPhotoGrandPrix(opts = {}) {
+    const vc = this.ensureViralContests();
+    const hours = Math.max(1, Number(opts.durationHours || 48));
+    const prevEntries = opts.keepEntries && Array.isArray(vc.photoGrandPrix.entries) ? vc.photoGrandPrix.entries : [];
+    vc.photoGrandPrix = {
+      active: true,
+      status: 'open',
+      title_en: (opts.title_en || 'World Cities Photo & Video Grand Prix').trim(),
+      title_fr: (opts.title_fr || 'Grand Prix Photo & Vidéo des Villes').trim(),
+      prize1st: Math.max(100, Number(opts.prize1st || 3000)),
+      prize2nd: Math.max(50, Number(opts.prize2nd || 1500)),
+      prize3rd: Math.max(25, Number(opts.prize3rd || 750)),
+      endsAt: Date.now() + hours * 3600000,
+      entries: prevEntries,
+      voters: opts.keepEntries ? (vc.photoGrandPrix.voters || {}) : {},
+      winnersAwarded: false,
+      updatedAt: Date.now()
+    };
+    this._notifyContestUpdate('pgp_launched');
+    return vc.photoGrandPrix;
+  },
+
+  submitPhotoGrandPrixEntry(data = {}) {
+    const vc = this.ensureViralContests();
+    const pgp = vc.photoGrandPrix;
+    const u = this.getCurrentUser();
+    const isAdm = this.isCurrentUserAdmin() || this.isAdminUnlocked();
+    if (!isAdm && (!pgp.active || pgp.status !== 'open')) return { ok: false, error: 'inactive' };
+    if (!u && !isAdm) return { ok: false, error: 'auth_required' };
+    pgp.entries = Array.isArray(pgp.entries) ? pgp.entries : [];
+    const uid = u ? u.uid : 'u_admin_founder';
+    if (!isAdm && pgp.entries.some((e) => e && e.uid === uid)) {
+      return { ok: false, error: 'already_submitted' };
+    }
+    const cityId = data.cityId || (u && u.homeCity) || 'montreal';
+    const entry = {
+      id: 'pgp_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+      cityId,
+      title: (data.title || 'City Masterpiece').trim().slice(0, 90),
+      authorName: ((u && u.name) || 'Creator').slice(0, 45),
+      uid,
+      mediaUrl: (data.mediaUrl || '').trim(),
+      mediaType: data.mediaType || 'image',
+      votes: 0,
+      createdAt: Date.now()
+    };
+    pgp.entries.push(entry);
+    pgp.updatedAt = Date.now();
+    if (u && !isAdm) {
+      this.addCoins(u.uid, 20, 15);
+      this.addCityScore(cityId, 15);
+    }
+    this._notifyContestUpdate('pgp_entry_added');
+    return { ok: true, entry };
+  },
+
+  adminDeletePhotoGrandPrixEntry(entryId) {
+    const vc = this.ensureViralContests();
+    if (!vc.photoGrandPrix || !Array.isArray(vc.photoGrandPrix.entries)) return;
+    vc.photoGrandPrix.entries = vc.photoGrandPrix.entries.filter((e) => e && e.id !== entryId);
+    vc.photoGrandPrix.updatedAt = Date.now();
+    this._notifyContestUpdate('pgp_entry_deleted');
+  },
+
+  votePhotoGrandPrixEntry(entryId) {
+    const vc = this.ensureViralContests();
+    const pgp = vc.photoGrandPrix;
+    const u = this.getCurrentUser();
+    if (!u || u.role === 'guest') return { ok: false, error: 'auth_required' };
+    if (!pgp.active || pgp.status !== 'open' || (pgp.endsAt && Date.now() > pgp.endsAt)) {
+      return { ok: false, error: 'ended' };
+    }
+    pgp.voters = pgp.voters || {};
+    if (pgp.voters[u.uid]) return { ok: false, error: 'already_voted' };
+    const entry = (pgp.entries || []).find((e) => e && e.id === entryId);
+    if (!entry) return { ok: false, error: 'not_found' };
+    entry.votes = Number(entry.votes || 0) + 1;
+    pgp.voters[u.uid] = entryId;
+    pgp.updatedAt = Date.now();
+    this.addCoins(u.uid, 10, 10);
+    this.addCityScore(entry.cityId, 10);
+    this._notifyContestUpdate('pgp_voted');
+    return { ok: true, entry };
+  },
+
+  adminConcludePhotoGrandPrix() {
+    const vc = this.ensureViralContests();
+    const pgp = vc.photoGrandPrix;
+    if (!pgp || !Array.isArray(pgp.entries) || pgp.entries.length === 0) {
+      return { ok: false, error: 'no_entries' };
+    }
+    const sorted = pgp.entries.slice().sort((a, b) => Number(b.votes || 0) - Number(a.votes || 0));
+    const prizes = [Number(pgp.prize1st || 3000), Number(pgp.prize2nd || 1500), Number(pgp.prize3rd || 750)];
+    sorted.slice(0, 3).forEach((ent, idx) => {
+      if (ent && ent.uid) {
+        this.adminAdjustUserCoins(ent.uid, 'add', prizes[idx]);
+      }
+      if (ent && ent.cityId) {
+        this.addCityScore(ent.cityId, idx === 0 ? 300 : idx === 1 ? 150 : 75);
+      }
+    });
+    pgp.status = 'concluded';
+    pgp.winnersAwarded = true;
+    pgp.updatedAt = Date.now();
+    this._notifyContestUpdate('pgp_concluded');
+    return { ok: true, podium: sorted.slice(0, 3) };
+  },
+
+  adminStopPhotoGrandPrix() {
+    const vc = this.ensureViralContests();
+    vc.photoGrandPrix = Object.assign(getDefaultViralContests().photoGrandPrix, { updatedAt: Date.now() });
+    this._notifyContestUpdate('pgp_stopped');
+  },
+
+  // ── 3. ⚽ 8-CITY WORLD KNOCKOUT CUP (QF ➔ SF ➔ Final) ──
+  adminLaunchWorldCupBracket(opts = {}) {
+    const vc = this.ensureViralContests();
+    const default8 = ['montreal', 'chisinau', 'paris', 'bucharest', 'newyork', 'tokyo', 'london', 'dubai'];
+    const rawCities = Array.isArray(opts.cityIds) && opts.cityIds.length >= 8 ? opts.cityIds.slice(0, 8) : default8;
+    const roundHours = Math.max(1, Number(opts.roundHours || 24));
+    const matches = [
+      { id: 'wc_qf_1', round: 'qf', cityA: rawCities[0], cityB: rawCities[1], votesA: 0, votesB: 0, voters: {}, winner: '' },
+      { id: 'wc_qf_2', round: 'qf', cityA: rawCities[2], cityB: rawCities[3], votesA: 0, votesB: 0, voters: {}, winner: '' },
+      { id: 'wc_qf_3', round: 'qf', cityA: rawCities[4], cityB: rawCities[5], votesA: 0, votesB: 0, voters: {}, winner: '' },
+      { id: 'wc_qf_4', round: 'qf', cityA: rawCities[6], cityB: rawCities[7], votesA: 0, votesB: 0, voters: {}, winner: '' }
+    ];
+    vc.worldCupBracket = {
+      active: true,
+      status: 'open',
+      title_en: (opts.title_en || '8-City World Knockout Cup').trim(),
+      title_fr: (opts.title_fr || 'Coupe du Monde des Villes (8 Villes)').trim(),
+      prizePool: Math.max(500, Number(opts.prizePool || 5000)),
+      round: 'qf',
+      roundHours,
+      endsAt: Date.now() + roundHours * 3600000,
+      matches,
+      championCityId: '',
+      updatedAt: Date.now()
+    };
+    this._notifyContestUpdate('worldcup_launched');
+    return vc.worldCupBracket;
+  },
+
+  voteWorldCupMatch(matchId, side) {
+    const vc = this.ensureViralContests();
+    const wc = vc.worldCupBracket;
+    const u = this.getCurrentUser();
+    if (!u || u.role === 'guest') return { ok: false, error: 'auth_required' };
+    if (!wc.active || wc.status !== 'open') return { ok: false, error: 'ended' };
+    const m = (wc.matches || []).find((x) => x && x.id === matchId && x.round === wc.round);
+    if (!m) return { ok: false, error: 'not_found' };
+    m.voters = m.voters || {};
+    if (m.voters[u.uid]) return { ok: false, error: 'already_voted' };
+    if (side === 'A') {
+      m.votesA = Number(m.votesA || 0) + 1;
+      this.addCityScore(m.cityA, 10);
+    } else {
+      m.votesB = Number(m.votesB || 0) + 1;
+      this.addCityScore(m.cityB, 10);
+    }
+    m.voters[u.uid] = side;
+    wc.updatedAt = Date.now();
+    this.addCoins(u.uid, 10, 10);
+    this._notifyContestUpdate('worldcup_voted');
+    return { ok: true, match: m };
+  },
+
+  adminAdvanceWorldCupRound() {
+    const vc = this.ensureViralContests();
+    const wc = vc.worldCupBracket;
+    if (!wc || !wc.active) return { ok: false };
+    const pickWinner = (m) => (Number(m.votesA || 0) >= Number(m.votesB || 0) ? m.cityA : m.cityB);
+    const roundHours = Math.max(1, Number(wc.roundHours || 24));
+    if (wc.round === 'qf') {
+      const qfs = (wc.matches || []).filter((m) => m.round === 'qf');
+      qfs.forEach((m) => { m.winner = pickWinner(m); });
+      if (qfs.length >= 4) {
+        wc.matches.push(
+          { id: 'wc_sf_1', round: 'sf', cityA: qfs[0].winner, cityB: qfs[1].winner, votesA: 0, votesB: 0, voters: {}, winner: '' },
+          { id: 'wc_sf_2', round: 'sf', cityA: qfs[2].winner, cityB: qfs[3].winner, votesA: 0, votesB: 0, voters: {}, winner: '' }
+        );
+        wc.round = 'sf';
+        wc.endsAt = Date.now() + roundHours * 3600000;
+      }
+    } else if (wc.round === 'sf') {
+      const sfs = (wc.matches || []).filter((m) => m.round === 'sf');
+      sfs.forEach((m) => { m.winner = pickWinner(m); });
+      if (sfs.length >= 2) {
+        wc.matches.push(
+          { id: 'wc_final_1', round: 'final', cityA: sfs[0].winner, cityB: sfs[1].winner, votesA: 0, votesB: 0, voters: {}, winner: '' }
+        );
+        wc.round = 'final';
+        wc.endsAt = Date.now() + roundHours * 3600000;
+      }
+    } else if (wc.round === 'final') {
+      const fin = (wc.matches || []).find((m) => m.round === 'final');
+      if (fin) {
+        fin.winner = pickWinner(fin);
+        wc.championCityId = fin.winner;
+        wc.round = 'champion';
+        wc.status = 'concluded';
+        this.addCityScore(fin.winner, Number(wc.prizePool || 5000));
+      }
+    }
+    wc.updatedAt = Date.now();
+    this._notifyContestUpdate('worldcup_advanced');
+    return { ok: true, round: wc.round, championCityId: wc.championCityId };
+  },
+
+  adminStopWorldCupBracket() {
+    const vc = this.ensureViralContests();
+    vc.worldCupBracket = Object.assign(getDefaultViralContests().worldCupBracket, { updatedAt: Date.now() });
+    this._notifyContestUpdate('worldcup_stopped');
+  },
+
+  // ── 4. 🕵️ MYSTERY CITY DETECTIVE (1-Attempt Secret Landmark Quiz) ──
+  adminLaunchMysteryDetective(opts = {}) {
+    const vc = this.ensureViralContests();
+    const hours = Math.max(1, Number(opts.durationHours || 24));
+    vc.mysteryDetective = {
+      active: true,
+      status: 'open',
+      imageUrl: (opts.imageUrl || '').trim(),
+      clue_en: (opts.clue_en || 'Identify the secret world city from this view & clue!').trim(),
+      clue_fr: (opts.clue_fr || 'Identifiez la ville secrète grâce à cette vue et cet indice !').trim(),
+      correctCityId: opts.correctCityId || 'paris',
+      rewardCoins: Math.max(50, Number(opts.rewardCoins || 500)),
+      maxWinners: Math.max(1, Number(opts.maxWinners || 15)),
+      endsAt: Date.now() + hours * 3600000,
+      attempts: {},
+      winners: [],
+      updatedAt: Date.now()
+    };
+    this._notifyContestUpdate('mystery_launched');
+    return vc.mysteryDetective;
+  },
+
+  submitMysteryDetectiveGuess(guessedCityId) {
+    const vc = this.ensureViralContests();
+    const md = vc.mysteryDetective;
+    const u = this.getCurrentUser();
+    if (!u || u.role === 'guest') return { ok: false, error: 'auth_required' };
+    if (!md.active || md.status !== 'open') return { ok: false, error: 'ended' };
+    md.attempts = md.attempts || {};
+    md.winners = Array.isArray(md.winners) ? md.winners : [];
+    if (md.attempts[u.uid]) return { ok: false, error: 'already_tried' };
+    if (md.winners.length >= Number(md.maxWinners || 15)) {
+      return { ok: false, error: 'max_winners_reached' };
+    }
+    const isCorrect = guessedCityId === md.correctCityId;
+    md.attempts[u.uid] = { cityId: guessedCityId, correct: isCorrect, ts: Date.now() };
+    if (isCorrect) {
+      const reward = Number(md.rewardCoins || 500);
+      md.winners.push({ uid: u.uid, name: u.name, cityId: u.homeCity, reward, ts: Date.now() });
+      this.addCoins(u.uid, reward, 30);
+      this.addCityScore(u.homeCity || md.correctCityId, 50);
+      if (md.winners.length >= Number(md.maxWinners || 15)) {
+        md.status = 'concluded';
+      }
+    }
+    md.updatedAt = Date.now();
+    this._notifyContestUpdate('mystery_guessed');
+    return { ok: true, correct: isCorrect, reward: isCorrect ? Number(md.rewardCoins || 500) : 0 };
+  },
+
+  adminStopMysteryDetective() {
+    const vc = this.ensureViralContests();
+    vc.mysteryDetective = Object.assign(getDefaultViralContests().mysteryDetective, { updatedAt: Date.now() });
+    this._notifyContestUpdate('mystery_stopped');
+  },
+
+  // ── 5. 🎟️ FOUNDER'S GOLDEN TICKET RAFFLE ──
+  adminLaunchGoldenRaffle(opts = {}) {
+    const vc = this.ensureViralContests();
+    const hours = Math.max(1, Number(opts.durationHours || 48));
+    vc.goldenRaffle = {
+      active: true,
+      status: 'open',
+      title_en: (opts.title_en || 'Founder’s Golden Ticket Raffle').trim(),
+      title_fr: (opts.title_fr || 'Grande Tombola Ticket d’Or du Fondateur').trim(),
+      prizeCoins: Math.max(100, Number(opts.prizeCoins || 2500)),
+      winnersCount: Math.max(1, Number(opts.winnersCount || 3)),
+      endsAt: Date.now() + hours * 3600000,
+      tickets: [],
+      winningTickets: [],
+      updatedAt: Date.now()
+    };
+    this._notifyContestUpdate('raffle_launched');
+    return vc.goldenRaffle;
+  },
+
+  claimGoldenRaffleTicket() {
+    const vc = this.ensureViralContests();
+    const gr = vc.goldenRaffle;
+    const u = this.getCurrentUser();
+    if (!u || u.role === 'guest') return { ok: false, error: 'auth_required' };
+    if (!gr.active || gr.status !== 'open') return { ok: false, error: 'ended' };
+    gr.tickets = Array.isArray(gr.tickets) ? gr.tickets : [];
+    const existing = gr.tickets.find((t) => t && t.uid === u.uid);
+    if (existing) return { ok: false, error: 'already_claimed', ticket: existing };
+    const code = 'GOLD-' + String(1001 + gr.tickets.length);
+    const ticket = {
+      code,
+      uid: u.uid,
+      name: u.name,
+      cityId: u.homeCity || 'montreal',
+      ts: Date.now()
+    };
+    gr.tickets.push(ticket);
+    gr.updatedAt = Date.now();
+    this.addCoins(u.uid, 10, 10);
+    this._notifyContestUpdate('raffle_ticket_claimed');
+    return { ok: true, ticket };
+  },
+
+  adminDrawGoldenRaffleWinners() {
+    const vc = this.ensureViralContests();
+    const gr = vc.goldenRaffle;
+    if (!gr || !Array.isArray(gr.tickets) || gr.tickets.length === 0) {
+      return { ok: false, error: 'no_tickets' };
+    }
+    const pool = gr.tickets.slice();
+    const count = Math.min(pool.length, Math.max(1, Number(gr.winnersCount || 3)));
+    const winners = [];
+    for (let i = 0; i < count; i++) {
+      const idx = Math.floor(Math.random() * pool.length);
+      const picked = pool.splice(idx, 1)[0];
+      if (picked) {
+        winners.push(picked);
+        if (picked.uid) {
+          this.adminAdjustUserCoins(picked.uid, 'add', Number(gr.prizeCoins || 2500));
+        }
+      }
+    }
+    gr.winningTickets = winners;
+    gr.status = 'concluded';
+    gr.updatedAt = Date.now();
+    this._notifyContestUpdate('raffle_drawn');
+    return { ok: true, winners };
+  },
+
+  adminStopGoldenRaffle() {
+    const vc = this.ensureViralContests();
+    vc.goldenRaffle = Object.assign(getDefaultViralContests().goldenRaffle, { updatedAt: Date.now() });
+    this._notifyContestUpdate('raffle_stopped');
+  },
+
+  // ── 6. ⚡ FOUNDER'S FLASH TREASURE HUNT (First N Citizens) ──
+  adminLaunchFlashHunt(opts = {}) {
+    const vc = this.ensureViralContests();
+    vc.flashHunt = {
+      active: true,
+      status: 'open',
+      riddle_en: (opts.riddle_en || 'Solve the Founder’s riddle and pick the secret target city!').trim(),
+      riddle_fr: (opts.riddle_fr || 'Résolvez l’énigme du Fondateur et trouvez la ville cible secrète !').trim(),
+      targetCityId: opts.targetCityId || 'montreal',
+      rewardCoins: Math.max(50, Number(opts.rewardCoins || 300)),
+      maxClaims: Math.max(1, Number(opts.maxClaims || 20)),
+      claims: [],
+      attempts: {},
+      updatedAt: Date.now()
+    };
+    this._notifyContestUpdate('flash_hunt_launched');
+    return vc.flashHunt;
+  },
+
+  claimFlashHuntTreasure(selectedCityId) {
+    const vc = this.ensureViralContests();
+    const fh = vc.flashHunt;
+    const u = this.getCurrentUser();
+    if (!u || u.role === 'guest') return { ok: false, error: 'auth_required' };
+    if (!fh.active || fh.status !== 'open') return { ok: false, error: 'ended' };
+    fh.claims = Array.isArray(fh.claims) ? fh.claims : [];
+    fh.attempts = fh.attempts || {};
+    if (fh.claims.some((c) => c && c.uid === u.uid) || fh.attempts[u.uid]) {
+      return { ok: false, error: 'already_tried' };
+    }
+    if (fh.claims.length >= Number(fh.maxClaims || 20)) {
+      return { ok: false, error: 'empty' };
+    }
+    const isCorrect = selectedCityId === fh.targetCityId;
+    fh.attempts[u.uid] = { cityId: selectedCityId, correct: isCorrect, ts: Date.now() };
+    if (isCorrect) {
+      const reward = Number(fh.rewardCoins || 300);
+      fh.claims.push({ uid: u.uid, name: u.name, cityId: u.homeCity, reward, ts: Date.now() });
+      this.addCoins(u.uid, reward, 25);
+      this.addCityScore(fh.targetCityId, 30);
+      if (fh.claims.length >= Number(fh.maxClaims || 20)) {
+        fh.status = 'concluded';
+      }
+    }
+    fh.updatedAt = Date.now();
+    this._notifyContestUpdate('flash_hunt_claimed');
+    return { ok: true, correct: isCorrect, reward: isCorrect ? Number(fh.rewardCoins || 300) : 0 };
+  },
+
+  adminStopFlashHunt() {
+    const vc = this.ensureViralContests();
+    vc.flashHunt = Object.assign(getDefaultViralContests().flashHunt, { updatedAt: Date.now() });
+    this._notifyContestUpdate('flash_hunt_stopped');
+  },
+
   syncToFirestore(reason = 'update', immediate = false) {
     if (!this.fbDb) return;
     clearTimeout(this._fbSyncDebounce);
@@ -4364,6 +5029,7 @@ const REMO_STORE = {
           jukeboxTracks: (this.state.jukeboxTracks || []).slice(0, 30),
           auctions: (this.state.auctions || []).slice(0, 25),
           geoVaults: (this.state.geoVaults || []).slice(0, 35),
+          viralContests: this.state.viralContests || getDefaultViralContests(),
           deletedPostIds: [...(this.deletedPostIds || [])].slice(-100),
           deletedUserIds: [...(this.deletedUserIds || [])].slice(-100),
           deletedDuelIds: [...(this.deletedDuelIds || [])].slice(-100),

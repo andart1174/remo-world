@@ -3,7 +3,7 @@
    Offline Shell Caching + Native Push & Incoming Call Notifications
    ════════════════════════════════════════════════════════════════════ */
 
-const CACHE_NAME = 'remo-pwa-v68';
+const CACHE_NAME = 'remo-pwa-v69';
 const CORE_ASSETS = [
   './',
   './index.html',

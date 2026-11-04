@@ -110,6 +110,7 @@ function switchRemoView(viewId) {
   else if (viewId === 'messages') renderDirectMessagesView();
   else if (viewId === 'bottles') renderWorldBottlesView();
   else if (viewId === 'wheel') renderWheelView();
+  else if (viewId === 'contests') renderViralContestsView();
 
   if (typeof updateUnreadBadges === 'function') {
     updateUnreadBadges();
@@ -1372,6 +1373,9 @@ function getInterCityDistanceBridge(postCity, lang) {
 
 function renderSocialFeed(searchQuery = '') {
   renderStoriesAndBanners();
+  if (typeof renderFeedActiveContestsBanner === 'function') {
+    renderFeedActiveContestsBanner();
+  }
   const grid = document.getElementById('remoPostsGrid');
   if (!grid) return;
 
@@ -10016,3 +10020,902 @@ window.addEventListener('remo:postaudiochange', syncActivePostAudioDOM);
 
 
 
+
+/* ════════════════════════════════════════════════════════════════════
+   🎤🏆⚽🕵️🎟️⚡ v69: EUROVISION REMO (60S SONG CONTEST) &
+   6 ADMIN-CONTROLLED VIRAL CONTESTS ENGINE (EN / FR ONLY)
+   ════════════════════════════════════════════════════════════════════ */
+
+let _euroAudioPlayer = null;
+let _euroPlayingEntryId = '';
+let _euroTimerInterval = null;
+let _euroElapsedSec = 0;
+let _pendingEuroAudioDataUrl = '';
+let _pendingPgpMediaDataUrl = '';
+let _pendingPgpMediaType = 'image';
+
+function stopEurovision60sPreview() {
+  if (_euroTimerInterval) {
+    clearInterval(_euroTimerInterval);
+    _euroTimerInterval = null;
+  }
+  if (_euroAudioPlayer) {
+    try {
+      _euroAudioPlayer.pause();
+      _euroAudioPlayer.currentTime = 0;
+    } catch (e) {}
+    _euroAudioPlayer = null;
+  }
+  if (window.RemoAudio && window.RemoAudio.activeSoundtrackPostId && String(window.RemoAudio.activeSoundtrackPostId).startsWith('euro_')) {
+    try { window.RemoAudio.stopPostSoundtrack(); } catch (e) {}
+  }
+  _euroPlayingEntryId = '';
+  _euroElapsedSec = 0;
+  document.querySelectorAll('[data-euro-play-btn]').forEach((btn) => {
+    btn.innerHTML = escapeHtmlStr(t('euro_play_60s'));
+    btn.classList.remove('active');
+  });
+  document.querySelectorAll('[data-euro-timer]').forEach((el) => {
+    el.textContent = '0:00 / 1:00';
+  });
+}
+window.stopEurovision60sPreview = stopEurovision60sPreview;
+
+function playEurovision60sPreview(entryId) {
+  const vc = REMO_STORE.ensureViralContests();
+  const ev = vc.eurovision || {};
+  const entry = (ev.entries || []).find((e) => e && e.id === entryId);
+  if (!entry) return;
+
+  if (_euroPlayingEntryId === entryId) {
+    stopEurovision60sPreview();
+    return;
+  }
+
+  stopEurovision60sPreview();
+  _euroPlayingEntryId = entryId;
+  _euroElapsedSec = 0;
+
+  const btn = document.querySelector(`[data-euro-play-btn="${entryId}"]`);
+  if (btn) {
+    btn.innerHTML = escapeHtmlStr(t('euro_stop_60s'));
+    btn.classList.add('active');
+  }
+
+  if (entry.audioUrl) {
+    const resolved = entry.audioUrl.startsWith('idb://')
+      ? RemoMediaDB.resolveSyncOrPlaceholder(entry.audioUrl)
+      : entry.audioUrl;
+    if (resolved) {
+      _euroAudioPlayer = new Audio(resolved);
+      _euroAudioPlayer.play().catch(() => {});
+      _euroAudioPlayer.ontimeupdate = () => {
+        if (!_euroAudioPlayer) return;
+        const sec = Math.min(60, Math.floor(_euroAudioPlayer.currentTime || 0));
+        const timerEl = document.querySelector(`[data-euro-timer="${entryId}"]`);
+        if (timerEl) {
+          timerEl.textContent = `0:${String(sec).padStart(2, '0')} / 1:00`;
+        }
+        if (_euroAudioPlayer.currentTime >= 60) {
+          stopEurovision60sPreview();
+        }
+      };
+      _euroAudioPlayer.onended = () => stopEurovision60sPreview();
+      return;
+    }
+  }
+
+  // Fallback to built-in 60s synth preset preview if no raw MP3 file
+  if (window.RemoAudio && typeof window.RemoAudio.togglePostSoundtrack === 'function') {
+    window.RemoAudio.togglePostSoundtrack(entry.soundPreset || 'shibuya_neon', entry.id, entry.cityId);
+  }
+  _euroTimerInterval = setInterval(() => {
+    _euroElapsedSec++;
+    const sec = Math.min(60, _euroElapsedSec);
+    const timerEl = document.querySelector(`[data-euro-timer="${entryId}"]`);
+    if (timerEl) {
+      timerEl.textContent = `0:${String(sec).padStart(2, '0')} / 1:00`;
+    }
+    if (_euroElapsedSec >= 60) {
+      stopEurovision60sPreview();
+    }
+  }, 1000);
+}
+window.playEurovision60sPreview = playEurovision60sPreview;
+
+function formatContestRemainingTime(endsAt) {
+  const lang = REMO_I18N.getLang();
+  if (!endsAt) return lang === 'fr' ? 'En direct' : 'Live';
+  const diff = Number(endsAt) - Date.now();
+  if (diff <= 0) return lang === 'fr' ? 'Terminé' : 'Ended';
+  const hrs = Math.floor(diff / 3600000);
+  const mins = Math.floor((diff % 3600000) / 60000);
+  return `${hrs}h ${mins}m`;
+}
+
+function renderFeedActiveContestsBanner() {
+  const banner = document.getElementById('feedActiveContestsBanner');
+  if (!banner || !REMO_STORE || !REMO_STORE.state) return;
+  const lang = REMO_I18N.getLang();
+  const isFr = lang === 'fr';
+  const vc = REMO_STORE.ensureViralContests();
+
+  const activePills = [];
+  if (vc.eurovision && vc.eurovision.active) {
+    activePills.push(`🎤 Eurovision REMO (+${Number(vc.eurovision.prizeCoins || 5000).toLocaleString()} 🪙)`);
+  }
+  if (vc.photoGrandPrix && vc.photoGrandPrix.active) {
+    activePills.push(`📸 Photo Grand Prix (🥇 +${Number(vc.photoGrandPrix.prize1st || 3000).toLocaleString()} 🪙)`);
+  }
+  if (vc.worldCupBracket && vc.worldCupBracket.active) {
+    activePills.push(`⚽ World Cup 8-Cities (+${Number(vc.worldCupBracket.prizePool || 5000).toLocaleString()} 🪙)`);
+  }
+  if (vc.mysteryDetective && vc.mysteryDetective.active) {
+    activePills.push(`🕵️ Mystery City (+${Number(vc.mysteryDetective.rewardCoins || 500)} 🪙)`);
+  }
+  if (vc.goldenRaffle && vc.goldenRaffle.active) {
+    activePills.push(`🎟️ Golden Raffle (+${Number(vc.goldenRaffle.prizeCoins || 2500).toLocaleString()} 🪙)`);
+  }
+  if (vc.flashHunt && vc.flashHunt.active) {
+    const rem = Math.max(0, Number(vc.flashHunt.maxClaims || 20) - (vc.flashHunt.claims || []).length);
+    activePills.push(`⚡ Flash Hunt (${rem} ${isFr ? 'restants' : 'left'})`);
+  }
+
+  if (activePills.length === 0) {
+    banner.style.display = 'none';
+    banner.innerHTML = '';
+    return;
+  }
+
+  banner.style.display = 'block';
+  banner.innerHTML = `
+    <div onclick="switchRemoView('contests')" style="cursor:pointer;background:linear-gradient(135deg,rgba(245,158,11,0.18),rgba(236,72,153,0.18),rgba(56,189,248,0.15));border:1.5px solid rgba(251,191,36,0.65);border-radius:16px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;box-shadow:0 8px 24px rgba(0,0,0,0.45);">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <span style="background:#fbbf24;color:#0f172a;font-weight:900;font-size:0.7rem;padding:3px 9px;border-radius:99px;letter-spacing:0.6px;">🔥 ${isFr ? 'CONCOURS OFFICIELS EN DIRECT' : 'LIVE OFFICIAL CONTESTS'}</span>
+        <span style="font-size:0.82rem;font-weight:800;color:#fde047;">${activePills.join(' · ')}</span>
+      </div>
+      <span class="btn-cyber btn-gold" style="padding:5px 12px;font-size:0.74rem;">${isFr ? 'Participer & Voter ➔' : 'Join & Vote ➔'}</span>
+    </div>
+  `;
+}
+window.renderFeedActiveContestsBanner = renderFeedActiveContestsBanner;
+
+function renderViralContestsView() {
+  const stage = document.getElementById('viralContestsStage');
+  if (!stage || !REMO_STORE || !REMO_STORE.state) return;
+
+  const lang = REMO_I18N.getLang();
+  const isFr = lang === 'fr';
+  const vc = REMO_STORE.ensureViralContests();
+  const u = REMO_STORE.getCurrentUser();
+  const isAdm = Boolean(REMO_STORE.isCurrentUserAdmin() && REMO_STORE.isAdminUnlocked());
+  const cities = getRemoCities();
+
+  const cityOptionsHtml = cities.map((c) =>
+    `<option value="${c.id}" ${u && u.homeCity === c.id ? 'selected' : ''}>${c.flag} ${escapeHtmlStr(getCityName(c, lang))}</option>`
+  ).join('');
+
+  const anyActive = Boolean(
+    (vc.eurovision && vc.eurovision.active) ||
+    (vc.photoGrandPrix && vc.photoGrandPrix.active) ||
+    (vc.worldCupBracket && vc.worldCupBracket.active) ||
+    (vc.mysteryDetective && vc.mysteryDetective.active) ||
+    (vc.goldenRaffle && vc.goldenRaffle.active) ||
+    (vc.flashHunt && vc.flashHunt.active)
+  );
+
+  // ── 1. EUROVISION REMO BLOCK ──
+  const ev = vc.eurovision || {};
+  let euroHtml = '';
+  if (ev.active || isAdm) {
+    const evTitle = isFr ? (ev.title_fr || ev.title_en) : (ev.title_en || ev.title_fr);
+    const evEntries = Array.isArray(ev.entries) ? ev.entries.slice().sort((a, b) => Number(b.points || 0) - Number(a.points || 0)) : [];
+    const myVotedEntryId = u && ev.voters ? ev.voters[u.uid] : '';
+    const canSubmit = isAdm || (ev.active && ev.status === 'open' && ev.allowCitizenSubmissions);
+
+    euroHtml = `
+      <div class="glass-box" style="margin-bottom:16px;border:1.5px solid rgba(251,191,36,0.55);background:radial-gradient(circle at top right,rgba(236,72,153,0.16),rgba(15,23,42,0.95) 70%);">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
+          <div>
+            <div style="display:inline-flex;align-items:center;gap:6px;background:rgba(251,191,36,0.18);border:1px solid #fbbf24;color:#fde047;padding:3px 10px;border-radius:99px;font-size:0.7rem;font-weight:900;margin-bottom:6px;">
+              ${escapeHtmlStr(t('euro_badge'))} ${!ev.active ? '· (ADMIN PREVIEW - INACTIVE)' : ''}
+            </div>
+            <h2 style="font-family:'Orbitron',sans-serif;font-size:1.18rem;color:#fff;margin:0;">${escapeHtmlStr(evTitle || 'Eurovision REMO')}</h2>
+            <p style="font-size:0.78rem;color:#cbd5e1;margin-top:4px;">${escapeHtmlStr(t('euro_rule_note'))}</p>
+          </div>
+          <div style="text-align:right;">
+            <div style="background:linear-gradient(135deg,#f59e0b,#ec4899);color:#fff;font-weight:900;padding:6px 14px;border-radius:12px;font-size:0.86rem;box-shadow:0 4px 15px rgba(245,158,11,0.4);">
+              🏆 ${isFr ? 'Grand Prix' : 'Grand Prize'}: +${Number(ev.prizeCoins || 5000).toLocaleString()} 🪙
+            </div>
+            <div style="font-size:0.74rem;color:#38bdf8;font-weight:800;margin-top:4px;">
+              ⏳ ${formatContestRemainingTime(ev.endsAt)} · ${evEntries.length} ${isFr ? 'villes en lice' : 'songs competing'}
+            </div>
+          </div>
+        </div>
+
+        ${ev.status === 'concluded' && ev.winnerEntryId ? (() => {
+          const winE = evEntries.find((x) => x.id === ev.winnerEntryId) || evEntries[0];
+          if (!winE) return '';
+          const wc = getCityById(winE.cityId);
+          return `
+            <div style="background:linear-gradient(135deg,rgba(251,191,36,0.25),rgba(16,185,129,0.22));border:2px solid #fbbf24;border-radius:14px;padding:14px;text-align:center;margin-bottom:14px;">
+              <div style="font-size:1.5rem;">👑🎤🏆</div>
+              <div style="font-family:'Orbitron',sans-serif;font-weight:900;color:#fde047;font-size:1.05rem;">
+                ${isFr ? 'CHAMPION EUROVISION REMO' : 'EUROVISION REMO CHAMPION'}: ${wc.flag} ${escapeHtmlStr(getCityName(wc, lang))}!
+              </div>
+              <div style="font-size:0.86rem;color:#fff;font-weight:800;margin-top:3px;">
+                "${escapeHtmlStr(winE.songTitle)}" — @${escapeHtmlStr(winE.artistName)} (${winE.points} PTS · +${Number(ev.prizeCoins || 5000).toLocaleString()} 🪙)
+              </div>
+            </div>
+          `;
+        })() : ''}
+
+        ${canSubmit ? `
+          <div style="margin-bottom:12px;">
+            <button type="button" class="btn-cyber btn-gold" onclick="document.getElementById('euroSubmitDrawer').style.display = document.getElementById('euroSubmitDrawer').style.display === 'none' ? 'block' : 'none'">
+              ${escapeHtmlStr(t('euro_submit_btn'))}
+            </button>
+            <div id="euroSubmitDrawer" style="display:none;margin-top:10px;padding:14px;border-radius:14px;background:rgba(15,23,42,0.85);border:1px solid rgba(56,189,248,0.4);">
+              <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px;margin-bottom:8px;">
+                <div>
+                  <label style="font-size:0.74rem;color:#94a3b8;font-weight:800;">${isFr ? 'Ville Représentée' : 'Represented City'}</label>
+                  <select id="euroSubCitySel" class="remo-input">${cityOptionsHtml}</select>
+                </div>
+                <div>
+                  <label style="font-size:0.74rem;color:#94a3b8;font-weight:800;">${isFr ? 'Titre de la Chanson (60s)' : 'Song Title (60s)'}</label>
+                  <input type="text" id="euroSubTitleInp" class="remo-input" maxlength="70" placeholder="${isFr ? 'Ex: Hymne Nocturne de ma Ville' : 'e.g. Midnight City Anthem'}">
+                </div>
+                <div>
+                  <label style="font-size:0.74rem;color:#94a3b8;font-weight:800;">${isFr ? 'Artiste / Créateur' : 'Artist / Creator'}</label>
+                  <input type="text" id="euroSubArtistInp" class="remo-input" maxlength="45" value="${escapeHtmlStr(u ? u.name : 'REMO Creator')}">
+                </div>
+              </div>
+              <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:8px;margin-bottom:10px;">
+                <div>
+                  <label style="font-size:0.74rem;color:#38bdf8;font-weight:800;">🎵 ${isFr ? 'Fichier Audio MP3/WAV (Max 60s, Optionnel)' : 'Upload MP3/Audio File (Max 60s, Optional)'}</label>
+                  <input type="file" accept="audio/*,video/mp4" class="remo-input" onchange="handleEurovisionAudioUpload(event)">
+                  <div id="euroAudioUploadStatus" style="font-size:0.72rem;color:#34d399;margin-top:3px;"></div>
+                </div>
+                <div>
+                  <label style="font-size:0.74rem;color:#fbbf24;font-weight:800;">🔗 ${isFr ? 'OU Lien Externe (YouTube, Suno, SoundCloud...)' : 'OR External Link (YouTube, Suno, SoundCloud...)'}</label>
+                  <input type="url" id="euroSubLinkInp" class="remo-input" placeholder="https://youtube.com/... or https://suno.com/...">
+                </div>
+                <div>
+                  <label style="font-size:0.74rem;color:#a78bfa;font-weight:800;">🎹 ${isFr ? 'Ambiance Synthé 60s (si pas de MP3)' : 'Backup 60s Synth Vibe (if no MP3)'}</label>
+                  <select id="euroSubPresetSel" class="remo-input">
+                    <option value="shibuya_neon">🌆 Shibuya Neon Synthwave</option>
+                    <option value="sunset_house">🏖️ Ibiza Sunset Deep House</option>
+                    <option value="french_cafe">🥐 Paris Sunset Lounge</option>
+                    <option value="afro_groove">🥁 Warm Afro-Groove Pulse</option>
+                    <option value="cyber_pulse">⚡ Cyber Metropolis Bass</option>
+                    <option value="velvet_jazz">🎷 Velvet Midnight Jazz</option>
+                  </select>
+                </div>
+              </div>
+              <button type="button" class="btn-cyber btn-gold" style="width:100%;justify-content:center;" onclick="submitCitizenEurovisionSong()">
+                🚀 ${isFr ? 'Inscrire la Chanson Officielle (+25 🪙)' : 'Submit Official City Song (+25 🪙)'}
+              </button>
+            </div>
+          </div>
+        ` : ''}
+
+        <!-- Eurovision Entries List -->
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          ${evEntries.length === 0 ? `
+            <div style="text-align:center;padding:22px;background:rgba(0,0,0,0.28);border-radius:12px;color:var(--muted);font-size:0.83rem;">
+              🎤 ${isFr ? 'Aucune chanson inscrite pour le moment. Soyez la première ville en compétition !' : 'No city songs submitted yet. Be the first city to enter!'}
+            </div>
+          ` : evEntries.map((ent, idx) => {
+            const c = getCityById(ent.cityId);
+            const rankBadge = idx === 0 ? '🥇 #1' : idx === 1 ? '🥈 #2' : idx === 2 ? '🥉 #3' : `#${idx + 1}`;
+            const isMyVote = myVotedEntryId === ent.id;
+            const isPlaying = _euroPlayingEntryId === ent.id;
+            return `
+              <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;padding:11px 14px;border-radius:14px;background:${idx === 0 ? 'linear-gradient(90deg,rgba(251,191,36,0.16),rgba(15,23,42,0.85))' : 'rgba(255,255,255,0.04)'};border:1px solid ${isMyVote ? '#10b981' : idx === 0 ? 'rgba(251,191,36,0.5)' : 'rgba(255,255,255,0.08)'};">
+                <div style="display:flex;align-items:center;gap:10px;min-width:200px;flex:1;">
+                  <span style="font-family:'Orbitron',sans-serif;font-weight:900;font-size:0.9rem;color:${idx === 0 ? '#fde047' : '#94a3b8'};min-width:44px;">${rankBadge}</span>
+                  <span style="font-size:1.45rem;">${c.flag}</span>
+                  <div style="min-width:0;">
+                    <div style="font-weight:900;font-size:0.92rem;color:#fff;">
+                      ${escapeHtmlStr(getCityName(c, lang))} — "${escapeHtmlStr(ent.songTitle)}"
+                    </div>
+                    <div style="font-size:0.75rem;color:#7dd3fc;font-weight:700;">
+                      🎤 @${escapeHtmlStr(ent.artistName)} · <span data-euro-timer="${ent.id}" style="color:#fde047;">0:00 / 1:00</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;">
+                  <button type="button" class="btn-ghost ${isPlaying ? 'active' : ''}" data-euro-play-btn="${ent.id}" style="font-size:0.75rem;padding:6px 11px;border-color:#38bdf8;color:#7dd3fc;" onclick="playEurovision60sPreview('${ent.id}')">
+                    ${isPlaying ? escapeHtmlStr(t('euro_stop_60s')) : escapeHtmlStr(t('euro_play_60s'))}
+                  </button>
+                  ${ent.externalLink ? `
+                    <a href="${escapeHtmlStr(ent.externalLink)}" target="_blank" rel="noopener noreferrer" class="btn-ghost" style="font-size:0.75rem;padding:6px 11px;border-color:#f472b6;color:#fbcfe8;text-decoration:none;">
+                      ${escapeHtmlStr(t('euro_open_link'))}
+                    </a>
+                  ` : ''}
+                  <span style="font-family:'Orbitron',sans-serif;font-weight:900;font-size:0.88rem;color:#fbbf24;padding:0 6px;">
+                    ${Number(ent.points || 0)} PTS
+                  </span>
+                  ${ev.status === 'open' ? `
+                    <button type="button" class="btn-cyber ${isMyVote ? '' : 'btn-gold'}" style="font-size:0.75rem;padding:6px 12px;" ${myVotedEntryId ? 'disabled' : ''} onclick="castCitizenEurovisionVote('${ent.id}')">
+                      ${isMyVote ? escapeHtmlStr(t('euro_voted_lbl')) : escapeHtmlStr(t('euro_vote_btn'))}
+                    </button>
+                  ` : ''}
+                  ${isAdm ? `
+                    <button type="button" class="btn-ghost" style="padding:5px 9px;color:#f43f5e;border-color:#f43f5e;font-size:0.74rem;" onclick="REMO_STORE.adminDeleteEurovisionEntry('${ent.id}')" title="Delete Entry">✕</button>
+                  ` : ''}
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  // ── 2. PHOTO & VIDEO GRAND PRIX (TOP 3 PODIUM 🥇🥈🥉) ──
+  const pgp = vc.photoGrandPrix || {};
+  let pgpHtml = '';
+  if (pgp.active || isAdm) {
+    const pgpTitle = isFr ? (pgp.title_fr || pgp.title_en) : (pgp.title_en || pgp.title_fr);
+    const pgpEntries = Array.isArray(pgp.entries) ? pgp.entries.slice().sort((a, b) => Number(b.votes || 0) - Number(a.votes || 0)) : [];
+    const myVotedId = u && pgp.voters ? pgp.voters[u.uid] : '';
+
+    pgpHtml = `
+      <div class="glass-box" style="margin-bottom:16px;border:1.5px solid rgba(56,189,248,0.5);">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
+          <div>
+            <div style="display:inline-flex;align-items:center;gap:6px;background:rgba(56,189,248,0.16);border:1px solid #38bdf8;color:#7dd3fc;padding:3px 10px;border-radius:99px;font-size:0.7rem;font-weight:900;margin-bottom:6px;">
+              ${escapeHtmlStr(t('pgp_badge'))} ${!pgp.active ? '· (INACTIVE)' : ''}
+            </div>
+            <h2 style="font-family:'Orbitron',sans-serif;font-size:1.12rem;color:#fff;margin:0;">${escapeHtmlStr(pgpTitle || 'Photo & Video Grand Prix')}</h2>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;font-size:0.78rem;font-weight:900;">
+            <span style="background:rgba(251,191,36,0.2);border:1px solid #fbbf24;color:#fde047;padding:4px 10px;border-radius:10px;">🥇 +${Number(pgp.prize1st || 3000).toLocaleString()} 🪙</span>
+            <span style="background:rgba(226,232,240,0.15);border:1px solid #cbd5e1;color:#f1f5f9;padding:4px 10px;border-radius:10px;">🥈 +${Number(pgp.prize2nd || 1500).toLocaleString()} 🪙</span>
+            <span style="background:rgba(217,119,6,0.2);border:1px solid #f59e0b;color:#fed7aa;padding:4px 10px;border-radius:10px;">🥉 +${Number(pgp.prize3rd || 750).toLocaleString()} 🪙</span>
+          </div>
+        </div>
+
+        ${pgp.active && pgp.status === 'open' ? `
+          <div style="margin-bottom:12px;">
+            <button type="button" class="btn-cyber" onclick="document.getElementById('pgpSubmitDrawer').style.display = document.getElementById('pgpSubmitDrawer').style.display === 'none' ? 'block' : 'none'">
+              ${escapeHtmlStr(t('pgp_submit_btn'))}
+            </button>
+            <div id="pgpSubmitDrawer" style="display:none;margin-top:10px;padding:12px;border-radius:14px;background:rgba(15,23,42,0.85);border:1px solid rgba(56,189,248,0.35);">
+              <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:8px;margin-bottom:8px;">
+                <select id="pgpSubCitySel" class="remo-input">${cityOptionsHtml}</select>
+                <input type="text" id="pgpSubTitleInp" class="remo-input" placeholder="${isFr ? 'Titre ou légende de la photo/vidéo...' : 'Photo/Video title or caption...'}">
+                <input type="file" accept="image/*,video/*" class="remo-input" onchange="handlePgpMediaUpload(event)">
+              </div>
+              <div id="pgpUploadStatus" style="font-size:0.74rem;color:#34d399;margin-bottom:6px;"></div>
+              <button type="button" class="btn-cyber btn-gold" style="width:100%;justify-content:center;" onclick="submitCitizenPgpEntry()">
+                🚀 ${isFr ? 'Publier dans le Grand Prix (+20 🪙)' : 'Submit to Grand Prix (+20 🪙)'}
+              </button>
+            </div>
+          </div>
+        ` : ''}
+
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px;">
+          ${pgpEntries.length === 0 ? `
+            <div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--muted);font-size:0.82rem;">
+              📸 ${isFr ? 'Aucune photo/vidéo soumise pour le moment.' : 'No photo/video entries submitted yet.'}
+            </div>
+          ` : pgpEntries.map((ent, idx) => {
+            const c = getCityById(ent.cityId);
+            const medal = idx === 0 ? '🥇 1ST' : idx === 1 ? '🥈 2ND' : idx === 2 ? '🥉 3RD' : `#${idx + 1}`;
+            const imgSrc = ent.mediaUrl || generateCityPostVisualDataUrl(c.id, ent.title, ent.authorName);
+            return `
+              <div style="background:rgba(15,23,42,0.85);border:1px solid ${idx < 3 ? '#fbbf24' : 'rgba(255,255,255,0.1)'};border-radius:14px;overflow:hidden;display:flex;flex-direction:column;">
+                <div style="position:relative;height:155px;background:#050816;">
+                  ${ent.mediaType === 'video'
+                    ? `<video src="${imgSrc}" controls playsinline style="width:100%;height:100%;object-fit:cover;"></video>`
+                    : `<img src="${imgSrc}" alt="${escapeHtmlStr(ent.title)}" style="width:100%;height:100%;object-fit:cover;">`
+                  }
+                  <span style="position:absolute;top:8px;left:8px;background:rgba(0,0,0,0.8);border:1px solid #fbbf24;color:#fde047;font-weight:900;font-size:0.72rem;padding:2px 8px;border-radius:99px;">${medal}</span>
+                  <span style="position:absolute;top:8px;right:8px;background:rgba(0,0,0,0.8);color:#fff;font-weight:800;font-size:0.72rem;padding:2px 8px;border-radius:99px;">${c.flag} ${escapeHtmlStr(getCityName(c, lang))}</span>
+                </div>
+                <div style="padding:10px;display:flex;flex-direction:column;gap:6px;flex:1;justify-content:space-between;">
+                  <div>
+                    <div style="font-weight:800;font-size:0.84rem;color:#fff;">${escapeHtmlStr(ent.title)}</div>
+                    <div style="font-size:0.73rem;color:#7dd3fc;">@${escapeHtmlStr(ent.authorName)} · 🔥 ${Number(ent.votes || 0)} votes</div>
+                  </div>
+                  <div style="display:flex;gap:6px;">
+                    ${pgp.status === 'open' ? `
+                      <button type="button" class="btn-cyber ${myVotedId === ent.id ? '' : 'btn-gold'}" style="flex:1;justify-content:center;padding:6px;font-size:0.74rem;" ${myVotedId ? 'disabled' : ''} onclick="voteCitizenPgpEntry('${ent.id}')">
+                        ${myVotedId === ent.id ? '✓ Voted' : escapeHtmlStr(t('pgp_vote_btn'))}
+                      </button>
+                    ` : ''}
+                    ${isAdm ? `<button type="button" class="btn-ghost" style="padding:5px 8px;color:#f43f5e;border-color:#f43f5e;" onclick="REMO_STORE.adminDeletePhotoGrandPrixEntry('${ent.id}')">✕</button>` : ''}
+                  </div>
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  // ── 3. 8-CITY WORLD KNOCKOUT CUP BRACKET ──
+  const wc = vc.worldCupBracket || {};
+  let wcHtml = '';
+  if (wc.active || isAdm) {
+    const wcTitle = isFr ? (wc.title_fr || wc.title_en) : (wc.title_en || wc.title_fr);
+    const roundLabel = wc.round === 'qf'
+      ? (isFr ? 'Quarts de Finale (8 Villes)' : 'Quarter-Finals (8 Cities)')
+      : wc.round === 'sf'
+      ? (isFr ? 'Demi-Finales (4 Villes)' : 'Semi-Finals (4 Cities)')
+      : wc.round === 'final'
+      ? (isFr ? 'GRANDE FINALE MONDIALE' : 'WORLD GRAND FINAL')
+      : (isFr ? 'CHAMPION COURONNÉ' : 'CHAMPION CROWNED');
+    const curMatches = (wc.matches || []).filter((m) => m.round === (wc.round === 'champion' ? 'final' : wc.round));
+
+    wcHtml = `
+      <div class="glass-box" style="margin-bottom:16px;border:1.5px solid rgba(16,185,129,0.5);">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
+          <div>
+            <div style="display:inline-flex;align-items:center;gap:6px;background:rgba(16,185,129,0.18);border:1px solid #10b981;color:#6ee7b7;padding:3px 10px;border-radius:99px;font-size:0.7rem;font-weight:900;margin-bottom:6px;">
+              ${escapeHtmlStr(t('wc_badge'))} · ${escapeHtmlStr(roundLabel)}
+            </div>
+            <h2 style="font-family:'Orbitron',sans-serif;font-size:1.12rem;color:#fff;margin:0;">${escapeHtmlStr(wcTitle)}</h2>
+          </div>
+          <div style="font-weight:900;color:#fbbf24;font-size:0.86rem;">
+            🏆 +${Number(wc.prizePool || 5000).toLocaleString()} PTS
+          </div>
+        </div>
+
+        ${wc.championCityId ? (() => {
+          const champ = getCityById(wc.championCityId);
+          return `
+            <div style="background:linear-gradient(135deg,rgba(251,191,36,0.25),rgba(16,185,129,0.25));border:2px solid #fbbf24;border-radius:14px;padding:14px;text-align:center;margin-bottom:12px;">
+              <div style="font-size:1.6rem;">🏆👑⚽</div>
+              <div style="font-family:'Orbitron',sans-serif;font-weight:900;color:#fde047;font-size:1.05rem;">
+                ${champ.flag} ${escapeHtmlStr(getCityName(champ, lang))} — ${isFr ? 'CHAMPION DE LA COUPE DU MONDE !' : 'WORLD KNOCKOUT CUP CHAMPION!'}
+              </div>
+            </div>
+          `;
+        })() : ''}
+
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:10px;">
+          ${curMatches.map((m) => {
+            const cA = getCityById(m.cityA);
+            const cB = getCityById(m.cityB);
+            const vA = Number(m.votesA || 0);
+            const vB = Number(m.votesB || 0);
+            const tot = Math.max(1, vA + vB);
+            const pA = Math.round((vA / tot) * 100);
+            const pB = 100 - pA;
+            const myVote = u && m.voters ? m.voters[u.uid] : '';
+            return `
+              <div style="padding:12px;border-radius:14px;background:rgba(15,23,42,0.85);border:1px solid rgba(255,255,255,0.1);">
+                <div style="display:flex;justify-content:space-between;align-items:center;font-weight:900;font-size:0.88rem;margin-bottom:8px;">
+                  <span>${cA.flag} ${escapeHtmlStr(getCityName(cA, lang))} (${vA})</span>
+                  <span style="color:#fbbf24;font-family:'Orbitron',sans-serif;font-size:0.75rem;">VS</span>
+                  <span>${cB.flag} ${escapeHtmlStr(getCityName(cB, lang))} (${vB})</span>
+                </div>
+                <div class="war-bar-track" style="height:8px;margin-bottom:10px;">
+                  <div class="war-bar-fill-a" style="width:${pA}%;"></div>
+                </div>
+                <div style="display:flex;gap:6px;">
+                  <button type="button" class="btn-cyber ${myVote === 'A' ? 'btn-gold' : ''}" style="flex:1;justify-content:center;font-size:0.74rem;padding:6px;" ${myVote ? 'disabled' : ''} onclick="voteCitizenWorldCupMatch('${m.id}','A')">
+                    ${cA.flag} ${myVote === 'A' ? '✓' : 'Vote'} (${pA}%)
+                  </button>
+                  <button type="button" class="btn-cyber ${myVote === 'B' ? 'btn-gold' : ''}" style="flex:1;justify-content:center;font-size:0.74rem;padding:6px;" ${myVote ? 'disabled' : ''} onclick="voteCitizenWorldCupMatch('${m.id}','B')">
+                    ${cB.flag} ${myVote === 'B' ? '✓' : 'Vote'} (${pB}%)
+                  </button>
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  // ── 4. MYSTERY CITY DETECTIVE (1-ATTEMPT QUIZ) ──
+  const md = vc.mysteryDetective || {};
+  let mdHtml = '';
+  if (md.active || isAdm) {
+    const clueTxt = isFr ? (md.clue_fr || md.clue_en) : (md.clue_en || md.clue_fr);
+    const myAttempt = u && md.attempts ? md.attempts[u.uid] : null;
+    const winnersCount = (md.winners || []).length;
+    const maxW = Number(md.maxWinners || 15);
+
+    mdHtml = `
+      <div class="glass-box" style="margin-bottom:16px;border:1.5px solid rgba(168,85,247,0.55);">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
+          <div>
+            <div style="display:inline-flex;align-items:center;gap:6px;background:rgba(168,85,247,0.18);border:1px solid #a855f7;color:#e9d5ff;padding:3px 10px;border-radius:99px;font-size:0.7rem;font-weight:900;margin-bottom:6px;">
+              ${escapeHtmlStr(t('md_badge'))}
+            </div>
+            <h2 style="font-family:'Orbitron',sans-serif;font-size:1.08rem;color:#fff;margin:0;">
+              🕵️ ${isFr ? 'Enquête Ville Mystère' : 'Mystery City Detective'} (+${Number(md.rewardCoins || 500)} 🪙)
+            </h2>
+          </div>
+          <span style="font-size:0.78rem;font-weight:900;color:#fbbf24;">🏆 ${winnersCount} / ${maxW} ${isFr ? 'Gagnants' : 'Winners'}</span>
+        </div>
+
+        ${md.imageUrl ? `<img src="${escapeHtmlStr(md.imageUrl)}" alt="Mystery City" style="width:100%;max-height:260px;object-fit:cover;border-radius:14px;margin-bottom:10px;">` : ''}
+        <div style="padding:10px 14px;border-radius:12px;background:rgba(0,0,0,0.35);border:1px solid rgba(255,255,255,0.08);color:#fde047;font-weight:700;font-size:0.86rem;margin-bottom:10px;">
+          💡 "${escapeHtmlStr(clueTxt || 'Guess the secret city!')}"
+        </div>
+
+        ${myAttempt ? `
+          <div style="padding:10px;border-radius:12px;text-align:center;font-weight:900;background:${myAttempt.correct ? 'rgba(16,185,129,0.2)' : 'rgba(244,63,94,0.2)'};color:${myAttempt.correct ? '#6ee7b7' : '#fda4af'};">
+            ${myAttempt.correct
+              ? (isFr ? `🎉 BRAVO ! Vous avez trouvé la ville secrète (+${md.rewardCoins} 🪙) !` : `🎉 BINGO! You solved the Mystery City (+${md.rewardCoins} 🪙)!`)
+              : (isFr ? '❌ Essai unique utilisé ! Ce n’était pas la bonne ville.' : '❌ 1 Attempt used! That was not the secret city.')
+            }
+          </div>
+        ` : (md.active && md.status === 'open' ? `
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <select id="mdGuessCitySel" class="remo-input" style="flex:1;min-width:180px;">${cityOptionsHtml}</select>
+            <button type="button" class="btn-cyber btn-gold" onclick="submitCitizenMysteryDetective()">
+              🕵️ ${isFr ? 'Valider mon Unique Essai' : 'Lock In My 1 Attempt'} (+${Number(md.rewardCoins || 500)} 🪙)
+            </button>
+          </div>
+        ` : '')}
+      </div>
+    `;
+  }
+
+  // ── 5. FOUNDER'S GOLDEN TICKET RAFFLE ──
+  const gr = vc.goldenRaffle || {};
+  let grHtml = '';
+  if (gr.active || isAdm) {
+    const grTitle = isFr ? (gr.title_fr || gr.title_en) : (gr.title_en || gr.title_fr);
+    const myTicket = u && Array.isArray(gr.tickets) ? gr.tickets.find((t) => t && t.uid === u.uid) : null;
+    const winners = Array.isArray(gr.winningTickets) ? gr.winningTickets : [];
+
+    grHtml = `
+      <div class="glass-box" style="margin-bottom:16px;border:1.5px solid rgba(251,191,36,0.6);">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
+          <div>
+            <div style="display:inline-flex;align-items:center;gap:6px;background:rgba(251,191,36,0.2);border:1px solid #fbbf24;color:#fde047;padding:3px 10px;border-radius:99px;font-size:0.7rem;font-weight:900;margin-bottom:6px;">
+              ${escapeHtmlStr(t('gr_badge'))}
+            </div>
+            <h2 style="font-family:'Orbitron',sans-serif;font-size:1.08rem;color:#fff;margin:0;">${escapeHtmlStr(grTitle)}</h2>
+          </div>
+          <div style="font-weight:900;color:#fde047;font-size:0.86rem;">
+            🎟️ ${(gr.tickets || []).length} ${isFr ? 'Tickets inscrits' : 'Tickets Claimed'} · +${Number(gr.prizeCoins || 2500).toLocaleString()} 🪙 × ${Number(gr.winnersCount || 3)}
+          </div>
+        </div>
+
+        ${winners.length > 0 ? `
+          <div style="padding:12px;border-radius:12px;background:rgba(251,191,36,0.18);border:1px solid #fbbf24;margin-bottom:10px;text-align:center;">
+            <div style="font-weight:900;color:#fde047;margin-bottom:4px;">🎉 ${isFr ? 'TICKETS D’OR GAGNANTS TIRÉS AU SORT' : 'WINNING GOLDEN TICKETS DRAWN'}:</div>
+            <div style="font-size:0.85rem;color:#fff;font-weight:800;">
+              ${winners.map((w) => `🎟️ #${escapeHtmlStr(w.code)} (@${escapeHtmlStr(w.name)})`).join(' · ')}
+            </div>
+          </div>
+        ` : ''}
+
+        ${myTicket ? `
+          <div style="padding:10px 14px;border-radius:12px;background:rgba(16,185,129,0.16);border:1px solid #10b981;color:#6ee7b7;font-weight:900;text-align:center;">
+            🎟️ ${isFr ? 'Votre Ticket d’Or Officiel' : 'Your Official Golden Ticket'}: <span style="color:#fde047;font-family:'Orbitron',sans-serif;">#${escapeHtmlStr(myTicket.code)}</span>
+          </div>
+        ` : (gr.active && gr.status === 'open' ? `
+          <button type="button" class="btn-cyber btn-gold" style="width:100%;justify-content:center;padding:11px;" onclick="claimCitizenGoldenTicket()">
+            🎟️ ${isFr ? 'Réclamer mon Ticket d’Or Gratuit (+10 🪙)' : 'Claim My Free Golden Ticket (+10 🪙)'}
+          </button>
+        ` : '')}
+      </div>
+    `;
+  }
+
+  // ── 6. FOUNDER'S FLASH TREASURE HUNT ──
+  const fh = vc.flashHunt || {};
+  let fhHtml = '';
+  if (fh.active || isAdm) {
+    const riddleTxt = isFr ? (fh.riddle_fr || fh.riddle_en) : (fh.riddle_en || fh.riddle_fr);
+    const claimedList = Array.isArray(fh.claims) ? fh.claims : [];
+    const maxC = Number(fh.maxClaims || 20);
+    const rem = Math.max(0, maxC - claimedList.length);
+    const myTried = u && fh.attempts ? fh.attempts[u.uid] : null;
+
+    fhHtml = `
+      <div class="glass-box" style="margin-bottom:16px;border:1.5px solid rgba(244,63,94,0.55);">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
+          <div>
+            <div style="display:inline-flex;align-items:center;gap:6px;background:rgba(244,63,94,0.2);border:1px solid #f43f5e;color:#fda4af;padding:3px 10px;border-radius:99px;font-size:0.7rem;font-weight:900;margin-bottom:6px;">
+              ${escapeHtmlStr(t('fh_badge'))}
+            </div>
+            <h2 style="font-family:'Orbitron',sans-serif;font-size:1.08rem;color:#fff;margin:0;">
+              ⚡ ${isFr ? 'Chasse au Trésor Flash' : 'Founder’s Flash Treasure Hunt'} (+${Number(fh.rewardCoins || 300)} 🪙)
+            </h2>
+          </div>
+          <span style="font-weight:900;color:#fde047;font-size:0.85rem;">🔥 ${rem} / ${maxC} ${isFr ? ' coffres restants' : ' chests left'}</span>
+        </div>
+
+        <div style="padding:10px 14px;border-radius:12px;background:rgba(0,0,0,0.35);border:1px solid rgba(255,255,255,0.08);color:#fde047;font-weight:700;font-size:0.86rem;margin-bottom:10px;">
+          🗺️ "${escapeHtmlStr(riddleTxt || 'Find the secret city chest!')}"
+        </div>
+
+        ${myTried ? `
+          <div style="padding:10px;border-radius:12px;text-align:center;font-weight:900;background:${myTried.correct ? 'rgba(16,185,129,0.2)' : 'rgba(244,63,94,0.2)'};color:${myTried.correct ? '#6ee7b7' : '#fda4af'};">
+            ${myTried.correct
+              ? (isFr ? `🎉 TRÉSOR DÉBLOQUÉ ! +${fh.rewardCoins} 🪙 ajoutés !` : `🎉 TREASURE UNLOCKED! +${fh.rewardCoins} 🪙 claimed!`)
+              : (isFr ? '❌ Mauvaise ville ! Le coffre flash était ailleurs.' : '❌ Wrong city! The flash chest was hidden elsewhere.')
+            }
+          </div>
+        ` : (fh.active && fh.status === 'open' && rem > 0 ? `
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <select id="fhGuessCitySel" class="remo-input" style="flex:1;min-width:180px;">${cityOptionsHtml}</select>
+            <button type="button" class="btn-cyber btn-gold" onclick="claimCitizenFlashHunt()">
+              ⚡ ${isFr ? 'Ouvrir le Coffre Flash' : 'Unlock Flash Chest'} (+${Number(fh.rewardCoins || 300)} 🪙)
+            </button>
+          </div>
+        ` : '')}
+      </div>
+    `;
+  }
+
+  stage.innerHTML = `
+    <div class="glass-box" style="margin-bottom:16px;background:linear-gradient(135deg,rgba(15,23,42,0.96),rgba(49,16,68,0.75));border-color:rgba(251,191,36,0.5);">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
+        <div>
+          <h1 style="font-family:'Orbitron',sans-serif;font-size:1.25rem;color:#fde047;margin:0;" data-i18n="contests_hub_title">${escapeHtmlStr(t('contests_hub_title'))}</h1>
+          <p style="font-size:0.82rem;color:#cbd5e1;margin-top:4px;" data-i18n="contests_hub_sub">${escapeHtmlStr(t('contests_hub_sub'))}</p>
+        </div>
+        ${isAdm ? `
+          <a href="admin.html" class="btn-cyber btn-gold" style="text-decoration:none;">
+            👑 ${isFr ? 'Gérer les 6 Concours (Bureau Admin)' : 'Manage All 6 Contests (Admin Office)'}
+          </a>
+        ` : ''}
+      </div>
+    </div>
+
+    ${!anyActive && !isAdm ? `
+      <div class="glass-box" style="text-align:center;padding:38px 20px;color:#cbd5e1;font-size:0.9rem;">
+        <div style="font-size:2.4rem;margin-bottom:8px;">🎤🏆⚽</div>
+        <div style="font-weight:800;">${escapeHtmlStr(t('contests_none_active'))}</div>
+      </div>
+    ` : ''}
+
+    ${euroHtml}
+    ${pgpHtml}
+    ${wcHtml}
+    ${mdHtml}
+    ${grHtml}
+    ${fhHtml}
+  `;
+}
+window.renderViralContestsView = renderViralContestsView;
+
+function handleEurovisionAudioUpload(ev) {
+  const file = ev.target.files && ev.target.files[0];
+  if (!file) return;
+  const statusEl = document.getElementById('euroAudioUploadStatus');
+  const lang = REMO_I18N.getLang();
+  if (file.size > 12 * 1024 * 1024) {
+    remoToast(lang === 'fr' ? '⚠️ Fichier trop volumineux (Max 12 MB / 60s).' : '⚠️ Audio file too large (Max 12 MB / 60s).');
+    return;
+  }
+  const rd = new FileReader();
+  rd.onload = async (e) => {
+    const dataUrl = e.target.result;
+    if (window.RemoMediaDB && typeof window.RemoMediaDB.saveDataUrl === 'function') {
+      _pendingEuroAudioDataUrl = await window.RemoMediaDB.saveDataUrl(dataUrl);
+    } else {
+      _pendingEuroAudioDataUrl = dataUrl;
+    }
+    if (statusEl) {
+      statusEl.textContent = lang === 'fr'
+        ? `✓ Audio 60s prêt : ${file.name}`
+        : `✓ 60s Audio ready: ${file.name}`;
+    }
+  };
+  rd.readAsDataURL(file);
+}
+window.handleEurovisionAudioUpload = handleEurovisionAudioUpload;
+
+function submitCitizenEurovisionSong() {
+  const lang = REMO_I18N.getLang();
+  const isFr = lang === 'fr';
+  const u = REMO_STORE.getCurrentUser();
+  if (!u || u.role === 'guest') {
+    openAuthModal();
+    return;
+  }
+  const cityId = document.getElementById('euroSubCitySel')?.value || u.homeCity || 'montreal';
+  const songTitle = (document.getElementById('euroSubTitleInp')?.value || '').trim();
+  const artistName = (document.getElementById('euroSubArtistInp')?.value || u.name || 'Creator').trim();
+  const externalLink = (document.getElementById('euroSubLinkInp')?.value || '').trim();
+  const soundPreset = document.getElementById('euroSubPresetSel')?.value || 'shibuya_neon';
+
+  if (!songTitle) {
+    remoToast(isFr ? '⚠️ Entrez le titre de votre chanson !' : '⚠️ Please enter a song title!');
+    return;
+  }
+
+  const res = REMO_STORE.submitEurovisionEntry({
+    cityId,
+    songTitle,
+    artistName,
+    audioUrl: _pendingEuroAudioDataUrl,
+    externalLink,
+    soundPreset
+  });
+
+  if (!res.ok) {
+    if (res.error === 'already_submitted') {
+      remoToast(isFr ? '⚠️ Vous avez déjà inscrit une chanson pour cette édition !' : '⚠️ You already submitted a song for this edition!');
+    } else {
+      remoToast(isFr ? '⚠️ Inscriptions fermées.' : '⚠️ Submissions are closed.');
+    }
+    return;
+  }
+
+  _pendingEuroAudioDataUrl = '';
+  spawnRemoCoinsFX(10);
+  remoToast(isFr ? `🎤 "${songTitle}" inscrit à l’Eurovision REMO (+25 🪙) !` : `🎤 "${songTitle}" entered in Eurovision REMO (+25 🪙)!`, 'fanfare');
+  renderViralContestsView();
+}
+window.submitCitizenEurovisionSong = submitCitizenEurovisionSong;
+
+function castCitizenEurovisionVote(entryId) {
+  const lang = REMO_I18N.getLang();
+  const isFr = lang === 'fr';
+  const u = REMO_STORE.getCurrentUser();
+  if (!u || u.role === 'guest') {
+    openAuthModal();
+    return;
+  }
+  const res = REMO_STORE.voteEurovisionEntry(entryId);
+  if (!res.ok) {
+    if (res.error === 'self_city_blocked') {
+      remoToast(t('euro_no_self_city_err'));
+    } else if (res.error === 'already_voted') {
+      remoToast(isFr ? '⚠️ Vous avez déjà attribué vos 12 Points !' : '⚠️ You already cast your 12 Points!');
+    } else {
+      remoToast(isFr ? '⚠️ Vote terminé.' : '⚠️ Voting has ended.');
+    }
+    return;
+  }
+  spawnRemoCoinsFX(12);
+  const c = getCityById(res.entry.cityId);
+  remoToast(
+    isFr
+      ? `🏆 DOUZE POINTS (12 PTS) pour ${c.flag} ${getCityName(c, 'fr')} ! (+15 🪙)`
+      : `🏆 DOUZE POINTS (12 PTS) to ${c.flag} ${getCityName(c, 'en')}! (+15 🪙)`,
+    'fanfare'
+  );
+  syncHeaderAndSidebars();
+  renderViralContestsView();
+}
+window.castCitizenEurovisionVote = castCitizenEurovisionVote;
+
+function handlePgpMediaUpload(ev) {
+  const file = ev.target.files && ev.target.files[0];
+  if (!file) return;
+  const lang = REMO_I18N.getLang();
+  _pendingPgpMediaType = file.type.startsWith('video') ? 'video' : 'image';
+  const rd = new FileReader();
+  rd.onload = (e) => {
+    _pendingPgpMediaDataUrl = e.target.result;
+    const st = document.getElementById('pgpUploadStatus');
+    if (st) st.textContent = `✓ ${file.name}`;
+  };
+  rd.readAsDataURL(file);
+}
+window.handlePgpMediaUpload = handlePgpMediaUpload;
+
+function submitCitizenPgpEntry() {
+  const isFr = REMO_I18N.getLang() === 'fr';
+  const u = REMO_STORE.getCurrentUser();
+  if (!u || u.role === 'guest') { openAuthModal(); return; }
+  const cityId = document.getElementById('pgpSubCitySel')?.value || u.homeCity || 'montreal';
+  const title = (document.getElementById('pgpSubTitleInp')?.value || '').trim();
+  if (!title) {
+    remoToast(isFr ? '⚠️ Ajoutez un titre !' : '⚠️ Please enter a title!');
+    return;
+  }
+  const res = REMO_STORE.submitPhotoGrandPrixEntry({
+    cityId,
+    title,
+    mediaUrl: _pendingPgpMediaDataUrl,
+    mediaType: _pendingPgpMediaType
+  });
+  if (!res.ok) {
+    remoToast(isFr ? '⚠️ Vous avez déjà soumis une participation !' : '⚠️ You already submitted an entry!');
+    return;
+  }
+  _pendingPgpMediaDataUrl = '';
+  spawnRemoCoinsFX(8);
+  remoToast(isFr ? '📸 Participation inscrite au Grand Prix (+20 🪙) !' : '📸 Entry submitted to Grand Prix (+20 🪙)!', 'fanfare');
+  syncHeaderAndSidebars();
+  renderViralContestsView();
+}
+window.submitCitizenPgpEntry = submitCitizenPgpEntry;
+
+function voteCitizenPgpEntry(entryId) {
+  const isFr = REMO_I18N.getLang() === 'fr';
+  const u = REMO_STORE.getCurrentUser();
+  if (!u || u.role === 'guest') { openAuthModal(); return; }
+  const res = REMO_STORE.votePhotoGrandPrixEntry(entryId);
+  if (!res.ok) {
+    remoToast(isFr ? '⚠️ 1 seul vote par citoyen !' : '⚠️ Only 1 vote per citizen!');
+    return;
+  }
+  spawnRemoCoinsFX(6);
+  remoToast(isFr ? '🔥 Vote enregistré (+10 🪙) !' : '🔥 Vote recorded (+10 🪙)!', 'coin');
+  syncHeaderAndSidebars();
+  renderViralContestsView();
+}
+window.voteCitizenPgpEntry = voteCitizenPgpEntry;
+
+function voteCitizenWorldCupMatch(matchId, side) {
+  const isFr = REMO_I18N.getLang() === 'fr';
+  const u = REMO_STORE.getCurrentUser();
+  if (!u || u.role === 'guest') { openAuthModal(); return; }
+  const res = REMO_STORE.voteWorldCupMatch(matchId, side);
+  if (!res.ok) {
+    remoToast(isFr ? '⚠️ Vous avez déjà voté pour ce match !' : '⚠️ You already voted in this match!');
+    return;
+  }
+  spawnRemoCoinsFX(6);
+  remoToast(isFr ? '⚽ Vote Coupe du Monde enregistré (+10 🪙) !' : '⚽ World Cup vote recorded (+10 🪙)!', 'coin');
+  syncHeaderAndSidebars();
+  renderViralContestsView();
+}
+window.voteCitizenWorldCupMatch = voteCitizenWorldCupMatch;
+
+function submitCitizenMysteryDetective() {
+  const isFr = REMO_I18N.getLang() === 'fr';
+  const u = REMO_STORE.getCurrentUser();
+  if (!u || u.role === 'guest') { openAuthModal(); return; }
+  const cityId = document.getElementById('mdGuessCitySel')?.value || 'paris';
+  const res = REMO_STORE.submitMysteryDetectiveGuess(cityId);
+  if (!res.ok) {
+    remoToast(isFr ? '⚠️ Essai déjà utilisé ou enquête terminée !' : '⚠️ Attempt already used or detective quiz ended!');
+    return;
+  }
+  if (res.correct) {
+    spawnRemoCoinsFX(14);
+    remoToast(isFr ? `🎉 BINGO ! Vous gagnez +${res.reward} 🪙 !` : `🎉 BINGO! You won +${res.reward} 🪙!`, 'fanfare');
+  } else {
+    remoToast(isFr ? '❌ Mauvaise réponse ! Vous n’aviez qu’un seul essai.' : '❌ Wrong city! Only 1 attempt allowed.');
+  }
+  syncHeaderAndSidebars();
+  renderViralContestsView();
+}
+window.submitCitizenMysteryDetective = submitCitizenMysteryDetective;
+
+function claimCitizenGoldenTicket() {
+  const isFr = REMO_I18N.getLang() === 'fr';
+  const u = REMO_STORE.getCurrentUser();
+  if (!u || u.role === 'guest') { openAuthModal(); return; }
+  const res = REMO_STORE.claimGoldenRaffleTicket();
+  if (!res.ok) {
+    remoToast(isFr ? '⚠️ Vous avez déjà votre Ticket d’Or !' : '⚠️ You already claimed your Golden Ticket!');
+    return;
+  }
+  spawnRemoCoinsFX(8);
+  remoToast(isFr ? `🎟️ Ticket #${res.ticket.code} activé (+10 🪙) !` : `🎟️ Ticket #${res.ticket.code} claimed (+10 🪙)!`, 'fanfare');
+  syncHeaderAndSidebars();
+  renderViralContestsView();
+}
+window.claimCitizenGoldenTicket = claimCitizenGoldenTicket;
+
+function claimCitizenFlashHunt() {
+  const isFr = REMO_I18N.getLang() === 'fr';
+  const u = REMO_STORE.getCurrentUser();
+  if (!u || u.role === 'guest') { openAuthModal(); return; }
+  const cityId = document.getElementById('fhGuessCitySel')?.value || 'montreal';
+  const res = REMO_STORE.claimFlashHuntTreasure(cityId);
+  if (!res.ok) {
+    remoToast(isFr ? '⚠️ Déjà tenté ou coffres épuisés !' : '⚠️ Already tried or all chests claimed!');
+    return;
+  }
+  if (res.correct) {
+    spawnRemoCoinsFX(12);
+    remoToast(isFr ? `⚡ COFFRE FLASH TROUVÉ ! +${res.reward} 🪙 !` : `⚡ FLASH CHEST FOUND! +${res.reward} 🪙!`, 'fanfare');
+  } else {
+    remoToast(isFr ? '❌ Ce n’était pas la bonne ville cible !' : '❌ That was not the secret target city!');
+  }
+  syncHeaderAndSidebars();
+  renderViralContestsView();
+}
+window.claimCitizenFlashHunt = claimCitizenFlashHunt;
