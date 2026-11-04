@@ -847,7 +847,13 @@ const REMO_DICT = {
     ws_pixel_badge: '🎨 REMO WORLD PIXEL-ART FRESCO™',
     ws_vault_badge: '⏳ CITY MONUMENT TIME-VAULT™',
     ws_vault_deposit_btn: '⏳ Seal My Future Capsule (+25 🪙)',
-    ws_bourse_badge: '📈 CREATOR SHARES & FAN DIVIDENDS EXCHANGE™'
+    ws_bourse_badge: '📈 CREATOR SHARES & FAN DIVIDENDS EXCHANGE™',
+
+    // 📸 v72: Header Story Button & 24h City Stories Hub (EN)
+    hdr_story_btn: '📸 Story',
+    nav_story_btn: '24h City Stories',
+    story_modal_title: '📸 REMO 24h City Stories',
+    story_add_new_btn: '📸 + Add My 24h Story (+10 🪙)'
   },
 
   fr: {
@@ -1693,7 +1699,13 @@ const REMO_DICT = {
     ws_pixel_badge: '🎨 FRESQUE PIXEL-ART MONDIALE REMO™',
     ws_vault_badge: '⏳ MONUMENT CAPSULE TEMPORELLE DES VILLES™',
     ws_vault_deposit_btn: '⏳ Sceller Ma Capsule du Futur (+25 🪙)',
-    ws_bourse_badge: '📈 BOURSE DES CRÉATEURS & DIVIDENDES FANS™'
+    ws_bourse_badge: '📈 BOURSE DES CRÉATEURS & DIVIDENDES FANS™',
+
+    // 📸 v72: Bouton Story En-Tête & Hub Stories 24h (FR)
+    hdr_story_btn: '📸 Story',
+    nav_story_btn: 'Stories Villes 24h',
+    story_modal_title: '📸 Stories Villes 24h REMO',
+    story_add_new_btn: '📸 + Ajouter ma Story 24h (+10 🪙)'
   }
 };
 

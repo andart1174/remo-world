@@ -846,32 +846,11 @@ function renderStoriesAndBanners() {
   const lang = REMO_I18N.getLang();
   const bar = document.getElementById('storiesBarEl');
   if (bar) {
-    const stories = REMO_STORE.state.stories || [];
-    bar.innerHTML = `
-      <div class="story-pill" onclick="openStoryUploadPrompt()">
-        <div class="story-ring" style="background:rgba(99,102,241,0.4);">
-          <div class="story-ring-inner">+</div>
-        </div>
-        <div class="story-lbl">${t('stories_add')}</div>
-      </div>
-      <div class="story-pill" onclick="openLiveStreamModal()">
-        <div class="story-ring" style="background:linear-gradient(135deg,#f43f5e,#f59e0b);">
-          <div class="story-ring-inner">🔴</div>
-        </div>
-        <div class="story-lbl">${t('stories_live')}</div>
-      </div>
-      ${stories.map((s) => {
-        const c = getCityById(s.cityId);
-        return `
-          <div class="story-pill" onclick="openStoryViewer('${s.id}')">
-            <div class="story-ring">
-              <div class="story-ring-inner">${c.flag}</div>
-            </div>
-            <div class="story-lbl">${s.author}</div>
-          </div>
-        `;
-      }).join('')}
-    `;
+    bar.style.display = 'none';
+    bar.innerHTML = '';
+  }
+  if (typeof updateHeaderStoryBadge === 'function') {
+    updateHeaderStoryBadge();
   }
 
   // Daily Pulse Banner + 1-Click Live World Window
@@ -3100,51 +3079,261 @@ async function record1ClickCityVideoReel() {
   requestAnimationFrame(drawFrame);
 }
 
-/* ── Stories Upload & Viewer ── */
-function openStoryUploadPrompt() {
+/* ── Stories Hub, Real Photo Upload & Interactive Viewer (Header Button next to Radio) ── */
+let _pendingStoryPhotoDataUrl = '';
+let _activeStoryViewerId = '';
+
+function updateHeaderStoryBadge() {
+  const badge = document.getElementById('hdrStoryCountBadge');
+  if (!badge || !REMO_STORE || !REMO_STORE.state) return;
+  const stories = Array.isArray(REMO_STORE.state.stories) ? REMO_STORE.state.stories : [];
+  badge.textContent = String(stories.length);
+  badge.style.display = stories.length > 0 ? 'inline-flex' : 'none';
+}
+window.updateHeaderStoryBadge = updateHeaderStoryBadge;
+
+function openStoriesHubModal(initialStoryId = '') {
+  const modal = document.getElementById('storyViewerModal');
+  if (!modal) return;
   const lang = REMO_I18N.getLang();
-  const txt = prompt(lang === 'fr' ? 'Texte de votre Story 24h :' : 'Caption for your 24h City Story:');
-  if (!txt) return;
-  const u = REMO_STORE.getCurrentUser() || REMO_STORE.ensureGuestOrCitizen('Creator', '', 'montreal');
-  REMO_STORE.state.stories.unshift({
+  const u = REMO_STORE.getCurrentUser();
+  const citySel = document.getElementById('storyCreateCitySel');
+  if (citySel) {
+    citySel.innerHTML = getRemoCities().map((c) =>
+      `<option value="${c.id}" ${u && u.homeCity === c.id ? 'selected' : ''}>${c.flag} ${escapeHtmlStr(getCityName(c, lang))}</option>`
+    ).join('');
+  }
+  const stories = Array.isArray(REMO_STORE.state.stories) ? REMO_STORE.state.stories : [];
+  const targetId = initialStoryId || (stories[0] && stories[0].id) || '';
+  renderStoriesModalStripAndStage(targetId);
+  modal.classList.add('open');
+}
+window.openStoriesHubModal = openStoriesHubModal;
+
+function toggleStoryCreateDrawer(forceOpen) {
+  const drawer = document.getElementById('storyCreateDrawerBox');
+  if (!drawer) return;
+  const isOpen = forceOpen !== undefined ? forceOpen : drawer.style.display === 'none';
+  drawer.style.display = isOpen ? 'block' : 'none';
+}
+window.toggleStoryCreateDrawer = toggleStoryCreateDrawer;
+
+function openStoryUploadPrompt() {
+  openStoriesHubModal();
+  toggleStoryCreateDrawer(true);
+}
+window.openStoryUploadPrompt = openStoryUploadPrompt;
+
+function handleStoryPhotoUpload(ev) {
+  const file = ev.target.files && ev.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const img = new Image();
+    img.onload = () => {
+      const cv = document.createElement('canvas');
+      const maxDim = 720;
+      let w = img.width;
+      let h = img.height;
+      if (w > maxDim || h > maxDim) {
+        if (w > h) { h = Math.round((h * maxDim) / w); w = maxDim; }
+        else { w = Math.round((w * maxDim) / h); h = maxDim; }
+      }
+      cv.width = w;
+      cv.height = h;
+      cv.getContext('2d').drawImage(img, 0, 0, w, h);
+      _pendingStoryPhotoDataUrl = cv.toDataURL('image/jpeg', 0.78);
+      const prev = document.getElementById('storyPhotoPreviewBox');
+      if (prev) {
+        prev.style.display = 'block';
+        prev.innerHTML = `<img src="${_pendingStoryPhotoDataUrl}" style="width:100%;max-height:165px;object-fit:cover;display:block;">`;
+      }
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+window.handleStoryPhotoUpload = handleStoryPhotoUpload;
+
+function publishCitizen24hStory() {
+  const lang = REMO_I18N.getLang();
+  const isFr = lang === 'fr';
+  const u = REMO_STORE.getCurrentUser();
+  if (!u || u.role === 'guest') {
+    document.getElementById('storyViewerModal')?.classList.remove('open');
+    openAuthModal();
+    return;
+  }
+  const cityId = document.getElementById('storyCreateCitySel')?.value || u.homeCity || 'montreal';
+  const capInp = document.getElementById('storyCreateCaptionInp');
+  const txt = (capInp?.value || '').trim();
+  if (!txt && !_pendingStoryPhotoDataUrl) {
+    remoToast(isFr ? '⚠️ Ajoutez une photo ou un texte pour votre Story !' : '⚠️ Add a photo or caption for your Story!');
+    return;
+  }
+  const finalTxt = txt || (isFr ? 'En direct de ma ville ! ✨' : 'Live from my city! ✨');
+  const newStory = {
     id: 'st_' + Date.now(),
+    uid: u.uid,
     author: u.name,
-    cityId: u.homeCity || 'montreal',
-    caption_en: txt,
-    caption_fr: txt,
+    cityId,
+    caption_en: finalTxt,
+    caption_fr: finalTxt,
+    mediaUrl: _pendingStoryPhotoDataUrl || '',
+    reactions: { '❤️': 1, '🔥': 1, '👑': 0 },
     createdAt: Date.now()
-  });
+  };
+  REMO_STORE.state.stories = Array.isArray(REMO_STORE.state.stories) ? REMO_STORE.state.stories : [];
+  REMO_STORE.state.stories.unshift(newStory);
+  _pendingStoryPhotoDataUrl = '';
+  if (capInp) capInp.value = '';
+  const prev = document.getElementById('storyPhotoPreviewBox');
+  if (prev) { prev.style.display = 'none'; prev.innerHTML = ''; }
+  toggleStoryCreateDrawer(false);
+
   REMO_STORE.addCoins(u.uid, 10, 10);
   REMO_STORE.save(true, 'story');
-  renderStoriesAndBanners();
-  remoToast(lang === 'fr' ? '📖 Story 24h publiée (+10 🪙) !' : '📖 24h Story published (+10 🪙)!', 'coin');
+  REMO_STORE.syncToFirestore('story_added', true);
+  syncHeaderAndSidebars();
+  updateHeaderStoryBadge();
+  renderStoriesModalStripAndStage(newStory.id);
+  spawnRemoCoinsFX(8);
+  remoToast(isFr ? '📸 Story 24h publiée (+10 🪙) !' : '📸 24h Story published (+10 🪙)!', 'fanfare');
 }
+window.publishCitizen24hStory = publishCitizen24hStory;
 
-function openStoryViewer(storyId) {
-  const s = (REMO_STORE.state.stories || []).find((x) => x.id === storyId);
-  if (!s) return;
-  const lang = REMO_I18N.getLang();
-  const c = getCityById(s.cityId);
+function renderStoriesModalStripAndStage(storyId = '') {
+  const strip = document.getElementById('storyModalAvatarsStrip');
   const box = document.getElementById('storyViewerBody');
-  if (box) {
-    const art = generateCityPostVisualDataUrl(c.id, s.author, lang === 'fr' ? s.caption_fr : s.caption_en);
-    box.innerHTML = `
-      <img src="${art}" style="width:100%;border-radius:16px;max-height:65dvh;object-fit:cover;">
-      <div style="margin-top:10px;font-weight:800;text-align:center;">${c.flag} @${s.author} — ${lang === 'fr' ? s.caption_fr : s.caption_en}</div>
-      ${REMO_STORE.isAdminUnlocked() ? `<div style="text-align:center;margin-top:10px;"><button class="adm-pbtn danger" onclick="adminDeleteStoryInline('${s.id}')">🗑️ Delete Story (Admin)</button></div>` : ''}
+  const lang = REMO_I18N.getLang();
+  const isFr = lang === 'fr';
+  const stories = Array.isArray(REMO_STORE.state.stories) ? REMO_STORE.state.stories : [];
+  const activeStory = stories.find((x) => x && x.id === storyId) || stories[0] || null;
+  _activeStoryViewerId = activeStory ? activeStory.id : '';
+
+  if (strip) {
+    strip.innerHTML = `
+      <div class="story-pill" onclick="toggleStoryCreateDrawer()" style="flex-shrink:0;cursor:pointer;">
+        <div class="story-ring" style="background:linear-gradient(135deg,#ec4899,#6366f1);">
+          <div class="story-ring-inner">+</div>
+        </div>
+        <div class="story-lbl" style="color:#fbcfe8;font-weight:900;">${escapeHtmlStr(t('stories_add'))}</div>
+      </div>
+      ${stories.map((s) => {
+        const c = getCityById(s.cityId);
+        const isSel = activeStory && activeStory.id === s.id;
+        return `
+          <div class="story-pill" onclick="renderStoriesModalStripAndStage('${s.id}')" style="flex-shrink:0;cursor:pointer;transform:${isSel ? 'scale(1.06)' : 'none'};">
+            <div class="story-ring" style="background:${isSel ? 'linear-gradient(135deg,#fbbf24,#ec4899)' : 'rgba(255,255,255,0.22)'};box-shadow:${isSel ? '0 0 12px rgba(251,191,36,0.6)' : 'none'};">
+              <div class="story-ring-inner">${c.flag}</div>
+            </div>
+            <div class="story-lbl" style="color:${isSel ? '#fde047' : '#cbd5e1'};font-weight:${isSel ? '900' : '700'};">${escapeHtmlStr(s.author)}</div>
+          </div>
+        `;
+      }).join('')}
     `;
   }
-  document.getElementById('storyViewerModal')?.classList.add('open');
+
+  if (!box) return;
+  if (!activeStory) {
+    box.innerHTML = `
+      <div style="text-align:center;padding:28px;color:var(--muted);">
+        📸 ${isFr ? 'Aucune Story active. Cliquez sur + pour publier la première Story (+10 🪙) !' : 'No active Story yet. Click + to publish the first 24h Story (+10 🪙)!'}
+      </div>
+    `;
+    return;
+  }
+
+  const c = getCityById(activeStory.cityId);
+  const idx = stories.findIndex((x) => x && x.id === activeStory.id);
+  const capTxt = isFr ? (activeStory.caption_fr || activeStory.caption_en) : (activeStory.caption_en || activeStory.caption_fr);
+  const imgSrc = activeStory.mediaUrl || generateCityPostVisualDataUrl(c.id, activeStory.author, capTxt);
+  const rx = activeStory.reactions || { '❤️': 1, '🔥': 1, '👑': 0 };
+  const isAdm = REMO_STORE.isAdminUnlocked() || REMO_STORE.isCurrentUserAdmin();
+
+  box.innerHTML = `
+    <div style="position:relative;border-radius:16px;overflow:hidden;background:#050816;border:1px solid rgba(255,255,255,0.12);">
+      <!-- Story Progress Indicators -->
+      <div style="display:flex;gap:4px;padding:8px 10px;background:rgba(0,0,0,0.65);">
+        ${stories.map((st, i) => `
+          <div style="flex:1;height:3px;border-radius:99px;background:${i <= idx ? '#fbbf24' : 'rgba(255,255,255,0.2)'};"></div>
+        `).join('')}
+      </div>
+
+      <!-- Story Header -->
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:rgba(15,23,42,0.88);">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="font-size:1.3rem;">${c.flag}</span>
+          <div>
+            <div style="font-weight:900;font-size:0.88rem;color:#fff;">@${escapeHtmlStr(activeStory.author)}</div>
+            <div style="font-size:0.72rem;color:#7dd3fc;">${escapeHtmlStr(getCityName(c, lang))} · ${idx + 1}/${stories.length}</div>
+          </div>
+        </div>
+        ${isAdm ? `
+          <button type="button" class="adm-pbtn danger" onclick="adminDeleteStoryInline('${activeStory.id}')">🗑️ Delete</button>
+        ` : ''}
+      </div>
+
+      <!-- Story Image + Prev/Next Controls -->
+      <div style="position:relative;">
+        <img src="${imgSrc}" alt="${escapeHtmlStr(capTxt)}" style="width:100%;max-height:52dvh;object-fit:cover;display:block;">
+        ${stories.length > 1 ? `
+          <button type="button" onclick="stepStoryViewer(-1)" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);width:36px;height:36px;border-radius:50%;border:1px solid rgba(255,255,255,0.35);background:rgba(0,0,0,0.65);color:#fff;font-size:1.1rem;cursor:pointer;">‹</button>
+          <button type="button" onclick="stepStoryViewer(1)" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);width:36px;height:36px;border-radius:50%;border:1px solid rgba(255,255,255,0.35);background:rgba(0,0,0,0.65);color:#fff;font-size:1.1rem;cursor:pointer;">›</button>
+        ` : ''}
+      </div>
+
+      <!-- Story Caption & Quick Reactions -->
+      <div style="padding:12px;background:rgba(15,23,42,0.95);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+        <div style="font-weight:800;font-size:0.88rem;color:#fde047;flex:1;">"${escapeHtmlStr(capTxt)}"</div>
+        <div style="display:flex;gap:6px;">
+          ${['❤️', '🔥', '👑'].map((em) => `
+            <button type="button" class="btn-ghost" style="padding:4px 10px;font-size:0.78rem;" onclick="reactToStory('${activeStory.id}','${em}')">
+              ${em} ${Number(rx[em] || 0)}
+            </button>
+          `).join('')}
+        </div>
+      </div>
+    </div>
+  `;
 }
+window.renderStoriesModalStripAndStage = renderStoriesModalStripAndStage;
+
+function openStoryViewer(storyId) {
+  openStoriesHubModal(storyId);
+}
+window.openStoryViewer = openStoryViewer;
+
+function stepStoryViewer(delta) {
+  const stories = Array.isArray(REMO_STORE.state.stories) ? REMO_STORE.state.stories : [];
+  if (!stories.length) return;
+  const curIdx = Math.max(0, stories.findIndex((x) => x && x.id === _activeStoryViewerId));
+  const nextIdx = (curIdx + delta + stories.length) % stories.length;
+  renderStoriesModalStripAndStage(stories[nextIdx].id);
+}
+window.stepStoryViewer = stepStoryViewer;
+
+function reactToStory(storyId, emoji) {
+  const s = (REMO_STORE.state.stories || []).find((x) => x && x.id === storyId);
+  if (!s) return;
+  s.reactions = s.reactions || { '❤️': 1, '🔥': 1, '👑': 0 };
+  s.reactions[emoji] = Number(s.reactions[emoji] || 0) + 1;
+  RemoAudio.play('click');
+  REMO_STORE.save(true, 'story_react');
+  renderStoriesModalStripAndStage(storyId);
+}
+window.reactToStory = reactToStory;
 
 function adminDeleteStoryInline(storyId) {
-  if (!REMO_STORE.isAdminUnlocked()) return;
+  if (!REMO_STORE.isAdminUnlocked() && !REMO_STORE.isCurrentUserAdmin()) return;
   REMO_STORE.state.stories = (REMO_STORE.state.stories || []).filter((x) => x.id !== storyId);
   REMO_STORE.save(true, 'story_del');
-  document.getElementById('storyViewerModal')?.classList.remove('open');
-  renderStoriesAndBanners();
+  REMO_STORE.syncToFirestore('story_deleted', true);
+  updateHeaderStoryBadge();
+  renderStoriesModalStripAndStage();
   remoToast('🗑️ Story deleted!');
 }
+window.adminDeleteStoryInline = adminDeleteStoryInline;
 
 /* ── 5. CITY LIVE CHAT ROOMS (#7 WALKIE-TALKIE), #5 1-ON-1 PRIVATE MESSENGER & WEBRTC CALLS ── */
 function renderCityChatView() {

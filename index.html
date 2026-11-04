@@ -151,6 +151,10 @@
       <span class="happy-hour-pill" id="hdrHappyHourBadge" style="display:none;" data-i18n="happy_hour_badge">⚡ 2X REWARDS HAPPY HOUR</span>
 
       <button class="btn-ghost" id="btnRadioToggle" onclick="toggleHeaderRadio()">📻 Radio</button>
+      <button class="btn-ghost" id="btnHeaderStoryToggle" onclick="openStoriesHubModal()" title="24h City Stories" style="position:relative;display:inline-flex;align-items:center;gap:5px;border-color:rgba(236,72,153,0.45);">
+        <span data-i18n="hdr_story_btn">📸 Story</span>
+        <span id="hdrStoryCountBadge" style="background:linear-gradient(135deg,#ec4899,#f59e0b);color:#fff;font-size:0.65rem;font-weight:900;border-radius:99px;padding:1px 6px;line-height:1.2;">4</span>
+      </button>
       <button class="btn-ghost" id="btnWishingWellToggle" onclick="openWishingWellModal()" title="Wishing Well" data-i18n="hdr_wishing_well">⛲ Fontaine</button>
 
       <!-- 🔔 Notifications Bell Hub -->
@@ -217,6 +221,9 @@
           </button>
           <button class="nav-btn" onclick="openRemoRadioModal()" style="border-color:rgba(16,185,129,0.28);">
             <span class="nav-ic">📻</span> <span data-i18n="radio_nav_btn">World Radio &amp; Jukebox</span>
+          </button>
+          <button class="nav-btn" onclick="openStoriesHubModal()" style="border-color:rgba(236,72,153,0.32);">
+            <span class="nav-ic">📸</span> <span data-i18n="nav_story_btn">24h City Stories</span>
           </button>
           <button class="nav-btn" onclick="openWishingWellModal()">
             <span class="nav-ic">⛲</span> <span data-i18n="nav_wishing_well">Puits aux Souhaits 🪙</span>
@@ -306,7 +313,7 @@
           <div id="gameChallengeHeroBar" class="game-challenge-hero-bar" style="display:none;"></div>
           <div class="flash-banner" id="flashDropBannerEl" style="display:none;"></div>
           <div id="feedActiveContestsBanner" style="display:none;margin-bottom:10px;"></div>
-          <div class="glass-box stories-bar" id="storiesBarEl"></div>
+          <div class="glass-box stories-bar" id="storiesBarEl" style="display:none;"></div>
 
           <!-- Clean Feed 1-Line Collapsible City Pulse Bar (Keeps Posts Immediately Visible!) -->
           <button type="button" class="clean-feed-pulse-toggle" id="cleanFeedPulseToggle" onclick="toggleCleanFeedPulseDrawer()">
@@ -1653,13 +1660,31 @@
     </div>
   </div>
 
-  <!-- 📖 Story Viewer Modal -->
+  <!-- 📸 24h City Stories Hub & Creator Modal -->
   <div class="remo-modal-backdrop" id="storyViewerModal" onclick="if(event.target===this)this.classList.remove('open')">
-    <div class="remo-modal">
+    <div class="remo-modal" style="max-width:560px;border-color:rgba(236,72,153,0.55);">
       <div class="modal-hdr">
-        <b>📖 REMO 24h Story</b>
+        <b style="font-family:'Orbitron',sans-serif;color:#f472b6;" data-i18n="story_modal_title">📸 REMO 24h City Stories</b>
         <button class="modal-close" onclick="document.getElementById('storyViewerModal').classList.remove('open')">✕</button>
       </div>
+
+      <!-- Top Horizontal Stories Strip inside Modal -->
+      <div id="storyModalAvatarsStrip" style="display:flex;align-items:center;gap:12px;overflow-x:auto;padding:6px 4px 12px;margin-bottom:10px;border-bottom:1px solid rgba(255,255,255,0.08);"></div>
+
+      <!-- Collapsible Add Real Photo/Text Story Drawer (+10 🪙) -->
+      <div id="storyCreateDrawerBox" style="display:none;padding:12px;border-radius:14px;background:rgba(15,23,42,0.92);border:1px solid rgba(236,72,153,0.45);margin-bottom:12px;">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:8px;margin-bottom:8px;">
+          <select id="storyCreateCitySel" class="remo-input"></select>
+          <input type="file" id="storyCreatePhotoInp" accept="image/*" class="remo-input" onchange="handleStoryPhotoUpload(event)">
+        </div>
+        <div id="storyPhotoPreviewBox" style="display:none;margin-bottom:8px;position:relative;max-height:170px;border-radius:10px;overflow:hidden;border:1px solid rgba(251,191,36,0.4);"></div>
+        <input type="text" id="storyCreateCaptionInp" class="remo-input" maxlength="140" style="margin-bottom:8px;" placeholder="Caption for your 24h City Story...">
+        <button type="button" class="btn-cyber btn-gold" style="width:100%;justify-content:center;" onclick="publishCitizen24hStory()">
+          🚀 <span data-i18n="story_add_new_btn">📸 + Add My 24h Story (+10 🪙)</span>
+        </button>
+      </div>
+
+      <!-- Active Story Viewer Stage (Photo/Poster + Prev/Next + Reactions + Admin Delete) -->
       <div id="storyViewerBody"></div>
     </div>
   </div>
@@ -2124,13 +2149,13 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 
   <!-- REMO Modular Engines -->
-  <script src="js/remo-i18n.js?v=71"></script>
-  <script src="js/remo-cities-data.js?v=71"></script>
-  <script src="js/remo-store.js?v=71"></script>
-  <script src="js/remo-card-engine.js?v=71"></script>
-  <script src="js/remo-radar-arena.js?v=71"></script>
-  <script src="js/remo-social-comms.js?v=71"></script>
-  <script src="js/remo-radio-engine.js?v=71"></script>
+  <script src="js/remo-i18n.js?v=72"></script>
+  <script src="js/remo-cities-data.js?v=72"></script>
+  <script src="js/remo-store.js?v=72"></script>
+  <script src="js/remo-card-engine.js?v=72"></script>
+  <script src="js/remo-radar-arena.js?v=72"></script>
+  <script src="js/remo-social-comms.js?v=72"></script>
+  <script src="js/remo-radio-engine.js?v=72"></script>
 
   <noscript>
     <nav aria-label="REMO World Static Directory" style="padding:20px;background:#050816;color:#f8fafc;">

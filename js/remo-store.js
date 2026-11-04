@@ -4129,6 +4129,10 @@ const REMO_STORE = {
           if (typeof renderViralContestsView === 'function') renderViralContestsView();
           if (typeof renderFeedActiveContestsBanner === 'function') renderFeedActiveContestsBanner();
         }
+        if (Array.isArray(data.stories) && data.stories.length > 0) {
+          this.state.stories = data.stories;
+          if (typeof updateHeaderStoryBadge === 'function') updateHeaderStoryBadge();
+        }
         if (data.worldSystems && typeof data.worldSystems === 'object') {
           this.state.worldSystems = this.state.worldSystems || getDefaultUniqueWorldSystems();
           Object.keys(data.worldSystems).forEach((k) => {
@@ -5932,6 +5936,7 @@ const REMO_STORE = {
           jukeboxTracks: (this.state.jukeboxTracks || []).slice(0, 30),
           auctions: (this.state.auctions || []).slice(0, 25),
           geoVaults: (this.state.geoVaults || []).slice(0, 35),
+          stories: (this.state.stories || []).slice(0, 15),
           viralContests: this.state.viralContests || getDefaultViralContests(),
           worldSystems: this.state.worldSystems || getDefaultUniqueWorldSystems(),
           deletedPostIds: [...(this.deletedPostIds || [])].slice(-100),
