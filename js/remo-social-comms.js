@@ -1625,7 +1625,7 @@ function renderSocialFeed(searchQuery = '') {
           <button class="tk-btn" onclick="sharePostLink('${p.id}')" title="${lang === 'fr' ? 'Partager' : 'Share'}">🔗</button>
           ${p.mediaType === 'html_app'
             ? `<button class="tk-btn" onclick="openHtmlFullscreenModal('${p.id}')" title="Fullscreen">⛶</button>`
-            : `<button class="tk-btn" onclick="mintPostAsCityCard('${p.id}')" title="Mint Card">🎴</button>
+            : `${(isPostOwner || p.mintedCard) ? `<button class="tk-btn" onclick="mintPostAsCityCard('${p.id}')" title="${p.mintedCard ? (lang === 'fr' ? 'Voir Carte 4D' : 'View 4D Card') : (lang === 'fr' ? 'Créer Carte 4D' : 'Mint 4D Card')}">🎴</button>` : ''}
                <button class="tk-btn" onclick="switchRemoView('arena')" title="Duel">⚔️</button>`}
           <div class="tk-disc" onclick="toggleHeaderRadio()">🎵</div>
           ${(isPostOwner || isAdm) ? `<button class="tk-btn" onclick="userDeleteOwnPost('${p.id}')" title="${lang === 'fr' ? 'Supprimer' : 'Delete'}" style="color:#f43f5e;">🗑️</button>` : ''}
@@ -1784,17 +1784,92 @@ function boostPost24h(postId) {
   remoToast(lang === 'fr' ? '🚀 Publication boostée en tête du flux 24h !' : '🚀 Post boosted to top of feed for 24h!', 'fanfare');
 }
 
+function getCurrentPhotoMintMonthKey() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function hasCitizenUsedMonthlyPhotoCardQuota(u) {
+  if (!u || !u.uid) return false;
+  const isAdm = REMO_STORE.isAdminUnlocked() || REMO_STORE.isCurrentUserAdmin();
+  if (isAdm) return false;
+  const monthKey = getCurrentPhotoMintMonthKey();
+  let localKey = '';
+  try {
+    localKey = localStorage.getItem('remo_photo_card_mint_month_' + u.uid) || '';
+  } catch (e) {}
+  return u.lastPhotoCardMintMonth === monthKey || localKey === monthKey;
+}
+
 function mintPostAsCityCard(postId) {
   const lang = REMO_I18N.getLang();
-  const u = REMO_STORE.getCurrentUser() || REMO_STORE.ensureGuestOrCitizen('Creator', '', 'montreal');
+  const u = REMO_STORE.getCurrentUser();
   const p = REMO_STORE.state.posts.find((x) => x.id === postId);
   if (!p) return;
+
+  // If this post was already minted into a 4D Card, open/inspect the existing card instead of duplicating!
+  if (p.mintedCard) {
+    const existing =
+      (p.mintedCardId && (REMO_STORE.state.droppedCardsPool || []).find((c) => c && c.id === p.mintedCardId)) ||
+      p.mintedCardSpec;
+    if (existing) {
+      inspectCardModal(existing);
+      return;
+    }
+    const postPhotoExisting = ['image', 'carousel', 'before_after'].includes(p.mediaType)
+      ? (p.mediaUrl || (Array.isArray(p.mediaUrls) && p.mediaUrls[0]) || '')
+      : '';
+    inspectCardModal({
+      id: p.mintedCardId || ('card_post_' + p.id),
+      cityId: p.cityId || 'montreal',
+      subtitle: `MOMENT BY ${(p.authorName || 'CITIZEN').toUpperCase()}`,
+      serial: '0001',
+      rarity: 'Legendary Gold',
+      coinValue: 9500,
+      customPhotoDataUrl: postPhotoExisting,
+      ownerUid: p.uid || p.authorUid || '',
+      ownerName: p.authorName || 'Citizen'
+    });
+    return;
+  }
+
+  if (!u) {
+    remoToast(lang === 'fr' ? '🔒 Connectez-vous pour créer votre Carte 4D !' : '🔒 Sign in to mint your 4D Card!');
+    return;
+  }
+
+  const isPostOwner = Boolean(
+    (p.uid && u.uid === p.uid) ||
+    (p.authorUid && u.uid === p.authorUid) ||
+    (u.email && p.authorEmail && u.email.toLowerCase() === p.authorEmail.toLowerCase()) ||
+    (u.name && p.authorName && u.name.trim().toLowerCase() === p.authorName.trim().toLowerCase())
+  );
+  if (!isPostOwner) {
+    remoToast(
+      lang === 'fr'
+        ? '🔒 Seul le propriétaire de cette publication peut en faire une Carte 4D !'
+        : '🔒 Only the owner of this post can mint it as a 4D Card!'
+    );
+    return;
+  }
+
+  const isAdm = REMO_STORE.isAdminUnlocked() || REMO_STORE.isCurrentUserAdmin();
+  const monthKey = getCurrentPhotoMintMonthKey();
+  if (!isAdm && hasCitizenUsedMonthlyPhotoCardQuota(u)) {
+    remoToast(
+      lang === 'fr'
+        ? '⏳ Limite atteinte : 1 Carte 4D par mois maximum à partir de vos publications (prochaine le 1er du mois) !'
+        : '⏳ Limit reached: maximum 1 4D Card per month from your own posts (next on the 1st of the month)!'
+    );
+    return;
+  }
+
   const cost = REMO_STORE.state.settings.rewards.mintPostCardCost || 100;
-  if (!REMO_STORE.addCoins(u.uid, -cost, 30)) {
+  if (!isAdm && !REMO_STORE.addCoins(u.uid, -cost, 30)) {
     remoToast(lang === 'fr' ? `Il faut ${cost} 🪙 pour convertir en Carte 4D !` : `Need ${cost} 🪙 to mint as a 4D City Card!`);
     return;
   }
-  p.mintedCard = true;
+
   const postPhoto = ['image', 'carousel', 'before_after'].includes(p.mediaType)
     ? (p.mediaUrl || (Array.isArray(p.mediaUrls) && p.mediaUrls[0]) || '')
     : '';
@@ -1802,6 +1877,32 @@ function mintPostAsCityCard(postId) {
     subtitle: `MOMENT BY ${p.authorName.toUpperCase()}`,
     customPhotoDataUrl: postPhoto
   });
+
+  p.mintedCard = true;
+  p.mintedCardId = card.id;
+  p.mintedCardSpec = {
+    id: card.id,
+    cityId: card.cityId,
+    title: card.title || '',
+    subtitle: card.subtitle || `MOMENT BY ${p.authorName.toUpperCase()}`,
+    serial: card.serial,
+    rarity: card.rarity,
+    coinValue: card.coinValue,
+    customPhotoDataUrl: postPhoto,
+    ownerUid: u.uid,
+    ownerName: u.name
+  };
+
+  if (!isAdm) {
+    u.lastPhotoCardMintMonth = monthKey;
+    try {
+      localStorage.setItem('remo_photo_card_mint_month_' + u.uid, monthKey);
+    } catch (e) {}
+    REMO_STORE.syncUserToCloud(u);
+  }
+  REMO_STORE.syncPostToCloud(p);
+  REMO_STORE.save(true, 'card_minted', card);
+
   spawnRemoCoinsFX(10);
   renderSocialFeed();
   inspectCardModal(card);
@@ -5118,13 +5219,29 @@ function openPostActionsSheet(postId) {
         </div>
       </button>
 
+      ${p.mintedCard ? `
+      <button type="button" class="action-sheet-row" onclick="closePostActionsModal(); mintPostAsCityCard('${p.id}');">
+        <span class="as-icon" style="background:rgba(251,191,36,0.18);color:#fbbf24;">🎴</span>
+        <div style="text-align:left;flex:1;">
+          <b style="color:#fef08a;">${lang === 'fr' ? 'Voir la Carte Ville 4D' : 'View 4D City Card'}</b>
+          <div style="font-size:0.72rem;color:var(--muted);">${lang === 'fr' ? 'Inspectez la Carte 4D créée par l’auteur' : 'Inspect the 4D Card minted by the author'}</div>
+        </div>
+      </button>
+      ` : isPostOwner ? `
       <button type="button" class="action-sheet-row" onclick="closePostActionsModal(); mintPostAsCityCard('${p.id}');">
         <span class="as-icon" style="background:rgba(251,191,36,0.15);color:#fbbf24;">🎴</span>
         <div style="text-align:left;flex:1;">
           <b style="color:#fef08a;">${lang === 'fr' ? 'Créer Carte Ville 4D' : 'Mint 4D City Card'}</b>
-          <div style="font-size:0.72rem;color:var(--muted);">${lang === 'fr' ? 'Transformez ce moment en carte de collection' : 'Turn this moment into a collectible 4D card'}</div>
+          <div style="font-size:0.72rem;color:var(--muted);">${
+            isAdm
+              ? (lang === 'fr' ? '👑 Fondateur : Création 4D illimitée depuis vos publications' : '👑 Founder: Unlimited 4D Card minting from your posts')
+              : hasCitizenUsedMonthlyPhotoCardQuota(u)
+                ? (lang === 'fr' ? '⏳ Limite atteinte : 1 Carte 4D / mois (Prochaine le 1er du mois)' : '⏳ Limit reached: 1 4D Card / month (Next on the 1st)')
+                : (lang === 'fr' ? '1 Carte 4D / mois (Votre publication uniquement)' : '1 4D Card / month (Your own post only)')
+          }</div>
         </div>
       </button>
+      ` : ''}
 
       <button type="button" class="action-sheet-row" onclick="closePostActionsModal(); boostPost24h('${p.id}');">
         <span class="as-icon" style="background:rgba(56,189,248,0.15);color:#38bdf8;">🚀</span>

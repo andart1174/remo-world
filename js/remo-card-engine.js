@@ -496,17 +496,39 @@ function getRarityColor(rarity) {
 /* ── 3. FRONT CARD RENDERER (750 × 1050 px @ 300 DPI) ── */
 function renderCityCardFront(canvas, spec = {}, langOverride) {
   if (!canvas) return;
-  if (spec.customPhotoDataUrl && !spec._loadedPhotoImg && !spec._loadingPhoto) {
+  if (spec.customPhotoDataUrl && !spec._loadedPhotoImg && !spec._loadingPhoto && !spec._photoFailed) {
     spec._loadingPhoto = true;
     const loadImgFromSrc = (srcUrl) => {
       if (!srcUrl) { spec._loadingPhoto = false; return; }
+      const isRemoteHttp = /^https?:\/\//i.test(String(srcUrl));
       const im = new Image();
+      if (isRemoteHttp) {
+        im.crossOrigin = 'anonymous';
+      }
       im.onload = () => {
         spec._loadedPhotoImg = im;
+        spec._photoTainted = false;
         spec._loadingPhoto = false;
         renderCityCardFront(canvas, spec, langOverride);
       };
       im.onerror = () => {
+        if (isRemoteHttp && im.crossOrigin) {
+          // Fallback without crossOrigin so photo still renders on screen even if bucket lacks CORS header
+          const imFallback = new Image();
+          imFallback.onload = () => {
+            spec._loadedPhotoImg = imFallback;
+            spec._photoTainted = true;
+            spec._loadingPhoto = false;
+            renderCityCardFront(canvas, spec, langOverride);
+          };
+          imFallback.onerror = () => {
+            spec._loadingPhoto = false;
+            spec._photoFailed = true;
+            renderCityCardFront(canvas, spec, langOverride);
+          };
+          imFallback.src = srcUrl;
+          return;
+        }
         spec._loadingPhoto = false;
         spec._photoFailed = true;
         renderCityCardFront(canvas, spec, langOverride);
@@ -1034,12 +1056,70 @@ function renderCityCardBack(canvas, spec = {}, langOverride) {
 /* ── 5. EXPORTERS: PNG, 9:16 STORY, 16:9 VS BATTLE, A4 CERTIFICATE & DUPLEX PRINT ── */
 function downloadCanvasAsPNG(canvas, filename) {
   if (!canvas) return;
-  const a = document.createElement('a');
-  a.href = canvas.toDataURL('image/png');
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  setTimeout(() => a.remove(), 150);
+  const lang = window.REMO_I18N ? window.REMO_I18N.getLang() : 'en';
+  const triggerDownload = (hrefUrl, revokeAfter = false) => {
+    const a = document.createElement('a');
+    a.href = hrefUrl;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => {
+      a.remove();
+      if (revokeAfter) {
+        try { URL.revokeObjectURL(hrefUrl); } catch (e) {}
+      }
+    }, 800);
+    if (typeof window.remoToast === 'function') {
+      window.remoToast(
+        lang === 'fr' ? `📸 Affiche téléchargée : ${filename}` : `📸 Poster downloaded: ${filename}`,
+        'fanfare'
+      );
+    }
+  };
+
+  try {
+    if (typeof canvas.toBlob === 'function') {
+      canvas.toBlob((blob) => {
+        if (blob) {
+          const url = URL.createObjectURL(blob);
+          triggerDownload(url, true);
+        } else {
+          triggerDownload(canvas.toDataURL('image/png'), false);
+        }
+      }, 'image/png');
+      return;
+    }
+    triggerDownload(canvas.toDataURL('image/png'), false);
+  } catch (err) {
+    console.warn('downloadCanvasAsPNG error:', err);
+    if (typeof window.remoToast === 'function') {
+      window.remoToast(
+        lang === 'fr' ? '⚠️ Erreur d’exportation de l’image.' : '⚠️ Image export error.',
+        'warn'
+      );
+    }
+  }
+}
+
+function getUntaintedCardCanvas(frontCanvas, spec = {}, langOverride) {
+  if (frontCanvas && !spec._photoTainted) {
+    try {
+      frontCanvas.toDataURL('image/png');
+      return frontCanvas;
+    } catch (e) {
+      // Canvas was tainted by a cross-origin image without CORS headers; render clean vector card fallback
+    }
+  }
+  const cleanCv = document.createElement('canvas');
+  const safeSpec = Object.assign({}, spec, {
+    customPhotoDataUrl: '',
+    _loadedPhotoImg: null,
+    _loadingPhoto: false,
+    _photoFailed: false,
+    _photoTainted: false
+  });
+  renderCityCardFront(cleanCv, safeSpec, langOverride);
+  return cleanCv;
 }
 
 function exportCityStory916(frontCanvas, spec = {}, langOverride) {
@@ -1047,6 +1127,7 @@ function exportCityStory916(frontCanvas, spec = {}, langOverride) {
   const city = getCityById(spec.cityId || 'montreal');
   const serial = String(spec.serial || '0001').padStart(4, '0');
   const fullSerial = `REMO-${city.code}-${serial}`;
+  const safeCardCanvas = getUntaintedCardCanvas(frontCanvas, spec, lang);
 
   const W = 1080, H = 1920;
   const cv = document.createElement('canvas');
@@ -1077,7 +1158,7 @@ function exportCityStory916(frontCanvas, spec = {}, langOverride) {
   ctx.save();
   ctx.shadowColor = city.themeColor || '#6366f1';
   ctx.shadowBlur = 55;
-  ctx.drawImage(frontCanvas, (W - cw) / 2, 235, cw, ch);
+  ctx.drawImage(safeCardCanvas, (W - cw) / 2, 235, cw, ch);
   ctx.restore();
 
   // Scannable QR CTA

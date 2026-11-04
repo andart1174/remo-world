@@ -2885,6 +2885,7 @@ const REMO_STORE = {
         visas: Array.isArray(user.visas) ? user.visas : [user.homeCity || 'montreal'],
         equippedFrame: user.equippedFrame || '',
         equippedTitleId: user.equippedTitleId || '',
+        lastPhotoCardMintMonth: user.lastPhotoCardMintMonth || '',
         banned: Boolean(user.banned),
         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
       };

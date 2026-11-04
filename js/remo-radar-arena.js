@@ -1592,6 +1592,27 @@ function inspectCardById(cardId) {
   if (c) inspectCardModal(c);
 }
 
+function isCurrentUserOwnerOfCard(cardSpec) {
+  if (!cardSpec) return false;
+  const u = REMO_STORE.getCurrentUser();
+  const isAdm = REMO_STORE.isAdminUnlocked() || REMO_STORE.isCurrentUserAdmin();
+  if (!u) return false;
+  if (cardSpec.ownerUid && u.uid === cardSpec.ownerUid) return true;
+  if (cardSpec.ownerName && u.name && u.name.trim().toLowerCase() === cardSpec.ownerName.trim().toLowerCase()) return true;
+  if (!cardSpec.ownerUid && isAdm) return true;
+  return false;
+}
+
+function isCardAlreadyInAuction(cardSpec) {
+  if (!cardSpec) return false;
+  return (REMO_STORE.state.auctions || []).some((a) => {
+    if (!a || !a.cardSpec) return false;
+    if (cardSpec.id && a.cardSpec.id && a.cardSpec.id === cardSpec.id) return true;
+    if (cardSpec.serial && a.cardSpec.serial === cardSpec.serial && a.cardSpec.cityId === cardSpec.cityId) return true;
+    return false;
+  });
+}
+
 function inspectCardModal(cardSpec) {
   activeInspectedCard = cardSpec;
   const ov = document.getElementById('cardInspectModal');
@@ -1599,6 +1620,12 @@ function inspectCardModal(cardSpec) {
   const fCv = document.getElementById('inspectFrontCv');
   const bCv = document.getElementById('inspectBackCv');
   if (!ov || !fCv || !bCv) return;
+
+  const aucBtn = document.getElementById('btnInspectCardAuction');
+  if (aucBtn) {
+    const canAuction = isCurrentUserOwnerOfCard(cardSpec);
+    aucBtn.style.display = canAuction ? '' : 'none';
+  }
 
   if (flipper) flipper.classList.remove('flipped');
   renderCityCardFront(fCv, cardSpec);
@@ -1628,13 +1655,49 @@ function showInspectedCardTradeQR() {
 function listInspectedCardInAuction() {
   if (!activeInspectedCard) return;
   const lang = REMO_I18N.getLang();
-  const startBid = Number(prompt(lang === 'fr' ? 'Prix de départ en Pièces REMO :' : 'Starting bid in REMO Coins:', '250'));
-  if (!startBid || startBid < 10) return;
   const u = REMO_STORE.getCurrentUser();
+  if (!u) {
+    remoToast(lang === 'fr' ? '🔒 Connectez-vous pour vendre vos Cartes 4D !' : '🔒 Sign in to auction your 4D Cards!');
+    return;
+  }
+  const isAdm = REMO_STORE.isAdminUnlocked() || REMO_STORE.isCurrentUserAdmin();
+  if (!isCurrentUserOwnerOfCard(activeInspectedCard)) {
+    remoToast(
+      lang === 'fr'
+        ? '🔒 Vous ne pouvez mettre aux enchères que vos propres Cartes 4D !'
+        : '🔒 You can only auction your own 4D Cards!'
+    );
+    return;
+  }
+  if (isCardAlreadyInAuction(activeInspectedCard)) {
+    remoToast(
+      lang === 'fr'
+        ? '🔨 Cette Carte 4D est déjà en vente aux enchères !'
+        : '🔨 This 4D Card is already listed in the Auction House!'
+    );
+    return;
+  }
+
+  const promptMsg = isAdm
+    ? (lang === 'fr' ? '👑 Prix de départ en Pièces REMO (Fondateur — sans limite) :' : '👑 Starting bid in REMO Coins (Founder — unlimited):')
+    : (lang === 'fr' ? 'Prix de départ en Pièces REMO (entre 50 🪙 et 5 000 🪙) :' : 'Starting bid in REMO Coins (between 50 🪙 and 5,000 🪙):');
+  const rawInput = prompt(promptMsg, '250');
+  if (rawInput === null) return;
+  const startBid = Math.round(Number(rawInput));
+  if (!Number.isFinite(startBid) || startBid < (isAdm ? 10 : 50) || (!isAdm && startBid > 5000)) {
+    remoToast(
+      lang === 'fr'
+        ? '⚠️ Prix autorisé pour les citoyens : entre 50 🪙 et 5 000 🪙 !'
+        : '⚠️ Allowed starting price for citizens: between 50 🪙 and 5,000 🪙!'
+    );
+    return;
+  }
+
   REMO_STORE.state.auctions.unshift({
     id: 'auc_' + Date.now(),
     cardSpec: activeInspectedCard,
-    sellerName: u ? u.name : 'Citizen',
+    sellerUid: u.uid,
+    sellerName: u.name || 'Citizen',
     currentBid: startBid,
     highestBidder: '—',
     endsAt: Date.now() + 24 * 3600 * 1000
