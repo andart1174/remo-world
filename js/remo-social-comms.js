@@ -1801,7 +1801,7 @@ function hasCitizenUsedMonthlyPhotoCardQuota(u) {
   return u.lastPhotoCardMintMonth === monthKey || localKey === monthKey;
 }
 
-function mintPostAsCityCard(postId) {
+async function mintPostAsCityCard(postId) {
   const lang = REMO_I18N.getLang();
   const u = REMO_STORE.getCurrentUser();
   const p = REMO_STORE.state.posts.find((x) => x.id === postId);
@@ -1870,9 +1870,14 @@ function mintPostAsCityCard(postId) {
     return;
   }
 
-  const postPhoto = ['image', 'carousel', 'before_after'].includes(p.mediaType)
+  const rawPostPhoto = ['image', 'carousel', 'before_after'].includes(p.mediaType)
     ? (p.mediaUrl || (Array.isArray(p.mediaUrls) && p.mediaUrls[0]) || '')
     : '';
+  let postPhoto = rawPostPhoto;
+  if (rawPostPhoto && typeof window.fetchRemotePhotoAsDataUrl === 'function') {
+    const cleanDataUrl = await window.fetchRemotePhotoAsDataUrl(rawPostPhoto);
+    if (cleanDataUrl) postPhoto = cleanDataUrl;
+  }
   const card = REMO_STORE.mintCardForUser(u.uid, p.cityId, 'Legendary Gold', !!p.verifiedGps, {
     subtitle: `MOMENT BY ${p.authorName.toUpperCase()}`,
     customPhotoDataUrl: postPhoto

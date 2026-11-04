@@ -494,52 +494,120 @@ function getRarityColor(rarity) {
 }
 
 /* ── 3. FRONT CARD RENDERER (750 × 1050 px @ 300 DPI) ── */
+async function fetchRemotePhotoAsDataUrl(srcUrl) {
+  if (!srcUrl) return '';
+  const s = String(srcUrl);
+  if (s.startsWith('data:') || s.startsWith('blob:')) return s;
+  if (s.startsWith('idb://') && window.RemoMediaDB) {
+    try {
+      const objUrl = await window.RemoMediaDB.getObjectUrl(s);
+      if (objUrl) return objUrl;
+    } catch (e) {}
+  }
+  if (!/^https?:\/\//i.test(s)) return s;
+
+  const blobToDataUrl = (blob) => new Promise((resolve) => {
+    const safeBlob = (!blob.type || !blob.type.startsWith('image/'))
+      ? new Blob([blob], { type: 'image/jpeg' })
+      : blob;
+    const r = new FileReader();
+    r.onloadend = () => resolve(typeof r.result === 'string' ? r.result : '');
+    r.onerror = () => resolve('');
+    r.readAsDataURL(safeBlob);
+  });
+
+  const wsrvSafeUrl = s.replace(/%2F/gi, '%252F');
+  const candidates = [
+    s + (s.includes('?') ? '&' : '?') + '_cors=' + Date.now(),
+    'https://corsproxy.io/?url=' + encodeURIComponent(s),
+    'https://corsproxy.io/?' + encodeURIComponent(s),
+    'https://api.allorigins.win/raw?url=' + encodeURIComponent(s),
+    'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(s),
+    'https://wsrv.nl/?url=' + encodeURIComponent(wsrvSafeUrl) + '&output=jpg',
+    'https://wsrv.nl/?url=' + encodeURIComponent(s) + '&output=jpg'
+  ];
+
+  const tryCandidate = async (url) => {
+    const res = await fetch(url, { mode: 'cors', cache: 'no-store' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const blob = await res.blob();
+    if (!blob || blob.size < 200) throw new Error('Empty blob');
+    const dataUrl = await blobToDataUrl(blob);
+    if (!dataUrl || !dataUrl.startsWith('data:image')) throw new Error('Invalid dataUrl');
+    const testImg = await loadImageElement(dataUrl, false);
+    if (!testImg || !testImg.naturalWidth) throw new Error('Decode failed');
+    return dataUrl;
+  };
+
+  try {
+    if (typeof Promise.any === 'function') {
+      return await Promise.any(candidates.map((u) => tryCandidate(u)));
+    }
+  } catch (e) {}
+
+  for (const url of candidates) {
+    try {
+      const dUrl = await tryCandidate(url);
+      if (dUrl) return dUrl;
+    } catch (e) {}
+  }
+  return '';
+}
+
+function loadImageElement(src, withCors = false) {
+  return new Promise((resolve) => {
+    if (!src) { resolve(null); return; }
+    const im = new Image();
+    if (withCors && /^https?:\/\//i.test(String(src))) {
+      im.crossOrigin = 'anonymous';
+    }
+    im.onload = () => resolve(im);
+    im.onerror = () => resolve(null);
+    im.src = src;
+  });
+}
+
+async function ensureSpecPhotoUntainted(spec) {
+  if (!spec || !spec.customPhotoDataUrl) return false;
+  if (spec._loadedPhotoImg && !spec._photoTainted) return true;
+
+  const safeDataUrl = await fetchRemotePhotoAsDataUrl(spec.customPhotoDataUrl);
+  if (safeDataUrl) {
+    const cleanImg = await loadImageElement(safeDataUrl, false);
+    if (cleanImg) {
+      spec.customPhotoDataUrl = safeDataUrl;
+      spec._loadedPhotoImg = cleanImg;
+      spec._photoTainted = false;
+      spec._photoFailed = false;
+      spec._loadingPhoto = false;
+      return true;
+    }
+  }
+  return false;
+}
+
 function renderCityCardFront(canvas, spec = {}, langOverride) {
   if (!canvas) return;
   if (spec.customPhotoDataUrl && !spec._loadedPhotoImg && !spec._loadingPhoto && !spec._photoFailed) {
     spec._loadingPhoto = true;
-    const loadImgFromSrc = (srcUrl) => {
-      if (!srcUrl) { spec._loadingPhoto = false; return; }
-      const isRemoteHttp = /^https?:\/\//i.test(String(srcUrl));
-      const im = new Image();
-      if (isRemoteHttp) {
-        im.crossOrigin = 'anonymous';
-      }
-      im.onload = () => {
-        spec._loadedPhotoImg = im;
-        spec._photoTainted = false;
-        spec._loadingPhoto = false;
+    (async () => {
+      const untaintedOk = await ensureSpecPhotoUntainted(spec);
+      if (untaintedOk) {
         renderCityCardFront(canvas, spec, langOverride);
-      };
-      im.onerror = () => {
-        if (isRemoteHttp && im.crossOrigin) {
-          // Fallback without crossOrigin so photo still renders on screen even if bucket lacks CORS header
-          const imFallback = new Image();
-          imFallback.onload = () => {
-            spec._loadedPhotoImg = imFallback;
-            spec._photoTainted = true;
-            spec._loadingPhoto = false;
-            renderCityCardFront(canvas, spec, langOverride);
-          };
-          imFallback.onerror = () => {
-            spec._loadingPhoto = false;
-            spec._photoFailed = true;
-            renderCityCardFront(canvas, spec, langOverride);
-          };
-          imFallback.src = srcUrl;
-          return;
-        }
+        return;
+      }
+      // Last-resort fallback without CORS for on-screen viewing if offline/unreachable
+      const fallbackImg = await loadImageElement(spec.customPhotoDataUrl, false);
+      if (fallbackImg) {
+        spec._loadedPhotoImg = fallbackImg;
+        spec._photoTainted = /^https?:\/\//i.test(String(spec.customPhotoDataUrl));
+        spec._loadingPhoto = false;
+      } else {
         spec._loadingPhoto = false;
         spec._photoFailed = true;
-        renderCityCardFront(canvas, spec, langOverride);
-      };
-      im.src = srcUrl;
-    };
-    if (String(spec.customPhotoDataUrl).startsWith('idb://') && window.RemoMediaDB) {
-      window.RemoMediaDB.getObjectUrl(spec.customPhotoDataUrl).then(loadImgFromSrc);
-    } else {
-      loadImgFromSrc(spec.customPhotoDataUrl);
-    }
+      }
+      renderCityCardFront(canvas, spec, langOverride);
+    })();
   }
   canvas.width = CARD_W;
   canvas.height = CARD_H;
@@ -1101,16 +1169,27 @@ function downloadCanvasAsPNG(canvas, filename) {
   }
 }
 
-function getUntaintedCardCanvas(frontCanvas, spec = {}, langOverride) {
+async function getUntaintedCardCanvas(frontCanvas, spec = {}, langOverride) {
+  if (spec && spec.customPhotoDataUrl) {
+    await ensureSpecPhotoUntainted(spec);
+  }
+  const cleanCv = document.createElement('canvas');
+  if (spec && spec._loadedPhotoImg && !spec._photoTainted) {
+    renderCityCardFront(cleanCv, spec, langOverride);
+    try {
+      cleanCv.toDataURL('image/png');
+      if (frontCanvas) {
+        renderCityCardFront(frontCanvas, spec, langOverride);
+      }
+      return cleanCv;
+    } catch (e) {}
+  }
   if (frontCanvas && !spec._photoTainted) {
     try {
       frontCanvas.toDataURL('image/png');
       return frontCanvas;
-    } catch (e) {
-      // Canvas was tainted by a cross-origin image without CORS headers; render clean vector card fallback
-    }
+    } catch (e) {}
   }
-  const cleanCv = document.createElement('canvas');
   const safeSpec = Object.assign({}, spec, {
     customPhotoDataUrl: '',
     _loadedPhotoImg: null,
@@ -1122,12 +1201,12 @@ function getUntaintedCardCanvas(frontCanvas, spec = {}, langOverride) {
   return cleanCv;
 }
 
-function exportCityStory916(frontCanvas, spec = {}, langOverride) {
+async function exportCityStory916(frontCanvas, spec = {}, langOverride) {
   const lang = langOverride || (window.REMO_I18N ? window.REMO_I18N.getLang() : 'en');
   const city = getCityById(spec.cityId || 'montreal');
   const serial = String(spec.serial || '0001').padStart(4, '0');
   const fullSerial = `REMO-${city.code}-${serial}`;
-  const safeCardCanvas = getUntaintedCardCanvas(frontCanvas, spec, lang);
+  const safeCardCanvas = await getUntaintedCardCanvas(frontCanvas, spec, lang);
 
   const W = 1080, H = 1920;
   const cv = document.createElement('canvas');
@@ -1399,3 +1478,4 @@ window.exportCityStory916 = exportCityStory916;
 window.exportCityBattleVS16x9 = exportCityBattleVS16x9;
 window.downloadCityCertificateA4 = downloadCityCertificateA4;
 window.openCityPrintSuite = openCityPrintSuite;
+window.fetchRemotePhotoAsDataUrl = fetchRemotePhotoAsDataUrl;

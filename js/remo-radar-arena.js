@@ -1599,7 +1599,8 @@ function isCurrentUserOwnerOfCard(cardSpec) {
   if (!u) return false;
   if (cardSpec.ownerUid && u.uid === cardSpec.ownerUid) return true;
   if (cardSpec.ownerName && u.name && u.name.trim().toLowerCase() === cardSpec.ownerName.trim().toLowerCase()) return true;
-  if (!cardSpec.ownerUid && isAdm) return true;
+  if (cardSpec.subtitle && u.name && String(cardSpec.subtitle).toLowerCase().includes('moment by ' + u.name.trim().toLowerCase())) return true;
+  if (!cardSpec.ownerUid && !cardSpec.ownerName && isAdm) return true;
   return false;
 }
 
@@ -1621,11 +1622,13 @@ function inspectCardModal(cardSpec) {
   const bCv = document.getElementById('inspectBackCv');
   if (!ov || !fCv || !bCv) return;
 
+  const isOwner = isCurrentUserOwnerOfCard(cardSpec);
+  const expBtn = document.getElementById('btnInspectCardExportStory');
+  const qrBtn = document.getElementById('btnInspectCardTradeQR');
   const aucBtn = document.getElementById('btnInspectCardAuction');
-  if (aucBtn) {
-    const canAuction = isCurrentUserOwnerOfCard(cardSpec);
-    aucBtn.style.display = canAuction ? '' : 'none';
-  }
+  if (expBtn) expBtn.style.display = isOwner ? '' : 'none';
+  if (qrBtn) qrBtn.style.display = isOwner ? '' : 'none';
+  if (aucBtn) aucBtn.style.display = isOwner ? '' : 'none';
 
   if (flipper) flipper.classList.remove('flipped');
   renderCityCardFront(fCv, cardSpec);
@@ -1633,9 +1636,21 @@ function inspectCardModal(cardSpec) {
   ov.classList.add('open');
 }
 
-function exportInspectedCardStory() {
+async function exportInspectedCardStory() {
+  if (!activeInspectedCard) return;
+  const lang = REMO_I18N.getLang();
+  if (!isCurrentUserOwnerOfCard(activeInspectedCard)) {
+    remoToast(
+      lang === 'fr'
+        ? '🔒 Seul le propriétaire de cette Carte 4D peut l’exporter !'
+        : '🔒 Only the owner of this 4D Card can export it!'
+    );
+    return;
+  }
   const fCv = document.getElementById('inspectFrontCv');
-  if (fCv && activeInspectedCard) exportCityStory916(fCv, activeInspectedCard);
+  if (fCv && activeInspectedCard) {
+    await exportCityStory916(fCv, activeInspectedCard);
+  }
 }
 
 function showInspectedCardTradeQR() {
