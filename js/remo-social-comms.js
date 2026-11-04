@@ -10161,6 +10161,29 @@ function renderFeedActiveContestsBanner() {
     activePills.push(`⚡ Flash Hunt (${rem} ${isFr ? 'restants' : 'left'})`);
   }
 
+  const ws = typeof REMO_STORE.ensureWorldSystems === 'function' ? REMO_STORE.ensureWorldSystems() : {};
+  if (ws.torchRelay && ws.torchRelay.active) {
+    activePills.push(`🔥 4D Torch (${Number(ws.torchRelay.totalKm || 0).toLocaleString()} km)`);
+  }
+  if (ws.globalSync && ws.globalSync.active) {
+    activePills.push(`🌍 Global Sync (+${Number(ws.globalSync.rewardCoins || 100)} 🪙)`);
+  }
+  if (ws.mayorElections && ws.mayorElections.active) {
+    activePills.push(`🏛️ ${isFr ? 'Élections Maires 4D' : 'City Mayor Elections'}`);
+  }
+  if (ws.sisterAlliances && ws.sisterAlliances.active && (ws.sisterAlliances.treaties || []).length > 0) {
+    activePills.push(`🤝 ${isFr ? 'Villes Jumelées 2X' : 'Sister Cities 2X'}`);
+  }
+  if (ws.pixelCanvas && ws.pixelCanvas.active) {
+    activePills.push(`🎨 Pixel Canvas (+${Number(ws.pixelCanvas.pixelRewardCoins || 5)} 🪙)`);
+  }
+  if (ws.monumentVault && ws.monumentVault.active) {
+    activePills.push(`⏳ ${ws.monumentVault.sealed ? (isFr ? 'Monument Scellé' : 'Sealed Monument') : (isFr ? '🔓 Monument Ouvert !' : '🔓 Monument Unsealed!')}`);
+  }
+  if (ws.creatorBourse && ws.creatorBourse.active) {
+    activePills.push(`📈 ${isFr ? 'Bourse Créateurs' : 'Creator Shares'}`);
+  }
+
   if (activePills.length === 0) {
     banner.style.display = 'none';
     banner.innerHTML = '';
@@ -10195,13 +10218,22 @@ function renderViralContestsView() {
     `<option value="${c.id}" ${u && u.homeCity === c.id ? 'selected' : ''}>${c.flag} ${escapeHtmlStr(getCityName(c, lang))}</option>`
   ).join('');
 
+  const ws = typeof REMO_STORE.ensureWorldSystems === 'function' ? REMO_STORE.ensureWorldSystems() : {};
+
   const anyActive = Boolean(
     (vc.eurovision && vc.eurovision.active) ||
     (vc.photoGrandPrix && vc.photoGrandPrix.active) ||
     (vc.worldCupBracket && vc.worldCupBracket.active) ||
     (vc.mysteryDetective && vc.mysteryDetective.active) ||
     (vc.goldenRaffle && vc.goldenRaffle.active) ||
-    (vc.flashHunt && vc.flashHunt.active)
+    (vc.flashHunt && vc.flashHunt.active) ||
+    (ws.torchRelay && ws.torchRelay.active) ||
+    (ws.globalSync && ws.globalSync.active) ||
+    (ws.mayorElections && ws.mayorElections.active) ||
+    (ws.sisterAlliances && ws.sisterAlliances.active && (ws.sisterAlliances.treaties || []).length > 0) ||
+    (ws.pixelCanvas && ws.pixelCanvas.active) ||
+    (ws.monumentVault && ws.monumentVault.active) ||
+    (ws.creatorBourse && ws.creatorBourse.active)
   );
 
   // ── 1. REMO MUSIC CONTEST (60S CITY SOUNDS & ANTHEMS) ──
@@ -10655,6 +10687,403 @@ function renderViralContestsView() {
     `;
   }
 
+  /* ═══════════════════════════════════════════════════════════════════════
+     7 UNIQUE REMO WORLD SYSTEMS (Rendered ONLY when Admin-Activated)
+     ═══════════════════════════════════════════════════════════════════════ */
+  // 🔥 1. 4D WORLD TORCH RELAY™
+  const tr = ws.torchRelay || {};
+  let torchHtml = '';
+  if (tr.active) {
+    const curCity = getCityById(tr.currentCityId || 'montreal');
+    const visited = Array.isArray(tr.visitedCities) ? tr.visitedCities : ['montreal'];
+    const targetC = Math.max(2, Number(tr.targetCitiesCount || 10));
+    const pct = Math.min(100, Math.round((visited.length / targetC) * 100));
+    const routeChain = visited.map((cid) => {
+      const cObj = getCityById(cid);
+      return `${cObj.flag} ${escapeHtmlStr(getCityName(cObj, lang))}`;
+    }).join(' ➔ ');
+    const nextCitiesOpts = cities
+      .filter((c) => c.id !== tr.currentCityId)
+      .map((c) => `<option value="${c.id}">${c.flag} ${escapeHtmlStr(getCityName(c, lang))}</option>`)
+      .join('');
+
+    torchHtml = `
+      <div class="glass-box" style="margin-bottom:16px;border:1.5px solid rgba(249,115,22,0.7);background:radial-gradient(circle at top left,rgba(249,115,22,0.18),rgba(15,23,42,0.96) 70%);">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
+          <div>
+            <div style="display:inline-flex;align-items:center;gap:6px;background:rgba(249,115,22,0.2);border:1px solid #f97316;color:#fdba74;padding:3px 10px;border-radius:99px;font-size:0.7rem;font-weight:900;margin-bottom:6px;">
+              ${escapeHtmlStr(t('ws_torch_badge'))}
+            </div>
+            <h2 style="font-family:'Orbitron',sans-serif;font-size:1.12rem;color:#fff;margin:0;">
+              🔥 ${escapeHtmlStr(isFr ? (tr.title_fr || tr.title_en) : (tr.title_en || tr.title_fr))}
+            </h2>
+          </div>
+          <div style="text-align:right;">
+            <span style="background:linear-gradient(135deg,#f97316,#ef4444);color:#fff;font-weight:900;padding:5px 12px;border-radius:10px;font-size:0.82rem;">
+              🏆 Jackpot: +${Number(tr.jackpotCoins || 5000).toLocaleString()} 🪙
+            </span>
+            <div style="font-size:0.75rem;color:#fde047;font-weight:800;margin-top:4px;">
+              🌍 ${Number(tr.totalKm || 0).toLocaleString()} KM · ${visited.length}/${targetC} ${isFr ? 'Villes' : 'Cities'}
+            </div>
+          </div>
+        </div>
+
+        <div style="padding:11px 14px;border-radius:12px;background:rgba(0,0,0,0.4);border:1px solid rgba(251,191,36,0.35);margin-bottom:10px;">
+          <div style="font-size:0.76rem;color:#94a3b8;font-weight:800;margin-bottom:4px;">
+            🔥 ${isFr ? 'Parcours Planétaire de la Flamme en Direct :' : 'Live Planetary Torch Route:'}
+          </div>
+          <div style="font-weight:900;color:#fde047;font-size:0.86rem;line-height:1.5;">${routeChain}</div>
+          <div style="font-size:0.76rem;color:#38bdf8;font-weight:800;margin-top:6px;">
+            🏃 ${isFr ? 'Porteur Actuel de la Flamme' : 'Current Torchbearer'}: <span style="color:#fff;">@${escapeHtmlStr(tr.currentHolderName || 'REMO Founder')}</span> (${curCity.flag} ${escapeHtmlStr(getCityName(curCity, lang))})
+          </div>
+        </div>
+
+        <div class="war-bar-track" style="height:8px;margin-bottom:12px;">
+          <div class="war-bar-fill-a" style="width:${pct}%;background:linear-gradient(90deg,#f97316,#fde047);"></div>
+        </div>
+
+        ${tr.status === 'running' ? `
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <select id="wsTorchNextCitySel" class="remo-input" style="min-width:170px;">${nextCitiesOpts}</select>
+            <input type="text" id="wsTorchMsgInp" class="remo-input" style="flex:1;min-width:180px;" maxlength="120" placeholder="${isFr ? 'Message olympique en passant la flamme...' : 'Olympic relay message as you pass the torch...'}">
+            <button type="button" class="btn-cyber btn-gold" onclick="citizenPassWorldTorch()">
+              ${escapeHtmlStr(t('ws_torch_pass_btn'))}
+            </button>
+          </div>
+        ` : `
+          <div style="padding:10px;border-radius:12px;background:rgba(16,185,129,0.2);border:1px solid #10b981;color:#6ee7b7;font-weight:900;text-align:center;">
+            🎉 ${isFr ? 'Objectif Planétaire Atteint ! Tous les porteurs de la Flamme ont partagé le Grand Jackpot !' : 'Planetary Target Reached! All Torchbearers shared the Grand Jackpot!'}
+          </div>
+        `}
+      </div>
+    `;
+  }
+
+  // 🌍 2. GLOBAL SYNC FLASH™ (Simultaneous Planetary Live Mosaic)
+  const gs = ws.globalSync || {};
+  let syncHtml = '';
+  if (gs.active) {
+    const promptTxt = isFr ? (gs.prompt_fr || gs.prompt_en) : (gs.prompt_en || gs.prompt_fr);
+    const moments = Array.isArray(gs.moments) ? gs.moments : [];
+    const alreadySynced = Boolean(u && gs.participants && gs.participants[u.uid]);
+
+    syncHtml = `
+      <div class="glass-box" style="margin-bottom:16px;border:1.5px solid rgba(56,189,248,0.65);background:radial-gradient(circle at top right,rgba(56,189,248,0.16),rgba(15,23,42,0.96) 70%);">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
+          <div>
+            <div style="display:inline-flex;align-items:center;gap:6px;background:rgba(56,189,248,0.2);border:1px solid #38bdf8;color:#7dd3fc;padding:3px 10px;border-radius:99px;font-size:0.7rem;font-weight:900;margin-bottom:6px;">
+              ${escapeHtmlStr(t('ws_sync_badge'))}
+            </div>
+            <h2 style="font-family:'Orbitron',sans-serif;font-size:1.1rem;color:#fff;margin:0;">
+              🌍 "${escapeHtmlStr(promptTxt)}"
+            </h2>
+          </div>
+          <div style="text-align:right;">
+            <span style="background:rgba(16,185,129,0.2);border:1px solid #10b981;color:#6ee7b7;font-weight:900;padding:4px 10px;border-radius:10px;font-size:0.8rem;">
+              ⚡ +${Number(gs.rewardCoins || 100)} 🪙 · ⏳ ${formatContestRemainingTime(gs.endsAt)}
+            </span>
+          </div>
+        </div>
+
+        ${!alreadySynced && gs.status === 'open' ? `
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+            <select id="wsSyncCitySel" class="remo-input" style="min-width:155px;">${cityOptionsHtml}</select>
+            <input type="text" id="wsSyncCaptionInp" class="remo-input" style="flex:1;min-width:190px;" maxlength="160" placeholder="${isFr ? 'Que voyez-vous ou faites-vous dans votre ville à cette seconde ?' : 'What is happening in your city at this exact second?'}">
+            <button type="button" class="btn-cyber btn-gold" onclick="citizenSubmitGlobalSync()">
+              ${escapeHtmlStr(t('ws_sync_join_btn'))}
+            </button>
+          </div>
+        ` : ''}
+
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;">
+          ${moments.length === 0 ? `
+            <div style="grid-column:1/-1;text-align:center;padding:16px;color:var(--muted);font-size:0.82rem;">
+              🌍 ${isFr ? 'Soyez le premier citoyen à synchroniser votre ville en direct !' : 'Be the first citizen to sync your city live!'}
+            </div>
+          ` : moments.map((m) => {
+            const c = getCityById(m.cityId);
+            return `
+              <div style="padding:10px 12px;border-radius:12px;background:rgba(15,23,42,0.9);border:1px solid rgba(56,189,248,0.4);">
+                <div style="display:flex;justify-content:space-between;align-items:center;font-size:0.74rem;font-weight:900;color:#fde047;margin-bottom:5px;">
+                  <span>${c.flag} ${escapeHtmlStr(getCityName(c, lang))}</span>
+                  <span>${m.weatherIcon || '☀️'} ${escapeHtmlStr(m.localTime || '12:00')} · ${m.tempC !== undefined ? m.tempC + '°C' : ''}</span>
+                </div>
+                <div style="font-size:0.84rem;color:#fff;font-weight:700;margin-bottom:4px;">"${escapeHtmlStr(m.caption)}"</div>
+                <div style="font-size:0.72rem;color:#7dd3fc;font-weight:800;">⚡ LIVE SYNC · @${escapeHtmlStr(m.authorName)}</div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  // 🏛️ 3. WORLD CITY MAYOR & ROYAL KEY™
+  const me = ws.mayorElections || {};
+  let mayorHtml = '';
+  if (me.active) {
+    const selCityId = window._selectedMayorElectionCity || (u && u.homeCity) || 'montreal';
+    const selCity = getCityById(selCityId);
+    const currentMayorUid = (REMO_STORE.state.cityMayors && REMO_STORE.state.cityMayors[selCityId]) || 'u_admin_founder';
+    const mayorUser = (REMO_STORE.state.users || []).find((x) => x && x.uid === currentMayorUid);
+    const mayorName = (mayorUser && mayorUser.name) || (currentMayorUid === 'u_admin_founder' ? 'REMO Founder' : currentMayorUid.replace(/^u_mayor_/, ''));
+    const decreeObj = me.cityDecrees && me.cityDecrees[selCityId];
+    const cityCandidates = (me.candidates && Array.isArray(me.candidates[selCityId])) ? me.candidates[selCityId] : [];
+    const isCityMayorOrAdmin = Boolean((u && u.uid === currentMayorUid) || isAdm);
+
+    mayorHtml = `
+      <div class="glass-box" style="margin-bottom:16px;border:1.5px solid rgba(251,191,36,0.65);">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
+          <div>
+            <div style="display:inline-flex;align-items:center;gap:6px;background:rgba(251,191,36,0.2);border:1px solid #fbbf24;color:#fde047;padding:3px 10px;border-radius:99px;font-size:0.7rem;font-weight:900;margin-bottom:6px;">
+              ${escapeHtmlStr(t('ws_mayor_badge'))}
+            </div>
+            <h2 style="font-family:'Orbitron',sans-serif;font-size:1.1rem;color:#fff;margin:0;">
+              🏛️ ${selCity.flag} ${escapeHtmlStr(getCityName(selCity, lang))} — 👑 ${isFr ? 'Maire Actuel' : 'Current Mayor'}: <span style="color:#fde047;">@${escapeHtmlStr(mayorName)}</span> 🔑
+            </h2>
+          </div>
+          <select class="remo-input" style="max-width:210px;" onchange="window._selectedMayorElectionCity=this.value;renderViralContestsView();">
+            ${cities.map((c) => `<option value="${c.id}" ${c.id === selCityId ? 'selected' : ''}>${c.flag} ${escapeHtmlStr(getCityName(c, lang))}</option>`).join('')}
+          </select>
+        </div>
+
+        ${decreeObj && (decreeObj.approved || isAdm) ? `
+          <div style="padding:10px 14px;border-radius:12px;background:linear-gradient(90deg,rgba(251,191,36,0.16),rgba(15,23,42,0.9));border:1px solid #fbbf24;margin-bottom:10px;">
+            <div style="font-size:0.72rem;font-weight:900;color:#fde047;margin-bottom:3px;">
+              🔑 ${isFr ? 'DÉCRET D’ACCUEIL OFFICIEL DU MAIRE' : 'OFFICIAL MAYOR WELCOME DECREE'} (@${escapeHtmlStr(decreeObj.authorName)}) ${!decreeObj.approved ? '· [⏳ PENDING ADMIN]' : ''}:
+            </div>
+            <div style="font-size:0.86rem;color:#fff;font-weight:700;">"${escapeHtmlStr(isFr ? (decreeObj.text_fr || decreeObj.text_en) : (decreeObj.text_en || decreeObj.text_fr))}"</div>
+          </div>
+        ` : ''}
+
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+          <input type="text" id="wsMayorManifestoInp" class="remo-input" style="flex:1;min-width:190px;" maxlength="130" placeholder="${isFr ? 'Votre promesse électorale pour cette ville...' : 'Your campaign promise for this city...'}">
+          <button type="button" class="btn-cyber btn-gold" onclick="citizenVoteOrNominateMayor('${selCityId}','')">
+            ${escapeHtmlStr(t('ws_mayor_vote_btn'))}
+          </button>
+        </div>
+
+        ${isCityMayorOrAdmin ? `
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;padding:10px;border-radius:12px;background:rgba(251,191,36,0.1);border:1px dashed rgba(251,191,36,0.5);">
+            <input type="text" id="wsMayorDecreeInp" class="remo-input" style="flex:1;min-width:190px;" maxlength="200" placeholder="${isFr ? '🔑 Écrire le message officiel de bienvenue de la ville...' : '🔑 Write the official city welcome message...'}">
+            <button type="button" class="btn-cyber" onclick="citizenSubmitMayorDecree('${selCityId}')">
+              ${escapeHtmlStr(t('ws_mayor_decree_btn'))}
+            </button>
+          </div>
+        ` : ''}
+
+        ${cityCandidates.length > 0 ? `
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px;">
+            ${cityCandidates.map((cand, idx) => `
+              <div style="padding:9px 12px;border-radius:12px;background:rgba(15,23,42,0.85);border:1px solid ${idx === 0 ? '#fbbf24' : 'rgba(255,255,255,0.1)'};display:flex;justify-content:space-between;align-items:center;gap:8px;">
+                <div>
+                  <div style="font-weight:900;font-size:0.84rem;color:#fff;">${idx === 0 ? '👑 ' : ''}@${escapeHtmlStr(cand.name)} (${Number(cand.votes || 0)} votes)</div>
+                  <div style="font-size:0.72rem;color:#94a3b8;">"${escapeHtmlStr(cand.manifesto || '')}"</div>
+                </div>
+                <button type="button" class="btn-ghost" style="padding:5px 10px;font-size:0.73rem;border-color:#fbbf24;color:#fde047;" onclick="citizenVoteOrNominateMayor('${selCityId}','${cand.uid}')">
+                  Vote
+                </button>
+              </div>
+            `).join('')}
+          </div>
+        ` : ''}
+      </div>
+    `;
+  }
+
+  // 🤝 4. SISTER CITIES 2X ALLIANCE™ (48h Twin-City Treaties)
+  const sa = ws.sisterAlliances || {};
+  let allianceHtml = '';
+  if (sa.active && Array.isArray(sa.treaties) && sa.treaties.length > 0) {
+    allianceHtml = `
+      <div class="glass-box" style="margin-bottom:16px;border:1.5px solid rgba(16,185,129,0.6);">
+        <div style="display:inline-flex;align-items:center;gap:6px;background:rgba(16,185,129,0.2);border:1px solid #10b981;color:#6ee7b7;padding:3px 10px;border-radius:99px;font-size:0.7rem;font-weight:900;margin-bottom:8px;">
+          ${escapeHtmlStr(t('ws_alliance_badge'))}
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;">
+          ${sa.treaties.map((trItem) => {
+            const cA = getCityById(trItem.cityA);
+            const cB = getCityById(trItem.cityB);
+            const waved = Boolean(u && trItem.wavedBy && trItem.wavedBy[u.uid]);
+            return `
+              <div style="padding:12px;border-radius:14px;background:rgba(15,23,42,0.9);border:1px solid rgba(16,185,129,0.45);">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                  <span style="font-family:'Orbitron',sans-serif;font-weight:900;font-size:0.95rem;color:#fff;">
+                    ${cA.flag} ${escapeHtmlStr(getCityName(cA, lang))} 🤝 ${cB.flag} ${escapeHtmlStr(getCityName(cB, lang))}
+                  </span>
+                  <span style="background:rgba(251,191,36,0.2);border:1px solid #fbbf24;color:#fde047;font-size:0.7rem;font-weight:900;padding:2px 8px;border-radius:99px;">2X BONUS</span>
+                </div>
+                <div style="font-size:0.74rem;color:#6ee7b7;font-weight:800;margin-bottom:8px;">
+                  👋 ${Number(trItem.wavesCount || 0)} ${isFr ? 'Saluts Diplomatiques' : 'Diplomatic Waves'} · ⏳ ${formatContestRemainingTime(trItem.endsAt)}
+                </div>
+                <button type="button" class="btn-cyber ${waved ? '' : 'btn-gold'}" style="width:100%;justify-content:center;font-size:0.76rem;padding:7px;" ${waved ? 'disabled' : ''} onclick="citizenSendAllianceWave('${trItem.id}')">
+                  ${waved ? (isFr ? '✓ Salut Diplomatique Envoyé' : '✓ Diplomatic Wave Sent') : escapeHtmlStr(t('ws_alliance_wave_btn'))}
+                </button>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  // 🎨 5. REMO WORLD PIXEL CANVAS™
+  const pc = ws.pixelCanvas || {};
+  let pixelHtml = '';
+  if (pc.active) {
+    const W = Number(pc.width || 24);
+    const H = Number(pc.height || 14);
+    const palette = ['#fbbf24', '#ef4444', '#38bdf8', '#2563eb', '#10b981', '#ffffff', '#a855f7', '#f97316', '#ec4899', '#0f172a'];
+    const curColor = window._selectedWorldPixelColor || '#fbbf24';
+    let gridCells = '';
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        const px = pc.pixels && pc.pixels[`${x}_${y}`];
+        const bg = (px && px.color) || 'rgba(15,23,42,0.85)';
+        const tip = px ? `@${px.name} (${px.cityId})` : `${x},${y}`;
+        gridCells += `<div onclick="citizenClickPixelCanvas(${x},${y})" title="${escapeHtmlStr(tip)}" style="aspect-ratio:1;background:${escapeHtmlStr(bg)};border:1px solid rgba(255,255,255,0.06);cursor:pointer;border-radius:2px;"></div>`;
+      }
+    }
+
+    pixelHtml = `
+      <div class="glass-box" style="margin-bottom:16px;border:1.5px solid rgba(168,85,247,0.6);">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
+          <div>
+            <div style="display:inline-flex;align-items:center;gap:6px;background:rgba(168,85,247,0.2);border:1px solid #a855f7;color:#e9d5ff;padding:3px 10px;border-radius:99px;font-size:0.7rem;font-weight:900;margin-bottom:6px;">
+              ${escapeHtmlStr(t('ws_pixel_badge'))}
+            </div>
+            <h2 style="font-family:'Orbitron',sans-serif;font-size:1.08rem;color:#fff;margin:0;">
+              🎨 ${escapeHtmlStr(isFr ? (pc.title_fr || pc.title_en) : (pc.title_en || pc.title_fr))} (+${Number(pc.pixelRewardCoins || 5)} 🪙/pixel)
+            </h2>
+          </div>
+          <span style="font-size:0.78rem;font-weight:900;color:#fde047;">
+            🖌️ ${Number(pc.totalPixelsPlaced || 0)} pixels · 🎴 ${Number(pc.mintedCardsCount || 0)} 4D Editions
+          </span>
+        </div>
+
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:10px;">
+          <span style="font-size:0.75rem;color:#cbd5e1;font-weight:800;">${isFr ? 'Couleur :' : 'Color:'}</span>
+          ${palette.map((col) => `
+            <button type="button" onclick="citizenSelectPixelColor('${col}')" style="width:24px;height:24px;border-radius:50%;background:${col};border:${curColor === col ? '3px solid #fff' : '1px solid rgba(255,255,255,0.3)'};cursor:pointer;box-shadow:${curColor === col ? '0 0 10px ' + col : 'none'};"></button>
+          `).join('')}
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(${W},1fr);gap:2px;background:#050816;padding:6px;border-radius:12px;border:1px solid rgba(255,255,255,0.12);max-width:680px;margin:0 auto;">
+          ${gridCells}
+        </div>
+      </div>
+    `;
+  }
+
+  // ⏳ 6. CITY MONUMENT TIME-VAULT™
+  const mv = ws.monumentVault || {};
+  let vaultHtml = '';
+  if (mv.active) {
+    const capsules = Array.isArray(mv.capsules) ? mv.capsules : [];
+    const hasDeposited = Boolean(u && capsules.some((c) => c && c.uid === u.uid));
+    const targetLbl = isFr ? (mv.unsealTargetLabel_fr || mv.unsealTargetLabel_en) : (mv.unsealTargetLabel_en || mv.unsealTargetLabel_fr);
+
+    vaultHtml = `
+      <div class="glass-box" style="margin-bottom:16px;border:1.5px solid rgba(251,191,36,0.65);">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
+          <div>
+            <div style="display:inline-flex;align-items:center;gap:6px;background:rgba(251,191,36,0.2);border:1px solid #fbbf24;color:#fde047;padding:3px 10px;border-radius:99px;font-size:0.7rem;font-weight:900;margin-bottom:6px;">
+              ${escapeHtmlStr(t('ws_vault_badge'))} · ${mv.sealed ? '🔒 SEALED' : '🔓 UNSEALED GALA'}
+            </div>
+            <h2 style="font-family:'Orbitron',sans-serif;font-size:1.08rem;color:#fff;margin:0;">
+              ⏳ ${escapeHtmlStr(isFr ? (mv.title_fr || mv.title_en) : (mv.title_en || mv.title_fr))}
+            </h2>
+            <p style="font-size:0.76rem;color:#7dd3fc;margin:3px 0 0;">🎯 ${escapeHtmlStr(targetLbl)} · ${capsules.length} ${isFr ? 'capsules déposées' : 'capsules sealed'}</p>
+          </div>
+        </div>
+
+        ${!hasDeposited ? `
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+            <select id="wsVaultCitySel" class="remo-input" style="min-width:155px;">${cityOptionsHtml}</select>
+            <input type="text" id="wsVaultMsgInp" class="remo-input" style="flex:1;min-width:190px;" maxlength="240" placeholder="${isFr ? 'Déposez votre vœu ou prédiction pour le futur de votre ville...' : 'Deposit your wish or prediction for your city’s future...'}">
+            <button type="button" class="btn-cyber btn-gold" onclick="citizenDepositMonumentCapsule()">
+              ${escapeHtmlStr(t('ws_vault_deposit_btn'))}
+            </button>
+          </div>
+        ` : ''}
+
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px;">
+          ${capsules.map((cap) => {
+            const c = getCityById(cap.cityId);
+            return `
+              <div style="padding:10px 12px;border-radius:12px;background:rgba(15,23,42,0.88);border:1px solid ${mv.sealed ? 'rgba(148,163,184,0.3)' : '#fbbf24'};">
+                <div style="font-size:0.74rem;font-weight:900;color:#fde047;margin-bottom:4px;">
+                  ${c.flag} ${escapeHtmlStr(getCityName(c, lang))} · @${escapeHtmlStr(cap.authorName)}
+                </div>
+                ${mv.sealed && !isAdm ? `
+                  <div style="font-size:0.78rem;color:#94a3b8;font-style:italic;">
+                    🔒 ${isFr ? 'Capsule scellée jusqu’à l’ouverture officielle par le Fondateur' : 'Capsule sealed until official Founder gala opening'}
+                  </div>
+                ` : `
+                  <div style="font-size:0.84rem;color:#fff;font-weight:700;">🔓 "${escapeHtmlStr(cap.message)}"</div>
+                `}
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  // 📈 7. CREATOR SHARES & FAN DIVIDENDS™
+  const cb = ws.creatorBourse || {};
+  let bourseHtml = '';
+  if (cb.active) {
+    const stocks = Array.isArray(cb.stocks) ? cb.stocks : [];
+    bourseHtml = `
+      <div class="glass-box" style="margin-bottom:16px;border:1.5px solid rgba(56,189,248,0.6);">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
+          <div>
+            <div style="display:inline-flex;align-items:center;gap:6px;background:rgba(56,189,248,0.2);border:1px solid #38bdf8;color:#7dd3fc;padding:3px 10px;border-radius:99px;font-size:0.7rem;font-weight:900;margin-bottom:6px;">
+              ${escapeHtmlStr(t('ws_bourse_badge'))}
+            </div>
+            <h2 style="font-family:'Orbitron',sans-serif;font-size:1.08rem;color:#fff;margin:0;">
+              📈 ${isFr ? 'Investissez dans les Créateurs & Recevez des Dividendes !' : 'Invest in Creators & Earn Automatic Fan Dividends!'}
+            </h2>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(235px,1fr));gap:10px;">
+          ${stocks.map((st) => {
+            const c = getCityById(st.cityId || 'montreal');
+            const myShares = Number((u && st.shareholders && st.shareholders[u.uid]) || 0);
+            return `
+              <div style="padding:12px;border-radius:14px;background:rgba(15,23,42,0.9);border:1px solid rgba(56,189,248,0.35);display:flex;flex-direction:column;justify-content:space-between;gap:8px;">
+                <div>
+                  <div style="display:flex;justify-content:space-between;align-items:center;">
+                    <span style="font-weight:900;color:#fff;font-size:0.9rem;">@${escapeHtmlStr(st.creatorName)}</span>
+                    <span style="font-family:'Orbitron',sans-serif;font-weight:900;color:#fde047;font-size:0.86rem;">${Number(st.sharePrice || 50)} 🪙</span>
+                  </div>
+                  <div style="font-size:0.74rem;color:#7dd3fc;margin-top:2px;">
+                    ${c.flag} ${escapeHtmlStr(getCityName(c, lang))} · ${isFr ? 'Mes parts :' : 'My shares:'} <strong style="color:#34d399;">${myShares}</strong>
+                  </div>
+                  ${st.lastDividendCoins ? `
+                    <div style="font-size:0.7rem;color:#fbbf24;margin-top:3px;">💎 ${isFr ? 'Dernier dividende' : 'Last dividend'}: +${st.lastDividendCoins} 🪙/part</div>
+                  ` : ''}
+                </div>
+                <div style="display:flex;gap:6px;">
+                  <button type="button" class="btn-cyber btn-gold" style="flex:1;justify-content:center;font-size:0.73rem;padding:6px;" onclick="citizenBuyCreatorShare('${st.creatorUid}')">
+                    📈 ${isFr ? 'Acheter' : 'Buy'} (${Number(st.sharePrice || 50)} 🪙)
+                  </button>
+                  ${myShares > 0 ? `
+                    <button type="button" class="btn-ghost" style="padding:6px 10px;font-size:0.73rem;" onclick="citizenSellCreatorShare('${st.creatorUid}')">
+                      💰 ${isFr ? 'Vendre' : 'Sell'}
+                    </button>
+                  ` : ''}
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    `;
+  }
+
   stage.innerHTML = `
     <div class="glass-box" style="margin-bottom:16px;background:linear-gradient(135deg,rgba(15,23,42,0.96),rgba(49,16,68,0.75));border-color:rgba(251,191,36,0.5);">
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
@@ -10664,7 +11093,7 @@ function renderViralContestsView() {
         </div>
         ${isAdm ? `
           <a href="admin.html" class="btn-cyber btn-gold" style="text-decoration:none;">
-            👑 ${isFr ? 'Gérer les 6 Concours (Bureau Admin)' : 'Manage All 6 Contests (Admin Office)'}
+            👑 ${isFr ? 'Gérer les Concours & 7 Systèmes (Admin)' : 'Manage Contests & 7 Systems (Admin)'}
           </a>
         ` : ''}
       </div>
@@ -10677,6 +11106,13 @@ function renderViralContestsView() {
       </div>
     ` : ''}
 
+    ${torchHtml}
+    ${syncHtml}
+    ${mayorHtml}
+    ${allianceHtml}
+    ${pixelHtml}
+    ${vaultHtml}
+    ${bourseHtml}
     ${euroHtml}
     ${pgpHtml}
     ${wcHtml}
@@ -10922,3 +11358,210 @@ function claimCitizenFlashHunt() {
   renderViralContestsView();
 }
 window.claimCitizenFlashHunt = claimCitizenFlashHunt;
+
+/* ── CITIZEN HANDLERS FOR THE 7 UNIQUE REMO WORLD SYSTEMS ── */
+function citizenPassWorldTorch() {
+  const isFr = REMO_I18N.getLang() === 'fr';
+  const u = REMO_STORE.getCurrentUser();
+  if (!u || u.role === 'guest') { openAuthModal(); return; }
+  const nextCityId = document.getElementById('wsTorchNextCitySel')?.value || 'paris';
+  const msg = (document.getElementById('wsTorchMsgInp')?.value || '').trim();
+  const res = REMO_STORE.passWorldTorchToCity(nextCityId, msg);
+  if (!res.ok) {
+    remoToast(isFr ? '⚠️ Choisissez une autre ville de destination !' : '⚠️ Please choose a different destination city!');
+    return;
+  }
+  spawnRemoCoinsFX(10);
+  const c = getCityById(nextCityId);
+  remoToast(
+    isFr
+      ? `🔥 Flamme passée à ${c.flag} ${getCityName(c, 'fr')} (+${res.km} km) ! +${res.reward} 🪙 !`
+      : `🔥 Torch passed to ${c.flag} ${getCityName(c, 'en')} (+${res.km} km)! +${res.reward} 🪙!`,
+    'fanfare'
+  );
+  syncHeaderAndSidebars();
+  renderViralContestsView();
+}
+window.citizenPassWorldTorch = citizenPassWorldTorch;
+
+function citizenSubmitGlobalSync() {
+  const isFr = REMO_I18N.getLang() === 'fr';
+  const u = REMO_STORE.getCurrentUser();
+  if (!u || u.role === 'guest') { openAuthModal(); return; }
+  const cityId = document.getElementById('wsSyncCitySel')?.value || u.homeCity || 'montreal';
+  const caption = (document.getElementById('wsSyncCaptionInp')?.value || '').trim();
+  if (!caption) {
+    remoToast(isFr ? '⚠️ Décrivez votre instant en direct !' : '⚠️ Describe your live moment!');
+    return;
+  }
+  const res = REMO_STORE.submitGlobalSyncMoment({ cityId, caption });
+  if (!res.ok) {
+    remoToast(isFr ? '⚠️ Vous avez déjà synchronisé votre ville !' : '⚠️ You already synced your city in this window!');
+    return;
+  }
+  spawnRemoCoinsFX(12);
+  remoToast(
+    isFr
+      ? `🌍 Instant Planétaire Synchronisé ! +${res.reward} 🪙 !`
+      : `🌍 Global Sync Moment Published! +${res.reward} 🪙!`,
+    'fanfare'
+  );
+  syncHeaderAndSidebars();
+  renderViralContestsView();
+}
+window.citizenSubmitGlobalSync = citizenSubmitGlobalSync;
+
+function citizenVoteOrNominateMayor(cityId, candidateUid = '') {
+  const isFr = REMO_I18N.getLang() === 'fr';
+  const u = REMO_STORE.getCurrentUser();
+  if (!u || u.role === 'guest') { openAuthModal(); return; }
+  const manifesto = (document.getElementById('wsMayorManifestoInp')?.value || '').trim();
+  const res = REMO_STORE.nominateOrVoteCityMayor(cityId, candidateUid, manifesto);
+  if (!res.ok) {
+    remoToast(isFr ? '⚠️ Vous avez déjà voté dans cette ville !' : '⚠️ You already voted in this city!');
+    return;
+  }
+  spawnRemoCoinsFX(8);
+  remoToast(
+    isFr
+      ? `👑 Vote Maire enregistré pour @${res.candidate.name} (+${res.reward} 🪙) !`
+      : `👑 Mayor vote recorded for @${res.candidate.name} (+${res.reward} 🪙)!`,
+    'fanfare'
+  );
+  syncHeaderAndSidebars();
+  renderViralContestsView();
+}
+window.citizenVoteOrNominateMayor = citizenVoteOrNominateMayor;
+
+function citizenSubmitMayorDecree(cityId) {
+  const isFr = REMO_I18N.getLang() === 'fr';
+  const text = (document.getElementById('wsMayorDecreeInp')?.value || '').trim();
+  if (!text) {
+    remoToast(isFr ? '⚠️ Écrivez le message officiel du Maire !' : '⚠️ Please write the official Mayor welcome message!');
+    return;
+  }
+  const res = REMO_STORE.submitMayorCityDecree(cityId, text);
+  if (!res.ok) {
+    remoToast(isFr ? '⚠️ Réservé au Maire de la ville ou à l’Admin !' : '⚠️ Reserved for the City Mayor or Admin!');
+    return;
+  }
+  remoToast(
+    res.approved
+      ? (isFr ? '🔑 Décret officiel du Maire publié !' : '🔑 Official Mayor Decree published!')
+      : (isFr ? '🔑 Décret soumis à l’approbation de l’Admin !' : '🔑 Decree submitted for Admin approval!'),
+    'fanfare'
+  );
+  renderViralContestsView();
+}
+window.citizenSubmitMayorDecree = citizenSubmitMayorDecree;
+
+function citizenSendAllianceWave(treatyId) {
+  const isFr = REMO_I18N.getLang() === 'fr';
+  const u = REMO_STORE.getCurrentUser();
+  if (!u || u.role === 'guest') { openAuthModal(); return; }
+  const res = REMO_STORE.sendSisterAllianceWave(treatyId);
+  if (!res.ok) {
+    remoToast(isFr ? '⚠️ Salut diplomatique déjà envoyé pour ce traité !' : '⚠️ Diplomatic wave already sent for this treaty!');
+    return;
+  }
+  spawnRemoCoinsFX(10);
+  remoToast(
+    isFr
+      ? `🤝 Salut d’Alliance 2X envoyé ! +${res.reward} 🪙 & +50 PTS aux 2 villes !`
+      : `🤝 2X Alliance Wave sent! +${res.reward} 🪙 & +50 PTS to both sister cities!`,
+    'fanfare'
+  );
+  syncHeaderAndSidebars();
+  renderViralContestsView();
+}
+window.citizenSendAllianceWave = citizenSendAllianceWave;
+
+function citizenSelectPixelColor(col) {
+  window._selectedWorldPixelColor = col;
+  renderViralContestsView();
+}
+window.citizenSelectPixelColor = citizenSelectPixelColor;
+
+function citizenClickPixelCanvas(x, y) {
+  const isFr = REMO_I18N.getLang() === 'fr';
+  const u = REMO_STORE.getCurrentUser();
+  if (!u || u.role === 'guest') { openAuthModal(); return; }
+  const col = window._selectedWorldPixelColor || '#fbbf24';
+  const res = REMO_STORE.placeWorldPixel(x, y, col);
+  if (!res.ok) return;
+  RemoAudio.play('coin');
+  remoToast(
+    isFr
+      ? `🎨 Pixel (${x},${y}) peint ! +${res.reward} 🪙`
+      : `🎨 Pixel (${x},${y}) painted! +${res.reward} 🪙`
+  );
+  syncHeaderAndSidebars();
+  renderViralContestsView();
+}
+window.citizenClickPixelCanvas = citizenClickPixelCanvas;
+
+function citizenDepositMonumentCapsule() {
+  const isFr = REMO_I18N.getLang() === 'fr';
+  const u = REMO_STORE.getCurrentUser();
+  if (!u || u.role === 'guest') { openAuthModal(); return; }
+  const cityId = document.getElementById('wsVaultCitySel')?.value || u.homeCity || 'montreal';
+  const message = (document.getElementById('wsVaultMsgInp')?.value || '').trim();
+  if (!message) {
+    remoToast(isFr ? '⚠️ Écrivez votre vœu ou prédiction !' : '⚠️ Please write your wish or prediction!');
+    return;
+  }
+  const res = REMO_STORE.depositMonumentCapsule({ cityId, message });
+  if (!res.ok) {
+    remoToast(isFr ? '⚠️ Vous avez déjà scellé une capsule dans le Monument !' : '⚠️ You already sealed a capsule in the Monument!');
+    return;
+  }
+  spawnRemoCoinsFX(8);
+  remoToast(
+    isFr
+      ? `⏳ Capsule scellée dans le Monument (+${res.reward} 🪙) !`
+      : `⏳ Capsule sealed inside the Monument (+${res.reward} 🪙)!`,
+    'fanfare'
+  );
+  syncHeaderAndSidebars();
+  renderViralContestsView();
+}
+window.citizenDepositMonumentCapsule = citizenDepositMonumentCapsule;
+
+function citizenBuyCreatorShare(creatorUid) {
+  const isFr = REMO_I18N.getLang() === 'fr';
+  const u = REMO_STORE.getCurrentUser();
+  if (!u || u.role === 'guest') { openAuthModal(); return; }
+  const res = REMO_STORE.buyCreatorShare(creatorUid);
+  if (!res.ok) {
+    remoToast(
+      res.error === 'insufficient_coins'
+        ? (isFr ? `⚠️ Il vous faut ${res.price} 🪙 pour acheter cette part !` : `⚠️ You need ${res.price} 🪙 to buy this share!`)
+        : (isFr ? '⚠️ Achat indisponible.' : '⚠️ Purchase unavailable.')
+    );
+    return;
+  }
+  RemoAudio.play('coin');
+  remoToast(
+    isFr
+      ? `📈 +1 Part achetée (${res.pricePaid} 🪙) ! Vous recevrez des dividendes automatiques !`
+      : `📈 +1 Share bought (${res.pricePaid} 🪙)! You now earn automatic Fan Dividends!`
+  );
+  syncHeaderAndSidebars();
+  renderViralContestsView();
+}
+window.citizenBuyCreatorShare = citizenBuyCreatorShare;
+
+function citizenSellCreatorShare(creatorUid) {
+  const isFr = REMO_I18N.getLang() === 'fr';
+  const res = REMO_STORE.sellCreatorShare(creatorUid);
+  if (!res.ok) return;
+  RemoAudio.play('coin');
+  remoToast(
+    isFr
+      ? `💰 1 Part vendue pour +${res.sellValue} 🪙 !`
+      : `💰 1 Share sold for +${res.sellValue} 🪙!`
+  );
+  syncHeaderAndSidebars();
+  renderViralContestsView();
+}
+window.citizenSellCreatorShare = citizenSellCreatorShare;

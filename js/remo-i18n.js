@@ -832,7 +832,22 @@ const REMO_DICT = {
     wc_badge: '⚽ 8-CITY WORLD KNOCKOUT CUP',
     md_badge: '🕵️ MYSTERY CITY DETECTIVE · 1 ATTEMPT ONLY',
     gr_badge: '🎟️ FOUNDER’S GOLDEN TICKET RAFFLE',
-    fh_badge: '⚡ FOUNDER’S FLASH TREASURE HUNT'
+    fh_badge: '⚡ FOUNDER’S FLASH TREASURE HUNT',
+
+    // 🔥🌍🏛️🤝🎨⏳📈 v71: 7 Unique REMO World Systems (EN)
+    ws_torch_badge: '🔥 4D WORLD TORCH RELAY™ AROUND THE EARTH',
+    ws_torch_pass_btn: '🔥 Pass the Torch to Next City (+50 🪙)',
+    ws_sync_badge: '🌍 GLOBAL SYNC FLASH™ — SIMULTANEOUS PLANETARY LIVE',
+    ws_sync_join_btn: '⚡ Post My Live City Sync (+100 🪙)',
+    ws_mayor_badge: '🏛️ WORLD CITY MAYOR ELECTIONS & 4D ROYAL KEY™',
+    ws_mayor_vote_btn: '👑 Vote / Run for Mayor (+15 🪙)',
+    ws_mayor_decree_btn: '🔑 Publish Official Mayor Welcome Decree',
+    ws_alliance_badge: '🤝 SISTER CITIES 48H 2X ALLIANCE TREATY™',
+    ws_alliance_wave_btn: '👋 Send Diplomatic 2X Wave (+40 🪙)',
+    ws_pixel_badge: '🎨 REMO WORLD PIXEL-ART FRESCO™',
+    ws_vault_badge: '⏳ CITY MONUMENT TIME-VAULT™',
+    ws_vault_deposit_btn: '⏳ Seal My Future Capsule (+25 🪙)',
+    ws_bourse_badge: '📈 CREATOR SHARES & FAN DIVIDENDS EXCHANGE™'
   },
 
   fr: {
@@ -1663,7 +1678,22 @@ const REMO_DICT = {
     wc_badge: '⚽ COUPE DU MONDE DES VILLES (8 VILLES)',
     md_badge: '🕵️ DÉTECTIVE VILLE MYSTÈRE · 1 SEUL ESSAI',
     gr_badge: '🎟️ TOMBOLA TICKET D’OR DU FONDATEUR',
-    fh_badge: '⚡ CHASSE AU TRÉSOR FLASH DU FONDATEUR'
+    fh_badge: '⚡ CHASSE AU TRÉSOR FLASH DU FONDATEUR',
+
+    // 🔥🌍🏛️🤝🎨⏳📈 v71: 7 Systèmes Uniques Mondiaux REMO (FR)
+    ws_torch_badge: '🔥 RELAIS DE LA FLAMME OLYMPIQUE 4D REMO™ AUTOUR DU MONDE',
+    ws_torch_pass_btn: '🔥 Passer la Flamme à une Autre Ville (+50 🪙)',
+    ws_sync_badge: '🌍 MOMENT PLANÉTAIRE SYNCHRONISÉ — LIVE SIMULTANÉ™',
+    ws_sync_join_btn: '⚡ Publier Mon Instant Live (+100 🪙)',
+    ws_mayor_badge: '🏛️ ÉLECTIONS DU MAIRE & CLÉ D’OR ROYALE 4D™',
+    ws_mayor_vote_btn: '👑 Voter / Se Présenter Maire (+15 🪙)',
+    ws_mayor_decree_btn: '🔑 Écrire le Décret d’Accueil Officiel',
+    ws_alliance_badge: '🤝 TRAITÉ DE JUMELAGE 48H — ALLIANCE BONUS 2X™',
+    ws_alliance_wave_btn: '👋 Salut Diplomatique 2X (+40 🪙)',
+    ws_pixel_badge: '🎨 FRESQUE PIXEL-ART MONDIALE REMO™',
+    ws_vault_badge: '⏳ MONUMENT CAPSULE TEMPORELLE DES VILLES™',
+    ws_vault_deposit_btn: '⏳ Sceller Ma Capsule du Futur (+25 🪙)',
+    ws_bourse_badge: '📈 BOURSE DES CRÉATEURS & DIVIDENDES FANS™'
   }
 };
 

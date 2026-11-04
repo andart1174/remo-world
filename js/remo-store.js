@@ -1255,7 +1255,136 @@ function createDefaultState() {
     wishes: getDefaultWishes(now),
     cityPredictions: getDefaultCityPredictions(now),
     viralContests: getDefaultViralContests(),
+    worldSystems: getDefaultUniqueWorldSystems(),
     notifications: []
+  };
+}
+
+function getDefaultUniqueWorldSystems() {
+  return {
+    torchRelay: {
+      active: false,
+      status: 'idle',
+      title_en: '4D World Torch Relay™ around the Earth',
+      title_fr: 'Relais de la Flamme Olympique 4D REMO™ autour du Monde',
+      startCityId: 'montreal',
+      currentCityId: 'montreal',
+      currentHolderUid: 'u_admin_founder',
+      currentHolderName: 'REMO Founder',
+      targetCitiesCount: 10,
+      jackpotCoins: 5000,
+      perPassCoins: 50,
+      totalKm: 0,
+      visitedCities: ['montreal'],
+      holdersHistory: [],
+      jackpotPaid: false,
+      updatedAt: 0
+    },
+    globalSync: {
+      active: false,
+      status: 'idle',
+      prompt_en: 'Show the sky or your view in your city right now!',
+      prompt_fr: 'Montrez le ciel ou votre vue dans votre ville en cet instant !',
+      rewardCoins: 100,
+      endsAt: 0,
+      moments: [],
+      participants: {},
+      updatedAt: 0
+    },
+    mayorElections: {
+      active: false,
+      status: 'idle',
+      voteRewardCoins: 15,
+      candidates: {},
+      voters: {},
+      cityDecrees: {
+        montreal: {
+          authorUid: 'u_admin_founder',
+          authorName: 'REMO Founder',
+          text_en: 'Welcome to Montréal 4D Hub — where art, code, and global citizens unite!',
+          text_fr: 'Bienvenue au Hub 4D de Montréal — où l’art, le code et les citoyens du monde s’unissent !',
+          approved: true,
+          updatedAt: 0
+        }
+      },
+      updatedAt: 0
+    },
+    sisterAlliances: {
+      active: false,
+      treaties: [],
+      updatedAt: 0
+    },
+    pixelCanvas: {
+      active: false,
+      width: 24,
+      height: 14,
+      title_en: 'REMO World Pixel-Art Fresco™',
+      title_fr: 'Fresque Pixel-Art Mondiale REMO™',
+      pixelRewardCoins: 5,
+      pixels: {},
+      totalPixelsPlaced: 0,
+      contributors: {},
+      mintedCardsCount: 0,
+      updatedAt: 0
+    },
+    monumentVault: {
+      active: false,
+      sealed: true,
+      title_en: 'City Monument Time-Vault™',
+      title_fr: 'Monument Capsule Temporelle des Villes™',
+      unsealTargetLabel_en: 'Official Founder Gala Opening',
+      unsealTargetLabel_fr: 'Grande Ouverture Gala du Fondateur',
+      depositRewardCoins: 25,
+      capsules: [],
+      updatedAt: 0
+    },
+    creatorBourse: {
+      active: false,
+      dividendPerShareDefault: 30,
+      stocks: [
+        {
+          creatorUid: 'u_admin_founder',
+          creatorName: 'REMO Founder',
+          cityId: 'montreal',
+          sharePrice: 80,
+          totalShares: 12,
+          shareholders: { u_admin_founder: 5 },
+          lastDividendCoins: 0,
+          dividendsPaidCount: 0
+        },
+        {
+          creatorUid: 'u_elena_kiv',
+          creatorName: 'Elena_KIV',
+          cityId: 'chisinau',
+          sharePrice: 60,
+          totalShares: 8,
+          shareholders: { u_admin_founder: 2 },
+          lastDividendCoins: 0,
+          dividendsPaidCount: 0
+        },
+        {
+          creatorUid: 'u_lucas_par',
+          creatorName: 'Lucas_Paris',
+          cityId: 'paris',
+          sharePrice: 55,
+          totalShares: 6,
+          shareholders: {},
+          lastDividendCoins: 0,
+          dividendsPaidCount: 0
+        },
+        {
+          creatorUid: 'u_kenji_tyo',
+          creatorName: 'Kenji_TYO',
+          cityId: 'tokyo',
+          sharePrice: 55,
+          totalShares: 6,
+          shareholders: {},
+          lastDividendCoins: 0,
+          dividendsPaidCount: 0
+        }
+      ],
+      updatedAt: 0
+    }
   };
 }
 
@@ -2122,6 +2251,19 @@ function upgradeEcosystemState(st) {
         st.viralContests.eurovision.title_fr = 'REMO Concours Musical — Sons & Hymnes 60s des Villes';
       }
     }
+  }
+
+  const defSystems = getDefaultUniqueWorldSystems();
+  if (!st.worldSystems || typeof st.worldSystems !== 'object') {
+    st.worldSystems = defSystems;
+  } else {
+    Object.keys(defSystems).forEach((k) => {
+      if (!st.worldSystems[k] || typeof st.worldSystems[k] !== 'object') {
+        st.worldSystems[k] = defSystems[k];
+      } else {
+        st.worldSystems[k] = Object.assign({}, defSystems[k], st.worldSystems[k]);
+      }
+    });
   }
 
   // Upgrade every citizen with Referral Codes & VIP Cosmetics
@@ -3970,6 +4112,9 @@ const REMO_STORE = {
         if (this.deletedDuelIds && this.deletedDuelIds.size > 0 && Array.isArray(this.state.duels)) {
           this.state.duels = this.state.duels.filter((d) => d && d.id && !this.deletedDuelIds.has(d.id));
         }
+        if (data.cityMayors && typeof data.cityMayors === 'object') {
+          this.state.cityMayors = Object.assign({}, this.state.cityMayors || {}, data.cityMayors);
+        }
         if (data.viralContests && typeof data.viralContests === 'object') {
           this.state.viralContests = this.state.viralContests || getDefaultViralContests();
           Object.keys(data.viralContests).forEach((k) => {
@@ -3984,12 +4129,27 @@ const REMO_STORE = {
           if (typeof renderViralContestsView === 'function') renderViralContestsView();
           if (typeof renderFeedActiveContestsBanner === 'function') renderFeedActiveContestsBanner();
         }
+        if (data.worldSystems && typeof data.worldSystems === 'object') {
+          this.state.worldSystems = this.state.worldSystems || getDefaultUniqueWorldSystems();
+          Object.keys(data.worldSystems).forEach((k) => {
+            const sObj = data.worldSystems[k];
+            if (sObj && typeof sObj === 'object') {
+              const localObj = this.state.worldSystems[k] || {};
+              if (Number(sObj.updatedAt || 0) >= Number(localObj.updatedAt || 0)) {
+                this.state.worldSystems[k] = Object.assign({}, localObj, sObj);
+              }
+            }
+          });
+          if (typeof renderViralContestsView === 'function') renderViralContestsView();
+          if (typeof renderFeedActiveContestsBanner === 'function') renderFeedActiveContestsBanner();
+        }
       };
       
       docRef.get().then((snap) => {
         if (!snap.exists) {
           docRef.set({
             cityScores: this.state.cityScores || {},
+            cityMayors: this.state.cityMayors || {},
             duels: (this.state.duels || []).slice(0, 15),
             settings: this.state.settings || {},
             bottles: (this.state.bottles || []).slice(0, 30),
@@ -3997,6 +4157,7 @@ const REMO_STORE = {
             auctions: (this.state.auctions || []).slice(0, 25),
             geoVaults: (this.state.geoVaults || []).slice(0, 35),
             viralContests: this.state.viralContests || getDefaultViralContests(),
+            worldSystems: this.state.worldSystems || getDefaultUniqueWorldSystems(),
             deletedPostIds: [...(this.deletedPostIds || [])].slice(-100),
             deletedUserIds: [...(this.deletedUserIds || [])].slice(-100),
             deletedDuelIds: [...(this.deletedDuelIds || [])].slice(-100),
@@ -5023,6 +5184,739 @@ const REMO_STORE = {
     this._notifyContestUpdate('flash_hunt_stopped');
   },
 
+  /* ═══════════════════════════════════════════════════════════════════════
+     7 UNIQUE REMO WORLD SYSTEMS (100% Admin Controlled, EN/FR Bilingual)
+     ═══════════════════════════════════════════════════════════════════════ */
+  ensureWorldSystems() {
+    const defs = getDefaultUniqueWorldSystems();
+    if (!this.state.worldSystems || typeof this.state.worldSystems !== 'object') {
+      this.state.worldSystems = defs;
+    } else {
+      Object.keys(defs).forEach((k) => {
+        if (!this.state.worldSystems[k] || typeof this.state.worldSystems[k] !== 'object') {
+          this.state.worldSystems[k] = defs[k];
+        } else {
+          this.state.worldSystems[k] = Object.assign({}, defs[k], this.state.worldSystems[k]);
+        }
+      });
+    }
+    return this.state.worldSystems;
+  },
+
+  _calcCityDistKm(cityAId, cityBId) {
+    const cA = typeof getCityById === 'function' ? getCityById(cityAId) : null;
+    const cB = typeof getCityById === 'function' ? getCityById(cityBId) : null;
+    if (!cA || !cB) return 1250;
+    const R = 6371;
+    const dLat = ((Number(cB.lat || 0) - Number(cA.lat || 0)) * Math.PI) / 180;
+    const dLng = ((Number(cB.lng || 0) - Number(cA.lng || 0)) * Math.PI) / 180;
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos((Number(cA.lat || 0) * Math.PI) / 180) *
+        Math.cos((Number(cB.lat || 0) * Math.PI) / 180) *
+        Math.sin(dLng / 2) *
+        Math.sin(dLng / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return Math.max(15, Math.round(R * c));
+  },
+
+  // ── 🔥 1. 4D WORLD TORCH RELAY™ ──
+  adminLaunchTorchRelay(opts = {}) {
+    const ws = this.ensureWorldSystems();
+    const startCity = opts.startCityId || 'montreal';
+    ws.torchRelay = {
+      active: true,
+      status: 'running',
+      title_en: (opts.title_en || '4D World Torch Relay™ around the Earth').trim(),
+      title_fr: (opts.title_fr || 'Relais de la Flamme Olympique 4D REMO™ autour du Monde').trim(),
+      startCityId: startCity,
+      currentCityId: startCity,
+      currentHolderUid: 'u_admin_founder',
+      currentHolderName: 'REMO Founder',
+      targetCitiesCount: Math.max(2, Number(opts.targetCitiesCount || 10)),
+      jackpotCoins: Math.max(200, Number(opts.jackpotCoins || 5000)),
+      perPassCoins: Math.max(10, Number(opts.perPassCoins || 50)),
+      totalKm: 0,
+      visitedCities: [startCity],
+      holdersHistory: [
+        {
+          uid: 'u_admin_founder',
+          name: 'REMO Founder',
+          fromCityId: startCity,
+          toCityId: startCity,
+          km: 0,
+          message: '🔥 Planetary Torch Ignited by Founder!',
+          ts: Date.now()
+        }
+      ],
+      jackpotPaid: false,
+      updatedAt: Date.now()
+    };
+    this.addCityScore(startCity, 50);
+    this._notifyContestUpdate('torch_relay_launched');
+    return ws.torchRelay;
+  },
+
+  passWorldTorchToCity(nextCityId, message = '') {
+    const ws = this.ensureWorldSystems();
+    const tr = ws.torchRelay;
+    const u = this.getCurrentUser();
+    if (!u || u.role === 'guest') return { ok: false, error: 'auth_required' };
+    if (!tr.active || tr.status !== 'running') return { ok: false, error: 'not_running' };
+    if (!nextCityId || nextCityId === tr.currentCityId) return { ok: false, error: 'same_city' };
+
+    const km = this._calcCityDistKm(tr.currentCityId, nextCityId);
+    const prevCity = tr.currentCityId;
+    tr.currentCityId = nextCityId;
+    tr.currentHolderUid = u.uid;
+    tr.currentHolderName = u.name;
+    tr.totalKm = Number(tr.totalKm || 0) + km;
+    tr.visitedCities = Array.isArray(tr.visitedCities) ? tr.visitedCities : [tr.startCityId || 'montreal'];
+    if (!tr.visitedCities.includes(nextCityId)) {
+      tr.visitedCities.push(nextCityId);
+    }
+    tr.holdersHistory = Array.isArray(tr.holdersHistory) ? tr.holdersHistory : [];
+    tr.holdersHistory.push({
+      uid: u.uid,
+      name: u.name,
+      fromCityId: prevCity,
+      toCityId: nextCityId,
+      km,
+      message: String(message || '').trim().slice(0, 140),
+      ts: Date.now()
+    });
+
+    const reward = Number(tr.perPassCoins || 50);
+    this.addCoins(u.uid, reward, 30);
+    this.addCityScore(nextCityId, 45);
+    this.addCityScore(prevCity, 20);
+
+    let jackpotTriggered = false;
+    if (tr.visitedCities.length >= Number(tr.targetCitiesCount || 10) && !tr.jackpotPaid) {
+      this._distributeTorchJackpotInternal(tr);
+      jackpotTriggered = true;
+    }
+
+    tr.updatedAt = Date.now();
+    this._notifyContestUpdate('torch_passed');
+    return { ok: true, km, reward, totalKm: tr.totalKm, visitedCount: tr.visitedCities.length, jackpotTriggered };
+  },
+
+  _distributeTorchJackpotInternal(tr) {
+    if (!tr || tr.jackpotPaid) return 0;
+    const uniqueUids = Array.from(
+      new Set((tr.holdersHistory || []).map((h) => h && h.uid).filter(Boolean))
+    );
+    const count = Math.max(1, uniqueUids.length);
+    const share = Math.max(50, Math.round(Number(tr.jackpotCoins || 5000) / count));
+    uniqueUids.forEach((uid) => {
+      this.adminAdjustUserCoins(uid, 'add', share);
+    });
+    (tr.visitedCities || []).forEach((cid) => {
+      this.addCityScore(cid, 100);
+    });
+    tr.jackpotPaid = true;
+    tr.status = 'concluded';
+    return share;
+  },
+
+  adminConcludeTorchJackpot() {
+    const ws = this.ensureWorldSystems();
+    const tr = ws.torchRelay;
+    const share = this._distributeTorchJackpotInternal(tr);
+    tr.updatedAt = Date.now();
+    this._notifyContestUpdate('torch_jackpot_concluded');
+    return { ok: true, share };
+  },
+
+  adminStopTorchRelay() {
+    const ws = this.ensureWorldSystems();
+    ws.torchRelay = Object.assign(getDefaultUniqueWorldSystems().torchRelay, { updatedAt: Date.now() });
+    this._notifyContestUpdate('torch_relay_stopped');
+  },
+
+  // ── 🌍 2. GLOBAL SYNC FLASH™ (Simultaneous Planetary Live Window) ──
+  adminLaunchGlobalSync(opts = {}) {
+    const ws = this.ensureWorldSystems();
+    const durationMin = Math.max(5, Number(opts.durationMinutes || 25));
+    ws.globalSync = {
+      active: true,
+      status: 'open',
+      prompt_en: (opts.prompt_en || 'Show the sky or your view in your city right now!').trim(),
+      prompt_fr: (opts.prompt_fr || 'Montrez le ciel ou votre vue dans votre ville en cet instant !').trim(),
+      rewardCoins: Math.max(25, Number(opts.rewardCoins || 100)),
+      endsAt: Date.now() + durationMin * 60000,
+      moments: [],
+      participants: {},
+      updatedAt: Date.now()
+    };
+    this._notifyContestUpdate('global_sync_launched');
+    return ws.globalSync;
+  },
+
+  submitGlobalSyncMoment(opts = {}) {
+    const ws = this.ensureWorldSystems();
+    const gs = ws.globalSync;
+    const u = this.getCurrentUser();
+    if (!u || u.role === 'guest') return { ok: false, error: 'auth_required' };
+    if (!gs.active || gs.status !== 'open') return { ok: false, error: 'not_open' };
+    if (gs.endsAt && Date.now() > gs.endsAt) {
+      gs.status = 'concluded';
+      gs.updatedAt = Date.now();
+      this._notifyContestUpdate('global_sync_expired');
+      return { ok: false, error: 'expired' };
+    }
+    gs.participants = gs.participants || {};
+    if (gs.participants[u.uid]) return { ok: false, error: 'already_synced' };
+
+    const cityId = opts.cityId || u.homeCity || 'montreal';
+    const wStatus = typeof REMO_WEATHER !== 'undefined' && REMO_WEATHER.getCityLiveStatus
+      ? REMO_WEATHER.getCityLiveStatus(cityId)
+      : { timeStr: '12:00', tempC: 20, icon: '☀️' };
+
+    const item = {
+      id: 'sync_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+      uid: u.uid,
+      authorName: u.name,
+      cityId,
+      caption: String(opts.caption || '').trim().slice(0, 180) || '⚡ Live from my city!',
+      mediaUrl: String(opts.mediaUrl || '').trim(),
+      localTime: wStatus.timeStr || '12:00',
+      tempC: wStatus.tempC !== undefined ? wStatus.tempC : 20,
+      weatherIcon: wStatus.icon || '☀️',
+      ts: Date.now()
+    };
+
+    gs.moments = Array.isArray(gs.moments) ? gs.moments : [];
+    gs.moments.unshift(item);
+    gs.participants[u.uid] = true;
+
+    const reward = Number(gs.rewardCoins || 100);
+    this.addCoins(u.uid, reward, 35);
+    this.addCityScore(cityId, 40);
+
+    gs.updatedAt = Date.now();
+    this._notifyContestUpdate('global_sync_submitted');
+    return { ok: true, reward, item };
+  },
+
+  adminStopGlobalSync() {
+    const ws = this.ensureWorldSystems();
+    ws.globalSync = Object.assign(getDefaultUniqueWorldSystems().globalSync, { updatedAt: Date.now() });
+    this._notifyContestUpdate('global_sync_stopped');
+  },
+
+  // ── 🏛️ 3. WORLD CITY MAYOR & ROYAL KEY™ ──
+  adminToggleMayorElections(active = true) {
+    const ws = this.ensureWorldSystems();
+    ws.mayorElections.active = !!active;
+    ws.mayorElections.status = active ? 'open' : 'idle';
+    ws.mayorElections.updatedAt = Date.now();
+    this._notifyContestUpdate('mayor_elections_toggled');
+    return ws.mayorElections;
+  },
+
+  nominateOrVoteCityMayor(cityId, candidateUidOrSelf = '', manifesto = '') {
+    const ws = this.ensureWorldSystems();
+    const me = ws.mayorElections;
+    const u = this.getCurrentUser();
+    if (!u || u.role === 'guest') return { ok: false, error: 'auth_required' };
+    if (!me.active) return { ok: false, error: 'inactive' };
+    const cid = cityId || u.homeCity || 'montreal';
+    me.candidates = me.candidates || {};
+    me.candidates[cid] = Array.isArray(me.candidates[cid]) ? me.candidates[cid] : [];
+    me.voters = me.voters || {};
+
+    const targetUid = candidateUidOrSelf || u.uid;
+    let cand = me.candidates[cid].find((c) => c && c.uid === targetUid);
+    if (!cand) {
+      const targetUser = (this.state.users || []).find((x) => x.uid === targetUid) || u;
+      cand = {
+        uid: targetUser.uid,
+        name: targetUser.name || 'Citizen',
+        manifesto: String(manifesto || 'For the glory of our 4D City!').trim().slice(0, 140),
+        votes: 0
+      };
+      me.candidates[cid].push(cand);
+    } else if (manifesto && targetUid === u.uid) {
+      cand.manifesto = String(manifesto).trim().slice(0, 140);
+    }
+
+    const voteKey = `${cid}_${u.uid}`;
+    if (me.voters[voteKey]) {
+      return { ok: false, error: 'already_voted' };
+    }
+    me.voters[voteKey] = targetUid;
+    cand.votes = Number(cand.votes || 0) + 1;
+
+    // Sort candidates by votes descending and update cityMayor if top
+    me.candidates[cid].sort((a, b) => Number(b.votes || 0) - Number(a.votes || 0));
+    const leader = me.candidates[cid][0];
+    if (leader && leader.uid) {
+      this.state.cityMayors = this.state.cityMayors || {};
+      this.state.cityMayors[cid] = leader.uid;
+    }
+
+    const reward = Number(me.voteRewardCoins || 15);
+    this.addCoins(u.uid, reward, 15);
+    this.addCityScore(cid, 20);
+    me.updatedAt = Date.now();
+    this._notifyContestUpdate('mayor_vote_cast');
+    return { ok: true, candidate: cand, reward };
+  },
+
+  adminCrownCityMayorDirect(cityId, citizenNameOrUid, customDecree = '') {
+    const ws = this.ensureWorldSystems();
+    const me = ws.mayorElections;
+    const cid = cityId || 'montreal';
+    const q = String(citizenNameOrUid || '').trim().toLowerCase();
+    let targetUser = (this.state.users || []).find(
+      (u) => u && (u.uid.toLowerCase() === q || (u.name && u.name.toLowerCase() === q))
+    );
+    if (!targetUser) {
+      targetUser = {
+        uid: q ? 'u_mayor_' + q.replace(/[^a-z0-9]/g, '_') : 'u_admin_founder',
+        name: citizenNameOrUid || 'REMO Founder'
+      };
+    }
+    this.state.cityMayors = this.state.cityMayors || {};
+    this.state.cityMayors[cid] = targetUser.uid;
+
+    me.candidates = me.candidates || {};
+    me.candidates[cid] = Array.isArray(me.candidates[cid]) ? me.candidates[cid] : [];
+    let cand = me.candidates[cid].find((c) => c && c.uid === targetUser.uid);
+    if (!cand) {
+      cand = { uid: targetUser.uid, name: targetUser.name, manifesto: customDecree || 'Appointed by Founder Royal Key 🔑', votes: 100 };
+      me.candidates[cid].unshift(cand);
+    } else {
+      cand.votes = Math.max(Number(cand.votes || 0) + 50, 100);
+    }
+
+    if (customDecree) {
+      me.cityDecrees = me.cityDecrees || {};
+      me.cityDecrees[cid] = {
+        authorUid: targetUser.uid,
+        authorName: targetUser.name,
+        text_en: customDecree,
+        text_fr: customDecree,
+        approved: true,
+        updatedAt: Date.now()
+      };
+    }
+    me.active = true;
+    me.status = 'open';
+    me.updatedAt = Date.now();
+    this._notifyContestUpdate('admin_mayor_crowned');
+    return { ok: true, mayor: targetUser, cityId: cid };
+  },
+
+  submitMayorCityDecree(cityId, text) {
+    const ws = this.ensureWorldSystems();
+    const me = ws.mayorElections;
+    const u = this.getCurrentUser();
+    if (!u || u.role === 'guest') return { ok: false, error: 'auth_required' };
+    const cid = cityId || u.homeCity || 'montreal';
+    const currentMayorUid = (this.state.cityMayors && this.state.cityMayors[cid]) || '';
+    const isAdmin = this.isAdminUnlocked() || u.uid === 'u_admin_founder';
+    if (currentMayorUid !== u.uid && !isAdmin) {
+      return { ok: false, error: 'not_mayor' };
+    }
+    const cleanText = String(text || '').trim().slice(0, 220);
+    if (!cleanText) return { ok: false, error: 'empty' };
+    me.cityDecrees = me.cityDecrees || {};
+    me.cityDecrees[cid] = {
+      authorUid: u.uid,
+      authorName: u.name,
+      text_en: cleanText,
+      text_fr: cleanText,
+      approved: isAdmin, // Admin decrees auto-approved; citizen mayors await Admin 1-click approval
+      updatedAt: Date.now()
+    };
+    me.updatedAt = Date.now();
+    this._notifyContestUpdate('mayor_decree_submitted');
+    return { ok: true, approved: isAdmin };
+  },
+
+  adminApproveMayorDecree(cityId, approve = true) {
+    const ws = this.ensureWorldSystems();
+    const me = ws.mayorElections;
+    me.cityDecrees = me.cityDecrees || {};
+    if (me.cityDecrees[cityId]) {
+      if (approve) {
+        me.cityDecrees[cityId].approved = true;
+      } else {
+        delete me.cityDecrees[cityId];
+      }
+      me.updatedAt = Date.now();
+      this._notifyContestUpdate('mayor_decree_moderated');
+    }
+    return { ok: true };
+  },
+
+  // ── 🤝 4. SISTER CITIES 2X ALLIANCE™ (48h Twin-City Treaties) ──
+  adminCreateSisterAlliance(cityA, cityB, durationHours = 48, waveRewardCoins = 40) {
+    if (!cityA || !cityB || cityA === cityB) return { ok: false, error: 'same_city' };
+    const ws = this.ensureWorldSystems();
+    const sa = ws.sisterAlliances;
+    sa.active = true;
+    sa.treaties = Array.isArray(sa.treaties) ? sa.treaties : [];
+    const existingIdx = sa.treaties.findIndex(
+      (t) => t && ((t.cityA === cityA && t.cityB === cityB) || (t.cityA === cityB && t.cityB === cityA))
+    );
+    const treaty = {
+      id: 'ally_' + cityA + '_' + cityB + '_' + Date.now(),
+      cityA,
+      cityB,
+      bonusMultiplier: 2,
+      waveRewardCoins: Math.max(10, Number(waveRewardCoins || 40)),
+      wavesCount: 0,
+      wavedBy: {},
+      recentWaves: [],
+      endsAt: Date.now() + Math.max(1, Number(durationHours || 48)) * 3600000
+    };
+    if (existingIdx >= 0) {
+      sa.treaties[existingIdx] = treaty;
+    } else {
+      sa.treaties.unshift(treaty);
+    }
+    sa.updatedAt = Date.now();
+    this._notifyContestUpdate('sister_alliance_created');
+    return { ok: true, treaty };
+  },
+
+  sendSisterAllianceWave(treatyId, greeting = '') {
+    const ws = this.ensureWorldSystems();
+    const sa = ws.sisterAlliances;
+    const u = this.getCurrentUser();
+    if (!u || u.role === 'guest') return { ok: false, error: 'auth_required' };
+    if (!sa.active || !Array.isArray(sa.treaties)) return { ok: false, error: 'inactive' };
+    const t = sa.treaties.find((x) => x && x.id === treatyId);
+    if (!t) return { ok: false, error: 'not_found' };
+    if (t.endsAt && Date.now() > t.endsAt) return { ok: false, error: 'expired' };
+    t.wavedBy = t.wavedBy || {};
+    if (t.wavedBy[u.uid]) return { ok: false, error: 'already_waved' };
+
+    t.wavedBy[u.uid] = Date.now();
+    t.wavesCount = Number(t.wavesCount || 0) + 1;
+    t.recentWaves = Array.isArray(t.recentWaves) ? t.recentWaves : [];
+    t.recentWaves.unshift({
+      uid: u.uid,
+      name: u.name,
+      homeCity: u.homeCity || t.cityA,
+      greeting: String(greeting || '🤝 Long live our Sister Cities Alliance!').trim().slice(0, 120),
+      ts: Date.now()
+    });
+    if (t.recentWaves.length > 15) t.recentWaves.length = 15;
+
+    const reward = Number(t.waveRewardCoins || 40);
+    this.addCoins(u.uid, reward, 30);
+    // 2X Alliance Bonus to BOTH sister cities!
+    this.addCityScore(t.cityA, 50);
+    this.addCityScore(t.cityB, 50);
+
+    sa.updatedAt = Date.now();
+    this._notifyContestUpdate('sister_alliance_wave');
+    return { ok: true, reward, treaty: t };
+  },
+
+  adminRemoveSisterAlliance(treatyId) {
+    const ws = this.ensureWorldSystems();
+    const sa = ws.sisterAlliances;
+    if (treatyId === 'ALL') {
+      sa.treaties = [];
+      sa.active = false;
+    } else {
+      sa.treaties = (sa.treaties || []).filter((t) => t && t.id !== treatyId);
+      if (sa.treaties.length === 0) sa.active = false;
+    }
+    sa.updatedAt = Date.now();
+    this._notifyContestUpdate('sister_alliance_removed');
+    return { ok: true };
+  },
+
+  // ── 🎨 5. REMO WORLD PIXEL CANVAS™ (Collaborative City Flags & Monuments Fresco) ──
+  adminTogglePixelCanvas(active = true, opts = {}) {
+    const ws = this.ensureWorldSystems();
+    const pc = ws.pixelCanvas;
+    pc.active = !!active;
+    if (opts.title_en) pc.title_en = opts.title_en.trim();
+    if (opts.title_fr) pc.title_fr = opts.title_fr.trim();
+    if (opts.pixelRewardCoins) pc.pixelRewardCoins = Math.max(1, Number(opts.pixelRewardCoins));
+    pc.updatedAt = Date.now();
+    this._notifyContestUpdate('pixel_canvas_toggled');
+    return pc;
+  },
+
+  placeWorldPixel(x, y, color = '#fbbf24') {
+    const ws = this.ensureWorldSystems();
+    const pc = ws.pixelCanvas;
+    const u = this.getCurrentUser();
+    if (!u || u.role === 'guest') return { ok: false, error: 'auth_required' };
+    if (!pc.active) return { ok: false, error: 'inactive' };
+    const ix = Math.max(0, Math.min(Number(pc.width || 24) - 1, Math.floor(Number(x || 0))));
+    const iy = Math.max(0, Math.min(Number(pc.height || 14) - 1, Math.floor(Number(y || 0))));
+    const key = `${ix}_${iy}`;
+
+    pc.pixels = pc.pixels || {};
+    pc.pixels[key] = {
+      color: String(color || '#fbbf24').slice(0, 16),
+      uid: u.uid,
+      name: u.name,
+      cityId: u.homeCity || 'montreal'
+    };
+    pc.totalPixelsPlaced = Number(pc.totalPixelsPlaced || 0) + 1;
+    pc.contributors = pc.contributors || {};
+    pc.contributors[u.uid] = {
+      name: u.name,
+      cityId: u.homeCity || 'montreal',
+      count: Number((pc.contributors[u.uid] && pc.contributors[u.uid].count) || 0) + 1
+    };
+
+    const reward = Number(pc.pixelRewardCoins || 5);
+    this.addCoins(u.uid, reward, 5);
+    this.addCityScore(u.homeCity || 'montreal', 5);
+    pc.updatedAt = Date.now();
+    this._notifyContestUpdate('pixel_placed');
+    return { ok: true, key, reward };
+  },
+
+  adminPresetCityFlagOnCanvas(preset = 'remo_gold') {
+    const ws = this.ensureWorldSystems();
+    const pc = ws.pixelCanvas;
+    pc.pixels = pc.pixels || {};
+    const W = Number(pc.width || 24);
+    const H = Number(pc.height || 14);
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        let col = '';
+        if (preset === 'tricolor_md_ro') {
+          col = x < W / 3 ? '#2563eb' : x < (2 * W) / 3 ? '#fbbf24' : '#ef4444';
+        } else if (preset === 'montreal_quebec') {
+          col = (x === Math.floor(W / 2) || y === Math.floor(H / 2)) ? '#ffffff' : '#1d4ed8';
+        } else {
+          // REMO Crown & Heart emblem
+          const isBorder = x === 0 || x === W - 1 || y === 0 || y === H - 1;
+          const isCenterCrown = y >= 4 && y <= 9 && x >= 7 && x <= 16 && ((x + y) % 2 === 0);
+          col = isBorder ? '#fbbf24' : isCenterCrown ? '#38bdf8' : '#0f172a';
+        }
+        if (col) {
+          pc.pixels[`${x}_${y}`] = { color: col, uid: 'u_admin_founder', name: 'REMO Founder', cityId: 'montreal' };
+        }
+      }
+    }
+    pc.active = true;
+    pc.totalPixelsPlaced = Number(pc.totalPixelsPlaced || 0) + W * H;
+    pc.updatedAt = Date.now();
+    this._notifyContestUpdate('pixel_canvas_preset');
+    return { ok: true };
+  },
+
+  adminClearPixelCanvas() {
+    const ws = this.ensureWorldSystems();
+    ws.pixelCanvas.pixels = {};
+    ws.pixelCanvas.updatedAt = Date.now();
+    this._notifyContestUpdate('pixel_canvas_cleared');
+    return { ok: true };
+  },
+
+  adminMintCanvasAs4DCard() {
+    const ws = this.ensureWorldSystems();
+    const pc = ws.pixelCanvas;
+    pc.mintedCardsCount = Number(pc.mintedCardsCount || 0) + 1;
+    // Reward all contributors +100 bonus coins!
+    Object.keys(pc.contributors || {}).forEach((uid) => {
+      this.adminAdjustUserCoins(uid, 'add', 100);
+    });
+    pc.updatedAt = Date.now();
+    this._notifyContestUpdate('pixel_canvas_minted');
+    return { ok: true, edition: pc.mintedCardsCount };
+  },
+
+  // ── ⏳ 6. CITY MONUMENT TIME-VAULT™ (Sealed Future Capsules) ──
+  adminLaunchMonumentVault(opts = {}) {
+    const ws = this.ensureWorldSystems();
+    const mv = ws.monumentVault;
+    mv.active = true;
+    mv.sealed = opts.sealed !== undefined ? !!opts.sealed : true;
+    mv.title_en = (opts.title_en || 'City Monument Time-Vault™ — Sealed Wishes & Predictions').trim();
+    mv.title_fr = (opts.title_fr || 'Monument Capsule Temporelle des Villes™ — Vœux & Prédictions Scellés').trim();
+    mv.unsealTargetLabel_en = (opts.unsealTargetLabel_en || 'Official Founder Gala Opening').trim();
+    mv.unsealTargetLabel_fr = (opts.unsealTargetLabel_fr || 'Grande Ouverture Gala du Fondateur').trim();
+    mv.depositRewardCoins = Math.max(10, Number(opts.depositRewardCoins || 25));
+    if (opts.resetCapsules) mv.capsules = [];
+    mv.updatedAt = Date.now();
+    this._notifyContestUpdate('monument_vault_launched');
+    return mv;
+  },
+
+  depositMonumentCapsule(opts = {}) {
+    const ws = this.ensureWorldSystems();
+    const mv = ws.monumentVault;
+    const u = this.getCurrentUser();
+    if (!u || u.role === 'guest') return { ok: false, error: 'auth_required' };
+    if (!mv.active) return { ok: false, error: 'inactive' };
+    mv.capsules = Array.isArray(mv.capsules) ? mv.capsules : [];
+    if (mv.capsules.some((c) => c && c.uid === u.uid)) {
+      return { ok: false, error: 'already_deposited' };
+    }
+    const message = String(opts.message || '').trim().slice(0, 260);
+    if (!message) return { ok: false, error: 'empty' };
+
+    const cap = {
+      id: 'cap_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+      uid: u.uid,
+      authorName: u.name,
+      cityId: opts.cityId || u.homeCity || 'montreal',
+      message,
+      mediaUrl: String(opts.mediaUrl || '').trim(),
+      ts: Date.now()
+    };
+    mv.capsules.unshift(cap);
+    const reward = Number(mv.depositRewardCoins || 25);
+    this.addCoins(u.uid, reward, 20);
+    this.addCityScore(cap.cityId, 30);
+
+    mv.updatedAt = Date.now();
+    this._notifyContestUpdate('monument_capsule_deposited');
+    return { ok: true, reward, capsule: cap };
+  },
+
+  adminUnsealMonumentVault() {
+    const ws = this.ensureWorldSystems();
+    const mv = ws.monumentVault;
+    mv.active = true;
+    mv.sealed = false;
+    // Bonus +50 coins to every citizen who deposited a capsule!
+    (mv.capsules || []).forEach((c) => {
+      if (c && c.uid) this.adminAdjustUserCoins(c.uid, 'add', 50);
+    });
+    mv.updatedAt = Date.now();
+    RemoAudio.play('fanfare');
+    this._notifyContestUpdate('monument_vault_unsealed');
+    return { ok: true, count: (mv.capsules || []).length };
+  },
+
+  adminStopMonumentVault() {
+    const ws = this.ensureWorldSystems();
+    ws.monumentVault.active = false;
+    ws.monumentVault.updatedAt = Date.now();
+    this._notifyContestUpdate('monument_vault_stopped');
+  },
+
+  // ── 📈 7. CREATOR SHARES & FAN DIVIDENDS™ (Creator Stock Exchange) ──
+  adminToggleCreatorBourse(active = true) {
+    const ws = this.ensureWorldSystems();
+    ws.creatorBourse.active = !!active;
+    ws.creatorBourse.updatedAt = Date.now();
+    this._notifyContestUpdate('creator_bourse_toggled');
+    return ws.creatorBourse;
+  },
+
+  adminAddFeaturedCreatorStock(creatorName, cityId = 'montreal', initialPrice = 50) {
+    const ws = this.ensureWorldSystems();
+    const cb = ws.creatorBourse;
+    const cleanName = String(creatorName || '').trim().replace(/^@/, '');
+    if (!cleanName) return { ok: false, error: 'empty' };
+    cb.stocks = Array.isArray(cb.stocks) ? cb.stocks : [];
+    const existing = cb.stocks.find((s) => s && s.creatorName.toLowerCase() === cleanName.toLowerCase());
+    if (existing) {
+      existing.cityId = cityId || existing.cityId;
+      existing.sharePrice = Math.max(10, Number(initialPrice || existing.sharePrice));
+    } else {
+      const matchedUser = (this.state.users || []).find(
+        (u) => u && u.name && u.name.toLowerCase() === cleanName.toLowerCase()
+      );
+      cb.stocks.push({
+        creatorUid: (matchedUser && matchedUser.uid) || 'u_creator_' + Date.now(),
+        creatorName: (matchedUser && matchedUser.name) || cleanName,
+        cityId: cityId || (matchedUser && matchedUser.homeCity) || 'montreal',
+        sharePrice: Math.max(10, Number(initialPrice || 50)),
+        totalShares: 5,
+        shareholders: {},
+        lastDividendCoins: 0,
+        dividendsPaidCount: 0
+      });
+    }
+    cb.active = true;
+    cb.updatedAt = Date.now();
+    this._notifyContestUpdate('creator_stock_added');
+    return { ok: true };
+  },
+
+  buyCreatorShare(creatorUid) {
+    const ws = this.ensureWorldSystems();
+    const cb = ws.creatorBourse;
+    const u = this.getCurrentUser();
+    if (!u || u.role === 'guest') return { ok: false, error: 'auth_required' };
+    if (!cb.active) return { ok: false, error: 'inactive' };
+    const stock = (cb.stocks || []).find((s) => s && s.creatorUid === creatorUid);
+    if (!stock) return { ok: false, error: 'not_found' };
+    const price = Math.max(10, Number(stock.sharePrice || 50));
+    if (Number(u.coins || 0) < price) return { ok: false, error: 'insufficient_coins', price };
+
+    u.coins = Number(u.coins || 0) - price;
+    stock.shareholders = stock.shareholders || {};
+    stock.shareholders[u.uid] = Number(stock.shareholders[u.uid] || 0) + 1;
+    stock.totalShares = Number(stock.totalShares || 0) + 1;
+    stock.sharePrice = price + 5; // Demand drives creator share price up!
+
+    // Creator receives +10 🪙 royalty when a fan invests in their stock
+    if (stock.creatorUid && stock.creatorUid !== u.uid) {
+      this.adminAdjustUserCoins(stock.creatorUid, 'add', 10);
+    }
+    this.addCityScore(stock.cityId || 'montreal', 15);
+    cb.updatedAt = Date.now();
+    this._notifyContestUpdate('creator_share_bought');
+    return { ok: true, pricePaid: price, newPrice: stock.sharePrice, owned: stock.shareholders[u.uid] };
+  },
+
+  sellCreatorShare(creatorUid) {
+    const ws = this.ensureWorldSystems();
+    const cb = ws.creatorBourse;
+    const u = this.getCurrentUser();
+    if (!u || u.role === 'guest') return { ok: false, error: 'auth_required' };
+    const stock = (cb.stocks || []).find((s) => s && s.creatorUid === creatorUid);
+    if (!stock || !stock.shareholders || Number(stock.shareholders[u.uid] || 0) <= 0) {
+      return { ok: false, error: 'no_shares' };
+    }
+    const sellValue = Math.max(10, Math.round(Number(stock.sharePrice || 50) * 0.9));
+    stock.shareholders[u.uid] = Number(stock.shareholders[u.uid]) - 1;
+    if (stock.shareholders[u.uid] <= 0) delete stock.shareholders[u.uid];
+    stock.totalShares = Math.max(1, Number(stock.totalShares || 1) - 1);
+    stock.sharePrice = Math.max(20, Number(stock.sharePrice || 50) - 3);
+    this.addCoins(u.uid, sellValue, 5);
+    cb.updatedAt = Date.now();
+    this._notifyContestUpdate('creator_share_sold');
+    return { ok: true, sellValue, newPrice: stock.sharePrice };
+  },
+
+  adminPayCreatorDividend(creatorUid, dividendPerShare = 30) {
+    const ws = this.ensureWorldSystems();
+    const cb = ws.creatorBourse;
+    const stock = (cb.stocks || []).find((s) => s && s.creatorUid === creatorUid);
+    if (!stock) return { ok: false, error: 'not_found' };
+    const divPer = Math.max(5, Number(dividendPerShare || cb.dividendPerShareDefault || 30));
+    let totalPaid = 0;
+    let holdersCount = 0;
+    Object.entries(stock.shareholders || {}).forEach(([holderUid, shares]) => {
+      const sh = Number(shares || 0);
+      if (sh > 0) {
+        const payout = sh * divPer;
+        this.adminAdjustUserCoins(holderUid, 'add', payout);
+        totalPaid += payout;
+        holdersCount++;
+      }
+    });
+    // Also reward the creator themselves!
+    this.adminAdjustUserCoins(stock.creatorUid, 'add', divPer * 2);
+    stock.lastDividendCoins = divPer;
+    stock.dividendsPaidCount = Number(stock.dividendsPaidCount || 0) + 1;
+    cb.updatedAt = Date.now();
+    RemoAudio.play('fanfare');
+    this._notifyContestUpdate('creator_dividend_paid');
+    return { ok: true, totalPaid, holdersCount, creatorName: stock.creatorName };
+  },
+
   syncToFirestore(reason = 'update', immediate = false) {
     if (!this.fbDb) return;
     clearTimeout(this._fbSyncDebounce);
@@ -5031,6 +5925,7 @@ const REMO_STORE = {
         const docRef = this.fbDb.collection('remo_ecosystem').doc('live_state');
         docRef.set({
           cityScores: this.state.cityScores || {},
+          cityMayors: this.state.cityMayors || {},
           duels: (this.state.duels || []).slice(0, 15),
           settings: this.state.settings || {},
           bottles: (this.state.bottles || []).slice(0, 30),
@@ -5038,6 +5933,7 @@ const REMO_STORE = {
           auctions: (this.state.auctions || []).slice(0, 25),
           geoVaults: (this.state.geoVaults || []).slice(0, 35),
           viralContests: this.state.viralContests || getDefaultViralContests(),
+          worldSystems: this.state.worldSystems || getDefaultUniqueWorldSystems(),
           deletedPostIds: [...(this.deletedPostIds || [])].slice(-100),
           deletedUserIds: [...(this.deletedUserIds || [])].slice(-100),
           deletedDuelIds: [...(this.deletedDuelIds || [])].slice(-100),

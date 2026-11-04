@@ -793,6 +793,146 @@
             <button class="adm-btn rose" onclick="adminResetFlashHuntFromOffice()">🗑️ Stop / Reset Flash Hunt</button>
           </div>
         </div>
+
+        <!-- ═══════════════════════════════════════════════════════════════
+             7 UNIQUE REMO WORLD SYSTEMS (100% ADMIN CONTROLLED)
+             ═══════════════════════════════════════════════════════════════ -->
+        <div class="exec-card" style="background:linear-gradient(135deg,rgba(249,115,22,0.16),rgba(56,189,248,0.16));border-color:#fbbf24;margin-top:20px;">
+          <h2 style="font-family:'Orbitron',sans-serif;font-size:1.12rem;color:#fde047;margin-bottom:4px;">
+            🔥🌍🏛️🤝🎨⏳📈 7 Unique REMO World Systems — 100% Founder Command Center
+          </h2>
+          <p style="font-size:0.8rem;color:#cbd5e1;margin:0;">
+            Every system below is 100% controlled by you as Admin. Only systems you activate appear live on REMO World!
+          </p>
+        </div>
+
+        <!-- 🔥 SYSTEM 1: 4D WORLD TORCH RELAY™ -->
+        <div class="exec-card" style="border-color:#f97316;">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
+            <h3 style="color:#fb923c;margin:0;">🔥 1. 4D World Torch Relay™ around the Earth</h3>
+            <span id="admWsTorchPill" style="font-size:0.76rem;font-weight:900;padding:4px 10px;border-radius:99px;background:rgba(255,255,255,0.08);">IDLE</span>
+          </div>
+          <div class="adm-row-2" style="margin-bottom:10px;">
+            <div class="adm-field"><label>Starting City (Ignite Torch)</label><select id="admTorchStartCity" class="adm-inp"></select></div>
+            <div class="adm-field"><label>Target Cities Count (Jackpot Goal)</label><input type="number" id="admTorchTargetCities" class="adm-inp" value="10"></div>
+            <div class="adm-field"><label>Grand Jackpot Shared by Torchbearers (🪙)</label><input type="number" id="admTorchJackpot" class="adm-inp" value="5000"></div>
+            <div class="adm-field"><label>Instant Reward per Torchbearer Pass (🪙)</label><input type="number" id="admTorchPerPass" class="adm-inp" value="50"></div>
+          </div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;">
+            <button class="adm-btn gold" onclick="adminIgniteWorldTorchFromOffice()">🔥 Ignite &amp; Launch 4D World Torch Relay</button>
+            <button class="adm-btn emerald" onclick="adminConcludeWorldTorchFromOffice()">🏆 Conclude &amp; Distribute Jackpot Now</button>
+            <button class="adm-btn rose" onclick="adminStopWorldTorchFromOffice()">🗑️ Extinguish / Reset Torch</button>
+          </div>
+        </div>
+
+        <!-- 🌍 SYSTEM 2: GLOBAL SYNC FLASH™ (Simultaneous Planetary Live) -->
+        <div class="exec-card" style="border-color:#38bdf8;">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
+            <h3 style="color:#38bdf8;margin:0;">🌍 2. Global Sync Flash™ — Simultaneous Planetary Live Window</h3>
+            <span id="admWsSyncPill" style="font-size:0.76rem;font-weight:900;padding:4px 10px;border-radius:99px;background:rgba(255,255,255,0.08);">IDLE</span>
+          </div>
+          <div class="adm-row-2" style="margin-bottom:10px;">
+            <div class="adm-field"><label>Live Prompt (EN)</label><input type="text" id="admSyncPromptEn" class="adm-inp" value="Show the sky or your view in your city right now!"></div>
+            <div class="adm-field"><label>Live Prompt (FR)</label><input type="text" id="admSyncPromptFr" class="adm-inp" value="Montrez le ciel ou votre vue dans votre ville en cet instant !"></div>
+            <div class="adm-field"><label>Countdown Window (Minutes)</label><input type="number" id="admSyncMinutes" class="adm-inp" value="25"></div>
+            <div class="adm-field"><label>Instant Sync Reward (🪙)</label><input type="number" id="admSyncReward" class="adm-inp" value="100"></div>
+          </div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;">
+            <button class="adm-btn gold" onclick="adminStartGlobalSyncFromOffice()">🚨 Trigger Global Sync Flash Live</button>
+            <button class="adm-btn rose" onclick="adminStopGlobalSyncFromOffice()">🗑️ Stop / Reset Global Sync</button>
+          </div>
+        </div>
+
+        <!-- 🏛️ SYSTEM 3: WORLD CITY MAYOR & ROYAL KEY™ -->
+        <div class="exec-card" style="border-color:#fbbf24;">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
+            <h3 style="color:#fde047;margin:0;">🏛️ 3. World City Mayor Elections &amp; 4D Royal Key™</h3>
+            <span id="admWsMayorPill" style="font-size:0.76rem;font-weight:900;padding:4px 10px;border-radius:99px;background:rgba(255,255,255,0.08);">IDLE</span>
+          </div>
+          <div class="adm-row-2" style="margin-bottom:10px;">
+            <div class="adm-field"><label>Select City</label><select id="admMayorCitySel" class="adm-inp"></select></div>
+            <div class="adm-field"><label>Appoint Mayor (@Username or UID)</label><input type="text" id="admMayorCitizenInp" class="adm-inp" value="REMO Founder"></div>
+            <div class="adm-field" style="grid-column:1/-1;"><label>Official City Welcome Decree (Optional — Approved Immediately)</label><input type="text" id="admMayorDecreeInp" class="adm-inp" placeholder="Welcome to our 4D City!..."></div>
+          </div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;">
+            <button class="adm-btn gold" onclick="adminToggleMayorHubFromOffice(true)">🏛️ Activate Mayor Elections Hub</button>
+            <button class="adm-btn emerald" onclick="adminCrownCityMayorFromOffice()">👑 1-Click Appoint Mayor &amp; Royal Key</button>
+            <button class="adm-btn rose" onclick="adminToggleMayorHubFromOffice(false)">🗑️ Hide Mayor Elections Hub</button>
+          </div>
+        </div>
+
+        <!-- 🤝 SYSTEM 4: SISTER CITIES 2X ALLIANCE™ -->
+        <div class="exec-card" style="border-color:#10b981;">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
+            <h3 style="color:#34d399;margin:0;">🤝 4. Sister Cities 48h 2X Alliance Treaties™</h3>
+            <span id="admWsAlliancePill" style="font-size:0.76rem;font-weight:900;padding:4px 10px;border-radius:99px;background:rgba(255,255,255,0.08);">IDLE</span>
+          </div>
+          <div class="adm-row-2" style="margin-bottom:10px;">
+            <div class="adm-field"><label>Sister City A</label><select id="admAllyCityA" class="adm-inp"></select></div>
+            <div class="adm-field"><label>Sister City B</label><select id="admAllyCityB" class="adm-inp"></select></div>
+            <div class="adm-field"><label>Treaty Duration (Hours)</label><input type="number" id="admAllyHours" class="adm-inp" value="48"></div>
+            <div class="adm-field"><label>2X Diplomatic Wave Bonus (🪙)</label><input type="number" id="admAllyWaveReward" class="adm-inp" value="40"></div>
+          </div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;">
+            <button class="adm-btn gold" onclick="adminCreateSisterAllianceFromOffice()">🤝 Unite Sister Cities in 2X Alliance</button>
+            <button class="adm-btn rose" onclick="adminClearSisterAlliancesFromOffice()">🗑️ End All Sister Alliances</button>
+          </div>
+        </div>
+
+        <!-- 🎨 SYSTEM 5: REMO WORLD PIXEL CANVAS™ -->
+        <div class="exec-card" style="border-color:#a855f7;">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
+            <h3 style="color:#c084fc;margin:0;">🎨 5. REMO World Pixel-Art Fresco™ (24×14 Live Canvas)</h3>
+            <span id="admWsPixelPill" style="font-size:0.76rem;font-weight:900;padding:4px 10px;border-radius:99px;background:rgba(255,255,255,0.08);">IDLE</span>
+          </div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;">
+            <button class="adm-btn gold" onclick="adminTogglePixelCanvasFromOffice(true)">🎨 Open World Pixel Canvas</button>
+            <button class="adm-btn indigo" onclick="REMO_STORE.adminPresetCityFlagOnCanvas('tricolor_md_ro');admToast('🎨 Loaded Tricolor Flag Preset!');">🇲🇩🇷🇴 Preset Tricolor Mural</button>
+            <button class="adm-btn indigo" onclick="REMO_STORE.adminPresetCityFlagOnCanvas('montreal_quebec');admToast('🎨 Loaded Montréal/Québec Preset!');">⚜️ Preset Montréal Mural</button>
+            <button class="adm-btn emerald" onclick="adminMintPixelCanvasFromOffice()">🎴 Mint Fresco as 4D Card (+100 🪙 to Artists)</button>
+            <button class="adm-btn rose" onclick="REMO_STORE.adminClearPixelCanvas();admToast('🗑️ Canvas cleared!');">🧹 Clear Canvas</button>
+            <button class="adm-btn rose" onclick="adminTogglePixelCanvasFromOffice(false)">🗑️ Hide Pixel Canvas</button>
+          </div>
+        </div>
+
+        <!-- ⏳ SYSTEM 6: CITY MONUMENT TIME-VAULT™ -->
+        <div class="exec-card" style="border-color:#f59e0b;">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
+            <h3 style="color:#fbbf24;margin:0;">⏳ 6. City Monument Time-Vault™ (Sealed Future Capsules)</h3>
+            <span id="admWsVaultPill" style="font-size:0.76rem;font-weight:900;padding:4px 10px;border-radius:99px;background:rgba(255,255,255,0.08);">IDLE</span>
+          </div>
+          <div class="adm-row-2" style="margin-bottom:10px;">
+            <div class="adm-field"><label>Vault Title (EN)</label><input type="text" id="admVaultTitleEn" class="adm-inp" value="City Monument Time-Vault™ — Wishes &amp; Predictions"></div>
+            <div class="adm-field"><label>Vault Title (FR)</label><input type="text" id="admVaultTitleFr" class="adm-inp" value="Monument Capsule Temporelle des Villes™"></div>
+            <div class="adm-field"><label>Gala Opening Milestone Label (EN)</label><input type="text" id="admVaultTargetEn" class="adm-inp" value="Official Founder Gala Opening"></div>
+            <div class="adm-field"><label>Gala Opening Milestone Label (FR)</label><input type="text" id="admVaultTargetFr" class="adm-inp" value="Grande Ouverture Gala du Fondateur"></div>
+          </div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;">
+            <button class="adm-btn gold" onclick="adminOpenMonumentVaultFromOffice(true)">🔒 Launch Sealed Monument Vault (Accept Capsules)</button>
+            <button class="adm-btn emerald" onclick="adminUnsealMonumentVaultFromOffice()">🔓 UNSEAL MONUMENT GALA NOW (+50 🪙 to All)</button>
+            <button class="adm-btn rose" onclick="adminStopMonumentVaultFromOffice()">🗑️ Hide Monument Vault</button>
+          </div>
+        </div>
+
+        <!-- 📈 SYSTEM 7: CREATOR SHARES & FAN DIVIDENDS™ -->
+        <div class="exec-card" style="border-color:#38bdf8;">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
+            <h3 style="color:#7dd3fc;margin:0;">📈 7. Creator Shares &amp; Fan Dividends Exchange™</h3>
+            <span id="admWsBoursePill" style="font-size:0.76rem;font-weight:900;padding:4px 10px;border-radius:99px;background:rgba(255,255,255,0.08);">IDLE</span>
+          </div>
+          <div class="adm-row-2" style="margin-bottom:10px;">
+            <div class="adm-field"><label>Add / Update Creator (@Name)</label><input type="text" id="admBourseCreatorName" class="adm-inp" placeholder="e.g. Elena_KIV"></div>
+            <div class="adm-field"><label>Creator Home City</label><select id="admBourseCreatorCity" class="adm-inp"></select></div>
+            <div class="adm-field"><label>Initial Share Price (🪙)</label><input type="number" id="admBourseSharePrice" class="adm-inp" value="60"></div>
+            <div class="adm-field"><label>Dividend Payout per Share (🪙)</label><input type="number" id="admBourseDividendAmt" class="adm-inp" value="30"></div>
+          </div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+            <button class="adm-btn gold" onclick="adminToggleCreatorBourseFromOffice(true)">📈 Open Creator Bourse Live</button>
+            <button class="adm-btn indigo" onclick="adminAddCreatorStockFromOffice()">➕ List Creator on Bourse</button>
+            <button class="adm-btn rose" onclick="adminToggleCreatorBourseFromOffice(false)">🗑️ Hide Creator Bourse</button>
+          </div>
+          <table class="adm-table"><tbody id="admBourseStocksTable"></tbody></table>
+        </div>
       </section>
 
     </main>
@@ -808,10 +948,10 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 
   <!-- Shared REMO Core + Admin Controller -->
-  <script src="js/remo-i18n.js?v=70"></script>
-  <script src="js/remo-cities-data.js?v=70"></script>
-  <script src="js/remo-store.js?v=70"></script>
-  <script src="js/remo-card-engine.js?v=70"></script>
-  <script src="js/remo-admin.js?v=70"></script>
+  <script src="js/remo-i18n.js?v=71"></script>
+  <script src="js/remo-cities-data.js?v=71"></script>
+  <script src="js/remo-store.js?v=71"></script>
+  <script src="js/remo-card-engine.js?v=71"></script>
+  <script src="js/remo-admin.js?v=71"></script>
 </body>
 </html>

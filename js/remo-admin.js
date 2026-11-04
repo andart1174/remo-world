@@ -1544,6 +1544,52 @@ function renderAdminContestsPanel() {
   // 6. Flash Hunt Status
   const fh = vc.flashHunt || {};
   setContestPillDOM('admFhStatusPill', !!fh.active, fh.active ? `🟢 LIVE (${(fh.claims || []).length}/${fh.maxClaims || 20} claimed)` : '⚪ IDLE');
+
+  // ── 7 UNIQUE REMO WORLD SYSTEMS (Admin Status & Tables) ──
+  const ws = typeof REMO_STORE.ensureWorldSystems === 'function' ? REMO_STORE.ensureWorldSystems() : {};
+  populateCitySel('admTorchStartCity', (ws.torchRelay && ws.torchRelay.currentCityId) || 'montreal');
+  populateCitySel('admMayorCitySel', 'montreal');
+  populateCitySel('admAllyCityA', 'montreal');
+  populateCitySel('admAllyCityB', 'chisinau');
+  populateCitySel('admBourseCreatorCity', 'montreal');
+
+  const tr = ws.torchRelay || {};
+  setContestPillDOM('admWsTorchPill', !!tr.active, tr.active ? `🟢 LIVE (${tr.totalKm || 0} km · ${(tr.visitedCities || []).length}/${tr.targetCitiesCount || 10} cities)` : '⚪ IDLE');
+
+  const gs = ws.globalSync || {};
+  setContestPillDOM('admWsSyncPill', !!gs.active, gs.active ? `🟢 LIVE (${(gs.moments || []).length} synced)` : '⚪ IDLE');
+
+  const me = ws.mayorElections || {};
+  setContestPillDOM('admWsMayorPill', !!me.active, me.active ? '🟢 LIVE (Mayor Elections Open)' : '⚪ IDLE');
+
+  const sa = ws.sisterAlliances || {};
+  setContestPillDOM('admWsAlliancePill', !!(sa.active && (sa.treaties || []).length), sa.active ? `🟢 LIVE (${(sa.treaties || []).length} treaties)` : '⚪ IDLE');
+
+  const pc = ws.pixelCanvas || {};
+  setContestPillDOM('admWsPixelPill', !!pc.active, pc.active ? `🟢 LIVE (${pc.totalPixelsPlaced || 0} pixels)` : '⚪ IDLE');
+
+  const mv = ws.monumentVault || {};
+  setContestPillDOM('admWsVaultPill', !!mv.active, mv.active ? (mv.sealed ? `🔒 SEALED (${(mv.capsules || []).length} capsules)` : `🔓 UNSEALED (${(mv.capsules || []).length} capsules)`) : '⚪ IDLE');
+
+  const cb = ws.creatorBourse || {};
+  setContestPillDOM('admWsBoursePill', !!cb.active, cb.active ? `🟢 LIVE (${(cb.stocks || []).length} creators)` : '⚪ IDLE');
+  const bourseBody = document.getElementById('admBourseStocksTable');
+  if (bourseBody) {
+    const stocks = Array.isArray(cb.stocks) ? cb.stocks : [];
+    bourseBody.innerHTML = stocks.map((st) => {
+      const c = getCityById(st.cityId || 'montreal');
+      const holders = Object.keys(st.shareholders || {}).length;
+      return `
+        <tr>
+          <td><b>@${st.creatorName}</b> (${c.flag} ${getCityName(c, lang)})</td>
+          <td style="color:#fbbf24;font-weight:900;">${Number(st.sharePrice || 50)} 🪙/share · ${holders} fan holder(s)</td>
+          <td>
+            <button class="adm-btn emerald" style="padding:4px 10px;font-size:0.74rem;" onclick="adminPayDividendToCreatorFromOffice('${st.creatorUid}')">💎 Pay Fan Dividend Now</button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  }
 }
 
 function handleAdminEuroAudioFile(ev) {
@@ -1763,3 +1809,150 @@ window.adminDrawRaffleFromOffice = adminDrawRaffleFromOffice;
 window.adminResetRaffleFromOffice = adminResetRaffleFromOffice;
 window.adminStartFlashHuntFromOffice = adminStartFlashHuntFromOffice;
 window.adminResetFlashHuntFromOffice = adminResetFlashHuntFromOffice;
+
+/* ── ADMIN OFFICE HANDLERS FOR THE 7 UNIQUE REMO WORLD SYSTEMS ── */
+function adminIgniteWorldTorchFromOffice() {
+  REMO_STORE.adminLaunchTorchRelay({
+    startCityId: document.getElementById('admTorchStartCity')?.value || 'montreal',
+    targetCitiesCount: Number(document.getElementById('admTorchTargetCities')?.value || 10),
+    jackpotCoins: Number(document.getElementById('admTorchJackpot')?.value || 5000),
+    perPassCoins: Number(document.getElementById('admTorchPerPass')?.value || 50)
+  });
+  RemoAudio.play('fanfare');
+  admToast('🔥 4D World Torch Relay ignited and LIVE!');
+}
+
+function adminConcludeWorldTorchFromOffice() {
+  const res = REMO_STORE.adminConcludeTorchJackpot();
+  RemoAudio.play('fanfare');
+  admToast(`🏆 Torch Jackpot distributed (+${res.share} 🪙 per Torchbearer)!`);
+}
+
+function adminStopWorldTorchFromOffice() {
+  REMO_STORE.adminStopTorchRelay();
+  admToast('🗑️ 4D World Torch Relay extinguished.');
+}
+
+function adminStartGlobalSyncFromOffice() {
+  REMO_STORE.adminLaunchGlobalSync({
+    prompt_en: document.getElementById('admSyncPromptEn')?.value || 'Show the sky or your view in your city right now!',
+    prompt_fr: document.getElementById('admSyncPromptFr')?.value || 'Montrez le ciel ou votre vue dans votre ville en cet instant !',
+    durationMinutes: Number(document.getElementById('admSyncMinutes')?.value || 25),
+    rewardCoins: Number(document.getElementById('admSyncReward')?.value || 100)
+  });
+  RemoAudio.play('fanfare');
+  admToast('🌍 Global Sync Flash triggered LIVE across all cities!');
+}
+
+function adminStopGlobalSyncFromOffice() {
+  REMO_STORE.adminStopGlobalSync();
+  admToast('🗑️ Global Sync Flash stopped.');
+}
+
+function adminToggleMayorHubFromOffice(active) {
+  REMO_STORE.adminToggleMayorElections(active);
+  admToast(active ? '🏛️ World City Mayor Elections Hub is now LIVE!' : '🗑️ Mayor Elections Hub hidden.');
+}
+
+function adminCrownCityMayorFromOffice() {
+  const cityId = document.getElementById('admMayorCitySel')?.value || 'montreal';
+  const citizen = (document.getElementById('admMayorCitizenInp')?.value || 'REMO Founder').trim();
+  const decree = (document.getElementById('admMayorDecreeInp')?.value || '').trim();
+  const res = REMO_STORE.adminCrownCityMayorDirect(cityId, citizen, decree);
+  RemoAudio.play('fanfare');
+  admToast(`👑 Appointed @${res.mayor.name} as Mayor of ${cityId} with 4D Royal Key!`);
+}
+
+function adminCreateSisterAllianceFromOffice() {
+  const cityA = document.getElementById('admAllyCityA')?.value || 'montreal';
+  const cityB = document.getElementById('admAllyCityB')?.value || 'chisinau';
+  const hrs = Number(document.getElementById('admAllyHours')?.value || 48);
+  const reward = Number(document.getElementById('admAllyWaveReward')?.value || 40);
+  const res = REMO_STORE.adminCreateSisterAlliance(cityA, cityB, hrs, reward);
+  if (!res.ok) {
+    admToast('⚠️ Please choose two different cities for the Sister Alliance!');
+    return;
+  }
+  RemoAudio.play('fanfare');
+  admToast(`🤝 Sister Cities 2X Alliance active: ${cityA.toUpperCase()} × ${cityB.toUpperCase()}!`);
+}
+
+function adminClearSisterAlliancesFromOffice() {
+  REMO_STORE.adminRemoveSisterAlliance('ALL');
+  admToast('🗑️ All Sister Cities Alliances ended.');
+}
+
+function adminTogglePixelCanvasFromOffice(active) {
+  REMO_STORE.adminTogglePixelCanvas(active);
+  admToast(active ? '🎨 REMO World Pixel Canvas is now LIVE!' : '🗑️ Pixel Canvas hidden.');
+}
+
+function adminMintPixelCanvasFromOffice() {
+  const res = REMO_STORE.adminMintCanvasAs4DCard();
+  RemoAudio.play('fanfare');
+  admToast(`🎴 Minted World Pixel Fresco Edition #${res.edition} & paid +100 🪙 to all pixel artists!`);
+}
+
+function adminOpenMonumentVaultFromOffice(sealed = true) {
+  REMO_STORE.adminLaunchMonumentVault({
+    sealed,
+    title_en: document.getElementById('admVaultTitleEn')?.value || 'City Monument Time-Vault™',
+    title_fr: document.getElementById('admVaultTitleFr')?.value || 'Monument Capsule Temporelle des Villes™',
+    unsealTargetLabel_en: document.getElementById('admVaultTargetEn')?.value || 'Official Founder Gala Opening',
+    unsealTargetLabel_fr: document.getElementById('admVaultTargetFr')?.value || 'Grande Ouverture Gala du Fondateur'
+  });
+  RemoAudio.play('fanfare');
+  admToast('🔒 Monument Time-Vault is now OPEN for sealed citizen capsules!');
+}
+
+function adminUnsealMonumentVaultFromOffice() {
+  const res = REMO_STORE.adminUnsealMonumentVault();
+  admToast(`🔓 MONUMENT UNSEALED! All ${res.count} capsules revealed in the Gala (+50 🪙 bonus paid)!`);
+}
+
+function adminStopMonumentVaultFromOffice() {
+  REMO_STORE.adminStopMonumentVault();
+  admToast('🗑️ Monument Time-Vault hidden.');
+}
+
+function adminToggleCreatorBourseFromOffice(active) {
+  REMO_STORE.adminToggleCreatorBourse(active);
+  admToast(active ? '📈 Creator Shares & Fan Dividends Exchange is now LIVE!' : '🗑️ Creator Bourse hidden.');
+}
+
+function adminAddCreatorStockFromOffice() {
+  const name = (document.getElementById('admBourseCreatorName')?.value || '').trim();
+  const cityId = document.getElementById('admBourseCreatorCity')?.value || 'montreal';
+  const price = Number(document.getElementById('admBourseSharePrice')?.value || 60);
+  if (!name) {
+    admToast('⚠️ Enter a Creator @Username!');
+    return;
+  }
+  REMO_STORE.adminAddFeaturedCreatorStock(name, cityId, price);
+  admToast(`📈 Listed @${name} on the Creator Stock Exchange!`);
+}
+
+function adminPayDividendToCreatorFromOffice(creatorUid) {
+  const amt = Number(document.getElementById('admBourseDividendAmt')?.value || 30);
+  const res = REMO_STORE.adminPayCreatorDividend(creatorUid, amt);
+  if (!res.ok) return;
+  admToast(`💎 Paid +${amt} 🪙/share Fan Dividend for @${res.creatorName} (${res.holdersCount} shareholder(s), +${res.totalPaid} 🪙 total)!`);
+}
+
+window.adminIgniteWorldTorchFromOffice = adminIgniteWorldTorchFromOffice;
+window.adminConcludeWorldTorchFromOffice = adminConcludeWorldTorchFromOffice;
+window.adminStopWorldTorchFromOffice = adminStopWorldTorchFromOffice;
+window.adminStartGlobalSyncFromOffice = adminStartGlobalSyncFromOffice;
+window.adminStopGlobalSyncFromOffice = adminStopGlobalSyncFromOffice;
+window.adminToggleMayorHubFromOffice = adminToggleMayorHubFromOffice;
+window.adminCrownCityMayorFromOffice = adminCrownCityMayorFromOffice;
+window.adminCreateSisterAllianceFromOffice = adminCreateSisterAllianceFromOffice;
+window.adminClearSisterAlliancesFromOffice = adminClearSisterAlliancesFromOffice;
+window.adminTogglePixelCanvasFromOffice = adminTogglePixelCanvasFromOffice;
+window.adminMintPixelCanvasFromOffice = adminMintPixelCanvasFromOffice;
+window.adminOpenMonumentVaultFromOffice = adminOpenMonumentVaultFromOffice;
+window.adminUnsealMonumentVaultFromOffice = adminUnsealMonumentVaultFromOffice;
+window.adminStopMonumentVaultFromOffice = adminStopMonumentVaultFromOffice;
+window.adminToggleCreatorBourseFromOffice = adminToggleCreatorBourseFromOffice;
+window.adminAddCreatorStockFromOffice = adminAddCreatorStockFromOffice;
+window.adminPayDividendToCreatorFromOffice = adminPayDividendToCreatorFromOffice;
