@@ -1708,19 +1708,34 @@ function listInspectedCardInAuction() {
     return;
   }
 
+  const cleanSpec = typeof window.sanitizeCardSpecForCloud === 'function'
+    ? window.sanitizeCardSpecForCloud(activeInspectedCard)
+    : Object.assign({}, activeInspectedCard);
+  if (cleanSpec) {
+    delete cleanSpec._loadedPhotoImg;
+    delete cleanSpec._loadingPhoto;
+    delete cleanSpec._photoFailed;
+    delete cleanSpec._photoTainted;
+  }
+
   REMO_STORE.state.auctions.unshift({
     id: 'auc_' + Date.now(),
-    cardSpec: activeInspectedCard,
+    cardSpec: cleanSpec,
     sellerUid: u.uid,
     sellerName: u.name || 'Citizen',
     currentBid: startBid,
     highestBidder: '—',
+    createdAt: Date.now(),
     endsAt: Date.now() + 24 * 3600 * 1000
   });
   REMO_STORE.save(true, 'auction_new');
+  if (typeof REMO_STORE.syncToFirestore === 'function') {
+    REMO_STORE.syncToFirestore('auction_new', true);
+  }
   document.getElementById('cardInspectModal')?.classList.remove('open');
   remoToast(lang === 'fr' ? '🔨 Carte mise aux enchères !' : '🔨 Card listed in the Auction House!', 'coin');
   if (typeof switchRemoView === 'function') switchRemoView('auctions');
+  if (typeof renderAuctionsView === 'function') renderAuctionsView();
 }
 
 /* ── 4. #9 OFFICIAL HOLOGRAPHIC CITIZEN ID, REFERRAL QR (+100 🪙) & 3D VISA PASSPORT ── */
@@ -3854,14 +3869,25 @@ function blessWishingWellItem(wishId) {
   remoToast(lang === 'fr' ? '✨ Bénédiction envoyée ! +1 🪙 Karma gagné !' : '✨ Blessing sent! +1 🪙 Karma earned!', 'coin');
 }
 
+function canCurrentUserDeleteAuction(a) {
+  if (!a) return false;
+  const isAdm = REMO_STORE.isAdminUnlocked() || REMO_STORE.isCurrentUserAdmin();
+  if (isAdm) return true;
+  const u = REMO_STORE.getCurrentUser();
+  if (!u) return false;
+  if (a.sellerUid && u.uid === a.sellerUid) return true;
+  if (a.sellerName && u.name && a.sellerName.trim().toLowerCase() === u.name.trim().toLowerCase()) return true;
+  if (a.cardSpec && isCurrentUserOwnerOfCard(a.cardSpec)) return true;
+  return false;
+}
+
 /* ── 5. LIVE AUCTION HOUSE & DAILY LUCKY WHEEL ── */
 function renderAuctionsView() {
   const box = document.getElementById('auctionsListGrid');
   if (!box) return;
   const lang = REMO_I18N.getLang();
-  const u = REMO_STORE.getCurrentUser();
-  const isAdm = REMO_STORE.isAdminUnlocked() || REMO_STORE.isCurrentUserAdmin();
-  const list = REMO_STORE.state.auctions || [];
+  const deletedSet = REMO_STORE.deletedAuctionIds || new Set();
+  const list = (REMO_STORE.state.auctions || []).filter((a) => a && a.id && a.cardSpec && !deletedSet.has(a.id));
 
   if (list.length === 0) {
     box.innerHTML = `
@@ -3875,17 +3901,22 @@ function renderAuctionsView() {
 
   box.innerHTML = list.map((a, idx) => {
     const city = getCityById(a.cardSpec.cityId);
-    const canDelete = isAdm || (u && a.sellerName === u.name);
+    const canDelete = canCurrentUserDeleteAuction(a);
     return `
       <div class="glass-box" style="display:flex;flex-direction:column;align-items:center;gap:10px;position:relative;">
-        ${canDelete ? `<button type="button" class="adm-pbtn danger" style="position:absolute;top:8px;right:8px;z-index:5;" onclick="adminDeleteAuction('${a.id}')" title="${lang === 'fr' ? 'Annuler l’enchère' : 'Cancel Auction'}">🗑️</button>` : ''}
-        <canvas id="aucCv_${idx}" style="width:100%;max-width:210px;height:auto;border-radius:14px;"></canvas>
+        ${canDelete ? `<button type="button" class="adm-pbtn danger" style="position:absolute;top:8px;right:8px;z-index:5;" onclick="adminDeleteAuction('${a.id}')" title="${lang === 'fr' ? 'Supprimer des enchères' : 'Remove from Auction'}">🗑️</button>` : ''}
+        <canvas id="aucCv_${idx}" style="width:100%;max-width:210px;height:auto;border-radius:14px;cursor:pointer;" onclick="inspectAuctionCard('${a.id}')"></canvas>
         <div style="font-weight:900;font-size:0.92rem;">${city.flag} ${getCityName(city, lang)} #${a.cardSpec.serial}</div>
         <div style="font-size:0.78rem;color:var(--muted);">${lang === 'fr' ? 'Vendeur' : 'Seller'}: ${typeof escapeHtmlStr === 'function' ? escapeHtmlStr(a.sellerName) : a.sellerName}</div>
         <div style="font-size:0.9rem;color:#fbbf24;font-weight:900;">${t('auction_min_bid')} 🪙 ${a.currentBid} (${typeof escapeHtmlStr === 'function' ? escapeHtmlStr(a.highestBidder) : a.highestBidder})</div>
         <button class="btn-cyber btn-gold" style="width:100%;justify-content:center;" onclick="placeAuctionBid('${a.id}')">
           🔨 ${t('auction_bid_btn')} (+50 🪙)
         </button>
+        ${canDelete ? `
+        <button type="button" class="btn-ghost" style="width:100%;justify-content:center;border-color:rgba(244,63,94,0.45);color:#fda4af;background:rgba(244,63,94,0.12);font-size:0.78rem;padding:7px 10px;" onclick="adminDeleteAuction('${a.id}')">
+          🗑️ ${lang === 'fr' ? 'Retirer des Enchères' : 'Remove from Auction'}
+        </button>
+        ` : ''}
       </div>
     `;
   }).join('');
@@ -3896,19 +3927,26 @@ function renderAuctionsView() {
   });
 }
 
+function inspectAuctionCard(aucId) {
+  const a = (REMO_STORE.state.auctions || []).find((x) => x && x.id === aucId);
+  if (a && a.cardSpec) inspectCardModal(a.cardSpec);
+}
+
 function adminDeleteAuction(aucId) {
-  const isAdm = REMO_STORE.isAdminUnlocked() || REMO_STORE.isCurrentUserAdmin();
-  const u = REMO_STORE.getCurrentUser();
-  const a = (REMO_STORE.state.auctions || []).find((x) => x.id === aucId);
+  const a = (REMO_STORE.state.auctions || []).find((x) => x && x.id === aucId);
   if (!a) return;
-  if (!isAdm && (!u || a.sellerName !== u.name)) {
-    remoToast(REMO_I18N.getLang() === 'fr' ? 'Action non autorisée.' : 'Unauthorized.');
+  if (!canCurrentUserDeleteAuction(a)) {
+    remoToast(REMO_I18N.getLang() === 'fr' ? '🔒 Action non autorisée.' : '🔒 Unauthorized action.');
     return;
   }
-  REMO_STORE.state.auctions = (REMO_STORE.state.auctions || []).filter((x) => x.id !== aucId);
-  REMO_STORE.save(true, 'auction_delete');
+  if (typeof REMO_STORE.deleteAuctionFromCloud === 'function') {
+    REMO_STORE.deleteAuctionFromCloud(aucId);
+  } else {
+    REMO_STORE.state.auctions = (REMO_STORE.state.auctions || []).filter((x) => x.id !== aucId);
+    REMO_STORE.save(true, 'auction_delete');
+  }
   renderAuctionsView();
-  remoToast(REMO_I18N.getLang() === 'fr' ? '🗑️ Enchère annulée et retirée !' : '🗑️ Auction cancelled and removed!');
+  remoToast(REMO_I18N.getLang() === 'fr' ? '🗑️ Carte retirée des enchères !' : '🗑️ Card removed from Auction House!');
 }
 
 function placeAuctionBid(aucId) {
@@ -4275,6 +4313,7 @@ window.teleportRadarCity = teleportRadarCity;
 window.renderAuctionsView = renderAuctionsView;
 window.placeAuctionBid = placeAuctionBid;
 window.adminDeleteAuction = adminDeleteAuction;
+window.inspectAuctionCard = inspectAuctionCard;
 window.startAdminDropPin = startAdminDropPin;
 window.geocodeVaultAddress = geocodeVaultAddress;
 window.renderWheelView = renderWheelView;

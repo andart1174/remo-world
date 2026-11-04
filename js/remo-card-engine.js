@@ -554,6 +554,81 @@ async function fetchRemotePhotoAsDataUrl(srcUrl) {
   return '';
 }
 
+const CARD_PHOTO_MEM_CACHE = new Map();
+const CARD_PHOTO_INFLIGHT = new Set();
+
+function getCardCacheKey(spec) {
+  if (!spec) return '';
+  return String(spec.id || spec.serial || spec.customPhotoDataUrl || '');
+}
+
+function recoverCardPhotoFromPosts(spec) {
+  if (!spec) return '';
+  if (spec.customPhotoDataUrl && String(spec.customPhotoDataUrl).length > 8) {
+    return spec.customPhotoDataUrl;
+  }
+  if (!window.REMO_STORE || !window.REMO_STORE.state || !Array.isArray(window.REMO_STORE.state.posts)) {
+    return '';
+  }
+  const posts = window.REMO_STORE.state.posts;
+  const matchedPost = posts.find((p) => {
+    if (!p || !p.mintedCard) return false;
+    if (spec.postId && p.id === spec.postId) return true;
+    if (spec.id && p.mintedCardId === spec.id) return true;
+    if (p.mintedCardSpec && spec.serial && p.mintedCardSpec.serial === spec.serial) return true;
+    if (spec.subtitle && p.authorName && String(spec.subtitle).toUpperCase().includes('MOMENT BY ' + String(p.authorName).toUpperCase()) && (!spec.cityId || p.cityId === spec.cityId)) {
+      return true;
+    }
+    return false;
+  });
+  if (matchedPost) {
+    const postPhoto = ['image', 'carousel', 'before_after'].includes(matchedPost.mediaType)
+      ? (matchedPost.mediaUrl || (Array.isArray(matchedPost.mediaUrls) && matchedPost.mediaUrls[0]) || '')
+      : '';
+    if (postPhoto) {
+      spec.customPhotoDataUrl = postPhoto;
+      return postPhoto;
+    }
+  }
+  return '';
+}
+
+function sanitizeCardSpecForCloud(spec) {
+  if (!spec || typeof spec !== 'object') return null;
+  recoverCardPhotoFromPosts(spec);
+  let photoUrl = spec.customPhotoDataUrl || '';
+  // If photoUrl is a large base64 dataUrl, check if a post has a compact https URL for cloud sync
+  if (photoUrl.startsWith('data:') && photoUrl.length > 150000 && window.REMO_STORE?.state?.posts) {
+    const p = window.REMO_STORE.state.posts.find((x) =>
+      x && (x.id === spec.postId || x.mintedCardId === spec.id || (x.mintedCard && x.authorName && spec.ownerName && x.authorName.toLowerCase() === spec.ownerName.toLowerCase()))
+    );
+    if (p && p.mediaUrl && /^https?:\/\//i.test(p.mediaUrl)) {
+      photoUrl = p.mediaUrl;
+    }
+  }
+  return {
+    id: spec.id || ('card_' + Date.now()),
+    postId: spec.postId || '',
+    cityId: spec.cityId || 'montreal',
+    title: spec.title || '',
+    subtitle: spec.subtitle || '',
+    serial: spec.serial || '0001',
+    maxSupply: Number(spec.maxSupply || 1000),
+    rarity: spec.rarity || 'Legendary Gold',
+    themeId: spec.themeId !== undefined ? Number(spec.themeId) : 0,
+    verifiedGps: Boolean(spec.verifiedGps),
+    coinValue: Number(spec.coinValue || 9500),
+    customPhotoDataUrl: photoUrl,
+    security: spec.security || {
+      guilloche: true, microtext: true, nfcChip: true,
+      psaSlab: false, goldStamp: true, founderSig: true, redLensSecret: ''
+    },
+    ownerUid: spec.ownerUid || '',
+    ownerName: spec.ownerName || 'Citizen',
+    mintedAt: Number(spec.mintedAt || Date.now())
+  };
+}
+
 function loadImageElement(src, withCors = false) {
   return new Promise((resolve) => {
     if (!src) { resolve(null); return; }
@@ -568,18 +643,20 @@ function loadImageElement(src, withCors = false) {
 }
 
 async function ensureSpecPhotoUntainted(spec) {
-  if (!spec || !spec.customPhotoDataUrl) return false;
-  if (spec._loadedPhotoImg && !spec._photoTainted) return true;
+  if (!spec) return false;
+  recoverCardPhotoFromPosts(spec);
+  if (!spec.customPhotoDataUrl) return false;
+  const key = getCardCacheKey(spec);
+  const cached = CARD_PHOTO_MEM_CACHE.get(key);
+  if (cached && cached.img && cached.img.width > 0 && !cached.tainted) {
+    return true;
+  }
 
   const safeDataUrl = await fetchRemotePhotoAsDataUrl(spec.customPhotoDataUrl);
   if (safeDataUrl) {
     const cleanImg = await loadImageElement(safeDataUrl, false);
-    if (cleanImg) {
-      spec.customPhotoDataUrl = safeDataUrl;
-      spec._loadedPhotoImg = cleanImg;
-      spec._photoTainted = false;
-      spec._photoFailed = false;
-      spec._loadingPhoto = false;
+    if (cleanImg && cleanImg.width > 0) {
+      CARD_PHOTO_MEM_CACHE.set(key, { img: cleanImg, tainted: false, dataUrl: safeDataUrl });
       return true;
     }
   }
@@ -588,24 +665,41 @@ async function ensureSpecPhotoUntainted(spec) {
 
 function renderCityCardFront(canvas, spec = {}, langOverride) {
   if (!canvas) return;
-  if (spec.customPhotoDataUrl && !spec._loadedPhotoImg && !spec._loadingPhoto && !spec._photoFailed) {
-    spec._loadingPhoto = true;
+  // Clean up any legacy serialized DOM flags from localStorage so they never block loading or Firestore
+  if (spec && typeof spec === 'object') {
+    if ('_loadedPhotoImg' in spec) delete spec._loadedPhotoImg;
+    if ('_loadingPhoto' in spec) delete spec._loadingPhoto;
+    if ('_photoFailed' in spec) delete spec._photoFailed;
+    if ('_photoTainted' in spec) delete spec._photoTainted;
+  }
+  recoverCardPhotoFromPosts(spec);
+
+  const cacheKey = getCardCacheKey(spec);
+  const cachedEntry = cacheKey ? CARD_PHOTO_MEM_CACHE.get(cacheKey) : null;
+
+  if (spec.customPhotoDataUrl && !cachedEntry && cacheKey && !CARD_PHOTO_INFLIGHT.has(cacheKey)) {
+    CARD_PHOTO_INFLIGHT.add(cacheKey);
     (async () => {
-      const untaintedOk = await ensureSpecPhotoUntainted(spec);
-      if (untaintedOk) {
-        renderCityCardFront(canvas, spec, langOverride);
-        return;
+      try {
+        const untaintedOk = await ensureSpecPhotoUntainted(spec);
+        if (untaintedOk) {
+          CARD_PHOTO_INFLIGHT.delete(cacheKey);
+          renderCityCardFront(canvas, spec, langOverride);
+          return;
+        }
+        const fallbackImg = await loadImageElement(spec.customPhotoDataUrl, false);
+        if (fallbackImg && fallbackImg.width > 0) {
+          CARD_PHOTO_MEM_CACHE.set(cacheKey, {
+            img: fallbackImg,
+            tainted: /^https?:\/\//i.test(String(spec.customPhotoDataUrl))
+          });
+        } else {
+          CARD_PHOTO_MEM_CACHE.set(cacheKey, { img: null, failed: true });
+        }
+      } catch (e) {
+        CARD_PHOTO_MEM_CACHE.set(cacheKey, { img: null, failed: true });
       }
-      // Last-resort fallback without CORS for on-screen viewing if offline/unreachable
-      const fallbackImg = await loadImageElement(spec.customPhotoDataUrl, false);
-      if (fallbackImg) {
-        spec._loadedPhotoImg = fallbackImg;
-        spec._photoTainted = /^https?:\/\//i.test(String(spec.customPhotoDataUrl));
-        spec._loadingPhoto = false;
-      } else {
-        spec._loadingPhoto = false;
-        spec._photoFailed = true;
-      }
+      CARD_PHOTO_INFLIGHT.delete(cacheKey);
       renderCityCardFront(canvas, spec, langOverride);
     })();
   }
@@ -719,17 +813,18 @@ function renderCityCardFront(canvas, spec = {}, langOverride) {
   ctx.clip();
 
   let photoRendered = false;
+  const activeImg = cachedEntry && cachedEntry.img ? cachedEntry.img : null;
   const hasValidPhoto = Boolean(
-    spec._loadedPhotoImg &&
-    spec._loadedPhotoImg.width > 0 &&
-    spec._loadedPhotoImg.height > 0 &&
-    !spec._photoFailed
+    activeImg &&
+    activeImg.width > 0 &&
+    activeImg.height > 0 &&
+    !cachedEntry.failed
   );
 
   if (hasValidPhoto) {
     try {
       // Draw custom uploaded or post photo with cover fit
-      const img = spec._loadedPhotoImg;
+      const img = activeImg;
       const scale = Math.max(artW / img.width, artH / img.height);
       const dw = img.width * scale, dh = img.height * scale;
       if (isFinite(dw) && isFinite(dh) && dw > 0 && dh > 0) {
@@ -1170,11 +1265,14 @@ function downloadCanvasAsPNG(canvas, filename) {
 }
 
 async function getUntaintedCardCanvas(frontCanvas, spec = {}, langOverride) {
+  recoverCardPhotoFromPosts(spec);
   if (spec && spec.customPhotoDataUrl) {
     await ensureSpecPhotoUntainted(spec);
   }
+  const cacheKey = getCardCacheKey(spec);
+  const cachedEntry = cacheKey ? CARD_PHOTO_MEM_CACHE.get(cacheKey) : null;
   const cleanCv = document.createElement('canvas');
-  if (spec && spec._loadedPhotoImg && !spec._photoTainted) {
+  if (cachedEntry && cachedEntry.img && !cachedEntry.tainted) {
     renderCityCardFront(cleanCv, spec, langOverride);
     try {
       cleanCv.toDataURL('image/png');
@@ -1184,18 +1282,15 @@ async function getUntaintedCardCanvas(frontCanvas, spec = {}, langOverride) {
       return cleanCv;
     } catch (e) {}
   }
-  if (frontCanvas && !spec._photoTainted) {
+  if (frontCanvas && (!cachedEntry || !cachedEntry.tainted)) {
     try {
       frontCanvas.toDataURL('image/png');
       return frontCanvas;
     } catch (e) {}
   }
   const safeSpec = Object.assign({}, spec, {
-    customPhotoDataUrl: '',
-    _loadedPhotoImg: null,
-    _loadingPhoto: false,
-    _photoFailed: false,
-    _photoTainted: false
+    id: (spec.id || 'card') + '_vec',
+    customPhotoDataUrl: ''
   });
   renderCityCardFront(cleanCv, safeSpec, langOverride);
   return cleanCv;
@@ -1479,3 +1574,5 @@ window.exportCityBattleVS16x9 = exportCityBattleVS16x9;
 window.downloadCityCertificateA4 = downloadCityCertificateA4;
 window.openCityPrintSuite = openCityPrintSuite;
 window.fetchRemotePhotoAsDataUrl = fetchRemotePhotoAsDataUrl;
+window.sanitizeCardSpecForCloud = sanitizeCardSpecForCloud;
+window.recoverCardPhotoFromPosts = recoverCardPhotoFromPosts;

@@ -2444,6 +2444,7 @@ const REMO_STORE = {
   deletedPostIds: null,
   deletedUserIds: null,
   deletedDuelIds: null,
+  deletedAuctionIds: null,
 
   init() {
     try {
@@ -2462,12 +2463,20 @@ const REMO_STORE = {
       this.deletedDuelIds = new Set();
     }
     try {
+      this.deletedAuctionIds = new Set(JSON.parse(localStorage.getItem('remo_deleted_auctions') || '[]'));
+    } catch (e) {
+      this.deletedAuctionIds = new Set();
+    }
+    try {
       const raw = localStorage.getItem(this.KEY);
       this.state = raw ? JSON.parse(raw) : createDefaultState();
     } catch (e) {
       this.state = createDefaultState();
     }
     if (!this.state.settings) this.state = createDefaultState();
+    if (Array.isArray(this.state.auctions) && this.deletedAuctionIds && this.deletedAuctionIds.size > 0) {
+      this.state.auctions = this.state.auctions.filter((a) => a && a.id && !this.deletedAuctionIds.has(a.id));
+    }
     // Strip out deleted city wars / duels and legacy mock wars
     const legacyMockWarIds = new Set(['war_1', 'war_2', 'war_3']);
     if (Array.isArray(this.state.duels)) {
@@ -2603,10 +2612,16 @@ const REMO_STORE = {
       try {
         this.deletedDuelIds = new Set(JSON.parse(localStorage.getItem('remo_deleted_duels') || '[]'));
       } catch (e) {}
+      try {
+        this.deletedAuctionIds = new Set(JSON.parse(localStorage.getItem('remo_deleted_auctions') || '[]'));
+      } catch (e) {}
       const raw = localStorage.getItem(this.KEY);
       if (raw) {
         const diskState = JSON.parse(raw);
         if (diskState && typeof diskState === 'object') {
+          if (Array.isArray(diskState.auctions) && this.deletedAuctionIds && this.deletedAuctionIds.size > 0) {
+            diskState.auctions = diskState.auctions.filter((a) => a && a.id && !this.deletedAuctionIds.has(a.id));
+          }
           // Never discard newer in-memory posts when reloading from disk
           const memPosts = this.state.posts || [];
           if (Array.isArray(diskState.posts)) {
@@ -4176,8 +4191,15 @@ const REMO_STORE = {
             if (Array.isArray(data.jukeboxTracks) && data.jukeboxTracks.length > 0) {
               this.state.jukeboxTracks = data.jukeboxTracks;
             }
+            if (Array.isArray(data.deletedAuctionIds)) {
+              if (!this.deletedAuctionIds) this.deletedAuctionIds = new Set();
+              data.deletedAuctionIds.forEach((id) => this.deletedAuctionIds.add(id));
+              try {
+                localStorage.setItem('remo_deleted_auctions', JSON.stringify([...this.deletedAuctionIds]));
+              } catch (e) {}
+            }
             if (Array.isArray(data.auctions)) {
-              this.state.auctions = data.auctions;
+              this.mergeCloudAuctions(data.auctions);
               if (typeof renderAuctionsView === 'function') renderAuctionsView();
             }
             if (Array.isArray(data.geoVaults)) {
@@ -4218,8 +4240,15 @@ const REMO_STORE = {
           if (Array.isArray(data.jukeboxTracks) && data.jukeboxTracks.length > 0) {
             this.state.jukeboxTracks = data.jukeboxTracks;
           }
+          if (Array.isArray(data.deletedAuctionIds)) {
+            if (!this.deletedAuctionIds) this.deletedAuctionIds = new Set();
+            data.deletedAuctionIds.forEach((id) => this.deletedAuctionIds.add(id));
+            try {
+              localStorage.setItem('remo_deleted_auctions', JSON.stringify([...this.deletedAuctionIds]));
+            } catch (e) {}
+          }
           if (Array.isArray(data.auctions)) {
-            this.state.auctions = data.auctions;
+            this.mergeCloudAuctions(data.auctions);
             if (typeof renderAuctionsView === 'function') renderAuctionsView();
           }
           if (Array.isArray(data.geoVaults)) {
@@ -5922,11 +5951,108 @@ const REMO_STORE = {
     return { ok: true, totalPaid, holdersCount, creatorName: stock.creatorName };
   },
 
+  sanitizeAuctionItem(a) {
+    if (!a || !a.cardSpec) return null;
+    const cs = a.cardSpec;
+    let photoUrl = cs.customPhotoDataUrl || '';
+    if (photoUrl.startsWith('data:') && photoUrl.length > 150000 && Array.isArray(this.state?.posts)) {
+      const p = this.state.posts.find((x) =>
+        x && (x.id === cs.postId || x.mintedCardId === cs.id || (x.mintedCard && x.authorName && cs.ownerName && x.authorName.toLowerCase() === cs.ownerName.toLowerCase()))
+      );
+      if (p && p.mediaUrl && /^https?:\/\//i.test(p.mediaUrl)) {
+        photoUrl = p.mediaUrl;
+      }
+    }
+    return {
+      id: a.id || ('auc_' + Date.now()),
+      sellerUid: a.sellerUid || cs.ownerUid || '',
+      sellerName: a.sellerName || cs.ownerName || 'Citizen',
+      currentBid: Number(a.currentBid || 250),
+      highestBidder: a.highestBidder || '—',
+      createdAt: Number(a.createdAt || Date.now()),
+      endsAt: Number(a.endsAt || (Date.now() + 24 * 3600 * 1000)),
+      cardSpec: {
+        id: cs.id || ('card_' + Date.now()),
+        postId: cs.postId || '',
+        cityId: cs.cityId || 'montreal',
+        title: cs.title || '',
+        subtitle: cs.subtitle || '',
+        serial: cs.serial || '0001',
+        maxSupply: Number(cs.maxSupply || 1000),
+        rarity: cs.rarity || 'Legendary Gold',
+        themeId: cs.themeId !== undefined ? Number(cs.themeId) : 0,
+        verifiedGps: Boolean(cs.verifiedGps),
+        coinValue: Number(cs.coinValue || 9500),
+        customPhotoDataUrl: photoUrl,
+        ownerUid: cs.ownerUid || a.sellerUid || '',
+        ownerName: cs.ownerName || a.sellerName || 'Citizen'
+      }
+    };
+  },
+
+  mergeCloudAuctions(cloudAuctions) {
+    if (!this.deletedAuctionIds) this.deletedAuctionIds = new Set();
+    const localList = Array.isArray(this.state.auctions) ? this.state.auctions : [];
+    const cloudList = Array.isArray(cloudAuctions) ? cloudAuctions : [];
+    const map = new Map();
+    let localUnsyncedAdded = false;
+
+    cloudList.forEach((ca) => {
+      if (!ca || !ca.id || this.deletedAuctionIds.has(ca.id)) return;
+      const cleanCa = this.sanitizeAuctionItem(ca);
+      if (cleanCa) map.set(cleanCa.id, cleanCa);
+    });
+
+    localList.forEach((la) => {
+      if (!la || !la.id || this.deletedAuctionIds.has(la.id)) return;
+      const cleanLa = this.sanitizeAuctionItem(la);
+      if (!cleanLa) return;
+      if (!map.has(cleanLa.id)) {
+        // Keep local auctions created by Admin or Citizen that had not yet synced to Cloud
+        if (cleanLa.id !== 'auc_1' && cleanLa.id !== 'auc_2') {
+          map.set(cleanLa.id, cleanLa);
+          localUnsyncedAdded = true;
+        }
+      } else {
+        const existing = map.get(cleanLa.id);
+        if (Number(cleanLa.currentBid || 0) > Number(existing.currentBid || 0)) {
+          existing.currentBid = cleanLa.currentBid;
+          existing.highestBidder = cleanLa.highestBidder;
+        }
+        if (!existing.cardSpec.customPhotoDataUrl && cleanLa.cardSpec.customPhotoDataUrl) {
+          existing.cardSpec.customPhotoDataUrl = cleanLa.cardSpec.customPhotoDataUrl;
+        }
+      }
+    });
+
+    this.state.auctions = Array.from(map.values());
+    if (localUnsyncedAdded) {
+      this.syncToFirestore('auction_resync', true);
+    }
+  },
+
+  deleteAuctionFromCloud(aucId) {
+    if (!aucId) return;
+    if (!this.deletedAuctionIds) this.deletedAuctionIds = new Set();
+    this.deletedAuctionIds.add(aucId);
+    try {
+      localStorage.setItem('remo_deleted_auctions', JSON.stringify([...this.deletedAuctionIds]));
+    } catch (e) {}
+    this.state.auctions = (this.state.auctions || []).filter((x) => x && x.id !== aucId);
+    this.save(true, 'auction_delete');
+    this.syncToFirestore('auction_delete', true);
+  },
+
   syncToFirestore(reason = 'update', immediate = false) {
     if (!this.fbDb) return;
     clearTimeout(this._fbSyncDebounce);
     const doSync = () => {
       try {
+        const cleanAuctions = (this.state.auctions || [])
+          .filter((a) => a && a.id && (!this.deletedAuctionIds || !this.deletedAuctionIds.has(a.id)))
+          .map((a) => this.sanitizeAuctionItem(a))
+          .filter(Boolean)
+          .slice(0, 25);
         const docRef = this.fbDb.collection('remo_ecosystem').doc('live_state');
         docRef.set({
           cityScores: this.state.cityScores || {},
@@ -5935,7 +6061,7 @@ const REMO_STORE = {
           settings: this.state.settings || {},
           bottles: (this.state.bottles || []).slice(0, 30),
           jukeboxTracks: (this.state.jukeboxTracks || []).slice(0, 30),
-          auctions: (this.state.auctions || []).slice(0, 25),
+          auctions: cleanAuctions,
           geoVaults: (this.state.geoVaults || []).slice(0, 35),
           stories: (this.state.stories || []).slice(0, 15),
           viralContests: this.state.viralContests || getDefaultViralContests(),
@@ -5943,6 +6069,7 @@ const REMO_STORE = {
           deletedPostIds: [...(this.deletedPostIds || [])].slice(-100),
           deletedUserIds: [...(this.deletedUserIds || [])].slice(-100),
           deletedDuelIds: [...(this.deletedDuelIds || [])].slice(-100),
+          deletedAuctionIds: [...(this.deletedAuctionIds || [])].slice(-100),
           updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         }, { merge: true }).catch((err) => {
           console.log('Firestore background sync info:', err.message);

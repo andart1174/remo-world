@@ -1809,18 +1809,29 @@ async function mintPostAsCityCard(postId) {
 
   // If this post was already minted into a 4D Card, open/inspect the existing card instead of duplicating!
   if (p.mintedCard) {
-    const existing =
-      (p.mintedCardId && (REMO_STORE.state.droppedCardsPool || []).find((c) => c && c.id === p.mintedCardId)) ||
-      p.mintedCardSpec;
-    if (existing) {
-      inspectCardModal(existing);
-      return;
-    }
     const postPhotoExisting = ['image', 'carousel', 'before_after'].includes(p.mediaType)
       ? (p.mediaUrl || (Array.isArray(p.mediaUrls) && p.mediaUrls[0]) || '')
       : '';
+    const existing =
+      (p.mintedCardId && (REMO_STORE.state.droppedCardsPool || []).find((c) => c && c.id === p.mintedCardId)) ||
+      (REMO_STORE.state.droppedCardsPool || []).find(
+        (c) => c && c.subtitle && p.authorName && String(c.subtitle).toUpperCase().includes('MOMENT BY ' + String(p.authorName).toUpperCase()) && c.cityId === p.cityId
+      ) ||
+      p.mintedCardSpec;
+    if (existing) {
+      if (!existing.customPhotoDataUrl && postPhotoExisting) {
+        existing.customPhotoDataUrl = postPhotoExisting;
+      }
+      if (!existing.postId) existing.postId = p.id;
+      if ('_loadedPhotoImg' in existing) delete existing._loadedPhotoImg;
+      if ('_loadingPhoto' in existing) delete existing._loadingPhoto;
+      if ('_photoFailed' in existing) delete existing._photoFailed;
+      inspectCardModal(existing);
+      return;
+    }
     inspectCardModal({
       id: p.mintedCardId || ('card_post_' + p.id),
+      postId: p.id,
       cityId: p.cityId || 'montreal',
       subtitle: `MOMENT BY ${(p.authorName || 'CITIZEN').toUpperCase()}`,
       serial: '0001',
@@ -1873,27 +1884,24 @@ async function mintPostAsCityCard(postId) {
   const rawPostPhoto = ['image', 'carousel', 'before_after'].includes(p.mediaType)
     ? (p.mediaUrl || (Array.isArray(p.mediaUrls) && p.mediaUrls[0]) || '')
     : '';
-  let postPhoto = rawPostPhoto;
-  if (rawPostPhoto && typeof window.fetchRemotePhotoAsDataUrl === 'function') {
-    const cleanDataUrl = await window.fetchRemotePhotoAsDataUrl(rawPostPhoto);
-    if (cleanDataUrl) postPhoto = cleanDataUrl;
-  }
   const card = REMO_STORE.mintCardForUser(u.uid, p.cityId, 'Legendary Gold', !!p.verifiedGps, {
     subtitle: `MOMENT BY ${p.authorName.toUpperCase()}`,
-    customPhotoDataUrl: postPhoto
+    customPhotoDataUrl: rawPostPhoto
   });
+  card.postId = p.id;
 
   p.mintedCard = true;
   p.mintedCardId = card.id;
   p.mintedCardSpec = {
     id: card.id,
+    postId: p.id,
     cityId: card.cityId,
     title: card.title || '',
     subtitle: card.subtitle || `MOMENT BY ${p.authorName.toUpperCase()}`,
     serial: card.serial,
     rarity: card.rarity,
     coinValue: card.coinValue,
-    customPhotoDataUrl: postPhoto,
+    customPhotoDataUrl: rawPostPhoto,
     ownerUid: u.uid,
     ownerName: u.name
   };
