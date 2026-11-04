@@ -629,18 +629,69 @@ footer{margin-top:34px;padding-top:20px;border-top:1px solid rgba(255,255,255,0.
 (function(){
   var audio = new Audio();
   audio.preload = 'none';
+  audio.setAttribute('playsinline', '');
   var activeId = '';
+  var activeBtn = null;
+
+  function getAllButtons(){
+    return Array.prototype.slice.call(document.querySelectorAll('[data-seo-rbtn]'));
+  }
+
+  function updateCarMediaSession(btn, isPlaying){
+    if(!('mediaSession' in navigator) || !btn) return;
+    try {
+      var item = btn.closest('.radio-item');
+      var titleEl = item ? item.querySelector('strong') : null;
+      var descEl = item ? item.querySelector('div div') : null;
+      var stTitle = titleEl ? titleEl.textContent.trim() : 'REMO World Radio';
+      var stDesc = descEl ? descEl.textContent.trim() : '38 Radios Mondiales en Direct';
+      var base = (window.location && window.location.origin && window.location.origin.indexOf('http') === 0) ? window.location.origin : 'https://remoworld.com';
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: stTitle,
+        artist: 'REMO World • remoworld.com',
+        album: stDesc,
+        artwork: [
+          { src: base + '/img/remo_brand_coin.png', sizes: '512x512', type: 'image/png' },
+          { src: base + '/img/remo_coin_front.png', sizes: '512x512', type: 'image/png' },
+          { src: base + '/img/remo_icon_512.png', sizes: '512x512', type: 'image/png' },
+          { src: base + '/img/remo_icon_192.png', sizes: '192x192', type: 'image/png' }
+        ]
+      });
+      navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
+      var stepStation = function(dir){
+        var btns = getAllButtons();
+        if(!btns.length) return;
+        var idx = activeBtn ? btns.indexOf(activeBtn) : 0;
+        var nextIdx = (idx + dir + btns.length) % btns.length;
+        btns[nextIdx].click();
+      };
+      navigator.mediaSession.setActionHandler('play', function(){ if(activeBtn && audio.paused){ audio.play().catch(function(){}); updateCarMediaSession(activeBtn, true); } });
+      navigator.mediaSession.setActionHandler('pause', function(){ audio.pause(); updateCarMediaSession(activeBtn, false); });
+      navigator.mediaSession.setActionHandler('previoustrack', function(){ stepStation(-1); });
+      navigator.mediaSession.setActionHandler('nexttrack', function(){ stepStation(1); });
+      navigator.mediaSession.setActionHandler('seekbackward', function(){ stepStation(-1); });
+      navigator.mediaSession.setActionHandler('seekforward', function(){ stepStation(1); });
+    } catch(e){}
+  }
+
+  audio.addEventListener('playing', function(){
+    if(activeBtn) updateCarMediaSession(activeBtn, true);
+  });
+
   window.playSeoStream = function(id, url, fallback, btn){
     if(activeId === id && !audio.paused){
       audio.pause();
       activeId = '';
-      document.querySelectorAll('[data-seo-rbtn]').forEach(function(b){ b.classList.remove('playing'); b.textContent = b.getAttribute('data-play-lbl'); });
+      updateCarMediaSession(btn, false);
+      getAllButtons().forEach(function(b){ b.classList.remove('playing'); b.textContent = b.getAttribute('data-play-lbl'); });
       return;
     }
     activeId = id;
-    document.querySelectorAll('[data-seo-rbtn]').forEach(function(b){ b.classList.remove('playing'); b.textContent = b.getAttribute('data-play-lbl'); });
+    activeBtn = btn;
+    getAllButtons().forEach(function(b){ b.classList.remove('playing'); b.textContent = b.getAttribute('data-play-lbl'); });
     btn.classList.add('playing');
     btn.textContent = btn.getAttribute('data-stop-lbl');
+    updateCarMediaSession(btn, true);
     var triedFallback = false;
     audio.onerror = function(){
       if(!triedFallback && fallback && fallback !== url){
@@ -650,7 +701,9 @@ footer{margin-top:34px;padding-top:20px;border-top:1px solid rgba(255,255,255,0.
       }
     };
     audio.src = url;
-    audio.play().catch(function(){
+    audio.play().then(function(){
+      updateCarMediaSession(btn, true);
+    }).catch(function(){
       if(!triedFallback && fallback){ triedFallback = true; audio.src = fallback; audio.play().catch(function(){}); }
     });
   };

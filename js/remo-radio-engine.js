@@ -145,12 +145,13 @@
     {
       id: 'remo_synth_offline',
       category: 'vibe',
-      name: 'Cyber-Lofi REMO (Zero-Fail)',
-      desc_fr: 'Synthétiseur d’accords en temps réel (100% Hors-Ligne)',
-      desc_en: 'Live Real-Time Chord Synthesizer (100% Offline)',
+      name: 'Cyber-Lofi REMO 4D',
+      desc_fr: 'Synthé Cyber-Lofi, Chillwave & Beats Futuristes 24/7',
+      desc_en: 'Cyber-Lofi Synth, Chillwave & Futuristic Beats 24/7',
       icon: '🤖',
-      streamUrl: 'internal://synth',
-      badge: 'OFFLINE SYNTH',
+      streamUrl: 'https://ice1.somafm.com/vaporwaves-128-mp3',
+      fallbackUrl: 'https://ice1.somafm.com/groovesalad-128-mp3',
+      badge: 'CYBER LOFI',
       cityId: null
     },
 
@@ -688,17 +689,13 @@
         return;
       }
 
-      const sep = rawUrl.includes('?') ? '&' : '?';
-      const freshUrl = `${rawUrl}${sep}_r=${Date.now()}`;
-
       try {
         this.audioEl.pause();
-        this.audioEl.removeAttribute('src');
-        this.audioEl.load();
       } catch (e) {}
 
-      this.audioEl.src = freshUrl;
+      this.audioEl.src = rawUrl;
       this._applyEffectiveVolume();
+      this._updateMediaSession();
 
       const p = this.audioEl.play();
       if (p && typeof p.then === 'function') {
@@ -712,11 +709,11 @@
           this._updateUI();
         }).catch(() => {
           this.isReconnecting = false;
-          if (this.userWantsPlaying && this.reconnectAttempts < 5) {
+          if (this.userWantsPlaying && this.reconnectAttempts < 8) {
+            if (this.currentStation && this.currentStation.fallbackUrl) {
+              this._usingFallbackUrl = !this._usingFallbackUrl;
+            }
             this._scheduleAutoReconnect('retry_' + reason);
-          } else if (this.userWantsPlaying) {
-            // Ultimate zero-fail fallback: Cyber-Lofi WebAudio synth never drops!
-            this.selectStation('remo_synth_offline', true);
           } else {
             this.isLoading = false;
             this._updateUI();
@@ -733,13 +730,13 @@
 
         const now = Date.now();
         const frozenMs = this._lastProgressTs > 0 ? (now - this._lastProgressTs) : 0;
-        if (this.audioEl.paused) {
+        if (this.audioEl.paused || this.audioEl.ended || this.audioEl.error) {
           this._scheduleAutoReconnect('watchdog_paused');
-        } else if (frozenMs > 9500 && this.audioEl.readyState < 3) {
+        } else if (frozenMs > 28000 && this.audioEl.readyState < 2) {
           this._lastProgressTs = now;
           this._scheduleAutoReconnect('watchdog_frozen');
         }
-      }, 4500);
+      }, 5000);
     }
 
     _bindVisibilityWatchdog() {
@@ -826,33 +823,48 @@
       }
     }
 
-    /* ── 📱 MEDIASESSION API ── */
+    /* ── 📱🚗 MEDIASESSION API (Car Bluetooth AVRCP / Apple CarPlay / Android Auto) ── */
     _initMediaSessionHandlers() {
       if (!('mediaSession' in navigator)) return;
-      try {
-        navigator.mediaSession.setActionHandler('play', () => this.play());
-        navigator.mediaSession.setActionHandler('pause', () => this.pause());
-        navigator.mediaSession.setActionHandler('stop', () => this.stop());
-        navigator.mediaSession.setActionHandler('nexttrack', () => this.nextStation());
-        navigator.mediaSession.setActionHandler('previoustrack', () => this.prevStation());
-      } catch (e) {}
+      const safeSet = (action, fn) => {
+        try { navigator.mediaSession.setActionHandler(action, fn); } catch (e) {}
+      };
+      safeSet('play', () => this.play());
+      safeSet('pause', () => this.pause());
+      safeSet('stop', () => this.pause());
+      safeSet('nexttrack', () => this.nextStation());
+      safeSet('previoustrack', () => this.prevStation());
+      safeSet('seekforward', () => this.nextStation());
+      safeSet('seekbackward', () => this.prevStation());
     }
 
     _updateMediaSession() {
       if (!('mediaSession' in navigator) || !this.currentStation) return;
       try {
+        this._initMediaSessionHandlers();
         const lang = (window.REMO_I18N && window.REMO_I18N.getLang) ? window.REMO_I18N.getLang() : 'en';
         const desc = lang === 'fr' ? this.currentStation.desc_fr : this.currentStation.desc_en;
+        const base = (window.location && window.location.origin && window.location.origin.startsWith('http'))
+          ? window.location.origin
+          : 'https://remoworld.com';
+        const coinUrl = `${base}/img/remo_brand_coin.png`;
+        const coinFrontUrl = `${base}/img/remo_coin_front.png`;
+        const icon512Url = `${base}/img/remo_icon_512.png`;
+        const icon192Url = `${base}/img/remo_icon_192.png`;
+
         navigator.mediaSession.metadata = new MediaMetadata({
-          title: this.currentStation.name,
-          artist: 'REMO World Radio 4D 🌐',
+          title: `${this.currentStation.icon || '📻'} ${this.currentStation.name}`,
+          artist: 'REMO World • remoworld.com',
           album: `${this.currentStation.badge} • ${desc}`,
           artwork: [
-            { src: 'img/remo_icon_192.png', sizes: '192x192', type: 'image/png' },
-            { src: 'img/remo_icon_512.png', sizes: '512x512', type: 'image/png' }
+            { src: coinUrl, sizes: '512x512', type: 'image/png' },
+            { src: coinUrl, sizes: '256x256', type: 'image/png' },
+            { src: coinFrontUrl, sizes: '512x512', type: 'image/png' },
+            { src: icon512Url, sizes: '512x512', type: 'image/png' },
+            { src: icon192Url, sizes: '192x192', type: 'image/png' }
           ]
         });
-        navigator.mediaSession.playbackState = this.isPlaying ? 'playing' : 'paused';
+        navigator.mediaSession.playbackState = (this.isPlaying || this.userWantsPlaying) ? 'playing' : 'paused';
       } catch (e) {}
     }
 
@@ -862,13 +874,17 @@
 
       this.currentStation = st;
       this._usingFallbackUrl = false;
+      this.isReconnecting = false;
+      if (this._reconnectTimer) clearTimeout(this._reconnectTimer);
       localStorage.setItem('remo_radio_current_station', st.id);
 
-      this.stop();
-
       if (autoPlay) {
+        // Keep the HTML5 <audio> session & Car MediaSession alive during station switch!
+        this._updateMediaSession();
         this.play();
       } else {
+        this.pause();
+        this._updateMediaSession();
         this._updateUI();
       }
     }
@@ -911,6 +927,7 @@
 
       this.isLoading = true;
       this._lastProgressTs = Date.now();
+      this._updateMediaSession();
       this._updateUI();
 
       this.audioEl.src = this._getActiveStreamUrl();

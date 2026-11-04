@@ -58,7 +58,7 @@
       <button class="adm-tab-btn" data-adm-tab="cards" onclick="switchAdminTab('cards')" data-i18n="adm_tab_cards">🎴 City Card Studio</button>
       <button class="adm-tab-btn" data-adm-tab="cities" onclick="switchAdminTab('cities')" data-i18n="adm_tab_cities">🌍 Cities &amp; Radar</button>
       <button class="adm-tab-btn" data-adm-tab="wars" onclick="switchAdminTab('wars')" data-i18n="adm_tab_wars">⚔️ Wars &amp; Pulse</button>
-      <button class="adm-tab-btn" data-adm-tab="contests" onclick="switchAdminTab('contests')" style="border-color:rgba(251,191,36,0.5);color:#fde047;" data-i18n="adm_tab_contests">🎤 Eurovision &amp; Contests</button>
+      <button class="adm-tab-btn" data-adm-tab="contests" onclick="switchAdminTab('contests')" style="border-color:rgba(251,191,36,0.5);color:#fde047;" data-i18n="adm_tab_contests">🏆 REMO Contests</button>
       <button class="adm-tab-btn" data-adm-tab="economy" onclick="switchAdminTab('economy')" data-i18n="adm_tab_economy">🪙 Bank &amp; Auctions</button>
       <button class="adm-tab-btn" data-adm-tab="moderation" onclick="switchAdminTab('moderation')" data-i18n="adm_tab_moderation">🛡️ Users &amp; Posts</button>
       <button class="adm-tab-btn" data-adm-tab="cloud" onclick="switchAdminTab('cloud')" data-i18n="adm_tab_cloud">☁️ Firebase &amp; Settings</button>
@@ -637,17 +637,17 @@
         </div>
       </section>
 
-      <!-- ══ TAB 8: 🎤🏆⚽🕵️🎟️⚡ EUROVISION REMO & 6 VIRAL CONTESTS COMMAND CENTER ══ -->
+      <!-- ══ TAB 8: 🏆🎤⚽🕵️🎟️⚡ REMO CONTESTS COMMAND CENTER ══ -->
       <section class="adm-panel" id="adm-panel-contests">
-        <!-- 1. 🎤 EUROVISION REMO (World Cities 60s Song Contest) -->
+        <!-- 1. 🎤 REMO MUSIC CONTEST (World Cities 60s Song Contest) -->
         <div class="exec-card" style="border-color:#fbbf24;background:linear-gradient(135deg,rgba(15,23,42,0.95),rgba(49,16,68,0.75));">
           <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
-            <h3 style="color:#fde047;margin:0;">🎤 1. Eurovision REMO — World Cities 60s Song Contest</h3>
+            <h3 style="color:#fde047;margin:0;">🎤 1. REMO Music Contest — 60s City Sounds &amp; Anthems</h3>
             <span id="admEuroStatusPill" style="font-size:0.76rem;font-weight:900;padding:4px 10px;border-radius:99px;background:rgba(255,255,255,0.08);">IDLE</span>
           </div>
           <div class="adm-row-2" style="margin-bottom:10px;">
-            <div class="adm-field"><label>Edition Title (EN)</label><input type="text" id="admEuroTitleEn" class="adm-inp" value="Eurovision REMO — World Cities 60s Song Contest"></div>
-            <div class="adm-field"><label>Edition Title (FR)</label><input type="text" id="admEuroTitleFr" class="adm-inp" value="Eurovision REMO — Concours Musical 60s des Villes"></div>
+            <div class="adm-field"><label>Edition Title (EN)</label><input type="text" id="admEuroTitleEn" class="adm-inp" value="REMO Music Contest — 60s City Sounds &amp; Anthems"></div>
+            <div class="adm-field"><label>Edition Title (FR)</label><input type="text" id="admEuroTitleFr" class="adm-inp" value="REMO Concours Musical — Sons &amp; Hymnes 60s des Villes"></div>
             <div class="adm-field"><label>Grand Prize (REMO Coins 🪙)</label><input type="number" id="admEuroPrize" class="adm-inp" value="5000"></div>
             <div class="adm-field">
               <label>Duration</label>
@@ -661,12 +661,12 @@
           </div>
           <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:12px;">
             <label class="check-pill"><input type="checkbox" id="admEuroAllowCitizens" checked> Allow Citizens to Submit 1 Song (60s Audio or Link)</label>
-            <label class="check-pill"><input type="checkbox" id="admEuroNoSelfVote" checked> Official Eurovision Rule (No Voting for Own Home City)</label>
+            <label class="check-pill"><input type="checkbox" id="admEuroNoSelfVote" checked> Official REMO Fair-Play Rule (No Voting for Own Home City)</label>
           </div>
           <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;">
-            <button class="adm-btn gold" onclick="adminStartEurovisionFromOffice()">🚀 Launch / Update Eurovision REMO</button>
+            <button class="adm-btn gold" onclick="adminStartEurovisionFromOffice()">🚀 Launch / Update REMO Music Contest</button>
             <button class="adm-btn emerald" onclick="adminConcludeEurovisionFromOffice()">👑 Conclude &amp; Pay Winner (+Coins)</button>
-            <button class="adm-btn rose" onclick="adminResetEurovisionFromOffice()">🗑️ Stop / Reset Eurovision</button>
+            <button class="adm-btn rose" onclick="adminResetEurovisionFromOffice()">🗑️ Stop / Reset Music Contest</button>
           </div>
 
           <!-- Admin Add Official City Song Entry (60s MP3 or External Link) -->
@@ -690,7 +690,7 @@
                 </select>
               </div>
             </div>
-            <button class="adm-btn indigo" onclick="adminAddEurovisionSongFromOffice()">🎵 Add Song to Eurovision Roster</button>
+            <button class="adm-btn indigo" onclick="adminAddEurovisionSongFromOffice()">🎵 Add Song to REMO Music Contest</button>
           </div>
           <table class="adm-table"><tbody id="admEuroEntriesTable"></tbody></table>
         </div>
@@ -808,10 +808,10 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 
   <!-- Shared REMO Core + Admin Controller -->
-  <script src="js/remo-i18n.js?v=69"></script>
-  <script src="js/remo-cities-data.js?v=69"></script>
-  <script src="js/remo-store.js?v=69"></script>
-  <script src="js/remo-card-engine.js?v=69"></script>
-  <script src="js/remo-admin.js?v=69"></script>
+  <script src="js/remo-i18n.js?v=70"></script>
+  <script src="js/remo-cities-data.js?v=70"></script>
+  <script src="js/remo-store.js?v=70"></script>
+  <script src="js/remo-card-engine.js?v=70"></script>
+  <script src="js/remo-admin.js?v=70"></script>
 </body>
 </html>

@@ -1264,8 +1264,8 @@ function getDefaultViralContests() {
     eurovision: {
       active: false,
       status: 'idle',
-      title_en: 'Eurovision REMO — World Cities 60s Song Contest',
-      title_fr: 'Eurovision REMO — Concours Musical 60s des Villes',
+      title_en: 'REMO Music Contest — 60s City Sounds & Anthems',
+      title_fr: 'REMO Concours Musical — Sons & Hymnes 60s des Villes',
       prizeCoins: 5000,
       endsAt: 0,
       allowCitizenSubmissions: true,
@@ -2114,6 +2114,14 @@ function upgradeEcosystemState(st) {
         st.viralContests[k] = Object.assign({}, defContests[k], st.viralContests[k]);
       }
     });
+    if (st.viralContests.eurovision) {
+      if (/eurovision/i.test(st.viralContests.eurovision.title_en || '')) {
+        st.viralContests.eurovision.title_en = 'REMO Music Contest — 60s City Sounds & Anthems';
+      }
+      if (/eurovision/i.test(st.viralContests.eurovision.title_fr || '')) {
+        st.viralContests.eurovision.title_fr = 'REMO Concours Musical — Sons & Hymnes 60s des Villes';
+      }
+    }
   }
 
   // Upgrade every citizen with Referral Codes & VIP Cosmetics
@@ -4484,7 +4492,7 @@ const REMO_STORE = {
     if (typeof refreshAllAdminPanels === 'function') refreshAllAdminPanels();
   },
 
-  // ── 1. 🎤 EUROVISION REMO (World Cities 60s Song Contest) ──
+  // ── 1. 🎤 REMO MUSIC CONTEST (World Cities 60s Song Contest) ──
   adminLaunchEurovision(opts = {}) {
     const vc = this.ensureViralContests();
     const hours = Math.max(1, Number(opts.durationHours || 48));
@@ -4492,8 +4500,8 @@ const REMO_STORE = {
     vc.eurovision = {
       active: true,
       status: 'open',
-      title_en: (opts.title_en || 'Eurovision REMO — World Cities 60s Song Contest').trim(),
-      title_fr: (opts.title_fr || 'Eurovision REMO — Concours Musical 60s des Villes').trim(),
+      title_en: (opts.title_en || 'REMO Music Contest — 60s City Sounds & Anthems').trim(),
+      title_fr: (opts.title_fr || 'REMO Concours Musical — Sons & Hymnes 60s des Villes').trim(),
       prizeCoins: Math.max(100, Number(opts.prizeCoins || 5000)),
       endsAt: Date.now() + hours * 3600000,
       allowCitizenSubmissions: opts.allowCitizenSubmissions !== false,
@@ -4576,12 +4584,12 @@ const REMO_STORE = {
     if (ev.noSelfCityVote && u.homeCity && entry.cityId === u.homeCity && !this.isCurrentUserAdmin()) {
       return { ok: false, error: 'self_city_blocked' };
     }
-    entry.points = Number(entry.points || 0) + 12;
+    entry.points = Number(entry.points || 0) + 100;
     entry.votesCount = Number(entry.votesCount || 0) + 1;
     ev.voters[u.uid] = entryId;
     ev.updatedAt = Date.now();
     this.addCoins(u.uid, 15, 15);
-    this.addCityScore(entry.cityId, 12);
+    this.addCityScore(entry.cityId, 20);
     this._notifyContestUpdate('eurovision_voted');
     return { ok: true, entry };
   },

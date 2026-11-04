@@ -1490,7 +1490,7 @@ function renderAdminContestsPanel() {
   if (euroBody) {
     const entries = (ev.entries || []).slice().sort((a, b) => Number(b.points || 0) - Number(a.points || 0));
     euroBody.innerHTML = entries.length === 0
-      ? `<tr><td colspan="4" style="color:var(--muted);text-align:center;">No Eurovision songs added yet.</td></tr>`
+      ? `<tr><td colspan="4" style="color:var(--muted);text-align:center;">No Music Contest songs added yet.</td></tr>`
       : entries.map((e, i) => {
           const c = getCityById(e.cityId);
           return `
@@ -1563,8 +1563,8 @@ function handleAdminEuroAudioFile(ev) {
 }
 
 function adminStartEurovisionFromOffice() {
-  const title_en = document.getElementById('admEuroTitleEn')?.value || 'Eurovision REMO — World Cities 60s Song Contest';
-  const title_fr = document.getElementById('admEuroTitleFr')?.value || 'Eurovision REMO — Concours Musical 60s des Villes';
+  const title_en = document.getElementById('admEuroTitleEn')?.value || 'REMO Music Contest — 60s City Sounds & Anthems';
+  const title_fr = document.getElementById('admEuroTitleFr')?.value || 'REMO Concours Musical — Sons & Hymnes 60s des Villes';
   const prizeCoins = Number(document.getElementById('admEuroPrize')?.value || 5000);
   const durationHours = Number(document.getElementById('admEuroDuration')?.value || 48);
   const allowCitizenSubmissions = !!document.getElementById('admEuroAllowCitizens')?.checked;
@@ -1580,7 +1580,7 @@ function adminStartEurovisionFromOffice() {
     keepEntries: true
   });
   RemoAudio.play('fanfare');
-  admToast('🎤 Eurovision REMO is now LIVE across the world!');
+  admToast('🎤 REMO Music Contest is now LIVE across the world!');
 }
 
 function adminAddEurovisionSongFromOffice() {
@@ -1608,22 +1608,22 @@ function adminAddEurovisionSongFromOffice() {
   if (titleInp) titleInp.value = '';
   const linkInp = document.getElementById('admEuroAddLink');
   if (linkInp) linkInp.value = '';
-  admToast(`🎵 Added "${songTitle}" to Eurovision REMO!`);
+  admToast(`🎵 Added "${songTitle}" to REMO Music Contest!`);
 }
 
 function adminConcludeEurovisionFromOffice() {
   const res = REMO_STORE.adminConcludeEurovision();
   if (!res.ok) {
-    admToast('⚠️ Add at least 1 song before concluding Eurovision!');
+    admToast('⚠️ Add at least 1 song before concluding the Music Contest!');
     return;
   }
   RemoAudio.play('fanfare');
-  admToast(`👑 Eurovision Concluded! Winner: "${res.winner.songTitle}" (+${res.prize} 🪙 paid)!`);
+  admToast(`👑 Music Contest Concluded! Winner: "${res.winner.songTitle}" (+${res.prize} 🪙 paid)!`);
 }
 
 function adminResetEurovisionFromOffice() {
   REMO_STORE.adminStopEurovision();
-  admToast('🗑️ Eurovision REMO stopped and cleared.');
+  admToast('🗑️ REMO Music Contest stopped and cleared.');
 }
 
 function adminStartPgpFromOffice() {

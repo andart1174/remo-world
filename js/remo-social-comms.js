@@ -10142,7 +10142,7 @@ function renderFeedActiveContestsBanner() {
 
   const activePills = [];
   if (vc.eurovision && vc.eurovision.active) {
-    activePills.push(`🎤 Eurovision REMO (+${Number(vc.eurovision.prizeCoins || 5000).toLocaleString()} 🪙)`);
+    activePills.push(`🎤 ${isFr ? 'REMO Concours Musical' : 'REMO Music Contest'} (+${Number(vc.eurovision.prizeCoins || 5000).toLocaleString()} 🪙)`);
   }
   if (vc.photoGrandPrix && vc.photoGrandPrix.active) {
     activePills.push(`📸 Photo Grand Prix (🥇 +${Number(vc.photoGrandPrix.prize1st || 3000).toLocaleString()} 🪙)`);
@@ -10171,7 +10171,7 @@ function renderFeedActiveContestsBanner() {
   banner.innerHTML = `
     <div onclick="switchRemoView('contests')" style="cursor:pointer;background:linear-gradient(135deg,rgba(245,158,11,0.18),rgba(236,72,153,0.18),rgba(56,189,248,0.15));border:1.5px solid rgba(251,191,36,0.65);border-radius:16px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;box-shadow:0 8px 24px rgba(0,0,0,0.45);">
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-        <span style="background:#fbbf24;color:#0f172a;font-weight:900;font-size:0.7rem;padding:3px 9px;border-radius:99px;letter-spacing:0.6px;">🔥 ${isFr ? 'CONCOURS OFFICIELS EN DIRECT' : 'LIVE OFFICIAL CONTESTS'}</span>
+        <span style="background:#fbbf24;color:#0f172a;font-weight:900;font-size:0.7rem;padding:3px 9px;border-radius:99px;letter-spacing:0.6px;">🔥 ${isFr ? 'REMO CONCOURS EN DIRECT' : 'LIVE REMO CONTESTS'}</span>
         <span style="font-size:0.82rem;font-weight:800;color:#fde047;">${activePills.join(' · ')}</span>
       </div>
       <span class="btn-cyber btn-gold" style="padding:5px 12px;font-size:0.74rem;">${isFr ? 'Participer & Voter ➔' : 'Join & Vote ➔'}</span>
@@ -10204,11 +10204,14 @@ function renderViralContestsView() {
     (vc.flashHunt && vc.flashHunt.active)
   );
 
-  // ── 1. EUROVISION REMO BLOCK ──
+  // ── 1. REMO MUSIC CONTEST (60S CITY SOUNDS & ANTHEMS) ──
   const ev = vc.eurovision || {};
   let euroHtml = '';
-  if (ev.active || isAdm) {
-    const evTitle = isFr ? (ev.title_fr || ev.title_en) : (ev.title_en || ev.title_fr);
+  if (ev.active) {
+    const rawTitle = isFr ? (ev.title_fr || ev.title_en) : (ev.title_en || ev.title_fr);
+    const evTitle = (!rawTitle || /eurovision/i.test(rawTitle))
+      ? (isFr ? 'REMO Concours Musical — Sons & Hymnes 60s des Villes' : 'REMO Music Contest — 60s City Sounds & Anthems')
+      : rawTitle;
     const evEntries = Array.isArray(ev.entries) ? ev.entries.slice().sort((a, b) => Number(b.points || 0) - Number(a.points || 0)) : [];
     const myVotedEntryId = u && ev.voters ? ev.voters[u.uid] : '';
     const canSubmit = isAdm || (ev.active && ev.status === 'open' && ev.allowCitizenSubmissions);
@@ -10218,9 +10221,9 @@ function renderViralContestsView() {
         <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
           <div>
             <div style="display:inline-flex;align-items:center;gap:6px;background:rgba(251,191,36,0.18);border:1px solid #fbbf24;color:#fde047;padding:3px 10px;border-radius:99px;font-size:0.7rem;font-weight:900;margin-bottom:6px;">
-              ${escapeHtmlStr(t('euro_badge'))} ${!ev.active ? '· (ADMIN PREVIEW - INACTIVE)' : ''}
+              ${escapeHtmlStr(t('euro_badge'))}
             </div>
-            <h2 style="font-family:'Orbitron',sans-serif;font-size:1.18rem;color:#fff;margin:0;">${escapeHtmlStr(evTitle || 'Eurovision REMO')}</h2>
+            <h2 style="font-family:'Orbitron',sans-serif;font-size:1.18rem;color:#fff;margin:0;">${escapeHtmlStr(evTitle)}</h2>
             <p style="font-size:0.78rem;color:#cbd5e1;margin-top:4px;">${escapeHtmlStr(t('euro_rule_note'))}</p>
           </div>
           <div style="text-align:right;">
@@ -10241,7 +10244,7 @@ function renderViralContestsView() {
             <div style="background:linear-gradient(135deg,rgba(251,191,36,0.25),rgba(16,185,129,0.22));border:2px solid #fbbf24;border-radius:14px;padding:14px;text-align:center;margin-bottom:14px;">
               <div style="font-size:1.5rem;">👑🎤🏆</div>
               <div style="font-family:'Orbitron',sans-serif;font-weight:900;color:#fde047;font-size:1.05rem;">
-                ${isFr ? 'CHAMPION EUROVISION REMO' : 'EUROVISION REMO CHAMPION'}: ${wc.flag} ${escapeHtmlStr(getCityName(wc, lang))}!
+                ${isFr ? 'CHAMPION REMO CONCOURS MUSICAL' : 'REMO MUSIC CONTEST CHAMPION'}: ${wc.flag} ${escapeHtmlStr(getCityName(wc, lang))}!
               </div>
               <div style="font-size:0.86rem;color:#fff;font-weight:800;margin-top:3px;">
                 "${escapeHtmlStr(winE.songTitle)}" — @${escapeHtmlStr(winE.artistName)} (${winE.points} PTS · +${Number(ev.prizeCoins || 5000).toLocaleString()} 🪙)
@@ -10357,7 +10360,7 @@ function renderViralContestsView() {
   // ── 2. PHOTO & VIDEO GRAND PRIX (TOP 3 PODIUM 🥇🥈🥉) ──
   const pgp = vc.photoGrandPrix || {};
   let pgpHtml = '';
-  if (pgp.active || isAdm) {
+  if (pgp.active) {
     const pgpTitle = isFr ? (pgp.title_fr || pgp.title_en) : (pgp.title_en || pgp.title_fr);
     const pgpEntries = Array.isArray(pgp.entries) ? pgp.entries.slice().sort((a, b) => Number(b.votes || 0) - Number(a.votes || 0)) : [];
     const myVotedId = u && pgp.voters ? pgp.voters[u.uid] : '';
@@ -10367,7 +10370,7 @@ function renderViralContestsView() {
         <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
           <div>
             <div style="display:inline-flex;align-items:center;gap:6px;background:rgba(56,189,248,0.16);border:1px solid #38bdf8;color:#7dd3fc;padding:3px 10px;border-radius:99px;font-size:0.7rem;font-weight:900;margin-bottom:6px;">
-              ${escapeHtmlStr(t('pgp_badge'))} ${!pgp.active ? '· (INACTIVE)' : ''}
+              ${escapeHtmlStr(t('pgp_badge'))}
             </div>
             <h2 style="font-family:'Orbitron',sans-serif;font-size:1.12rem;color:#fff;margin:0;">${escapeHtmlStr(pgpTitle || 'Photo & Video Grand Prix')}</h2>
           </div>
@@ -10441,7 +10444,7 @@ function renderViralContestsView() {
   // ── 3. 8-CITY WORLD KNOCKOUT CUP BRACKET ──
   const wc = vc.worldCupBracket || {};
   let wcHtml = '';
-  if (wc.active || isAdm) {
+  if (wc.active) {
     const wcTitle = isFr ? (wc.title_fr || wc.title_en) : (wc.title_en || wc.title_fr);
     const roundLabel = wc.round === 'qf'
       ? (isFr ? 'Quarts de Finale (8 Villes)' : 'Quarter-Finals (8 Cities)')
@@ -10517,7 +10520,7 @@ function renderViralContestsView() {
   // ── 4. MYSTERY CITY DETECTIVE (1-ATTEMPT QUIZ) ──
   const md = vc.mysteryDetective || {};
   let mdHtml = '';
-  if (md.active || isAdm) {
+  if (md.active) {
     const clueTxt = isFr ? (md.clue_fr || md.clue_en) : (md.clue_en || md.clue_fr);
     const myAttempt = u && md.attempts ? md.attempts[u.uid] : null;
     const winnersCount = (md.winners || []).length;
@@ -10564,7 +10567,7 @@ function renderViralContestsView() {
   // ── 5. FOUNDER'S GOLDEN TICKET RAFFLE ──
   const gr = vc.goldenRaffle || {};
   let grHtml = '';
-  if (gr.active || isAdm) {
+  if (gr.active) {
     const grTitle = isFr ? (gr.title_fr || gr.title_en) : (gr.title_en || gr.title_fr);
     const myTicket = u && Array.isArray(gr.tickets) ? gr.tickets.find((t) => t && t.uid === u.uid) : null;
     const winners = Array.isArray(gr.winningTickets) ? gr.winningTickets : [];
@@ -10608,7 +10611,7 @@ function renderViralContestsView() {
   // ── 6. FOUNDER'S FLASH TREASURE HUNT ──
   const fh = vc.flashHunt || {};
   let fhHtml = '';
-  if (fh.active || isAdm) {
+  if (fh.active) {
     const riddleTxt = isFr ? (fh.riddle_fr || fh.riddle_en) : (fh.riddle_en || fh.riddle_fr);
     const claimedList = Array.isArray(fh.claims) ? fh.claims : [];
     const maxC = Number(fh.maxClaims || 20);
@@ -10667,9 +10670,9 @@ function renderViralContestsView() {
       </div>
     </div>
 
-    ${!anyActive && !isAdm ? `
+    ${!anyActive ? `
       <div class="glass-box" style="text-align:center;padding:38px 20px;color:#cbd5e1;font-size:0.9rem;">
-        <div style="font-size:2.4rem;margin-bottom:8px;">🎤🏆⚽</div>
+        <div style="font-size:2.4rem;margin-bottom:8px;">🏆🎤⚽</div>
         <div style="font-weight:800;">${escapeHtmlStr(t('contests_none_active'))}</div>
       </div>
     ` : ''}
@@ -10750,7 +10753,7 @@ function submitCitizenEurovisionSong() {
 
   _pendingEuroAudioDataUrl = '';
   spawnRemoCoinsFX(10);
-  remoToast(isFr ? `🎤 "${songTitle}" inscrit à l’Eurovision REMO (+25 🪙) !` : `🎤 "${songTitle}" entered in Eurovision REMO (+25 🪙)!`, 'fanfare');
+  remoToast(isFr ? `🎤 "${songTitle}" inscrit au REMO Concours Musical (+25 🪙) !` : `🎤 "${songTitle}" entered in REMO Music Contest (+25 🪙)!`, 'fanfare');
   renderViralContestsView();
 }
 window.submitCitizenEurovisionSong = submitCitizenEurovisionSong;
@@ -10768,7 +10771,7 @@ function castCitizenEurovisionVote(entryId) {
     if (res.error === 'self_city_blocked') {
       remoToast(t('euro_no_self_city_err'));
     } else if (res.error === 'already_voted') {
-      remoToast(isFr ? '⚠️ Vous avez déjà attribué vos 12 Points !' : '⚠️ You already cast your 12 Points!');
+      remoToast(isFr ? '⚠️ Vous avez déjà attribué votre Vote d’Or (+100 PTS) !' : '⚠️ You already cast your REMO Gold Vote (+100 PTS)!');
     } else {
       remoToast(isFr ? '⚠️ Vote terminé.' : '⚠️ Voting has ended.');
     }
@@ -10778,8 +10781,8 @@ function castCitizenEurovisionVote(entryId) {
   const c = getCityById(res.entry.cityId);
   remoToast(
     isFr
-      ? `🏆 DOUZE POINTS (12 PTS) pour ${c.flag} ${getCityName(c, 'fr')} ! (+15 🪙)`
-      : `🏆 DOUZE POINTS (12 PTS) to ${c.flag} ${getCityName(c, 'en')}! (+15 🪙)`,
+      ? `🌟 VOTE D’OR REMO (+100 PTS) pour ${c.flag} ${getCityName(c, 'fr')} ! (+15 🪙)`
+      : `🌟 REMO GOLD VOTE (+100 PTS) to ${c.flag} ${getCityName(c, 'en')}! (+15 🪙)`,
     'fanfare'
   );
   syncHeaderAndSidebars();
