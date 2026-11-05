@@ -2419,6 +2419,10 @@ function switchCreateStudioTab(tabId) {
     remoToast(REMO_I18N.getLang() === 'fr' ? 'Seul l’administrateur peut publier un Duel Officiel !' : 'Only the administrator can create an Official City Duel!');
     tabId = 'photo';
   }
+  if (tabId === 'beat' && !isAdm) {
+    remoToast(REMO_I18N.getLang() === 'fr' ? 'La création de Beats est réservée aux administrateurs !' : 'Beat creation is reserved for administrators!');
+    tabId = 'photo';
+  }
   activeCreateStudioTab = tabId;
   document.querySelectorAll('.studio-tab-btn').forEach((b) => {
     b.classList.toggle('active', b.getAttribute('data-studio-tab') === tabId);
@@ -2505,7 +2509,9 @@ function openCreatePostModal(prefillTag = '') {
   if (copilotGameBtn) copilotGameBtn.style.display = isAdm ? 'inline-flex' : 'none';
   const versusTabBtn = document.getElementById('studioTabVersusBtn');
   if (versusTabBtn) versusTabBtn.style.display = isAdm ? 'inline-flex' : 'none';
-  if (!isAdm && activeCreateStudioTab === 'versus') {
+  const beatTabBtn = document.getElementById('studioTabBeatBtn');
+  if (beatTabBtn) beatTabBtn.style.display = isAdm ? 'inline-flex' : 'none';
+  if (!isAdm && (activeCreateStudioTab === 'versus' || activeCreateStudioTab === 'beat')) {
     switchCreateStudioTab('photo');
   }
 
@@ -2899,6 +2905,11 @@ async function publishNewRemoPost() {
       }
     }
   } else if (activeCreateStudioTab === 'beat') {
+    const isAdm = REMO_STORE.isAdminUnlocked() || REMO_STORE.isCurrentUserAdmin();
+    if (!isAdm) {
+      remoToast(lang === 'fr' ? 'Seul l’administrateur peut publier un Beat !' : 'Only the administrator can publish a Beat!');
+      return;
+    }
     if (typeof getStudioBeatPatternSnapshot === 'function') {
       beatPatternObj = getStudioBeatPatternSnapshot();
     }
@@ -6106,7 +6117,7 @@ function copilotGenerateCityHtmlGame(forcedGenre = '') {
   const cName = city.name_en.toUpperCase();
   switchCreateStudioTab('html');
 
-  const genres = ['defense', 'stacker', 'drone', 'metro', 'rhythm'];
+  const genres = ['defense', 'stacker', 'drone', 'metro', 'rhythm', 'beat'];
   const genre = forcedGenre && genres.includes(forcedGenre)
     ? forcedGenre
     : genres[(_cityArcadeCycleIdx++) % genres.length];
@@ -6285,7 +6296,7 @@ function loop(){
   x.beginPath();x.moveTo(carX,h-64);x.lineTo(carX-22,h-26);x.lineTo(carX+22,h-26);x.closePath();x.fill();x.shadowBlur=0;
   requestAnimationFrame(loop);
 }loop();<\/script></body></html>`;
-  } else {
+  } else if (genre === 'rhythm') {
     gameTitleEn = 'City Rhythm Synth Piano';
     gameTitleFr = 'Piano Rythmique Néon';
     code = `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>
@@ -6326,14 +6337,175 @@ function loop(){
   }
   requestAnimationFrame(loop);
 }loop();<\/script></body></html>`;
+  } else if (genre === 'beat') {
+    gameTitleEn = '4D City Beat Sequencer';
+    gameTitleFr = 'Séquenceur Beat Urbain 4D';
+    code = `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no">
+<style>
+html,body{margin:0;height:100%;overflow:hidden;background:#050716;font-family:system-ui,-apple-system,sans-serif;user-select:none;touch-action:manipulation;color:#fff;display:flex;flex-direction:column;justify-content:space-between;box-sizing:border-box;}
+.hud{display:flex;justify-content:space-between;align-items:center;padding:7px 10px;font-weight:900;font-size:11px;background:rgba(8,14,34,0.92);border-bottom:1px solid ${col}44;}
+.pill{background:rgba(15,23,42,0.85);border:1px solid ${col};padding:3px 9px;border-radius:99px;color:#fff;}
+.ctrls{display:flex;gap:6px;padding:6px 10px;justify-content:center;align-items:center;background:#070b1e;flex-wrap:wrap;}
+.btn{background:rgba(30,41,59,0.9);border:1px solid rgba(255,255,255,0.2);color:#fff;padding:5px 11px;border-radius:8px;font-weight:900;font-size:11px;cursor:pointer;transition:transform 0.08s,background 0.15s;}
+.btn:active{transform:scale(0.94);}
+.btn.act{background:${col};border-color:#fbbf24;color:#050816;box-shadow:0 0 12px ${col};}
+.grid{flex:1;display:grid;grid-template-rows:repeat(4,1fr);gap:5px;padding:8px 10px;box-sizing:border-box;}
+.row{display:grid;grid-template-columns:46px repeat(8,1fr);gap:4px;align-items:center;}
+.track-lbl{font-size:9px;font-weight:900;letter-spacing:0.5px;color:#cbd5e1;text-transform:uppercase;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.pad{height:100%;min-height:28px;max-height:46px;border-radius:8px;background:rgba(15,23,42,0.85);border:1px solid rgba(255,255,255,0.12);cursor:pointer;transition:transform 0.06s,box-shadow 0.1s,background 0.1s;display:flex;align-items:center;justify-content:center;}
+.pad:active{transform:scale(0.92);}
+.pad.on{border-color:#fff;box-shadow:0 0 12px currentColor;}
+.pad.head{border-color:#fbbf24!important;filter:brightness(1.5);}
+.r0 .pad.on{background:#f43f5e;color:#f43f5e;}
+.r1 .pad.on{background:#fbbf24;color:#fbbf24;}
+.r2 .pad.on{background:#a855f7;color:#a855f7;}
+.r3 .pad.on{background:#38bdf8;color:#38bdf8;}
+</style></head><body>
+<div class="hud">
+  <span class="pill">🎛️ ${city.flag} ${cName} 4D BEAT PAD</span>
+  <span class="pill" id="scoreEl">🪙 0 · 120 BPM</span>
+</div>
+<div class="ctrls">
+  <button class="btn act" id="playBtn" onclick="togglePlay()">▶️ PLAY</button>
+  <button class="btn" onclick="autoBeat()">🎲 AUTO</button>
+  <button class="btn" onclick="clearGrid()">🗑️ CLEAR</button>
+  <button class="btn" id="bpmBtn" onclick="toggleBpm()">⚡ 120</button>
+</div>
+<div class="grid" id="gridEl"></div>
+<script>
+const tracks=[
+  {n:'KICK',c:'#f43f5e'},
+  {n:'CLAP',c:'#fbbf24'},
+  {n:'BASS',c:'#a855f7',notes:[55,65.41,73.42,82.41]},
+  {n:'SYNTH',c:'#38bdf8',notes:[261.63,329.63,392.00,523.25]}
+];
+let grid=[
+  [1,0,0,0,1,0,0,0],
+  [0,0,1,0,0,0,1,0],
+  [1,0,1,0,1,0,1,0],
+  [0,1,0,1,0,1,0,1]
+];
+let isPlaying=false,step=0,timer=null,ac=null,score=0,bpm=120;
+const gridEl=document.getElementById('gridEl');
+function renderGrid(){
+  gridEl.innerHTML='';
+  tracks.forEach((tr,r)=>{
+    const rowEl=document.createElement('div');
+    rowEl.className='row r'+r;
+    const lbl=document.createElement('div');
+    lbl.className='track-lbl';lbl.textContent=tr.n;lbl.style.color=tr.c;
+    rowEl.appendChild(lbl);
+    for(let c=0;c<8;c++){
+      const p=document.createElement('div');
+      p.className='pad'+(grid[r][c]?' on':'');
+      p.dataset.r=r;p.dataset.c=c;
+      p.onpointerdown=()=>togglePad(r,c);
+      rowEl.appendChild(p);
+    }
+    gridEl.appendChild(rowEl);
+  });
+}
+function sfx(r,c){
+  try{
+    if(!ac)ac=new(window.AudioContext||window.webkitAudioContext)();
+    if(ac.state==='suspended')ac.resume();
+    const t=ac.currentTime;
+    if(r===0){
+      const o=ac.createOscillator(),g=ac.createGain();
+      o.type='sine';o.frequency.setValueAtTime(160,t);o.frequency.exponentialRampToValueAtTime(36,t+0.16);
+      g.gain.setValueAtTime(0.35,t);g.gain.exponentialRampToValueAtTime(0.001,t+0.2);
+      o.connect(g);g.connect(ac.destination);o.start(t);o.stop(t+0.22);
+    }else if(r===1){
+      const o=ac.createOscillator(),g=ac.createGain();
+      o.type='triangle';o.frequency.setValueAtTime(440,t);o.frequency.exponentialRampToValueAtTime(75,t+0.12);
+      g.gain.setValueAtTime(0.24,t);g.gain.exponentialRampToValueAtTime(0.001,t+0.14);
+      o.connect(g);g.connect(ac.destination);o.start(t);o.stop(t+0.15);
+    }else if(r===2){
+      const o=ac.createOscillator(),g=ac.createGain();
+      const n=tracks[2].notes[c%tracks[2].notes.length];
+      o.type='sawtooth';o.frequency.setValueAtTime(n,t);
+      g.gain.setValueAtTime(0.22,t);g.gain.exponentialRampToValueAtTime(0.001,t+0.28);
+      o.connect(g);g.connect(ac.destination);o.start(t);o.stop(t+0.3);
+    }else{
+      const o=ac.createOscillator(),g=ac.createGain();
+      const n=tracks[3].notes[(c*2)%tracks[3].notes.length];
+      o.type='sine';o.frequency.setValueAtTime(n,t);
+      g.gain.setValueAtTime(0.2,t);g.gain.exponentialRampToValueAtTime(0.001,t+0.25);
+      o.connect(g);g.connect(ac.destination);o.start(t);o.stop(t+0.26);
+    }
+  }catch(e){}
+}
+function togglePad(r,c){
+  grid[r][c]=grid[r][c]?0:1;
+  score+=5;
+  document.getElementById('scoreEl').textContent='🪙 '+score+' · '+bpm+' BPM';
+  if(grid[r][c])sfx(r,c);
+  renderGrid();
+}
+function togglePlay(){
+  isPlaying=!isPlaying;
+  const btn=document.getElementById('playBtn');
+  if(isPlaying){
+    btn.textContent='⏸️ STOP';btn.classList.add('act');
+    if(!ac)ac=new(window.AudioContext||window.webkitAudioContext)();
+    if(ac.state==='suspended')ac.resume();
+    startClock();
+  }else{
+    btn.textContent='▶️ PLAY';btn.classList.remove('act');
+    stopClock();
+    document.querySelectorAll('.pad').forEach(p=>p.classList.remove('head'));
+  }
+}
+function startClock(){
+  stopClock();
+  const ms=Math.round((60/bpm/2)*1000);
+  timer=setInterval(()=>{
+    document.querySelectorAll('.pad').forEach(p=>{
+      p.classList.toggle('head',Number(p.dataset.c)===step);
+    });
+    for(let r=0;r<4;r++){
+      if(grid[r][step])sfx(r,step);
+    }
+    step=(step+1)%8;
+  },ms);
+}
+function stopClock(){if(timer){clearInterval(timer);timer=null;}}
+function autoBeat(){
+  grid=[
+    [1,0,0,0,1,0,0,0],
+    [0,0,1,0,0,0,1,0],
+    [1,0,1,0,0,1,1,0],
+    [0,1,0,1,1,0,1,1]
+  ];
+  score+=20;
+  document.getElementById('scoreEl').textContent='🪙 '+score+' · '+bpm+' BPM';
+  renderGrid();
+  if(!isPlaying)togglePlay();
+}
+function clearGrid(){
+  grid=[[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0]];
+  renderGrid();
+}
+function toggleBpm(){
+  bpm=bpm===100?120:bpm===120?140:100;
+  document.getElementById('bpmBtn').textContent='⚡ '+bpm;
+  document.getElementById('scoreEl').textContent='🪙 '+score+' · '+bpm+' BPM';
+  if(isPlaying)startClock();
+}
+renderGrid();
+<\/script></body></html>`;
   }
 
   const area = document.getElementById('createHtmlCodeArea');
   if (area) area.value = code;
   refreshStudioHtmlPreview();
 
-  const enCap = `🎮 Play my ${city.flag} ${city.name_en} "${gameTitleEn}" Arcade Game directly inside this post! Can you beat my score? #${city.code} #LiveHTML`;
-  const frCap = `🎮 Jouez à mon jeu d’arcade ${city.flag} ${city.name_fr || city.name_en} « ${gameTitleFr} » directement dans ce post ! #${city.code} #LiveHTML`;
+  const enCap = genre === 'beat'
+    ? `🎛️ Play my ${city.flag} ${city.name_en} "4D City Beat Sequencer" Arcade Game directly inside this post! Can you create a hit? #${city.code} #LiveHTML`
+    : `🎮 Play my ${city.flag} ${city.name_en} "${gameTitleEn}" Arcade Game directly inside this post! Can you beat my score? #${city.code} #LiveHTML`;
+  const frCap = genre === 'beat'
+    ? `🎛️ Jouez à mon jeu d’arcade ${city.flag} ${city.name_fr || city.name_en} « ${gameTitleFr} » directement dans ce post ! #${city.code} #LiveHTML`
+    : `🎮 Jouez à mon jeu d’arcade ${city.flag} ${city.name_fr || city.name_en} « ${gameTitleFr} » directement dans ce post ! #${city.code} #LiveHTML`;
   const inp = document.getElementById('createCaptionInp');
   if (inp) inp.value = lang === 'fr' ? frCap : enCap;
   const drawer = document.getElementById('bilingualCaptionDrawer');
@@ -10296,9 +10468,14 @@ window.toggleFeedBeatLoop = toggleFeedBeatLoop;
 
 function remixBeatPost(postId, ev) {
   if (ev) ev.stopPropagation();
+  const lang = REMO_I18N.getLang();
+  const isAdm = REMO_STORE.isAdminUnlocked() || REMO_STORE.isCurrentUserAdmin();
+  if (!isAdm) {
+    remoToast(lang === 'fr' ? 'La création de Beats officiels est réservée aux administrateurs !' : 'Official Beat creation is reserved for administrators!');
+    return;
+  }
   const p = (REMO_STORE.state.posts || []).find((x) => x && x.id === postId);
   if (!p || !p.beatPattern) return;
-  const lang = REMO_I18N.getLang();
 
   openCreatePostModal('#RemoBeat');
   pendingRemixParent = { authorUid: p.uid || '', authorName: p.authorName || 'Creator' };

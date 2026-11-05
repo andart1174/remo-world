@@ -1139,6 +1139,9 @@
   window.openRemoRadioModal = function () {
     const modal = document.getElementById('remoRadioModal');
     if (!modal) return;
+    const isAdm = window.REMO_STORE && (window.REMO_STORE.isAdminUnlocked?.() || window.REMO_STORE.isCurrentUserAdmin?.());
+    const beatBtn = document.getElementById('radioBeatStudioBtn');
+    if (beatBtn) beatBtn.style.display = isAdm ? 'inline-flex' : 'none';
     populateJukeboxCitySelect();
     if (radioEngine.currentCategory === 'jukebox') {
       renderRadioJukeboxView();
@@ -1155,6 +1158,14 @@
   };
 
   window.openBeatStudioFromRadio = function () {
+    const isAdm = window.REMO_STORE && (window.REMO_STORE.isAdminUnlocked?.() || window.REMO_STORE.isCurrentUserAdmin?.());
+    if (!isAdm) {
+      if (typeof window.remoToast === 'function') {
+        const lang = window.REMO_I18N ? window.REMO_I18N.getLang() : 'en';
+        window.remoToast(lang === 'fr' ? 'La création de Beats est réservée aux administrateurs !' : 'Beat creation is reserved for administrators!');
+      }
+      return;
+    }
     window.closeRemoRadioModal();
     if (typeof window.openCreatePostModal === 'function') {
       window.openCreatePostModal('#RemoBeat');
