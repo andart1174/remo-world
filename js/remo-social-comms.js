@@ -281,10 +281,21 @@ function renderRightSidebarWidgets() {
       const tot = Math.max(1, vA + vB);
       const pA = Math.round((vA / tot) * 100);
       const pB = 100 - pA;
+      const u = REMO_STORE.getCurrentUser();
+      const myVote = localStorage.getItem('remo_voted_' + w.id) || (u && u.votedWars && u.votedWars[w.id]) || '';
+      const votedA = myVote === 'A';
+      const votedB = myVote === 'B';
+      const hasVoted = Boolean(myVote);
+      const btnTextA = votedA ? `✓ ${cA.flag} ${t('war_voted_btn')}` : `${cA.flag} ${t('war_tap_btn')}`;
+      const btnTextB = votedB ? `✓ ${cB.flag} ${t('war_voted_btn')}` : `${cB.flag} ${t('war_tap_btn')}`;
+      const styleA = votedA ? 'border-color:#10b981;box-shadow:0 0 10px rgba(16,185,129,0.4);font-weight:900;' : (hasVoted ? 'opacity:0.5;' : '');
+      const styleB = votedB ? 'border-color:#10b981;box-shadow:0 0 10px rgba(16,185,129,0.4);font-weight:900;' : (hasVoted ? 'opacity:0.5;' : '');
+      const prefSide = votedB ? 'B' : (votedA ? 'A' : (pA >= pB ? 'A' : 'B'));
+
       miniWar.innerHTML = `
         <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;margin-bottom:6px;">
           <b style="font-size:0.82rem;">⚔️ ${cA.flag} ${getCityName(cA, lang)} vs ${cB.flag} ${getCityName(cB, lang)}</b>
-          <button type="button" class="war-backup-btn" style="padding:3px 8px;font-size:0.66rem;" onclick="shareCityWarBackup('${w.id}','${pA >= pB ? 'A' : 'B'}')">${t('war_backup_btn')}</button>
+          <button type="button" class="war-backup-btn" style="padding:3px 8px;font-size:0.66rem;" onclick="shareCityWarBackup('${w.id}','${prefSide}')">${t('war_backup_btn')}</button>
         </div>
         <div style="display:flex;justify-content:space-between;font-size:0.72rem;font-weight:800;color:#cbd5e1;">
           <span>${cA.flag} ${pA}% (${vA.toLocaleString()})</span>
@@ -294,8 +305,8 @@ function renderRightSidebarWidgets() {
           <div class="war-bar-fill-a" style="width:${pA}%;transition:width 0.18s ease;"></div>
         </div>
         <div style="display:flex;gap:6px;margin-top:8px;">
-          <button type="button" class="war-pulse-btn side-a" style="flex:1;padding:7px 6px;font-size:0.69rem;" onclick="voteCityWar('${w.id}','A',event)">${cA.flag} ${t('war_tap_btn')}</button>
-          <button type="button" class="war-pulse-btn side-b" style="flex:1;padding:7px 6px;font-size:0.69rem;" onclick="voteCityWar('${w.id}','B',event)">${cB.flag} ${t('war_tap_btn')}</button>
+          <button type="button" class="war-pulse-btn side-a" style="flex:1;padding:7px 6px;font-size:0.69rem;${styleA}" onclick="voteCityWar('${w.id}','A',event)">${btnTextA}</button>
+          <button type="button" class="war-pulse-btn side-b" style="flex:1;padding:7px 6px;font-size:0.69rem;${styleB}" onclick="voteCityWar('${w.id}','B',event)">${btnTextB}</button>
         </div>
       `;
     } else {
@@ -9387,8 +9398,15 @@ function renderMobileCityWarStrip() {
   const pA = Math.round((vA / tot) * 100);
   const pB = 100 - pA;
   const u = REMO_STORE.getCurrentUser();
-  const myTaps = Number(localStorage.getItem('remo_war_taps_' + w.id) || 0);
-  const prefSide = (window._activeWarDeepLink && window._activeWarDeepLink.side) || (pA >= pB ? 'A' : 'B');
+  const myVote = localStorage.getItem('remo_voted_' + w.id) || (u && u.votedWars && u.votedWars[w.id]) || '';
+  const votedA = myVote === 'A';
+  const votedB = myVote === 'B';
+  const hasVoted = Boolean(myVote);
+  const prefSide = (window._activeWarDeepLink && window._activeWarDeepLink.side) || (votedB ? 'B' : (votedA ? 'A' : (pA >= pB ? 'A' : 'B')));
+  const btnTextA = votedA ? `✓ ${cA.flag} ${escapeHtmlStr(t('war_voted_btn'))}` : `${cA.flag} ${escapeHtmlStr(getCityName(cA, lang))} · ${escapeHtmlStr(t('war_tap_btn'))}`;
+  const btnTextB = votedB ? `✓ ${cB.flag} ${escapeHtmlStr(t('war_voted_btn'))}` : `${cB.flag} ${escapeHtmlStr(getCityName(cB, lang))} · ${escapeHtmlStr(t('war_tap_btn'))}`;
+  const styleA = votedA ? 'border-color:#10b981;box-shadow:0 0 10px rgba(16,185,129,0.4);font-weight:900;' : (hasVoted ? 'opacity:0.5;' : '');
+  const styleB = votedB ? 'border-color:#10b981;box-shadow:0 0 10px rgba(16,185,129,0.4);font-weight:900;' : (hasVoted ? 'opacity:0.5;' : '');
 
   strip.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:5px;">
@@ -9402,16 +9420,16 @@ function renderMobileCityWarStrip() {
       <div class="war-bar-fill-a" style="width:${pA}%;transition:width 0.18s ease;"></div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;">
-      <button type="button" class="war-pulse-btn side-a" style="padding:7px 8px;font-size:0.71rem;" onclick="voteCityWar('${w.id}','A',event)">
-        ${cA.flag} ${escapeHtmlStr(getCityName(cA, lang))} · ${escapeHtmlStr(t('war_tap_btn'))}
+      <button type="button" class="war-pulse-btn side-a" style="padding:7px 8px;font-size:0.71rem;${styleA}" onclick="voteCityWar('${w.id}','A',event)">
+        ${btnTextA}
       </button>
-      <button type="button" class="war-pulse-btn side-b" style="padding:7px 8px;font-size:0.71rem;" onclick="voteCityWar('${w.id}','B',event)">
-        ${cB.flag} ${escapeHtmlStr(getCityName(cB, lang))} · ${escapeHtmlStr(t('war_tap_btn'))}
+      <button type="button" class="war-pulse-btn side-b" style="padding:7px 8px;font-size:0.71rem;${styleB}" onclick="voteCityWar('${w.id}','B',event)">
+        ${btnTextB}
       </button>
     </div>
-    ${(!u && myTaps >= 15) ? `
+    ${(!u && hasVoted) ? `
       <div style="margin-top:7px;display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:0.72rem;color:#fde047;font-weight:800;">
-        <span>${escapeHtmlStr(t('war_guest_claim_bar', { taps: myTaps, city: getCityName(prefSide === 'B' ? cB : cA, lang) }))}</span>
+        <span>${escapeHtmlStr(t('war_guest_claim_bar', { city: getCityName(prefSide === 'B' ? cB : cA, lang) }))}</span>
         <button type="button" class="btn-cyber btn-gold" style="padding:3px 9px;font-size:0.68rem;" onclick="openAuthModal()">🛂 ${escapeHtmlStr(t('btn_sign_in'))}</button>
       </div>
     ` : ''}

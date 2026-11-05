@@ -731,14 +731,15 @@ const REMO_DICT = {
     guess_share_text: '🕵️ Can you guess which city this photo was taken in? Tap to guess on REMO (+10 🪙):',
 
     // ⚡ Live City Clicker Pulse War (v59)
-    war_tap_btn: '⚡ TAP +1',
-    war_backup_btn: '📢 Call Backup',
+    war_tap_btn: '⚡ VOTE',
+    war_voted_btn: '✓ VOTED',
+    war_backup_btn: '📢 Invite Friends',
     war_overtake_toast: '🚨 LEAD CHANGE! {city} just overtook {other} ({pct}%)!',
-    war_milestone_toast: '⚡ 25 Taps for {city}! +5 🪙 Battle Bonus!',
-    war_guest_claim_bar: '🔥 {taps} taps for {city}! Claim Passport to save your +Coins',
-    war_share_backup_text: '🚨 {cityA} vs {cityB} LIVE CLICKER WAR ({pctA}% - {pctB}%)! Tap to defend {myCity} right now (no login needed):',
+    war_milestone_toast: '⚡ Vote recorded for {city}! +20 🪙 Battle Bonus!',
+    war_guest_claim_bar: '🔥 Voted for {city}! Claim Passport to save your +Coins',
+    war_share_backup_text: '🚨 {cityA} vs {cityB} LIVE CITY DUEL ({pctA}% - {pctB}%)! Vote to support {myCity} now:',
     war_mobile_strip_lbl: '⚔️ LIVE WAR',
-    war_my_taps_lbl: 'Your taps: {n}',
+    war_my_taps_lbl: 'Your vote: {n}',
 
     // 🪟 World Window Sync 9:16 (v59)
     win_pulse_btn: '🪟 Live Window',
@@ -1583,14 +1584,15 @@ const REMO_DICT = {
     guess_share_text: '🕵️ Peux-tu deviner dans quelle ville cette photo a été prise ? Clique pour jouer sur REMO (+10 🪙) :',
 
     // ⚡ Live City Clicker Pulse War (v59)
-    war_tap_btn: '⚡ TAPER +1',
-    war_backup_btn: '📢 Renforts',
+    war_tap_btn: '⚡ VOTER',
+    war_voted_btn: '✓ VOTÉ',
+    war_backup_btn: '📢 Inviter des Amis',
     war_overtake_toast: '🚨 PRISE DE TÊTE ! {city} vient de dépasser {other} ({pct}%) !',
-    war_milestone_toast: '⚡ 25 Taps pour {city} ! +5 🪙 Bonus de Combat !',
-    war_guest_claim_bar: '🔥 {taps} taps pour {city} ! Créez votre Passeport pour garder vos +Pièces',
-    war_share_backup_text: '🚨 GUERRE LIVE {cityA} vs {cityB} ({pctA}% - {pctB}%) ! Tape pour défendre {myCity} maintenant (sans inscription) :',
+    war_milestone_toast: '⚡ Vote enregistré pour {city} ! +20 🪙 Bonus Citoyen !',
+    war_guest_claim_bar: '🔥 Voté pour {city} ! Créez votre Passeport pour garder vos +Pièces',
+    war_share_backup_text: '🚨 DUEL DE VILLES EN DIRECT {cityA} vs {cityB} ({pctA}% - {pctB}%) ! Votez pour soutenir {myCity} maintenant :',
     war_mobile_strip_lbl: '⚔️ DUEL LIVE',
-    war_my_taps_lbl: 'Vos taps : {n}',
+    war_my_taps_lbl: 'Votre vote : {n}',
 
     // 🪟 World Window Sync 9:16 (v59)
     win_pulse_btn: '🪟 Fenêtre Live',

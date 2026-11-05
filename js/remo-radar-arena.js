@@ -1051,10 +1051,17 @@ function renderArenaWarsOnly() {
     const pctA = Math.round((vA / tot) * 100);
     const pctB = 100 - pctA;
     const ttl = lang === 'fr' ? (w.title_fr || w.title_en) : w.title_en;
-    const myTaps = Number(localStorage.getItem('remo_war_taps_' + w.id) || 0);
-    const guestClaimHtml = (!u && myTaps >= 15)
+    const myVote = localStorage.getItem('remo_voted_' + w.id) || (u && u.votedWars && u.votedWars[w.id]) || '';
+    const votedA = myVote === 'A';
+    const votedB = myVote === 'B';
+    const hasVoted = Boolean(myVote);
+    const btnTextA = votedA ? `✓ ${cA.flag} ${getCityName(cA, lang)} · ${t('war_voted_btn')}` : `${cA.flag} ${getCityName(cA, lang)} · ${t('war_tap_btn')}`;
+    const btnTextB = votedB ? `✓ ${cB.flag} ${getCityName(cB, lang)} · ${t('war_voted_btn')}` : `${cB.flag} ${getCityName(cB, lang)} · ${t('war_tap_btn')}`;
+    const styleA = votedA ? 'border-color:#10b981;box-shadow:0 0 14px rgba(16,185,129,0.5);font-weight:900;' : (hasVoted ? 'opacity:0.55;' : '');
+    const styleB = votedB ? 'border-color:#10b981;box-shadow:0 0 14px rgba(16,185,129,0.5);font-weight:900;' : (hasVoted ? 'opacity:0.55;' : '');
+    const guestClaimHtml = (!u && hasVoted)
       ? `<div style="margin-top:8px;padding:6px 10px;border-radius:10px;background:rgba(251,191,36,0.14);border:1px solid rgba(251,191,36,0.45);display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;font-size:0.75rem;color:#fde047;font-weight:800;">
-           <span>${t('war_guest_claim_bar', { taps: myTaps, city: getCityName(cA, lang) })}</span>
+           <span>${t('war_guest_claim_bar', { city: getCityName(votedB ? cB : cA, lang) })}</span>
            <button class="btn-cyber btn-gold" style="padding:4px 10px;font-size:0.72rem;" onclick="openAuthModal()">🛂 ${t('btn_sign_in')}</button>
          </div>`
       : '';
@@ -1063,8 +1070,8 @@ function renderArenaWarsOnly() {
         <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
           <b style="font-size:1rem;color:#fff;">⚔️ ${ttl}</b>
           <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
-            ${myTaps > 0 ? `<span class="city-tag" style="border-color:rgba(251,191,36,0.5);color:#fde047;">⚡ ${t('war_my_taps_lbl', { n: myTaps })}</span>` : ''}
-            <span class="city-tag">+5 🪙 / 25 taps</span>
+            ${myVote ? `<span class="city-tag" style="border-color:rgba(16,185,129,0.6);color:#6ee7b7;font-weight:900;">${t('war_voted_btn')}</span>` : ''}
+            <span class="city-tag">+20 🪙 / ${lang === 'fr' ? 'vote' : 'vote'}</span>
           </div>
         </div>
         <div style="display:flex;justify-content:space-between;font-weight:800;font-size:0.9rem;">
@@ -1075,19 +1082,19 @@ function renderArenaWarsOnly() {
           <div class="war-bar-fill-a" style="width:${pctA}%;transition:width 0.18s ease;"></div>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;">
-          <button type="button" class="war-pulse-btn side-a" onclick="voteCityWar('${w.id}','A',event)">
-            ${cA.flag} ${getCityName(cA, lang)} · ${t('war_tap_btn')}
+          <button type="button" class="war-pulse-btn side-a" style="${styleA}" onclick="voteCityWar('${w.id}','A',event)">
+            ${btnTextA}
           </button>
-          <button type="button" class="war-pulse-btn side-b" onclick="voteCityWar('${w.id}','B',event)">
-            ${cB.flag} ${getCityName(cB, lang)} · ${t('war_tap_btn')}
+          <button type="button" class="war-pulse-btn side-b" style="${styleB}" onclick="voteCityWar('${w.id}','B',event)">
+            ${btnTextB}
           </button>
         </div>
         <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap;">
-          <button type="button" class="war-backup-btn" onclick="shareCityWarBackup('${w.id}','A')">
-            ${t('war_backup_btn')} ${cA.flag}
+          <button type="button" class="war-backup-btn" style="flex:1;justify-content:center;" onclick="shareCityWarBackup('${w.id}','A')">
+            ${t('war_backup_btn')} (${cA.flag} ${getCityName(cA, lang)})
           </button>
-          <button type="button" class="war-backup-btn" onclick="shareCityWarBackup('${w.id}','B')">
-            ${t('war_backup_btn')} ${cB.flag}
+          <button type="button" class="war-backup-btn" style="flex:1;justify-content:center;" onclick="shareCityWarBackup('${w.id}','B')">
+            ${t('war_backup_btn')} (${cB.flag} ${getCityName(cB, lang)})
           </button>
         </div>
         ${guestClaimHtml}
@@ -1276,15 +1283,27 @@ function scheduleWarPulseCloudFlush() {
 }
 
 function voteCityWar(warId, side, ev) {
-  const now = Date.now();
-  // Human anti-bot speed cap: max 12 taps per second
-  _warTapTimestamps = _warTapTimestamps.filter((ts) => now - ts < 1000);
-  if (_warTapTimestamps.length >= 12) return;
-  _warTapTimestamps.push(now);
-
   const lang = REMO_I18N.getLang();
   const war = (REMO_STORE.state.duels || []).find((d) => d.id === warId);
   if (!war) return;
+
+  const u = REMO_STORE.getCurrentUser();
+  const voteKey = 'remo_voted_' + warId;
+  const existingVote = localStorage.getItem(voteKey) || (u && u.votedWars && u.votedWars[warId]);
+
+  if (existingVote) {
+    remoToast(lang === 'fr' 
+      ? '⚠️ Vous avez déjà voté pour ce duel ! Invitez vos amis à voter.' 
+      : '⚠️ You have already voted in this battle! Invite your friends to vote.');
+    return;
+  }
+
+  // 1 User = 1 Vote per war
+  localStorage.setItem(voteKey, side);
+  if (u) {
+    if (!u.votedWars) u.votedWars = {};
+    u.votedWars[warId] = side;
+  }
 
   const cA = getCityById(war.cityA);
   const cB = getCityById(war.cityB);
@@ -1297,46 +1316,30 @@ function voteCityWar(warId, side, ev) {
 
   if (side === 'A') {
     war.votesA = prevA + 1;
-    REMO_STORE.state.cityScores[war.cityA] = (REMO_STORE.state.cityScores[war.cityA] || 1000) + 2;
+    REMO_STORE.state.cityScores[war.cityA] = (REMO_STORE.state.cityScores[war.cityA] || 1000) + 5;
   } else {
     war.votesB = prevB + 1;
-    REMO_STORE.state.cityScores[war.cityB] = (REMO_STORE.state.cityScores[war.cityB] || 1000) + 2;
+    REMO_STORE.state.cityScores[war.cityB] = (REMO_STORE.state.cityScores[war.cityB] || 1000) + 5;
   }
 
   try { RemoAudio.play('pop'); } catch (e) {}
-  try { if (navigator.vibrate) navigator.vibrate(10); } catch (e) {}
+  try { if (navigator.vibrate) navigator.vibrate(20); } catch (e) {}
   spawnWarTapSpark(ev, chosenCity ? chosenCity.flag : '⚡');
 
-  // Personal tap counter & capped coin rewards
-  const tapKey = 'remo_war_taps_' + warId;
-  const myTaps = Number(localStorage.getItem(tapKey) || 0) + 1;
-  localStorage.setItem(tapKey, String(myTaps));
-  localStorage.setItem('remo_war_last_side_' + warId, side);
-
-  const u = REMO_STORE.getCurrentUser();
-  const firstVoteKey = 'remo_voted_' + warId;
+  // Single-vote reward: +20 REMO Coins
   const dayKey = 'remo_war_coins_' + REMO_STORE._getLocalDateKey(0);
   const earnedToday = Number(localStorage.getItem(dayKey) || 0);
 
-  if (!localStorage.getItem(firstVoteKey)) {
-    localStorage.setItem(firstVoteKey, side);
-    if (u) {
-      REMO_STORE.addCoins(u.uid, 10, 10);
-      localStorage.setItem(dayKey, String(earnedToday + 10));
-    } else {
-      const gCoins = Math.min(25, Number(localStorage.getItem('remo_guest_war_coins') || 0) + 10);
-      localStorage.setItem('remo_guest_war_coins', String(gCoins));
-    }
-  } else if (myTaps % 25 === 0) {
-    if (u && earnedToday < 100) {
-      REMO_STORE.addCoins(u.uid, 5, 8);
-      localStorage.setItem(dayKey, String(earnedToday + 5));
-      spawnRemoCoinsFX(4);
-      remoToast(t('war_milestone_toast', { city: getCityName(chosenCity, lang) }), 'coin');
-    } else if (!u) {
-      const gCoins = Math.min(25, Number(localStorage.getItem('remo_guest_war_coins') || 0) + 5);
-      localStorage.setItem('remo_guest_war_coins', String(gCoins));
-    }
+  if (u) {
+    REMO_STORE.addCoins(u.uid, 20, 20);
+    localStorage.setItem(dayKey, String(earnedToday + 20));
+    spawnRemoCoinsFX(6);
+    remoToast(t('war_milestone_toast', { city: getCityName(chosenCity, lang) }), 'coin');
+  } else {
+    const gCoins = Math.min(100, Number(localStorage.getItem('remo_guest_war_coins') || 0) + 20);
+    localStorage.setItem('remo_guest_war_coins', String(gCoins));
+    spawnRemoCoinsFX(4);
+    remoToast(t('war_milestone_toast', { city: getCityName(chosenCity, lang) }), 'coin');
   }
 
   // Lead-change overtake alert!
@@ -1395,8 +1398,9 @@ async function shareCityWarBackup(warId, side) {
     }
   }
   copyTextToClipboard(`${msg} ${url}`);
-  const waUrl = `https://wa.me/?text=${encodeURIComponent(msg + ' ' + url)}`;
-  window.open(waUrl, '_blank', 'noopener');
+  remoToast(lang === 'fr' 
+    ? '📋 Lien copié ! Partagez-le avec vos amis pour soutenir votre ville.' 
+    : '📋 Link copied! Share it with your friends to support your city.', 'info');
 }
 
 function updatePvPCardPreviews() {
