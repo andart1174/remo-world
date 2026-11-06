@@ -441,7 +441,7 @@ function buildCityPage(city, lang, cities, elements, stations) {
           <div class="stat-row"><span>🍽️ ${isFr ? 'Gastronomie' : 'Gastronomy & Street Food'}</span><b>${city.stats.gastronomy}/100</b></div>
           <div class="bar"><i style="width:${city.stats.gastronomy}%"></i></div>
           <p style="font-size:0.8rem;color:var(--muted);margin-top:6px;">
-            📍 GPS: ${city.lat.toFixed(4)}°, ${city.lng.toFixed(4)}° • ${esc(tz)}
+            📍 ${isFr ? 'Localité' : 'Location'}: ${esc(cName)} (${esc(city.code || '')}) • ${esc(tz)}
           </p>
         </section>
       </div>

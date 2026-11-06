@@ -548,7 +548,7 @@ function generateCityPostVisualDataUrl(cityId, headline, subline) {
 
     ctx.font = '700 16px monospace';
     ctx.fillStyle = '#38bdf8';
-    ctx.fillText(`🌐 REMO LIVE · ${city.lat.toFixed(3)}°, ${city.lng.toFixed(3)}°`, 360, 825);
+    ctx.fillText(`🌐 REMO LIVE · ${city.name_en.toUpperCase()} · 4D CITY`, 360, 825);
 
     return cv.toDataURL('image/jpeg', 0.86);
   } catch (e) {

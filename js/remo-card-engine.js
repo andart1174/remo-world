@@ -859,16 +859,15 @@ function renderCityCardFront(canvas, spec = {}, langOverride) {
     drawCityLandmark(ctx, city.id, accent, CARD_W / 2, artY + artH * 0.52, Math.min(artW, artH) * 0.40);
   }
 
-  // GPS Coordinates Pill inside artwork bottom
-  const latStr = `${Math.abs(city.lat).toFixed(4)}° ${city.lat >= 0 ? 'N' : 'S'}`;
-  const lngStr = `${Math.abs(city.lng).toFixed(4)}° ${city.lng >= 0 ? 'E' : 'W'}`;
-  ctx.fillStyle = 'rgba(5, 8, 20, 0.82)';
+  // Locality Pill inside artwork bottom (Zero GPS coordinates for privacy & security)
+  const locName = `${city.flag || '📍'} ${(lang === 'fr' ? (city.name_fr || city.name_en) : city.name_en).toUpperCase()} · ${(lang === 'fr' ? (city.country_fr || city.country_en) : (city.country_en || 'WORLD')).toUpperCase()}`;
+  ctx.fillStyle = 'rgba(5, 8, 20, 0.85)';
   remoRoundRect(ctx, artX + 16, artY + artH - 42, 260, 28, 14);
   ctx.fill();
-  ctx.font = 'bold 12px monospace';
+  ctx.font = 'bold 12px "Outfit", sans-serif';
   ctx.fillStyle = '#38bdf8';
   ctx.textAlign = 'left';
-  ctx.fillText(`🧭 ${latStr} · ${lngStr}`, artX + 30, artY + artH - 24);
+  ctx.fillText(locName.length > 28 ? locName.slice(0, 26) + '...' : locName, artX + 26, artY + artH - 24);
 
   // City Code Pill bottom-right of artwork
   ctx.fillStyle = 'rgba(5, 8, 20, 0.86)';
@@ -1439,7 +1438,7 @@ function downloadCityCertificateA4(spec = {}, langOverride) {
     [lang === 'fr' ? 'VILLE OFFICIELLE :' : 'OFFICIAL CITY:', `${city.flag} ${getCityName(city, lang)} (${getCityCountry(city, lang)})`],
     [lang === 'fr' ? 'NUMÉRO DE SÉRIE :' : 'SERIAL NUMBER:', fullSerial],
     [lang === 'fr' ? 'RARETÉ :' : 'COLLECTOR RARITY:', rarity.toUpperCase()],
-    [lang === 'fr' ? 'COORDONNÉES GPS :' : 'GPS COORDINATES:', `${city.lat.toFixed(4)}, ${city.lng.toFixed(4)}`],
+    [lang === 'fr' ? 'LOCALITÉ SOUVERAINE :' : 'SOVEREIGN LOCALITY:', `${city.flag} ${getCityName(city, lang).toUpperCase()} (${getCityCountry(city, lang).toUpperCase()})`],
     [lang === 'fr' ? 'VALEUR CERTIFIÉE :' : 'CERTIFIED VALUATION:', `${(spec.coinValue || city.baseValue).toLocaleString()} REMO COINS`],
     ['SHA-256:', sha],
     [lang === 'fr' ? 'DATE D’ÉMISSION :' : 'MINT DATE:', new Date().toISOString().split('T')[0]]

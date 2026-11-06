@@ -907,8 +907,8 @@ function openGpsBorderStampSuccessModal(res) {
 
       <div style="background:rgba(15,23,42,0.8);border:1px solid rgba(251,191,36,0.3);border-radius:14px;padding:12px;margin-bottom:14px;text-align:left;font-size:0.75rem;">
         <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
-          <span style="color:#94a3b8;">GPS Satellites :</span>
-          <span style="color:#38bdf8;font-family:monospace;font-weight:700;">${s.lat.toFixed(4)}° N, ${s.lng.toFixed(4)}° W (±${s.accuracy}m)</span>
+          <span style="color:#94a3b8;">${lang === 'fr' ? 'Localité Officielle :' : 'Official Locality:'}</span>
+          <span style="color:#38bdf8;font-family:monospace;font-weight:700;">${c.flag} ${getCityName(c, lang)} (${lang === 'fr' ? 'Vérifiée' : 'Verified'})</span>
         </div>
         <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
           <span style="color:#94a3b8;">${lang === 'fr' ? 'Rang Diplomatique :' : 'Diplomatic Rank:'}</span>
@@ -1881,7 +1881,8 @@ function drawOfficialCitizenIdCard(cv, u, lang) {
 
   ctx.font = '800 24px "Outfit", sans-serif';
   ctx.fillStyle = '#38bdf8';
-  ctx.fillText(`${home.flag} ${getCityName(home, lang).toUpperCase()}  ·  ${home.lat.toFixed(2)}°, ${home.lng.toFixed(2)}°`, 235, 248);
+  const cityLocalityLabel = `${home.flag} ${getCityName(home, lang).toUpperCase()} · ${(lang === 'fr' ? (home.country_fr || 'CITOYEN OFFICIEL') : (home.country_en || 'OFFICIAL CITIZEN')).toUpperCase()}`;
+  ctx.fillText(cityLocalityLabel, 235, 248);
 
   if (royalTitle) {
     ctx.font = '900 21px "Outfit", sans-serif';
@@ -2569,7 +2570,7 @@ function renderPassportView() {
                   <b style="font-family:'Orbitron',sans-serif;font-size:0.88rem;color:#f8fafc;display:block;">${getCityName(c, lang)}</b>
                   <div class="stamp-meta-serial">${s.serial || 'BDR-GPS-001'}</div>
                   <div class="stamp-meta-time">📅 ${dateStr}</div>
-                  <div class="stamp-meta-coords">🛰️ ${Number(s.lat).toFixed(4)}° N, ${Number(s.lng).toFixed(4)}° W</div>
+                  <div class="stamp-meta-coords">🏛️ ${t('border_stamp_verified_badge')} · ${getCityName(c, lang)}</div>
                   <div class="stamp-verified-ribbon">${t('border_stamp_verified_badge')}</div>
                 </div>
               `;
@@ -2802,13 +2803,11 @@ function drawStoryVerticalCanvas(cv, u, lang) {
     ctx.fillStyle = col;
     ctx.fillText(`${home.flag} ${getCityName(home, lang).toUpperCase()}`, 540, 990);
 
-    const latVal = typeof home.lat === 'number' ? home.lat : (home.coords ? home.coords.lat : 45.50);
-    const lngVal = typeof home.lng === 'number' ? home.lng : (home.coords ? home.coords.lng : -73.57);
     const countryName = lang === 'fr' ? (home.country_fr || 'Monde') : (home.country_en || 'World');
 
     ctx.font = '700 24px monospace';
     ctx.fillStyle = '#cbd5e1';
-    ctx.fillText(`${latVal.toFixed(2)}° N, ${Math.abs(lngVal).toFixed(2)}° W · ${countryName}`, 540, 1030);
+    ctx.fillText(`${countryName.toUpperCase()} · ${lang === 'fr' ? 'CITOYEN SOUVERAIN 4D' : 'SOVEREIGN CITIZEN 4D'}`, 540, 1030);
 
     // 8. Stats Strip
     const statsY = 1080;
