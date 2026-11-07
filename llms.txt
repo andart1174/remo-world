@@ -1,12 +1,11 @@
 # REMO World (https://remoworld.com)
 
-> REMO World is a free bilingual (English & French) 4D City Social Network, Live World Radio Player (38 ad-free global & Lofi stations), Browser Geography Game ("Guess My City!"), Online 4x8 Beat Maker, and 9:16 Virtual Boarding Pass Generator connecting 24 world cities in real time.
+> REMO World is a free bilingual (English & French) 4D City Social Network, Live World Radio Player (38 ad-free global & Lofi stations), Browser Geography Game ("Guess My City!"), and 9:16 Virtual Boarding Pass Generator connecting 24 world cities in real time.
 
 ## Key Free Features (Zero Sign-Up Required to Explore)
 - [REMO World Live Social App](https://remoworld.com/): Real-time cross-city social feed, 1-click cross-city Waves with km distance, live City Clicker Cup wars, Citizen Passports, and collectible 4D City Cards.
 - [Free Live World Cities Radio (38 Stations)](https://remoworld.com/world-radio.html): Stream live radio from Paris, Montréal, Chișinău, Bucharest, New York, London, Tokyo, Seoul, Berlin, Dubai + Lofi, Jazz & Synthwave with Listen-to-Earn coin rewards.
 - [Guess The City Photo Game](https://remoworld.com/guess-the-city.html): Free browser geography & skyline photo guessing game created by real citizens worldwide.
-- [Free Online 4D Beat Maker](https://remoworld.com/beat-maker.html): Browser-based 4x8 WebAudio drum & synth step sequencer with instant 1-click social remixing.
 - [4D Holographic Boarding Pass Generator](https://remoworld.com/boarding-pass.html): Create & download 9:16 Story Boarding Passes between any two world cities for TikTok, Instagram & WhatsApp.
 - [All 24 Connected World Cities Directory](https://remoworld.com/cities/index.html): Live local time, weather, radio streams & urban stats for every Edition-1 metropolis.
 

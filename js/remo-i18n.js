@@ -101,9 +101,9 @@ const REMO_DICT = {
     nav_saved: 'Saved Moments',
     nav_hub: 'REMO Hub',
 
-    // Admin In-Feed God-Mode & World-Unique Features
+    // Admin In-Feed Controls & World-Unique Features
     btn_admin_mode_off: '👑 Admin Mode',
-    btn_admin_mode_on: '👑 GOD-MODE ON',
+    btn_admin_mode_on: '👑 ADMIN ACTIVE',
     happy_hour_badge: '⚡ 2X REWARDS HAPPY HOUR',
     mayor_badge: '👑 MAYOR',
     post_pinned_badge: '📌 OFFICIAL PINNED #1',
@@ -244,7 +244,7 @@ const REMO_DICT = {
     // Feed Filters & Moods
     filter_all: '🌍 All World',
     filter_html: '💻 HTML & Mini-Apps',
-    filter_videos: '🎬 60s Videos',
+    filter_videos: '🎬 Videos & Links',
     filter_photos: '📷 Photos',
     filter_my_city: '📍 My Home City',
     filter_following: '❤️ Following',
@@ -283,10 +283,10 @@ const REMO_DICT = {
     comments_placeholder: 'Write a comment in English or French...',
     btn_send: 'Send',
 
-    // Create Post Multi-Format Studio (Photo / 60s Video / Live HTML / Viral Extras)
-    create_title: '✨ REMO Creator Studio — Post Photo, 60s Video or Live HTML',
+    // Create Post Multi-Format Studio (Photo / Video & Link / Live HTML / Viral Extras)
+    create_title: '✨ REMO Creator Studio — Post Photo, Video or Link',
     create_tab_photo: '📷 Photo Studio',
-    create_tab_video: '🎬 Video (Max 60s)',
+    create_tab_video: '🎬 Video & Link',
     create_tab_html: '💻 Live HTML Code',
     create_tab_art: '🏙️ City Poster',
     create_caption_ph: 'What is happening in your city right now? Add #hashtags...',
@@ -298,7 +298,9 @@ const REMO_DICT = {
     create_upload_video60: '🎬 Upload Video File (Max 1 Min / 60s)',
     create_record_cam60: '📹 Record Live 60s Camera Video',
     create_stop_cam60: '⏹️ Stop Recording',
-    create_video_limit_hint: '⚡ Strict 60-second viral format — fast, punchy & stored in HD Vault.',
+    create_video_limit_hint: '⚡ Upload a 60s clip OR paste any external video / web link (no time limit).',
+    create_video_link_lbl: '🔗 Or Paste Video / Web Link (YouTube, Vimeo, TikTok, MP4 — No Time Limit)',
+    create_video_link_ph: 'https://www.youtube.com/watch?v=... or https://...',
     create_html_hint: '💻 Write or paste HTML/CSS/JS, upload an .html file, or pick a 1-click starter template:',
     create_html_upload_file: '📂 Upload .html File',
     create_html_preview_btn: '▶️ Refresh Live Preview',
@@ -1097,7 +1099,7 @@ const REMO_DICT = {
     // Feed Filters & Moods
     filter_all: '🌍 Monde Entier',
     filter_html: '💻 HTML & Mini-Apps',
-    filter_videos: '🎬 Vidéos 60s',
+    filter_videos: '🎬 Vidéos & Liens',
     filter_photos: '📷 Photos',
     filter_my_city: '📍 Ma Ville',
     filter_following: '❤️ Abonnements',
@@ -1136,10 +1138,10 @@ const REMO_DICT = {
     comments_placeholder: 'Écrivez un commentaire en français ou anglais...',
     btn_send: 'Envoyer',
 
-    // Create Post Multi-Format Studio (Photo / 60s Video / Live HTML / Viral Extras)
-    create_title: '✨ Studio Créateur REMO — Photo, Vidéo 60s ou Code HTML Live',
+    // Create Post Multi-Format Studio (Photo / Video & Link / Live HTML / Viral Extras)
+    create_title: '✨ Studio Créateur REMO — Photo, Vidéo ou Lien Web',
     create_tab_photo: '📷 Studio Photo',
-    create_tab_video: '🎬 Vidéo (Max 60s)',
+    create_tab_video: '🎬 Vidéo & Lien',
     create_tab_html: '💻 Code HTML Live',
     create_tab_art: '🏙️ Affiche Ville',
     create_caption_ph: 'Que se passe-t-il dans votre ville maintenant ? Ajoutez des #hashtags...',
@@ -1151,7 +1153,9 @@ const REMO_DICT = {
     create_upload_video60: '🎬 Importer une Vidéo (Max 1 Min / 60s)',
     create_record_cam60: '📹 Filmer en Direct (Caméra 60s)',
     create_stop_cam60: '⏹️ Arrêter l’Enregistrement',
-    create_video_limit_hint: '⚡ Format viral strict de 60 secondes maximum — stocké en qualité HD.',
+    create_video_limit_hint: '⚡ Importez une vidéo de 60s OU collez n’importe quel lien vidéo / web (sans limite de durée).',
+    create_video_link_lbl: '🔗 Ou Coller un Lien Vidéo / Web (YouTube, Vimeo, TikTok, MP4 — Sans Limite de Durée)',
+    create_video_link_ph: 'https://www.youtube.com/watch?v=... ou https://...',
     create_html_hint: '💻 Écrivez/collez du HTML/CSS/JS, importez un fichier .html ou choisissez un modèle :',
     create_html_upload_file: '📂 Importer Fichier .html',
     create_html_preview_btn: '▶️ Aperçu Live',

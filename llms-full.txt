@@ -1,12 +1,11 @@
 # REMO World (https://remoworld.com)
 
-> REMO World is a free bilingual (English & French) 4D City Social Network, Live World Radio Player (38 ad-free global & Lofi stations), Browser Geography Game ("Guess My City!"), Online 4x8 Beat Maker, and 9:16 Virtual Boarding Pass Generator connecting 24 world cities in real time.
+> REMO World is a free bilingual (English & French) 4D City Social Network, Live World Radio Player (38 ad-free global & Lofi stations), Browser Geography Game ("Guess My City!"), and 9:16 Virtual Boarding Pass Generator connecting 24 world cities in real time.
 
 ## Key Free Features (Zero Sign-Up Required to Explore)
 - [REMO World Live Social App](https://remoworld.com/): Real-time cross-city social feed, 1-click cross-city Waves with km distance, live City Clicker Cup wars, Citizen Passports, and collectible 4D City Cards.
 - [Free Live World Cities Radio (38 Stations)](https://remoworld.com/world-radio.html): Stream live radio from Paris, Montréal, Chișinău, Bucharest, New York, London, Tokyo, Seoul, Berlin, Dubai + Lofi, Jazz & Synthwave with Listen-to-Earn coin rewards.
 - [Guess The City Photo Game](https://remoworld.com/guess-the-city.html): Free browser geography & skyline photo guessing game created by real citizens worldwide.
-- [Free Online 4D Beat Maker](https://remoworld.com/beat-maker.html): Browser-based 4x8 WebAudio drum & synth step sequencer with instant 1-click social remixing.
 - [4D Holographic Boarding Pass Generator](https://remoworld.com/boarding-pass.html): Create & download 9:16 Story Boarding Passes between any two world cities for TikTok, Instagram & WhatsApp.
 - [All 24 Connected World Cities Directory](https://remoworld.com/cities/index.html): Live local time, weather, radio streams & urban stats for every Edition-1 metropolis.
 
@@ -87,7 +86,7 @@
 - Tagline (EN): Cyber-Creative Capital & Mount Royal Summit
 - Tagline (FR): Capitale Cyber-Créative & Sommet du Mont-Royal
 - Summary: Bilingual hub of AI innovation, festival lights, geodesic architecture, and iconic midnight gastronomy.
-- Rarity: Mythic 4D | Element: neon | Coordinates: 45.5017, -73.5673
+- Rarity: Mythic 4D | Element: neon
 - Urban Ratings: Culture 95/100, Nightlife 92/100, Tech 96/100, Gastronomy 94/100
 - Direct Hub: https://remoworld.com/cities/montreal.html
 
@@ -95,7 +94,7 @@
 - Tagline (EN): City of Light, Haute Couture & Golden Horizon
 - Tagline (FR): Ville Lumière, Haute Couture & Horizon Doré
 - Summary: Timeless elegance crowned by the Iron Lady, avant-garde galleries, Seine nights, and Michelin artistry.
-- Rarity: Mythic 4D | Element: crystal | Coordinates: 48.8566, 2.3522
+- Rarity: Mythic 4D | Element: crystal
 - Urban Ratings: Culture 99/100, Nightlife 90/100, Tech 88/100, Gastronomy 99/100
 - Direct Hub: https://remoworld.com/cities/paris.html
 
@@ -103,7 +102,7 @@
 - Tagline (EN): Green Capital of Moldova • Triumphal Arch & Wine Vaults
 - Tagline (FR): Capitale Verte de Moldavie • Arc de Triomphe & Caves Royales
 - Summary: Vibrant Eastern European capital famed for its white-stone City Gates, Triumphal Arch, underground wine cities, and rising IT talent.
-- Rarity: Mythic 4D | Element: plasma | Coordinates: 47.0105, 28.8638
+- Rarity: Mythic 4D | Element: plasma
 - Urban Ratings: Culture 94/100, Nightlife 89/100, Tech 91/100, Gastronomy 96/100
 - Direct Hub: https://remoworld.com/cities/chisinau.html
 
@@ -111,7 +110,7 @@
 - Tagline (EN): Little Paris of the East & Fiber-Speed Cyber Hub
 - Tagline (FR): Petit Paris de l’Est & Pôle Cyber Ultra-Rapide
 - Summary: Grand Belle Époque boulevards, the neoclassical Athenaeum, Old Town electric nights, and gigabit tech energy.
-- Rarity: Legendary Gold | Element: cyber | Coordinates: 44.4268, 26.1025
+- Rarity: Legendary Gold | Element: cyber
 - Urban Ratings: Culture 91/100, Nightlife 95/100, Tech 94/100, Gastronomy 90/100
 - Direct Hub: https://remoworld.com/cities/bucharest.html
 
@@ -119,7 +118,7 @@
 - Tagline (EN): The Sleepless Metropolis & Neon Skyline
 - Tagline (FR): La Métropole Qui Ne Dort Jamais
 - Summary: Skyscraper canyons of Manhattan, Times Square voltage, Broadway icons, and global cultural gravity.
-- Rarity: Mythic 4D | Element: neon | Coordinates: 40.7128, -74.006
+- Rarity: Mythic 4D | Element: neon
 - Urban Ratings: Culture 96/100, Nightlife 98/100, Tech 95/100, Gastronomy 95/100
 - Direct Hub: https://remoworld.com/cities/newyork.html
 
@@ -127,7 +126,7 @@
 - Tagline (EN): Hyper-Neon Shibuya & Ancient Shinto Harmony
 - Tagline (FR): Hyper-Néon de Shibuya & Harmonie Millénaire
 - Summary: Where futuristic robotics, holographic crossings, and serene Torii shrines merge in dazzling precision.
-- Rarity: Mythic 4D | Element: cyber | Coordinates: 35.6762, 139.6503
+- Rarity: Mythic 4D | Element: cyber
 - Urban Ratings: Culture 97/100, Nightlife 95/100, Tech 99/100, Gastronomy 98/100
 - Direct Hub: https://remoworld.com/cities/tokyo.html
 
@@ -135,7 +134,7 @@
 - Tagline (EN): Royal Thames Skyline & Global FinTech Crown
 - Tagline (FR): Horizon Royal de la Tamise & Couronne FinTech
 - Summary: Big Ben chimes beside futuristic glass towers, underground soundwaves, and world-leading museums.
-- Rarity: Legendary Gold | Element: void | Coordinates: 51.5072, -0.1276
+- Rarity: Legendary Gold | Element: void
 - Urban Ratings: Culture 96/100, Nightlife 92/100, Tech 94/100, Gastronomy 89/100
 - Direct Hub: https://remoworld.com/cities/london.html
 
@@ -143,7 +142,7 @@
 - Tagline (EN): Oasis of the Future & Sky-Piercing Spires
 - Tagline (FR): Oasis du Futur & Flèches Célestes
 - Summary: Home to the Burj Khalifa, desert luxury, palm archipelagos, and ultra-modern architectural marvels.
-- Rarity: Legendary Gold | Element: plasma | Coordinates: 25.2048, 55.2708
+- Rarity: Legendary Gold | Element: plasma
 - Urban Ratings: Culture 86/100, Nightlife 94/100, Tech 96/100, Gastronomy 92/100
 - Direct Hub: https://remoworld.com/cities/dubai.html
 
@@ -151,7 +150,7 @@
 - Tagline (EN): Ocean Drive Art Deco & Tropical Neon Nights
 - Tagline (FR): Art Déco d’Ocean Drive & Nuits Néon Tropicales
 - Summary: Turquoise Atlantic waves, pastel neon palms, superyacht marinas, and electric Latin-fusion nights.
-- Rarity: Legendary Gold | Element: plasma | Coordinates: 25.7617, -80.1918
+- Rarity: Legendary Gold | Element: plasma
 - Urban Ratings: Culture 88/100, Nightlife 99/100, Tech 85/100, Gastronomy 90/100
 - Direct Hub: https://remoworld.com/cities/miami.html
 
@@ -159,7 +158,7 @@
 - Tagline (EN): Gaudí’s Dreamscape & Mediterranean Pulse
 - Tagline (FR): Rêve de Gaudí & Pulsation Méditerranéenne
 - Summary: Sagrada Família spires, sunlit beaches, Gothic Quarter tapas, and smart-city Mediterranean innovation.
-- Rarity: Epic | Element: plasma | Coordinates: 41.3874, 2.1686
+- Rarity: Epic | Element: plasma
 - Urban Ratings: Culture 96/100, Nightlife 94/100, Tech 87/100, Gastronomy 96/100
 - Direct Hub: https://remoworld.com/cities/barcelona.html
 
@@ -167,7 +166,7 @@
 - Tagline (EN): The Eternal City & Imperial Marble Glory
 - Tagline (FR): La Ville Éternelle & Gloire Impériale
 - Summary: Two millennia of Colosseum grandeur, sunlit piazzas, espresso culture, and immortal artistry.
-- Rarity: Legendary Gold | Element: crystal | Coordinates: 41.9028, 12.4964
+- Rarity: Legendary Gold | Element: crystal
 - Urban Ratings: Culture 100/100, Nightlife 86/100, Tech 80/100, Gastronomy 99/100
 - Direct Hub: https://remoworld.com/cities/rome.html
 
@@ -175,7 +174,7 @@
 - Tagline (EN): CN Tower Horizon & Multicultural Powerhouse
 - Tagline (FR): Horizon CN Tower & Métropole Multiculturelle
 - Summary: Soaring Lake Ontario skyline, AI research corridors, film festivals, and 200 world cuisines.
-- Rarity: Epic | Element: cyber | Coordinates: 43.6532, -79.3832
+- Rarity: Epic | Element: cyber
 - Urban Ratings: Culture 90/100, Nightlife 88/100, Tech 94/100, Gastronomy 92/100
 - Direct Hub: https://remoworld.com/cities/toronto.html
 
@@ -183,7 +182,7 @@
 - Tagline (EN): Riviera Crown Jewel & Grand Prix Prestige
 - Tagline (FR): Joyau de la Riviera & Prestige Grand Prix
 - Summary: Monte Carlo glamour, cliffside Mediterranean palaces, supercar hairpins, and ultra-rare collector status.
-- Rarity: Mythic 4D | Element: crystal | Coordinates: 43.7384, 7.4246
+- Rarity: Mythic 4D | Element: crystal
 - Urban Ratings: Culture 91/100, Nightlife 96/100, Tech 88/100, Gastronomy 97/100
 - Direct Hub: https://remoworld.com/cities/monaco.html
 
@@ -191,7 +190,7 @@
 - Tagline (EN): Cinema Capital, Sunset Palms & Pacific Glow
 - Tagline (FR): Capitale du Cinéma & Crépuscule du Pacifique
 - Summary: Hollywood hills, Griffith Observatory stars, Venice Beach skate culture, and entertainment studios.
-- Rarity: Legendary Gold | Element: neon | Coordinates: 34.0522, -118.2437
+- Rarity: Legendary Gold | Element: neon
 - Urban Ratings: Culture 93/100, Nightlife 94/100, Tech 91/100, Gastronomy 91/100
 - Direct Hub: https://remoworld.com/cities/losangeles.html
 
@@ -199,7 +198,7 @@
 - Tagline (EN): K-Wave Megacity, E-Sports Arena & Royal Palaces
 - Tagline (FR):  Capitale K-Wave, E-Sports & Palais Royaux
 - Summary: 24-hour Hongdae energy, Gangnam futuristic towers, Gyeongbokgung heritage, and hyper-connected culture.
-- Rarity: Legendary Gold | Element: cyber | Coordinates: 37.5665, 126.978
+- Rarity: Legendary Gold | Element: cyber
 - Urban Ratings: Culture 95/100, Nightlife 96/100, Tech 99/100, Gastronomy 95/100
 - Direct Hub: https://remoworld.com/cities/seoul.html
 
@@ -207,7 +206,7 @@
 - Tagline (EN): Alpine Precision, Jet d’Eau & Quantum Science
 - Tagline (FR): Précision Alpine, Jet d’Eau & Science Quantique
 - Summary: Crystal alpine lake, master horology, diplomatic summits, and particle physics frontier.
-- Rarity: Epic | Element: crystal | Coordinates: 46.2044, 6.1432
+- Rarity: Epic | Element: crystal
 - Urban Ratings: Culture 90/100, Nightlife 80/100, Tech 96/100, Gastronomy 92/100
 - Direct Hub: https://remoworld.com/cities/geneva.html
 
@@ -215,7 +214,7 @@
 - Tagline (EN): Solar Supertrees & SkyPark Cyber Garden
 - Tagline (FR): Supertrees Solaires & Jardin Cyber Céleste
 - Summary: Bioluminescent Gardens by the Bay, Marina Bay SkyPark, hawker Michelin stars, and smart island design.
-- Rarity: Legendary Gold | Element: cyber | Coordinates: 1.3521, 103.8198
+- Rarity: Legendary Gold | Element: cyber
 - Urban Ratings: Culture 91/100, Nightlife 90/100, Tech 98/100, Gastronomy 97/100
 - Direct Hub: https://remoworld.com/cities/singapore.html
 
@@ -223,7 +222,7 @@
 - Tagline (EN): Opera Sails, Emerald Harbour & Bondi Surf
 - Tagline (FR): Voiles de l’Opéra, Port Émeraude & Bondi
 - Summary: Iconic white Opera House shells gleaming beside the Harbour Bridge and golden Pacific waves.
-- Rarity: Epic | Element: neon | Coordinates: -33.8688, 151.2093
+- Rarity: Epic | Element: neon
 - Urban Ratings: Culture 90/100, Nightlife 89/100, Tech 89/100, Gastronomy 91/100
 - Direct Hub: https://remoworld.com/cities/sydney.html
 
@@ -231,7 +230,7 @@
 - Tagline (EN): Corcovado Summit, Copacabana & Carnival Fire
 - Tagline (FR): Sommet du Corcovado, Copacabana & Feu du Carnaval
 - Summary: Dramatic granite peaks, samba rhythms, oceanfront promenades, and unforgettable tropical sunsets.
-- Rarity: Epic | Element: plasma | Coordinates: -22.9068, -43.1729
+- Rarity: Epic | Element: plasma
 - Urban Ratings: Culture 95/100, Nightlife 98/100, Tech 81/100, Gastronomy 90/100
 - Direct Hub: https://remoworld.com/cities/rio.html
 
@@ -239,7 +238,7 @@
 - Tagline (EN): Where Two Continents Meet Across the Bosphorus
 - Tagline (FR): Là Où Deux Continents Se Rencontrent sur le Bosphore
 - Summary: Majestic domes, Grand Bazaar treasures, Bosphorus ferries at dusk, and bridge between East and West.
-- Rarity: Epic | Element: void | Coordinates: 41.0082, 28.9784
+- Rarity: Epic | Element: void
 - Urban Ratings: Culture 98/100, Nightlife 90/100, Tech 85/100, Gastronomy 97/100
 - Direct Hub: https://remoworld.com/cities/istanbul.html
 
@@ -247,7 +246,7 @@
 - Tagline (EN): Brandenburg Heritage & Underground Techno Pulse
 - Tagline (FR): Porte de Brandebourg & Pulsation Techno
 - Summary: Avant-garde street art, legendary clubbing temples, startup factories, and fearless creative freedom.
-- Rarity: Epic | Element: void | Coordinates: 52.52, 13.405
+- Rarity: Epic | Element: void
 - Urban Ratings: Culture 94/100, Nightlife 100/100, Tech 92/100, Gastronomy 86/100
 - Direct Hub: https://remoworld.com/cities/berlin.html
 
@@ -255,7 +254,7 @@
 - Tagline (EN): Golden Canals, Night Bridges & Design Avant-Garde
 - Tagline (FR): Canaux Dorés, Ponts Illuminés & Design
 - Summary: Reflections on historic canals, master art museums, sustainable innovation, and electronic music festivals.
-- Rarity: Rare | Element: neon | Coordinates: 52.3676, 4.9041
+- Rarity: Rare | Element: neon
 - Urban Ratings: Culture 94/100, Nightlife 93/100, Tech 91/100, Gastronomy 87/100
 - Direct Hub: https://remoworld.com/cities/amsterdam.html
 
@@ -263,7 +262,7 @@
 - Tagline (EN): Seven Sunlit Hills, Atlantic Winds & Digital Nomads
 - Tagline (FR): Sept Collines Dorées, Atlantique & Nomades Tech
 - Summary: Yellow vintage trams, azulejo tiles, Tagus river viewpoints, and Europe’s warmest Web & AI summit hub.
-- Rarity: Rare | Element: crystal | Coordinates: 38.7223, -9.1393
+- Rarity: Rare | Element: crystal
 - Urban Ratings: Culture 93/100, Nightlife 90/100, Tech 89/100, Gastronomy 94/100
 - Direct Hub: https://remoworld.com/cities/lisbon.html
 
@@ -271,6 +270,6 @@
 - Tagline (EN): Eternal Giza Pyramids & Golden Nile Horizon
 - Tagline (FR): Pyramides Éternelles de Gizeh & Horizon du Nil
 - Summary: Ancient wonders aligned with the stars beside the bustling Nile metropolis and Grand Egyptian Museum.
-- Rarity: Legendary Gold | Element: void | Coordinates: 30.0444, 31.2357
+- Rarity: Legendary Gold | Element: void
 - Urban Ratings: Culture 99/100, Nightlife 85/100, Tech 82/100, Gastronomy 90/100
 - Direct Hub: https://remoworld.com/cities/cairo.html

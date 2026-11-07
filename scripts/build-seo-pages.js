@@ -192,7 +192,6 @@ function renderTopbar(lang, prefix, altUrl) {
   const dirHref = isFr ? `${prefix}fr/cities/index.html` : `${prefix}cities/index.html`;
   const radioHref = isFr ? `${prefix}fr/world-radio.html` : `${prefix}world-radio.html`;
   const guessHref = isFr ? `${prefix}fr/guess-the-city.html` : `${prefix}guess-the-city.html`;
-  const beatHref = isFr ? `${prefix}fr/beat-maker.html` : `${prefix}beat-maker.html`;
   const passHref = isFr ? `${prefix}fr/boarding-pass.html` : `${prefix}boarding-pass.html`;
   const appHref = `${prefix}index.html?lang=${lang}&from=seo`;
   return `
@@ -205,7 +204,6 @@ function renderTopbar(lang, prefix, altUrl) {
       <a class="pill" href="${dirHref}">🌍 ${isFr ? '24 Villes' : '24 Cities'}</a>
       <a class="pill" href="${radioHref}">📻 ${isFr ? 'Radio Monde' : 'World Radio'}</a>
       <a class="pill" href="${guessHref}">🕵️ ${isFr ? 'Deviner la Ville' : 'Guess City'}</a>
-      <a class="pill" href="${beatHref}">🎛️ Beat Maker</a>
       <a class="pill" href="${passHref}">🎫 ${isFr ? 'Billet 4D' : 'Boarding Pass'}</a>
       <a class="pill" href="${altUrl}" hreflang="${isFr ? 'en' : 'fr'}">${isFr ? '🇬🇧 EN' : '🇫🇷 FR'}</a>
       <a class="pill gold" href="${appHref}">🚀 ${isFr ? 'Ouvrir l’App' : 'Launch App'}</a>
@@ -267,7 +265,7 @@ function buildCityPage(city, lang, cities, elements, stations) {
         },
         {
           q: `Quels jeux et outils gratuits sont disponibles pour ${cName} ?`,
-          a: `Vous pouvez jouer à « Deviner la Ville » en photo, participer aux Guerres de Villes en direct pour ${cName}, composer un rythme dans le Beat-Pad 4D ou générer un Billet d’Embarquement Story 9:16 vers ${cName}.`
+          a: `Vous pouvez jouer à « Deviner la Ville » en photo, participer aux Guerres de Villes en direct pour ${cName}, partager des vidéos et des liens web ou générer un Billet d’Embarquement Story 9:16 vers ${cName}.`
         },
         {
           q: `Puis-je intégrer l’horloge, la météo et la radio live de ${cName} sur mon site ou blog ?`,
@@ -285,7 +283,7 @@ function buildCityPage(city, lang, cities, elements, stations) {
         },
         {
           q: `What free online city games can I play for ${cName}?`,
-          a: `Citizens represent ${cName} in the live World City Clicker Cup, test their geography in the "Guess My City" photo game, create loops in the 4D Beat Studio, and generate 9:16 Story Boarding Passes flying to ${city.code}.`
+          a: `Citizens represent ${cName} in the live World City Clicker Cup, test their geography in the "Guess My City" photo game, share videos and web links, and generate 9:16 Story Boarding Passes flying to ${city.code}.`
         },
         {
           q: `Can I embed a free live ${cName} clock, weather, and radio widget on my website?`,
@@ -1195,7 +1193,6 @@ function buildSitemapXml(cities) {
     { en: `${DOMAIN}/cities/index.html`, fr: `${DOMAIN}/fr/cities/index.html`, prio: '0.95', freq: 'daily' },
     { en: `${DOMAIN}/world-radio.html`, fr: `${DOMAIN}/fr/world-radio.html`, prio: '0.95', freq: 'daily' },
     { en: `${DOMAIN}/guess-the-city.html`, fr: `${DOMAIN}/fr/guess-the-city.html`, prio: '0.90', freq: 'weekly' },
-    { en: `${DOMAIN}/beat-maker.html`, fr: `${DOMAIN}/fr/beat-maker.html`, prio: '0.90', freq: 'weekly' },
     { en: `${DOMAIN}/boarding-pass.html`, fr: `${DOMAIN}/fr/boarding-pass.html`, prio: '0.88', freq: 'weekly' }
   ];
 
@@ -1278,13 +1275,12 @@ Sitemap: ${DOMAIN}/sitemap.xml
 function buildLlmsFiles(cities, stations) {
   const llmsShort = `# REMO World (${DOMAIN})
 
-> REMO World is a free bilingual (English & French) 4D City Social Network, Live World Radio Player (38 ad-free global & Lofi stations), Browser Geography Game ("Guess My City!"), Online 4x8 Beat Maker, and 9:16 Virtual Boarding Pass Generator connecting 24 world cities in real time.
+> REMO World is a free bilingual (English & French) 4D City Social Network, Live World Radio Player (38 ad-free global & Lofi stations), Browser Geography Game ("Guess My City!"), and 9:16 Virtual Boarding Pass Generator connecting 24 world cities in real time.
 
 ## Key Free Features (Zero Sign-Up Required to Explore)
 - [REMO World Live Social App](${DOMAIN}/): Real-time cross-city social feed, 1-click cross-city Waves with km distance, live City Clicker Cup wars, Citizen Passports, and collectible 4D City Cards.
 - [Free Live World Cities Radio (38 Stations)](${DOMAIN}/world-radio.html): Stream live radio from Paris, Montréal, Chișinău, Bucharest, New York, London, Tokyo, Seoul, Berlin, Dubai + Lofi, Jazz & Synthwave with Listen-to-Earn coin rewards.
 - [Guess The City Photo Game](${DOMAIN}/guess-the-city.html): Free browser geography & skyline photo guessing game created by real citizens worldwide.
-- [Free Online 4D Beat Maker](${DOMAIN}/beat-maker.html): Browser-based 4x8 WebAudio drum & synth step sequencer with instant 1-click social remixing.
 - [4D Holographic Boarding Pass Generator](${DOMAIN}/boarding-pass.html): Create & download 9:16 Story Boarding Passes between any two world cities for TikTok, Instagram & WhatsApp.
 - [All 24 Connected World Cities Directory](${DOMAIN}/cities/index.html): Live local time, weather, radio streams & urban stats for every Edition-1 metropolis.
 
@@ -1307,7 +1303,7 @@ ${cities.map((c) => `### ${c.flag} ${c.name_en} / ${c.name_fr} (${c.code}) — $
 - Tagline (EN): ${c.tagline_en}
 - Tagline (FR): ${c.tagline_fr}
 - Summary: ${c.desc_en}
-- Rarity: ${c.rarity} | Element: ${c.element} | Coordinates: ${c.lat}, ${c.lng}
+- Rarity: ${c.rarity} | Element: ${c.element}
 - Urban Ratings: Culture ${c.stats.culture}/100, Nightlife ${c.stats.nightlife}/100, Tech ${c.stats.tech}/100, Gastronomy ${c.stats.gastronomy}/100
 - Direct Hub: ${DOMAIN}/cities/${c.id}.html`).join('\n\n')}
 `;
@@ -1335,16 +1331,19 @@ function main() {
   fs.writeFileSync(path.join(ROOT, 'fr', 'cities', 'index.html'), buildDirectoryPage('fr', cities), 'utf8');
   generatedCount += 2;
 
-  // 8 High-Intent Feature Hub Pages
+  // 6 High-Intent Feature Hub Pages
   fs.writeFileSync(path.join(ROOT, 'world-radio.html'), buildWorldRadioHubPage('en', stations, cities), 'utf8');
   fs.writeFileSync(path.join(ROOT, 'fr', 'world-radio.html'), buildWorldRadioHubPage('fr', stations, cities), 'utf8');
   fs.writeFileSync(path.join(ROOT, 'guess-the-city.html'), buildGuessCityHubPage('en', cities), 'utf8');
   fs.writeFileSync(path.join(ROOT, 'fr', 'guess-the-city.html'), buildGuessCityHubPage('fr', cities), 'utf8');
-  fs.writeFileSync(path.join(ROOT, 'beat-maker.html'), buildBeatMakerHubPage('en'), 'utf8');
-  fs.writeFileSync(path.join(ROOT, 'fr', 'beat-maker.html'), buildBeatMakerHubPage('fr'), 'utf8');
   fs.writeFileSync(path.join(ROOT, 'boarding-pass.html'), buildBoardingPassHubPage('en', cities), 'utf8');
   fs.writeFileSync(path.join(ROOT, 'fr', 'boarding-pass.html'), buildBoardingPassHubPage('fr', cities), 'utf8');
-  generatedCount += 8;
+  generatedCount += 6;
+
+  // Clean up deprecated beat-maker static pages if present
+  [path.join(ROOT, 'beat-maker.html'), path.join(ROOT, 'fr', 'beat-maker.html')].forEach((p) => {
+    try { if (fs.existsSync(p)) fs.unlinkSync(p); } catch (e) {}
+  });
 
   // Embeddable Backlink Widget
   fs.writeFileSync(path.join(ROOT, 'widget.html'), buildWidgetHtml(cities, stations), 'utf8');

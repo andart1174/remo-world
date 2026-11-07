@@ -1176,17 +1176,19 @@ function renderPostMediaStage(p, city, lang) {
     `;
   }
 
-  // 0C. 🎛️ REMO BEAT-PAD 4D SEQUENCER LOOP
-  if (p.mediaType === 'beat_loop' && p.beatPattern && typeof renderBeatPostStage === 'function') {
-    return renderBeatPostStage(p, city, lang);
-  }
-
   // 1. LIVE INTERACTIVE HTML / 3D MINI-APP
   if (p.mediaType === 'html_app' && p.htmlCode) {
     const cleanCode = buildFittedHtmlSrcdoc(p.htmlCode, p.id);
     return `
       <iframe class="html-post-frame" id="htmlFrame_${p.id}" sandbox="allow-scripts" loading="lazy" scrolling="no" srcdoc="${escapeSrcDocAttr(cleanCode)}" style="width:100%;height:100%;border:none;border-radius:12px;background:#050816;overflow:hidden;"></iframe>
     `;
+  }
+
+  // 1B. EXTERNAL VIDEO / WEB LINK (YouTube, Shorts, Vimeo, Direct MP4/WebM, TikTok, IG, or Web Link — No Time Limit)
+  if (p.mediaType === 'video_link' || p.externalUrl) {
+    const extRaw = p.externalUrl || p.mediaUrl || '';
+    const capTxt = lang === 'fr' ? (p.caption_fr || p.caption_en || '') : (p.caption_en || p.caption_fr || '');
+    return renderExternalVideoOrLinkStage(extRaw, city, lang, capTxt);
   }
 
   // 2. 60-SECOND HD VIDEO
@@ -1372,7 +1374,7 @@ function renderSocialFeed(searchQuery = '') {
   const lang = REMO_I18N.getLang();
   const u = REMO_STORE.getCurrentUser();
   const isAdm = REMO_STORE.isAdminUnlocked();
-  let posts = (REMO_STORE.state.posts || []).slice();
+  let posts = (REMO_STORE.state.posts || []).filter((p) => p && p.mediaType !== 'beat_loop');
 
   // Official Pinned posts float #1, then Boosted posts, then newest
   posts.sort((a, b) =>
@@ -1386,8 +1388,6 @@ function renderSocialFeed(searchQuery = '') {
     posts = posts.filter((p) => p && myFollowing.includes(p.uid));
   } else if (currentFeedMode === 'mystery') {
     posts = posts.filter((p) => Boolean(p && p.mysteryCity));
-  } else if (currentFeedMode === 'beats') {
-    posts = posts.filter((p) => p && p.mediaType === 'beat_loop');
   } else if (currentFeedMode === 'duets') {
     posts = posts.filter((p) => Boolean(p.duetOf || p.mediaType === 'city_versus'));
   } else if (currentFeedMode === 'bounties') {
@@ -1397,7 +1397,7 @@ function renderSocialFeed(searchQuery = '') {
   } else if (currentFeedMode === 'html') {
     posts = posts.filter((p) => p.mediaType === 'html_app');
   } else if (currentFeedMode === 'videos') {
-    posts = posts.filter((p) => p.mediaType === 'video');
+    posts = posts.filter((p) => p.mediaType === 'video' || p.mediaType === 'video_link' || Boolean(p.externalUrl));
   } else if (currentFeedMode === 'photos') {
     posts = posts.filter((p) => ['image', 'carousel', 'before_after'].includes(p.mediaType));
   } else if (currentFeedMode === 'my_city' && u) {
@@ -1456,7 +1456,7 @@ function renderSocialFeed(searchQuery = '') {
         : (lang === 'fr' ? (p.caption_fr || p.caption_en) : (p.caption_en || p.caption_fr));
       const formattedCap = escapeHtmlStr(rawCap || '').replace(/#([\w\u00C0-\u024F]+)/g, `<span class="hashtag" onclick="renderSocialFeed('#$1')">#$1</span>`);
       const liked = u && (p.likes || []).includes(u.uid);
-      const interactiveNoTilt = hiddenByCapsule || p.mediaType === 'html_app' || p.mediaType === 'before_after' || p.mediaType === 'beat_loop';
+      const interactiveNoTilt = hiddenByCapsule || p.mediaType === 'html_app' || p.mediaType === 'before_after' || p.mediaType === 'video_link' || Boolean(p.externalUrl);
       const voiceResolved = p.voiceUrl ? RemoMediaDB.resolveSyncOrPlaceholder(p.voiceUrl) : '';
       const voiceIdbAttr = p.voiceUrl && String(p.voiceUrl).startsWith('idb://') ? `data-idb-src="${p.voiceUrl}"` : '';
       const rxMap = p.reactions || {};
@@ -1524,7 +1524,7 @@ function renderSocialFeed(searchQuery = '') {
                   ${p.bounty && !p.bounty.claimed ? `<span class="pbadge boost" style="background:#f59e0b;color:#000;">🎁 +${p.bounty.coins} 🪙</span>` : ''}
                   
                   ${!hiddenByCapsule && p.mediaType === 'video' ? `<span class="pbadge vid60">${t('post_video60_badge')} · ${formatDurationMMSS(p.videoDuration || 60)}</span>` : ''}
-                  ${!hiddenByCapsule && p.mediaType === 'beat_loop' ? `<span class="pbadge html">${t('beat_badge_live')}</span>` : ''}
+                  ${!hiddenByCapsule && (p.mediaType === 'video_link' || p.externalUrl) ? `<span class="pbadge vid60">🔗 ${lang === 'fr' ? 'LIEN VIDÉO / WEB' : 'VIDEO / WEB LINK'}</span>` : ''}
                   ${!hiddenByCapsule && p.mediaType === 'before_after' ? `<span class="pbadge html">${t('post_slider_badge')}</span>` : ''}
                   ${!mysteryMasked && p.verifiedGps ? `<span class="pbadge gps">${t('post_verified_gps')}</span>` : ''}
                   ${p.mintedCard ? `<span class="pbadge mint">${t('post_minted_badge')}</span>` : ''}
@@ -2419,10 +2419,6 @@ function switchCreateStudioTab(tabId) {
     remoToast(REMO_I18N.getLang() === 'fr' ? 'Seul l’administrateur peut publier un Duel Officiel !' : 'Only the administrator can create an Official City Duel!');
     tabId = 'photo';
   }
-  if (tabId === 'beat' && !isAdm) {
-    remoToast(REMO_I18N.getLang() === 'fr' ? 'La création de Beats est réservée aux administrateurs !' : 'Beat creation is reserved for administrators!');
-    tabId = 'photo';
-  }
   if (tabId === 'html' && !isAdm) {
     remoToast(REMO_I18N.getLang() === 'fr' ? 'Le studio HTML Live est réservé aux administrateurs !' : 'Live HTML Studio is reserved for administrators!');
     tabId = 'photo';
@@ -2434,12 +2430,6 @@ function switchCreateStudioTab(tabId) {
   document.querySelectorAll('.studio-pane').forEach((p) => p.classList.remove('active'));
   document.getElementById('studioPane-' + tabId)?.classList.add('active');
   if (tabId !== 'video') stopActiveCam60Stream();
-  if (tabId !== 'beat' && window.RemoAudio && window.RemoAudio.activeBeatTargetId === 'studio_preview') {
-    window.RemoAudio.stopBeatPattern();
-  }
-  if (tabId === 'beat' && typeof renderBeatStudioMatrix === 'function') {
-    renderBeatStudioMatrix();
-  }
 
   if (tabId === 'versus') {
     const leftSel = document.getElementById('createVersusLeftCity');
@@ -2502,6 +2492,10 @@ function openCreatePostModal(prefillTag = '') {
   }
   const vidPrev = document.getElementById('studioVideo60Preview');
   if (vidPrev) { vidPrev.style.display = 'none'; vidPrev.srcObject = null; vidPrev.src = ''; }
+  const extUrlInp = document.getElementById('createVideoExternalUrlInput');
+  if (extUrlInp) extUrlInp.value = '';
+  const extPrevBox = document.getElementById('studioExternalLinkPreviewBox');
+  if (extPrevBox) { extPrevBox.style.display = 'none'; extPrevBox.innerHTML = ''; }
   const timerRow = document.getElementById('video60TimerRow');
   if (timerRow) timerRow.style.display = 'none';
   const htmlFrame = document.getElementById('studioHtmlLivePreview');
@@ -2513,11 +2507,9 @@ function openCreatePostModal(prefillTag = '') {
   if (copilotGameBtn) copilotGameBtn.style.display = isAdm ? 'inline-flex' : 'none';
   const versusTabBtn = document.getElementById('studioTabVersusBtn');
   if (versusTabBtn) versusTabBtn.style.display = isAdm ? 'inline-flex' : 'none';
-  const beatTabBtn = document.getElementById('studioTabBeatBtn');
-  if (beatTabBtn) beatTabBtn.style.display = isAdm ? 'inline-flex' : 'none';
   const htmlTabBtn = document.getElementById('studioTabHtmlBtn');
   if (htmlTabBtn) htmlTabBtn.style.display = isAdm ? 'inline-flex' : 'none';
-  if (!isAdm && (activeCreateStudioTab === 'versus' || activeCreateStudioTab === 'beat' || activeCreateStudioTab === 'html')) {
+  if (!isAdm && (activeCreateStudioTab === 'versus' || activeCreateStudioTab === 'html')) {
     switchCreateStudioTab('photo');
   }
 
@@ -2653,7 +2645,140 @@ function setStudioPhotoFilter(fltClass, btnEl) {
   renderStudioPhotoThumbnails();
 }
 
-/* ── TAB 2: 60s Video Studio Handlers (Strict <= 60s Check + Live Camera 60s Recorder) ── */
+/* ── TAB 2: Video & External Link Studio Handlers (60s File/Cam + Unlimited Video/Web Link) ── */
+function parseExternalVideoUrl(rawUrl) {
+  const s = String(rawUrl || '').trim();
+  if (!/^https?:\/\//i.test(s)) return null;
+  try {
+    const u = new URL(s);
+    const host = u.hostname.replace(/^www\./i, '').toLowerCase();
+    // YouTube watch / youtu.be / shorts / embed / live
+    if (host === 'youtube.com' || host === 'm.youtube.com' || host === 'youtu.be' || host === 'youtube-nocookie.com') {
+      let ytId = '';
+      if (host === 'youtu.be') {
+        ytId = u.pathname.slice(1).split('/')[0];
+      } else if (u.pathname.startsWith('/shorts/')) {
+        ytId = u.pathname.split('/shorts/')[1]?.split('/')[0] || '';
+      } else if (u.pathname.startsWith('/embed/')) {
+        ytId = u.pathname.split('/embed/')[1]?.split('/')[0] || '';
+      } else if (u.pathname.startsWith('/live/')) {
+        ytId = u.pathname.split('/live/')[1]?.split('/')[0] || '';
+      } else {
+        ytId = u.searchParams.get('v') || '';
+      }
+      ytId = ytId.replace(/[^a-zA-Z0-9_-]/g, '');
+      if (ytId.length >= 6) {
+        return { kind: 'youtube', id: ytId, embedUrl: `https://www.youtube-nocookie.com/embed/${ytId}?rel=0`, url: s, host: 'YouTube' };
+      }
+    }
+    // Vimeo
+    if (host === 'vimeo.com' || host === 'player.vimeo.com') {
+      const m = u.pathname.match(/\/(?:video\/)?(\d{5,})/);
+      if (m && m[1]) {
+        return { kind: 'vimeo', id: m[1], embedUrl: `https://player.vimeo.com/video/${m[1]}`, url: s, host: 'Vimeo' };
+      }
+    }
+    // Direct video file (.mp4, .webm, .mov, .m4v)
+    if (/\.(mp4|webm|mov|m4v)(\?.*)?$/i.test(u.pathname)) {
+      return { kind: 'direct_video', url: s, host };
+    }
+    // Social / Web link
+    let platform = host;
+    let icon = '🔗';
+    if (host.includes('tiktok.com')) { platform = 'TikTok'; icon = '🎵'; }
+    else if (host.includes('instagram.com')) { platform = 'Instagram'; icon = '📸'; }
+    else if (host.includes('facebook.com') || host.includes('fb.watch')) { platform = 'Facebook Video'; icon = '🎬'; }
+    else if (host.includes('x.com') || host.includes('twitter.com')) { platform = 'X / Twitter'; icon = '🐦'; }
+    else if (host.includes('twitch.tv')) { platform = 'Twitch'; icon = '🎮'; }
+    return { kind: 'web_link', url: s, host: platform, icon };
+  } catch (e) {
+    return null;
+  }
+}
+
+function renderExternalVideoOrLinkStage(rawUrl, city, lang, captionText = '') {
+  const info = parseExternalVideoUrl(rawUrl);
+  const safeUrl = escapeHtmlStr(rawUrl || '');
+  const openLbl = lang === 'fr' ? 'Ouvrir le lien original ↗' : 'Open original link ↗';
+
+  if (!info) {
+    return `
+      <div style="width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;background:radial-gradient(circle at 50% 25%,#1e1b4b,#050816);text-align:center;">
+        <div style="font-size:2.4rem;margin-bottom:8px;">🔗</div>
+        <a href="${safeUrl}" target="_blank" rel="noopener noreferrer" class="btn-cyber" style="text-decoration:none;">${openLbl}</a>
+      </div>
+    `;
+  }
+
+  if (info.kind === 'youtube' || info.kind === 'vimeo') {
+    return `
+      <div style="width:100%;height:100%;display:flex;flex-direction:column;background:#050816;border-radius:12px;overflow:hidden;">
+        <div style="position:relative;width:100%;flex:1;min-height:240px;">
+          <iframe src="${escapeHtmlStr(info.embedUrl)}" title="${escapeHtmlStr(info.host)} Video" style="position:absolute;inset:0;width:100%;height:100%;border:none;" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen loading="lazy"></iframe>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 12px;background:rgba(15,23,42,0.95);border-top:1px solid rgba(56,189,248,0.25);font-size:0.74rem;">
+          <span style="color:#38bdf8;font-weight:800;">▶️ ${escapeHtmlStr(info.host)} · ${city ? `${city.flag} ${getCityName(city, lang)}` : 'REMO'}</span>
+          <a href="${safeUrl}" target="_blank" rel="noopener noreferrer" style="color:#fde047;font-weight:800;text-decoration:none;">${openLbl}</a>
+        </div>
+      </div>
+    `;
+  }
+
+  if (info.kind === 'direct_video') {
+    return `
+      <div style="width:100%;height:100%;display:flex;flex-direction:column;background:#050816;border-radius:12px;overflow:hidden;">
+        <video src="${safeUrl}" controls playsinline preload="metadata" style="width:100%;flex:1;max-height:440px;background:#050816;object-fit:contain;"></video>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 12px;background:rgba(15,23,42,0.95);border-top:1px solid rgba(56,189,248,0.25);font-size:0.74rem;">
+          <span style="color:#38bdf8;font-weight:800;">🎬 HD Video Link</span>
+          <a href="${safeUrl}" target="_blank" rel="noopener noreferrer" style="color:#fde047;font-weight:800;text-decoration:none;">${openLbl}</a>
+        </div>
+      </div>
+    `;
+  }
+
+  // Rich interactive card for TikTok, Instagram, Facebook, X, or general Web Links
+  const watchBtnLbl = lang === 'fr' ? `▶️ Ouvrir sur ${info.host} ↗` : `▶️ Watch / Open on ${info.host} ↗`;
+  return `
+    <div style="width:100%;height:100%;min-height:240px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px 18px;background:radial-gradient(circle at 50% 20%,rgba(56,189,248,0.22),rgba(15,23,42,0.96) 65%,#050816);border-radius:12px;text-align:center;gap:10px;">
+      <div style="width:62px;height:62px;border-radius:18px;background:rgba(56,189,248,0.14);border:1px solid rgba(56,189,248,0.45);display:flex;align-items:center;justify-content:center;font-size:2rem;box-shadow:0 0 24px rgba(56,189,248,0.25);">${info.icon || '🔗'}</div>
+      <div style="font-family:'Orbitron',sans-serif;font-size:0.86rem;font-weight:900;color:#38bdf8;letter-spacing:0.5px;">${escapeHtmlStr(info.host.toUpperCase())}</div>
+      ${captionText ? `<div style="font-size:0.84rem;color:#f8fafc;font-weight:700;max-width:90%;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${escapeHtmlStr(captionText)}</div>` : ''}
+      <div style="font-size:0.72rem;color:#94a3b8;max-width:92%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${safeUrl}</div>
+      <a href="${safeUrl}" target="_blank" rel="noopener noreferrer" class="btn-cyber" style="margin-top:4px;text-decoration:none;padding:9px 18px;font-size:0.82rem;box-shadow:0 0 18px rgba(56,189,248,0.35);">${escapeHtmlStr(watchBtnLbl)}</a>
+    </div>
+  `;
+}
+
+function handleStudioExternalLinkInput(rawVal) {
+  const lang = REMO_I18N.getLang();
+  const prevBox = document.getElementById('studioExternalLinkPreviewBox');
+  const statusEl = document.getElementById('createMediaPreviewStatus');
+  const val = String(rawVal || '').trim();
+  if (!val) {
+    if (prevBox) { prevBox.style.display = 'none'; prevBox.innerHTML = ''; }
+    return;
+  }
+  const info = parseExternalVideoUrl(val);
+  if (!info) {
+    if (prevBox) {
+      prevBox.style.display = 'block';
+      prevBox.innerHTML = `<div style="font-size:0.75rem;color:#f43f5e;font-weight:700;">${lang === 'fr' ? '⚠️ Entrez un lien complet commençant par https://...' : '⚠️ Please enter a full link starting with https://...'}</div>`;
+    }
+    return;
+  }
+  const cityId = document.getElementById('createCitySelect')?.value || 'montreal';
+  const city = getCityById(cityId);
+  if (prevBox) {
+    prevBox.style.display = 'block';
+    prevBox.innerHTML = `<div style="height:220px;border-radius:12px;overflow:hidden;border:1px solid rgba(56,189,248,0.35);">${renderExternalVideoOrLinkStage(val, city, lang)}</div>`;
+  }
+  if (statusEl) {
+    statusEl.textContent = lang === 'fr'
+      ? `✓ Lien externe prêt (${info.host}) — aucune limite de durée !`
+      : `✓ External link ready (${info.host}) — no duration limit!`;
+  }
+}
+
 function handleStudioVideo60File(ev) {
   const file = ev.target.files && ev.target.files[0];
   if (!file) return;
@@ -2864,12 +2989,13 @@ async function publishNewRemoPost() {
   const cityId = document.getElementById('createCitySelect')?.value || 'montreal';
   const vibe = document.getElementById('createVibeSelect')?.value || 'energy';
   let cap = document.getElementById('createCaptionInp')?.value.trim() || '';
+  const rawExternalVideoUrl = document.getElementById('createVideoExternalUrlInput')?.value.trim() || '';
 
-  if (!cap && activeCreateStudioTab === 'beat') {
+  if (!cap && activeCreateStudioTab === 'video' && rawExternalVideoUrl) {
     const cObj = getCityById(cityId);
     cap = lang === 'fr'
-      ? `🎛️ Beat Urbain 4D composé à ${getCityName(cObj, 'fr')} ! #RemoBeat`
-      : `🎛️ 4D City Beat Loop composed in ${getCityName(cObj, 'en')}! #RemoBeat`;
+      ? `🔗 Découvrez cette vidéo / ce lien partagé depuis ${getCityName(cObj, 'fr')} ! #${cObj.code}`
+      : `🔗 Check out this video / link shared from ${getCityName(cObj, 'en')}! #${cObj.code}`;
   }
 
   if (!cap) {
@@ -2885,7 +3011,7 @@ async function publishNewRemoPost() {
   let mediaUrls = [];
   let htmlCode = '';
   let videoDuration = 0;
-  let beatPatternObj = null;
+  let externalUrl = '';
   let soundtrackId = '';
 
   if (activeCreateStudioTab === 'photo') {
@@ -2910,35 +3036,25 @@ async function publishNewRemoPost() {
         mediaUrl = mediaUrls[0];
       }
     }
-  } else if (activeCreateStudioTab === 'beat') {
-    const isAdm = REMO_STORE.isAdminUnlocked() || REMO_STORE.isCurrentUserAdmin();
-    if (!isAdm) {
-      remoToast(lang === 'fr' ? 'Seul l’administrateur peut publier un Beat !' : 'Only the administrator can publish a Beat!');
-      return;
-    }
-    if (typeof getStudioBeatPatternSnapshot === 'function') {
-      beatPatternObj = getStudioBeatPatternSnapshot();
-    }
-    const activeCells = beatPatternObj && Array.isArray(beatPatternObj.rows)
-      ? beatPatternObj.rows.reduce((sum, r) => sum + r.filter(Boolean).length, 0)
-      : 0;
-    if (!activeCells) {
-      remoToast(t('beat_empty_err'));
-      return;
-    }
-    mediaType = 'beat_loop';
-    if (window.RemoAudio && window.RemoAudio.activeBeatTargetId === 'studio_preview') {
-      window.RemoAudio.stopBeatPattern();
-    }
   } else if (activeCreateStudioTab === 'video') {
-    if (!pendingStudioVideoBlob) {
-      remoToast(lang === 'fr' ? 'Importez ou filmez une vidéo de 60s maximum !' : 'Please upload or record a video (max 60s)!');
+    if (pendingStudioVideoBlob) {
+      remoToast(lang === 'fr' ? '⏳ Téléversement vidéo vers le Cloud REMO...' : '⏳ Uploading video to REMO Cloud...', 'coin');
+      mediaType = 'video';
+      mediaUrl = await uploadMediaToCloudOrDataUrl(pendingStudioVideoBlob, 'posts');
+      videoDuration = pendingStudioVideoDuration || 60;
+    } else if (rawExternalVideoUrl) {
+      const parsedLink = parseExternalVideoUrl(rawExternalVideoUrl);
+      if (!parsedLink) {
+        remoToast(lang === 'fr' ? '⚠️ Veuillez coller un lien valide commençant par https://...' : '⚠️ Please paste a valid link starting with https://...');
+        return;
+      }
+      mediaType = 'video_link';
+      mediaUrl = rawExternalVideoUrl;
+      externalUrl = rawExternalVideoUrl;
+    } else {
+      remoToast(lang === 'fr' ? 'Importez une vidéo (max 60s) OU collez un lien vidéo / web !' : 'Please upload a video (max 60s) OR paste a video / web link!');
       return;
     }
-    remoToast(lang === 'fr' ? '⏳ Téléversement vidéo vers le Cloud REMO...' : '⏳ Uploading video to REMO Cloud...', 'coin');
-    mediaType = 'video';
-    mediaUrl = await uploadMediaToCloudOrDataUrl(pendingStudioVideoBlob, 'posts');
-    videoDuration = pendingStudioVideoDuration || 60;
   } else if (activeCreateStudioTab === 'html') {
     const isAdm = REMO_STORE.isAdminUnlocked() || REMO_STORE.isCurrentUserAdmin();
     if (!isAdm) {
@@ -3052,9 +3168,9 @@ async function publishNewRemoPost() {
     mediaType,
     mediaUrl,
     mediaUrls,
+    externalUrl: externalUrl || '',
     photoFilter: pendingStudioPhotoFilter || 'flt-none',
     soundtrackId: soundtrackId || '',
-    beatPattern: beatPatternObj || null,
     videoDuration,
     enforce60sCap: !!window._pendingEnforce60sCap,
     htmlCode,
@@ -6349,175 +6465,14 @@ function loop(){
   }
   requestAnimationFrame(loop);
 }loop();<\/script></body></html>`;
-  } else if (genre === 'beat') {
-    gameTitleEn = '4D City Beat Sequencer';
-    gameTitleFr = 'Séquenceur Beat Urbain 4D';
-    code = `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no">
-<style>
-html,body{margin:0;height:100%;overflow:hidden;background:#050716;font-family:system-ui,-apple-system,sans-serif;user-select:none;touch-action:manipulation;color:#fff;display:flex;flex-direction:column;justify-content:space-between;box-sizing:border-box;}
-.hud{display:flex;justify-content:space-between;align-items:center;padding:7px 10px;font-weight:900;font-size:11px;background:rgba(8,14,34,0.92);border-bottom:1px solid ${col}44;}
-.pill{background:rgba(15,23,42,0.85);border:1px solid ${col};padding:3px 9px;border-radius:99px;color:#fff;}
-.ctrls{display:flex;gap:6px;padding:6px 10px;justify-content:center;align-items:center;background:#070b1e;flex-wrap:wrap;}
-.btn{background:rgba(30,41,59,0.9);border:1px solid rgba(255,255,255,0.2);color:#fff;padding:5px 11px;border-radius:8px;font-weight:900;font-size:11px;cursor:pointer;transition:transform 0.08s,background 0.15s;}
-.btn:active{transform:scale(0.94);}
-.btn.act{background:${col};border-color:#fbbf24;color:#050816;box-shadow:0 0 12px ${col};}
-.grid{flex:1;display:grid;grid-template-rows:repeat(4,1fr);gap:5px;padding:8px 10px;box-sizing:border-box;}
-.row{display:grid;grid-template-columns:46px repeat(8,1fr);gap:4px;align-items:center;}
-.track-lbl{font-size:9px;font-weight:900;letter-spacing:0.5px;color:#cbd5e1;text-transform:uppercase;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.pad{height:100%;min-height:28px;max-height:46px;border-radius:8px;background:rgba(15,23,42,0.85);border:1px solid rgba(255,255,255,0.12);cursor:pointer;transition:transform 0.06s,box-shadow 0.1s,background 0.1s;display:flex;align-items:center;justify-content:center;}
-.pad:active{transform:scale(0.92);}
-.pad.on{border-color:#fff;box-shadow:0 0 12px currentColor;}
-.pad.head{border-color:#fbbf24!important;filter:brightness(1.5);}
-.r0 .pad.on{background:#f43f5e;color:#f43f5e;}
-.r1 .pad.on{background:#fbbf24;color:#fbbf24;}
-.r2 .pad.on{background:#a855f7;color:#a855f7;}
-.r3 .pad.on{background:#38bdf8;color:#38bdf8;}
-</style></head><body>
-<div class="hud">
-  <span class="pill">🎛️ ${city.flag} ${cName} 4D BEAT PAD</span>
-  <span class="pill" id="scoreEl">🪙 0 · 120 BPM</span>
-</div>
-<div class="ctrls">
-  <button class="btn act" id="playBtn" onclick="togglePlay()">▶️ PLAY</button>
-  <button class="btn" onclick="autoBeat()">🎲 AUTO</button>
-  <button class="btn" onclick="clearGrid()">🗑️ CLEAR</button>
-  <button class="btn" id="bpmBtn" onclick="toggleBpm()">⚡ 120</button>
-</div>
-<div class="grid" id="gridEl"></div>
-<script>
-const tracks=[
-  {n:'KICK',c:'#f43f5e'},
-  {n:'CLAP',c:'#fbbf24'},
-  {n:'BASS',c:'#a855f7',notes:[55,65.41,73.42,82.41]},
-  {n:'SYNTH',c:'#38bdf8',notes:[261.63,329.63,392.00,523.25]}
-];
-let grid=[
-  [1,0,0,0,1,0,0,0],
-  [0,0,1,0,0,0,1,0],
-  [1,0,1,0,1,0,1,0],
-  [0,1,0,1,0,1,0,1]
-];
-let isPlaying=false,step=0,timer=null,ac=null,score=0,bpm=120;
-const gridEl=document.getElementById('gridEl');
-function renderGrid(){
-  gridEl.innerHTML='';
-  tracks.forEach((tr,r)=>{
-    const rowEl=document.createElement('div');
-    rowEl.className='row r'+r;
-    const lbl=document.createElement('div');
-    lbl.className='track-lbl';lbl.textContent=tr.n;lbl.style.color=tr.c;
-    rowEl.appendChild(lbl);
-    for(let c=0;c<8;c++){
-      const p=document.createElement('div');
-      p.className='pad'+(grid[r][c]?' on':'');
-      p.dataset.r=r;p.dataset.c=c;
-      p.onpointerdown=()=>togglePad(r,c);
-      rowEl.appendChild(p);
-    }
-    gridEl.appendChild(rowEl);
-  });
-}
-function sfx(r,c){
-  try{
-    if(!ac)ac=new(window.AudioContext||window.webkitAudioContext)();
-    if(ac.state==='suspended')ac.resume();
-    const t=ac.currentTime;
-    if(r===0){
-      const o=ac.createOscillator(),g=ac.createGain();
-      o.type='sine';o.frequency.setValueAtTime(160,t);o.frequency.exponentialRampToValueAtTime(36,t+0.16);
-      g.gain.setValueAtTime(0.35,t);g.gain.exponentialRampToValueAtTime(0.001,t+0.2);
-      o.connect(g);g.connect(ac.destination);o.start(t);o.stop(t+0.22);
-    }else if(r===1){
-      const o=ac.createOscillator(),g=ac.createGain();
-      o.type='triangle';o.frequency.setValueAtTime(440,t);o.frequency.exponentialRampToValueAtTime(75,t+0.12);
-      g.gain.setValueAtTime(0.24,t);g.gain.exponentialRampToValueAtTime(0.001,t+0.14);
-      o.connect(g);g.connect(ac.destination);o.start(t);o.stop(t+0.15);
-    }else if(r===2){
-      const o=ac.createOscillator(),g=ac.createGain();
-      const n=tracks[2].notes[c%tracks[2].notes.length];
-      o.type='sawtooth';o.frequency.setValueAtTime(n,t);
-      g.gain.setValueAtTime(0.22,t);g.gain.exponentialRampToValueAtTime(0.001,t+0.28);
-      o.connect(g);g.connect(ac.destination);o.start(t);o.stop(t+0.3);
-    }else{
-      const o=ac.createOscillator(),g=ac.createGain();
-      const n=tracks[3].notes[(c*2)%tracks[3].notes.length];
-      o.type='sine';o.frequency.setValueAtTime(n,t);
-      g.gain.setValueAtTime(0.2,t);g.gain.exponentialRampToValueAtTime(0.001,t+0.25);
-      o.connect(g);g.connect(ac.destination);o.start(t);o.stop(t+0.26);
-    }
-  }catch(e){}
-}
-function togglePad(r,c){
-  grid[r][c]=grid[r][c]?0:1;
-  score+=5;
-  document.getElementById('scoreEl').textContent='🪙 '+score+' · '+bpm+' BPM';
-  if(grid[r][c])sfx(r,c);
-  renderGrid();
-}
-function togglePlay(){
-  isPlaying=!isPlaying;
-  const btn=document.getElementById('playBtn');
-  if(isPlaying){
-    btn.textContent='⏸️ STOP';btn.classList.add('act');
-    if(!ac)ac=new(window.AudioContext||window.webkitAudioContext)();
-    if(ac.state==='suspended')ac.resume();
-    startClock();
-  }else{
-    btn.textContent='▶️ PLAY';btn.classList.remove('act');
-    stopClock();
-    document.querySelectorAll('.pad').forEach(p=>p.classList.remove('head'));
-  }
-}
-function startClock(){
-  stopClock();
-  const ms=Math.round((60/bpm/2)*1000);
-  timer=setInterval(()=>{
-    document.querySelectorAll('.pad').forEach(p=>{
-      p.classList.toggle('head',Number(p.dataset.c)===step);
-    });
-    for(let r=0;r<4;r++){
-      if(grid[r][step])sfx(r,step);
-    }
-    step=(step+1)%8;
-  },ms);
-}
-function stopClock(){if(timer){clearInterval(timer);timer=null;}}
-function autoBeat(){
-  grid=[
-    [1,0,0,0,1,0,0,0],
-    [0,0,1,0,0,0,1,0],
-    [1,0,1,0,0,1,1,0],
-    [0,1,0,1,1,0,1,1]
-  ];
-  score+=20;
-  document.getElementById('scoreEl').textContent='🪙 '+score+' · '+bpm+' BPM';
-  renderGrid();
-  if(!isPlaying)togglePlay();
-}
-function clearGrid(){
-  grid=[[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0]];
-  renderGrid();
-}
-function toggleBpm(){
-  bpm=bpm===100?120:bpm===120?140:100;
-  document.getElementById('bpmBtn').textContent='⚡ '+bpm;
-  document.getElementById('scoreEl').textContent='🪙 '+score+' · '+bpm+' BPM';
-  if(isPlaying)startClock();
-}
-renderGrid();
-<\/script></body></html>`;
   }
 
   const area = document.getElementById('createHtmlCodeArea');
   if (area) area.value = code;
   refreshStudioHtmlPreview();
 
-  const enCap = genre === 'beat'
-    ? `🎛️ Play my ${city.flag} ${city.name_en} "4D City Beat Sequencer" Arcade Game directly inside this post! Can you create a hit? #${city.code} #LiveHTML`
-    : `🎮 Play my ${city.flag} ${city.name_en} "${gameTitleEn}" Arcade Game directly inside this post! Can you beat my score? #${city.code} #LiveHTML`;
-  const frCap = genre === 'beat'
-    ? `🎛️ Jouez à mon jeu d’arcade ${city.flag} ${city.name_fr || city.name_en} « ${gameTitleFr} » directement dans ce post ! #${city.code} #LiveHTML`
-    : `🎮 Jouez à mon jeu d’arcade ${city.flag} ${city.name_fr || city.name_en} « ${gameTitleFr} » directement dans ce post ! #${city.code} #LiveHTML`;
+  const enCap = `🎮 Play my ${city.flag} ${city.name_en} "${gameTitleEn}" Arcade Game directly inside this post! Can you beat my score? #${city.code} #LiveHTML`;
+  const frCap = `🎮 Jouez à mon jeu d’arcade ${city.flag} ${city.name_fr || city.name_en} « ${gameTitleFr} » directement dans ce post ! #${city.code} #LiveHTML`;
   const inp = document.getElementById('createCaptionInp');
   if (inp) inp.value = lang === 'fr' ? frCap : enCap;
   const drawer = document.getElementById('bilingualCaptionDrawer');
