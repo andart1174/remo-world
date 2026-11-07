@@ -2421,6 +2421,32 @@ function drawViralPostStoryCanvas(postId) {
   const { post, isFr, u } = getViralPostShareData(postId);
   const lang = isFr ? 'fr' : 'en';
 
+  const drawCoverImg = (img, x, y, w, h) => {
+    if (!img) return false;
+    try {
+      const iw = img.naturalWidth || img.videoWidth || img.width || w;
+      const ih = img.naturalHeight || img.videoHeight || img.height || h;
+      if (!iw || !ih) {
+        ctx.drawImage(img, x, y, w, h);
+        return true;
+      }
+      const scale = Math.max(w / iw, h / ih);
+      const sw = w / scale;
+      const sh = h / scale;
+      const sx = Math.max(0, (iw - sw) / 2);
+      const sy = Math.max(0, (ih - sh) / 2);
+      ctx.drawImage(img, sx, sy, sw, sh, x, y, w, h);
+      return true;
+    } catch (e) {
+      try {
+        ctx.drawImage(img, x, y, w, h);
+        return true;
+      } catch (e2) {
+        return false;
+      }
+    }
+  };
+
   const renderFrame = (imgLeft, imgRight) => {
     // 1. Cyber Dark Background
     const bgGrad = ctx.createLinearGradient(0, 0, W, H);
@@ -2475,15 +2501,11 @@ function drawViralPostStoryCanvas(postId) {
       ctx.roundRect(stageX, stageY, stageW, stageH, 22);
       ctx.clip();
 
-      if (imgLeft) {
-        ctx.drawImage(imgLeft, stageX, stageY, halfW, stageH);
-      } else {
+      if (!drawCoverImg(imgLeft, stageX, stageY, halfW, stageH)) {
         ctx.fillStyle = '#1e293b';
         ctx.fillRect(stageX, stageY, halfW, stageH);
       }
-      if (imgRight) {
-        ctx.drawImage(imgRight, stageX + halfW, stageY, halfW, stageH);
-      } else {
+      if (!drawCoverImg(imgRight, stageX + halfW, stageY, halfW, stageH)) {
         ctx.fillStyle = '#0f172a';
         ctx.fillRect(stageX + halfW, stageY, halfW, stageH);
       }
@@ -2556,9 +2578,7 @@ function drawViralPostStoryCanvas(postId) {
       ctx.beginPath();
       ctx.roundRect(stageX, stageY, stageW, stageH, 22);
       ctx.clip();
-      if (imgLeft) {
-        ctx.drawImage(imgLeft, stageX, stageY, stageW, stageH);
-      } else {
+      if (!drawCoverImg(imgLeft, stageX, stageY, stageW, stageH)) {
         ctx.fillStyle = '#1e293b';
         ctx.fillRect(stageX, stageY, stageW, stageH);
       }
@@ -2630,16 +2650,34 @@ function drawViralPostStoryCanvas(postId) {
     ctx.fillText('TikTok • Instagram Stories • WhatsApp • REMO 4D World', W / 2, 922);
   };
 
-  // Initial immediate draw
-  renderFrame(null, null);
+  // Check if the post card in the DOM already has a loaded image or video frame
+  const domCard = postId ? document.getElementById('post_card_' + postId) : null;
+  const domImgEl = domCard ? domCard.querySelector('.post-media img') : null;
+  const domVidEl = domCard ? domCard.querySelector('.post-media video') : null;
+  const readyDomMedia = (domImgEl && domImgEl.complete && domImgEl.naturalWidth > 0)
+    ? domImgEl
+    : ((domVidEl && domVidEl.readyState >= 2) ? domVidEl : null);
 
-  // Load images asynchronously if available
-  const loadImg = (src) => new Promise((resolve) => {
-    if (!src) return resolve(null);
+  // Initial immediate draw (using already-loaded DOM image if available for instant display!)
+  renderFrame(post && !post.versus ? readyDomMedia : null, null);
+
+  // Load images asynchronously with automatic fallback when remote server lacks CORS headers
+  const loadImg = (src, fallbackEl = null) => new Promise((resolve) => {
+    if (!src) return resolve(fallbackEl);
+    const isDataOrBlob = String(src).startsWith('data:') || String(src).startsWith('blob:');
     const im = new Image();
-    im.crossOrigin = 'anonymous';
+    if (!isDataOrBlob) {
+      im.crossOrigin = 'anonymous';
+    }
     im.onload = () => resolve(im);
-    im.onerror = () => resolve(null);
+    im.onerror = () => {
+      if (isDataOrBlob) return resolve(fallbackEl);
+      // Retry without crossOrigin so Firebase Storage / external images always render in the 9:16 preview
+      const imNoCors = new Image();
+      imNoCors.onload = () => resolve(imNoCors);
+      imNoCors.onerror = () => resolve(fallbackEl);
+      imNoCors.src = src;
+    };
     im.src = src;
   });
 
@@ -2654,12 +2692,57 @@ function drawViralPostStoryCanvas(postId) {
     });
   } else if (post) {
     const city = getCityById(post.cityId || 'montreal');
-    const src = (post.mediaUrl && !String(post.mediaUrl).startsWith('idb://') && post.mediaType === 'image')
-      ? post.mediaUrl
-      : (post.thumbnailUrl || generateCityPostVisualDataUrl(city.id, getCityName(city, 'en')));
-    loadImg(src).then((im) => {
-      renderFrame(im, null);
+    let rawSrc = post.mediaUrl || (Array.isArray(post.mediaUrls) && post.mediaUrls[0]) || post.thumbnailUrl || '';
+    if (rawSrc && String(rawSrc).startsWith('idb://') && typeof RemoMediaDB !== 'undefined') {
+      const syncResolved = RemoMediaDB.resolveSyncOrPlaceholder(rawSrc);
+      rawSrc = (syncResolved && !String(syncResolved).startsWith('idb://')) ? syncResolved : '';
+    }
+    if ((!rawSrc || post.mediaType === 'video' || post.mediaType === 'video_link') && domImgEl && domImgEl.src) {
+      rawSrc = domImgEl.src;
+    }
+    const fallbackArt = generateCityPostVisualDataUrl(city.id, post.visualHeadline || getCityName(city, 'en'), post.visualSub || '');
+    const src = rawSrc || fallbackArt;
+    loadImg(src, readyDomMedia).then((im) => {
+      if (im) {
+        renderFrame(im, null);
+      } else {
+        loadImg(fallbackArt).then((artIm) => renderFrame(artIm, null));
+      }
     });
+  }
+}
+
+async function exportViralStoryCanvasDataUrl(postId) {
+  const cv = document.getElementById('viralPostStoryCanvas');
+  if (!cv) return '';
+  try {
+    return cv.toDataURL('image/png');
+  } catch (secErr) {
+    // If external non-CORS image tainted the canvas, re-render with taint-free procedural city art for export
+    const { post } = getViralPostShareData(postId);
+    if (post && !post.versus) {
+      const city = getCityById(post.cityId || 'montreal');
+      const artUrl = generateCityPostVisualDataUrl(city.id, post.visualHeadline || getCityName(city, 'en'), post.visualSub || '');
+      const cleanCv = document.createElement('canvas');
+      cleanCv.width = 540;
+      cleanCv.height = 960;
+      const origId = cv.id;
+      cv.id = 'viralPostStoryCanvas_orig';
+      cleanCv.id = 'viralPostStoryCanvas';
+      cleanCv.style.display = 'none';
+      document.body.appendChild(cleanCv);
+      const savedMediaUrl = post.mediaUrl;
+      post.mediaUrl = artUrl;
+      drawViralPostStoryCanvas(postId);
+      await new Promise((r) => setTimeout(r, 60));
+      let out = '';
+      try { out = cleanCv.toDataURL('image/png'); } catch (e) {}
+      post.mediaUrl = savedMediaUrl;
+      document.body.removeChild(cleanCv);
+      cv.id = origId;
+      return out;
+    }
+    return '';
   }
 }
 
@@ -2675,8 +2758,10 @@ async function shareViralPostStoryNative() {
 
   if (cv && navigator.share) {
     try {
-      const blob = await new Promise((res) => cv.toBlob(res, 'image/png'));
-      if (blob) {
+      const dataUrl = await exportViralStoryCanvasDataUrl(postId);
+      if (dataUrl) {
+        const res = await fetch(dataUrl);
+        const blob = await res.blob();
         const file = new File([blob], `REMO_Story_${postId || 'moment'}.png`, { type: 'image/png' });
         if (navigator.canShare && navigator.canShare({ files: [file] })) {
           await navigator.share({
@@ -2697,16 +2782,18 @@ async function shareViralPostStoryNative() {
 }
 window.shareViralPostStoryNative = shareViralPostStoryNative;
 
-function downloadViralPostStoryPNG() {
+async function downloadViralPostStoryPNG() {
   const postId = window._activeViralSharePostId;
   const { isFr } = getViralPostShareData(postId);
   const cv = document.getElementById('viralPostStoryCanvas');
   if (!cv) return;
   rewardViralShareOnce(postId);
   try {
+    const dataUrl = await exportViralStoryCanvasDataUrl(postId);
+    if (!dataUrl) throw new Error('export_failed');
     const a = document.createElement('a');
     a.download = `REMO_Story_9x16_${postId || Date.now()}.png`;
-    a.href = cv.toDataURL('image/png');
+    a.href = dataUrl;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);

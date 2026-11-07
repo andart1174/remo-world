@@ -687,10 +687,13 @@ async function uploadMediaToCloudOrDataUrl(blobOrFile, folder = 'posts') {
   const isImage = (blobOrFile.type && blobOrFile.type.startsWith('image/')) || (typeof blobOrFile === 'string' && blobOrFile.startsWith('data:image'));
   
   if (isImage) {
-    // 1. Downscale & compress to high-res mobile-optimized JPEG dataUrl (~60-90KB)
+    // 1. Downscale & compress to high-res mobile-optimized JPEG dataUrl (~60-90KB, CORS-free for 9:16 Story Canvas)
     const dataUrl = await compressImageFileToDataUrl(blobOrFile, 1080, 0.76);
+    if (dataUrl && dataUrl.length < 380000) {
+      return dataUrl;
+    }
     
-    // 2. Upload to Firebase Storage if available
+    // 2. Upload to Firebase Storage if larger
     if (typeof firebase !== 'undefined' && firebase.storage) {
       try {
         const storage = firebase.storage();
