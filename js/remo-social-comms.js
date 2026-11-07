@@ -1581,31 +1581,7 @@ function renderSinglePostCardHtml(p, lang, u, isAdm) {
           ${hiddenByCapsule ? '' : renderViralGoalWidget(p, lang, isAdm)}
           ${!hiddenByCapsule && p.voiceUrl ? `<audio src="${voiceResolved}" ${voiceIdbAttr} controls style="width:100%;height:34px;margin-top:6px;"></audio>` : ''}
           ${!hiddenByCapsule && p.mediaType === 'html_app' ? renderHtmlGameLeaderboardWidget(p, lang, u) : ''}
-        </div>
-
-        <!-- Mobile TikTok Bottom-Left Info Overlay -->
-        <div class="tiktok-overlay-info">
           ${renderAdminPostBar(p)}
-          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
-            <span style="font-weight:900;font-size:0.96rem;color:#fff;cursor:pointer;text-shadow:0 2px 8px rgba(0,0,0,0.85);" onclick="openCitizenProfileModal('${p.uid || ''}', '${escapeHtmlStr(p.authorName || '')}')">@${escapeHtmlStr(p.authorName)}</span>
-            ${p.authorVerified ? '<span style="color:#38bdf8;font-weight:900;">✓</span>' : ''}
-            ${(!isPostOwner && p.uid) ? `<button type="button" class="post-author-dm-mini" onclick="event.stopPropagation();openDirectChatWithUser('${p.uid || ''}')">💌</button>` : ''}
-            ${!mysteryMasked && isMayor ? `<span class="mayor-tag">${t('mayor_badge')}</span>` : ''}
-            ${royalTitle ? `<span class="royal-title-pill">${escapeHtmlStr(royalTitle)}</span>` : ''}
-            <span class="city-tag" onclick="${mysteryMasked ? '' : `filterFeedByCityFromMap('${city.id}')`}">${cityTagLabel}</span>
-            <button type="button" class="translate-pill-btn ${isDualOpen ? 'active' : ''}" onclick="togglePostAutoTranslate('${p.id}')">${isDualOpen ? t('post_translate_hide') : t('post_translate_btn')}</button>
-          </div>
-          ${formattedCap ? `<div class="tk-caption-text">${formattedCap}</div>` : ''}
-          <div class="bilingual-dual-box ${isDualOpen ? 'open' : ''}">
-            <div><b style="color:#38bdf8;">🇬🇧</b> ${escapeHtmlStr(dualPair.en)}</div>
-            <div><b style="color:#fbbf24;">🇫🇷</b> ${escapeHtmlStr(dualPair.fr)}</div>
-          </div>
-          ${!hiddenByCapsule && typeof renderMysteryCityWidget === 'function' ? renderMysteryCityWidget(p, city, lang, u, isPostOwner) : ''}
-          ${renderFeedBountyWidget(p, lang)}
-          ${hiddenByCapsule ? '' : renderPostPollWidget(p, lang, u)}
-          ${hiddenByCapsule ? '' : renderSecretCapsuleWidget(p, lang, u)}
-          ${hiddenByCapsule ? '' : renderViralGoalWidget(p, lang, isAdm)}
-          ${!hiddenByCapsule && p.voiceUrl ? `<audio src="${voiceResolved}" ${voiceIdbAttr} controls style="width:100%;height:32px;margin-top:4px;"></audio>` : ''}
         </div>
 
         <!-- Mobile TikTok Right Floating Rail -->
@@ -5503,10 +5479,12 @@ function openPostActionsSheet(postId) {
 
   const EMOJIS = ['🔥', '⚡', '💎', '🤯', '👑'];
   const rxMap = p.reactions || {};
+  const dualPair = buildPostBilingualPair(p);
+  const rawCap = String((lang === 'fr' ? (p.caption_fr || p.caption_en) : (p.caption_en || p.caption_fr)) || '').replace(/^(?:🇬🇧|🇫🇷)\s+/u, '');
 
   content.innerHTML = `
     <div class="modal-hdr">
-      <div style="display:flex;align-items:center;gap:10px;min-width:0;">
+      <div style="display:flex;align-items:center;gap:10px;min-width:0;cursor:pointer;" onclick="closePostActionsModal();openCitizenProfileModal('${p.uid || ''}', '${escapeHtmlStr(p.authorName || '')}');">
         <div class="avatar-circle" style="width:36px;height:36px;font-size:0.95rem;flex-shrink:0;">
           ${escapeHtmlStr((p.authorName || 'R')[0].toUpperCase())}
         </div>
@@ -5517,6 +5495,17 @@ function openPostActionsSheet(postId) {
       </div>
       <button class="modal-close" onclick="closePostActionsModal()">✕</button>
     </div>
+
+    ${rawCap ? `
+      <div style="margin:8px 0 12px;padding:10px 12px;border-radius:12px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);font-size:0.83rem;line-height:1.42;color:#f8fafc;">
+        <div>${escapeHtmlStr(rawCap)}</div>
+        ${dualPair.en && dualPair.fr && dualPair.en.toLowerCase() !== dualPair.fr.toLowerCase() ? `
+          <div style="margin-top:6px;padding-top:6px;border-top:1px dashed rgba(255,255,255,0.1);font-size:0.75rem;color:#94a3b8;">
+            🌐 ${escapeHtmlStr(lang === 'fr' ? dualPair.en : dualPair.fr)}
+          </div>
+        ` : ''}
+      </div>
+    ` : ''}
 
     <!-- Quick Emoji Reactions Row -->
     <div style="margin:12px 0 16px;">

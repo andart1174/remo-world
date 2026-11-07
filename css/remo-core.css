@@ -2102,8 +2102,15 @@ button, input, select, textarea {
   #view-feed.active .duet-city-pill { bottom: auto; top: 44px; }
 
   body:not(.mobile-feed-classic) #view-feed.active {
-    --tiktok-card-h: calc(100dvh - var(--header-h) - var(--mb-nav-h) - 82px - env(safe-area-inset-bottom, 0px));
+    --tiktok-card-h: calc(100dvh - var(--header-h) - var(--mb-nav-h) - 76px - env(safe-area-inset-bottom, 0px));
     overflow: hidden;
+  }
+
+  body:not(.mobile-feed-classic) #view-feed.active #feedActiveContestsBanner,
+  body:not(.mobile-feed-classic) #view-feed.active #newCitizenWelcomeBar,
+  body:not(.mobile-feed-classic) #view-feed.active #livePresenceStrip,
+  body:not(.mobile-feed-classic) #view-feed.active #gameChallengeHeroBar {
+    display: none !important;
   }
 
   body:not(.mobile-feed-classic) #view-feed.active .posts-grid {
@@ -2171,51 +2178,20 @@ button, input, select, textarea {
     border-radius: 0 !important;
   }
 
-  /* Keep City Versus vote pills above the bottom TikTok overlay on mobile */
+  /* Keep City Versus vote pills clear of the right-side TikTok rail on mobile */
   body:not(.mobile-feed-classic) #view-feed.active .post-card.is-city-versus .versus-city-pill {
-    top: 48px !important;
-    bottom: auto !important;
+    bottom: 18px !important;
+    top: auto !important;
     z-index: 16 !important;
     font-size: 0.76rem !important;
     padding: 5px 11px !important;
   }
+  body:not(.mobile-feed-classic) #view-feed.active .post-card.is-city-versus .versus-city-pill.right {
+    right: 64px !important;
+  }
 
   body:not(.mobile-feed-classic) #view-feed.active .tiktok-overlay-info {
-    position: absolute !important;
-    left: 0 !important;
-    right: 66px !important;
-    bottom: 0 !important;
-    z-index: 15 !important;
-    display: flex !important;
-    flex-direction: column !important;
-    gap: 6px !important;
-    padding: 36px 12px 14px !important;
-    background: linear-gradient(180deg, transparent 0%, rgba(3, 6, 18, 0.76) 38%, rgba(3, 6, 18, 0.95) 100%) !important;
-    pointer-events: none !important;
-    max-height: 56% !important;
-    overflow-y: auto !important;
-    scrollbar-width: none !important;
-  }
-  body:not(.mobile-feed-classic) #view-feed.active .tiktok-overlay-info::-webkit-scrollbar {
-    display: none;
-  }
-  body:not(.mobile-feed-classic) #view-feed.active .tiktok-overlay-info > * {
-    pointer-events: auto !important;
-  }
-  body:not(.mobile-feed-classic) #view-feed.active .tk-caption-text {
-    font-size: 0.85rem;
-    line-height: 1.38;
-    color: #f8fafc;
-    text-shadow: 0 1px 6px rgba(0, 0, 0, 0.9);
-    display: -webkit-box;
-    -webkit-line-clamp: 3;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-  }
-
-  body:not(.mobile-feed-classic) #view-feed.active .post-card:has(.post-flip-inner.flipped) .tiktok-overlay-info {
-    opacity: 0 !important;
-    pointer-events: none !important;
+    display: none !important;
   }
 
   body:not(.mobile-feed-classic) #view-feed.active .tiktok-rail {
