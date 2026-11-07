@@ -115,7 +115,7 @@
   <noscript><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"></noscript>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
 
-  <link rel="stylesheet" href="css/remo-core.css?v=62">
+  <link rel="stylesheet" href="css/remo-core.css?v=81">
 </head>
 <body>
 
@@ -315,11 +315,16 @@
           <div id="feedActiveContestsBanner" style="display:none;margin-bottom:10px;"></div>
           <div class="glass-box stories-bar" id="storiesBarEl" style="display:none;"></div>
 
-          <!-- Clean Feed 1-Line Collapsible City Pulse Bar (Keeps Posts Immediately Visible!) -->
-          <button type="button" class="clean-feed-pulse-toggle" id="cleanFeedPulseToggle" onclick="toggleCleanFeedPulseDrawer()">
-            <span data-i18n="clean_pulse_bar_lbl">⚡ City Pulse (Weather · Live War · Daily Challenge)</span>
-            <span id="cleanFeedPulseArrow" style="color:#38bdf8;font-size:0.72rem;" data-i18n="clean_pulse_open">Show ▾</span>
-          </button>
+          <!-- Clean Feed 1-Line Collapsible City Pulse Bar + Mobile TikTok/Classic View Toggle -->
+          <div style="display:flex;align-items:center;gap:6px;">
+            <button type="button" class="clean-feed-pulse-toggle" id="cleanFeedPulseToggle" onclick="toggleCleanFeedPulseDrawer()" style="flex:1;min-width:0;">
+              <span data-i18n="clean_pulse_bar_lbl" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">⚡ City Pulse (Weather · Live War · Daily Challenge)</span>
+              <span id="cleanFeedPulseArrow" style="color:#38bdf8;font-size:0.72rem;flex-shrink:0;" data-i18n="clean_pulse_open">Show ▾</span>
+            </button>
+            <button type="button" class="mobile-only-layout-btn" id="mobileFeedLayoutToggleBtn" onclick="toggleMobileFeedLayoutMode()" title="Switch Mobile Feed View">
+              📰 <span>Classic View</span>
+            </button>
+          </div>
           <div class="clean-feed-pulse-drawer" id="cleanFeedPulseDrawer">
             <div id="feedDailyMatchPill" class="feed-daily-match-pill" style="display:none;"></div>
             <div id="mobileCityWarStrip" class="mobile-war-strip"></div>
@@ -2123,13 +2128,13 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 
   <!-- REMO Modular Engines -->
-  <script src="js/remo-i18n.js?v=80"></script>
-  <script src="js/remo-cities-data.js?v=80"></script>
-  <script src="js/remo-store.js?v=80"></script>
-  <script src="js/remo-card-engine.js?v=80"></script>
-  <script src="js/remo-radar-arena.js?v=80"></script>
-  <script src="js/remo-social-comms.js?v=80"></script>
-  <script src="js/remo-radio-engine.js?v=80"></script>
+  <script src="js/remo-i18n.js?v=81"></script>
+  <script src="js/remo-cities-data.js?v=81"></script>
+  <script src="js/remo-store.js?v=81"></script>
+  <script src="js/remo-card-engine.js?v=81"></script>
+  <script src="js/remo-radar-arena.js?v=81"></script>
+  <script src="js/remo-social-comms.js?v=81"></script>
+  <script src="js/remo-radio-engine.js?v=81"></script>
 
   <noscript>
     <nav aria-label="REMO World Static Directory" style="padding:20px;background:#050816;color:#f8fafc;">

@@ -1363,6 +1363,7 @@ function voteCityWar(warId, side, ev) {
   if (typeof renderMobileCityWarStrip === 'function') renderMobileCityWarStrip();
   if (typeof syncHeaderAndSidebars === 'function') syncHeaderAndSidebars();
 
+  REMO_STORE.save(true, 'war_pulse');
   scheduleWarPulseCloudFlush();
 }
 

@@ -1936,7 +1936,7 @@ const REMO_TRANSLATOR = {
         const tr = this.wordsEnToFr[low];
         return m[0] === m[0].toUpperCase() ? tr.charAt(0).toUpperCase() + tr.slice(1) : tr;
       });
-      return out === text.trim() ? `🇫🇷 ${out}` : out;
+      return out;
     } else {
       // FR -> EN reverse phrase & word pass
       this.phrasesEnToFr.forEach(([enP, frP]) => {
@@ -1954,7 +1954,7 @@ const REMO_TRANSLATOR = {
         const tr = revWords[low];
         return m[0] === m[0].toUpperCase() ? tr.charAt(0).toUpperCase() + tr.slice(1) : tr;
       });
-      return out === text.trim() ? `🇬🇧 ${out}` : out;
+      return out;
     }
   },
 
@@ -4083,6 +4083,58 @@ const REMO_STORE = {
             (lp.comments || []).forEach((c) => { if (c && c.id && !cmtMap.has(c.id)) cmtMap.set(c.id, c); });
             cp.comments = Array.from(cmtMap.values());
             if ((lp.tipsTotal || 0) > (cp.tipsTotal || 0)) cp.tipsTotal = lp.tipsTotal;
+            // Smart-merge City Versus Duel votes, voters, bonus claims & conclusion state
+            if (cp.versus || lp.versus) {
+              const cv = cp.versus || {};
+              const lv = lp.versus || {};
+              const mergedVoters = Array.from(new Set([...(cv.voters || []), ...(lv.voters || [])]));
+              const mergedClaimed = Array.from(new Set([...(cv.claimedBonus || []), ...(lv.claimedBonus || [])]));
+              const mergedSides = Object.assign({}, cv.voterSides || {}, lv.voterSides || {});
+              cp.versus = Object.assign({}, lv, cv, {
+                leftVotes: Math.max(Number(cv.leftVotes || 0), Number(lv.leftVotes || 0)),
+                rightVotes: Math.max(Number(cv.rightVotes || 0), Number(lv.rightVotes || 0)),
+                voters: mergedVoters,
+                voterSides: mergedSides,
+                claimedBonus: mergedClaimed,
+                closed: Boolean(cv.closed || lv.closed),
+                winnerSide: cv.winnerSide || lv.winnerSide || null
+              });
+            }
+            // Smart-merge Poll votes & voters
+            if (cp.poll || lp.poll) {
+              const cPoll = cp.poll || {};
+              const lPoll = lp.poll || {};
+              const mergedPollVoters = Array.from(new Set([...(cPoll.voters || []), ...(lPoll.voters || [])]));
+              const baseOpts = Array.isArray(cPoll.options) ? cPoll.options : (lPoll.options || []);
+              const lOpts = Array.isArray(lPoll.options) ? lPoll.options : [];
+              const mergedOpts = baseOpts.map((opt, idx) => {
+                const lOpt = lOpts[idx] || {};
+                return Object.assign({}, lOpt, opt, {
+                  votes: Math.max(Number(opt?.votes || 0), Number(lOpt?.votes || 0))
+                });
+              });
+              cp.poll = Object.assign({}, lPoll, cPoll, {
+                voters: mergedPollVoters,
+                options: mergedOpts
+              });
+            }
+            // Smart-merge Secret Capsule & Feed Bounty claims
+            if (cp.secretCapsule || lp.secretCapsule) {
+              const cSc = cp.secretCapsule || {};
+              const lSc = lp.secretCapsule || {};
+              cp.secretCapsule = Object.assign({}, lSc, cSc, {
+                unlockedBy: Array.from(new Set([...(cSc.unlockedBy || []), ...(lSc.unlockedBy || [])]))
+              });
+            }
+            if (cp.bounty || lp.bounty) {
+              const cB = cp.bounty || {};
+              const lB = lp.bounty || {};
+              cp.bounty = Object.assign({}, lB, cB, {
+                claimed: Boolean(cB.claimed || lB.claimed),
+                claimedBy: cB.claimedBy || lB.claimedBy || '',
+                claimedAt: cB.claimedAt || lB.claimedAt || 0
+              });
+            }
             // Smart-merge HTML Arcade Leaderboard (keep highest score per citizen)
             if (Array.isArray(cp.leaderboard) || Array.isArray(lp.leaderboard)) {
               const lbMap = new Map();
@@ -4102,8 +4154,9 @@ const REMO_STORE = {
         });
         isInitialPostsSnap = false;
 
-        const prevSignature = (this.state.posts || []).map((p) => `${p.id}_${p.type || ''}_${p.likes?.length || 0}_${p.comments?.length || 0}_${Object.keys(p.cityGuesses || {}).length}_${p.leaderboard?.[0]?.score || 0}_${p.pinned ? 1 : 0}`).join('|');
-        const nextSignature = activePosts.map((p) => `${p.id}_${p.type || ''}_${p.likes?.length || 0}_${p.comments?.length || 0}_${Object.keys(p.cityGuesses || {}).length}_${p.leaderboard?.[0]?.score || 0}_${p.pinned ? 1 : 0}`).join('|');
+        const postSig = (p) => `${p.id}_${p.type || ''}_${p.likes?.length || 0}_${p.comments?.length || 0}_${p.tipsTotal || 0}_${Object.keys(p.cityGuesses || {}).length}_${p.leaderboard?.[0]?.score || 0}_${p.pinned ? 1 : 0}_${p.versus ? `${p.versus.leftVotes || 0}:${p.versus.rightVotes || 0}:${p.versus.closed ? 1 : 0}` : ''}_${p.poll ? (p.poll.voters || []).length : 0}`;
+        const prevSignature = (this.state.posts || []).map(postSig).join('|');
+        const nextSignature = activePosts.map(postSig).join('|');
         const hasContentChanged = prevSignature !== nextSignature;
 
         this.state.posts = activePosts;
@@ -4148,10 +4201,21 @@ const REMO_STORE = {
         }
         if (Array.isArray(data.duels)) {
           const legacyMockWarIds = new Set(['war_1', 'war_2', 'war_3']);
-          // Cloud duels list is authoritative - filter out deleted duels and legacy mocks
-          const cleanCloudDuels = data.duels.filter((cd) =>
-            cd && cd.id && !legacyMockWarIds.has(cd.id) && (!this.deletedDuelIds || !this.deletedDuelIds.has(cd.id))
-          );
+          const localDuelMap = new Map();
+          (this.state.duels || []).forEach((ld) => {
+            if (ld && ld.id) localDuelMap.set(ld.id, ld);
+          });
+          // Cloud duels list is authoritative - filter out deleted duels and legacy mocks, while preserving higher local vote counts
+          const cleanCloudDuels = data.duels
+            .filter((cd) => cd && cd.id && !legacyMockWarIds.has(cd.id) && (!this.deletedDuelIds || !this.deletedDuelIds.has(cd.id)))
+            .map((cd) => {
+              const ld = localDuelMap.get(cd.id);
+              if (!ld) return cd;
+              return Object.assign({}, ld, cd, {
+                votesA: Math.max(Number(cd.votesA || 0), Number(ld.votesA || 0)),
+                votesB: Math.max(Number(cd.votesB || 0), Number(ld.votesB || 0))
+              });
+            });
           this.state.duels = cleanCloudDuels;
         }
         if (this.deletedDuelIds && this.deletedDuelIds.size > 0 && Array.isArray(this.state.duels)) {

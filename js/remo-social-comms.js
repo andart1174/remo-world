@@ -388,8 +388,9 @@ function voteCityVersusDuel(postId, choice, ev) {
   const endsAt = Number(v.endsAt || (p.createdAt ? p.createdAt + (v.durationHours || 24) * 3600000 : now + 86400000));
   if (v.closed || now >= endsAt) {
     v.closed = true;
+    REMO_STORE.syncPostToCloud(p);
     remoToast(t('versus_ended_toast'));
-    renderSocialFeed();
+    rerenderSinglePostCard(p.id);
     return;
   }
 
@@ -401,36 +402,57 @@ function voteCityVersusDuel(postId, choice, ev) {
   }
 
   if (!Array.isArray(v.voters)) v.voters = [];
-  if (v.voters.includes(voterKey) || localStorage.getItem('remo_versus_voted_' + p.id)) {
+  if (!v.voterSides) v.voterSides = {};
+
+  const prevSide = v.voterSides[voterKey] || localStorage.getItem('remo_versus_side_' + p.id) || '';
+  const alreadyVoted = v.voters.includes(voterKey) || Boolean(localStorage.getItem('remo_versus_voted_' + p.id));
+
+  if (alreadyVoted && prevSide === choice) {
+    // Ensure vote count is at least 1 for the chosen side if legacy data had 0
+    if (choice === 'left' && (!v.leftVotes || v.leftVotes < 1)) v.leftVotes = 1;
+    if (choice === 'right' && (!v.rightVotes || v.rightVotes < 1)) v.rightVotes = 1;
+    REMO_STORE.syncPostToCloud(p);
+    rerenderSinglePostCard(p.id);
     remoToast(t('versus_already_voted'));
     return;
   }
 
-  v.voters.push(voterKey);
-  if (!v.voterSides) v.voterSides = {};
+  if (alreadyVoted && prevSide && prevSide !== choice) {
+    // Switching vote from one city to the other
+    if (prevSide === 'left') {
+      v.leftVotes = Math.max(0, (Number(v.leftVotes) || 1) - 1);
+    } else if (prevSide === 'right') {
+      v.rightVotes = Math.max(0, (Number(v.rightVotes) || 1) - 1);
+    }
+  } else if (!v.voters.includes(voterKey)) {
+    v.voters.push(voterKey);
+  }
+
   v.voterSides[voterKey] = choice;
   localStorage.setItem('remo_versus_voted_' + p.id, '1');
   localStorage.setItem('remo_versus_side_' + p.id, choice);
 
   if (choice === 'left') {
-    v.leftVotes = (v.leftVotes || 0) + 1;
-    REMO_STORE.addCityScore(v.leftCityId || 'montreal', 50);
+    v.leftVotes = (Number(v.leftVotes) || 0) + 1;
+    if (!alreadyVoted) REMO_STORE.addCityScore(v.leftCityId || 'montreal', 50);
   } else {
-    v.rightVotes = (v.rightVotes || 0) + 1;
-    REMO_STORE.addCityScore(v.rightCityId || 'paris', 50);
+    v.rightVotes = (Number(v.rightVotes) || 0) + 1;
+    if (!alreadyVoted) REMO_STORE.addCityScore(v.rightCityId || 'paris', 50);
   }
 
-  if (u && u.uid) {
+  if (!alreadyVoted && u && u.uid) {
     REMO_STORE.addCoins(u.uid, 10, 10);
   }
+  REMO_STORE.syncPostToCloud(p);
   REMO_STORE.save(true, 'versus_vote');
-  spawnRemoCoinsFX(10);
+  if (!alreadyVoted) spawnRemoCoinsFX(10);
   RemoAudio.play('coin');
   try { if (navigator.vibrate) navigator.vibrate(15); } catch (e) {}
 
   const chosenCity = getCityById(choice === 'left' ? v.leftCityId : v.rightCityId);
   remoToast(t('versus_voted_toast', { city: getCityName(chosenCity, lang) }), 'coin');
-  renderSocialFeed();
+  rerenderSinglePostCard(p.id);
+  syncHeaderAndSidebars();
 }
 window.voteCityVersusDuel = voteCityVersusDuel;
 
@@ -453,11 +475,13 @@ function claimVersusVictoryBonus(postId, ev) {
   if (u && u.uid) {
     REMO_STORE.addCoins(u.uid, 25, 25);
   }
+  REMO_STORE.syncPostToCloud(p);
   REMO_STORE.save(true, 'versus_claim_bonus');
   spawnRemoCoinsFX(20);
   RemoAudio.play('fanfare');
   remoToast(t('versus_bonus_claimed_toast'), 'fanfare');
-  renderSocialFeed();
+  rerenderSinglePostCard(p.id);
+  syncHeaderAndSidebars();
 }
 window.claimVersusVictoryBonus = claimVersusVictoryBonus;
 
@@ -474,8 +498,10 @@ function adminConcludeDuelNow(postId, ev) {
   v.winnerSide = leftVotes > rightVotes ? 'left' : (rightVotes > leftVotes ? 'right' : 'tie');
   if (v.winnerSide === 'left') REMO_STORE.addCityScore(v.leftCityId || 'montreal', 500);
   else if (v.winnerSide === 'right') REMO_STORE.addCityScore(v.rightCityId || 'paris', 500);
+  REMO_STORE.syncPostToCloud(p);
   REMO_STORE.save(true, 'admin_conclude_duel');
-  renderSocialFeed();
+  rerenderSinglePostCard(p.id);
+  syncHeaderAndSidebars();
   remoToast('👑 Official City Duel concluded by Admin!');
 }
 window.adminConcludeDuelNow = adminConcludeDuelNow;
@@ -503,11 +529,13 @@ function claimPostFeedBounty(postId) {
     b.claimedBy = u.name;
     b.claimedAt = Date.now();
     REMO_STORE.addCoins(u.uid, b.coins, b.coins);
+    REMO_STORE.syncPostToCloud(p);
     REMO_STORE.save(true, 'bounty_feed_claimed');
     spawnRemoCoinsFX(20);
     RemoAudio.play('fanfare');
     remoToast(t('bounty_feed_success', { coins: b.coins }), 'fanfare');
-    renderSocialFeed();
+    rerenderSinglePostCard(p.id);
+    syncHeaderAndSidebars();
   } else {
     RemoAudio.play('hit');
     remoToast(t('bounty_feed_wrong'));
@@ -577,18 +605,6 @@ function renderCityVersusDuelStage(p, lang) {
   const nameA = escapeHtmlStr(getCityName(cA, lang));
   const nameB = escapeHtmlStr(getCityName(cB, lang));
 
-  const leftVotes = Number(v.leftVotes || 0);
-  const rightVotes = Number(v.rightVotes || 0);
-  const total = leftVotes + rightVotes;
-  const pA = total > 0 ? Math.round((leftVotes / total) * 100) : 50;
-  const pB = 100 - pA;
-  const leftSrc = v.leftMedia || generateCityPostVisualDataUrl(cA.id, getCityName(cA, 'en'));
-  const rightSrc = v.rightMedia || generateCityPostVisualDataUrl(cB.id, getCityName(cB, 'en'));
-
-  const now = Date.now();
-  const endsAt = Number(v.endsAt || (p.createdAt ? p.createdAt + (v.durationHours || 24) * 3600000 : now + 86400000));
-  const isExpired = Boolean(v.closed) || (now >= endsAt);
-
   const u = (REMO_STORE && REMO_STORE.getCurrentUser) ? REMO_STORE.getCurrentUser() : null;
   const voterKey = (u && u.uid) ? u.uid : (localStorage.getItem('remo_guest_vid') || '');
   const hasVoted = Boolean(
@@ -596,6 +612,32 @@ function renderCityVersusDuelStage(p, lang) {
     localStorage.getItem('remo_versus_voted_' + p.id)
   );
   const votedSide = (v.voterSides && voterKey && v.voterSides[voterKey]) || localStorage.getItem('remo_versus_side_' + p.id) || '';
+
+  // Ensure local vote is always reflected in the tally even if a legacy duel was created before cloud vote sync
+  const leftVotes = Math.max(Number(v.leftVotes || 0), votedSide === 'left' ? 1 : 0);
+  const rightVotes = Math.max(Number(v.rightVotes || 0), votedSide === 'right' ? 1 : 0);
+  if (leftVotes !== Number(v.leftVotes || 0) || rightVotes !== Number(v.rightVotes || 0)) {
+    v.leftVotes = leftVotes;
+    v.rightVotes = rightVotes;
+    if (voterKey) {
+      if (!Array.isArray(v.voters)) v.voters = [];
+      if (!v.voters.includes(voterKey)) v.voters.push(voterKey);
+      if (!v.voterSides) v.voterSides = {};
+      if (votedSide) v.voterSides[voterKey] = votedSide;
+    }
+    if (REMO_STORE && typeof REMO_STORE.syncPostToCloud === 'function') {
+      REMO_STORE.syncPostToCloud(p);
+    }
+  }
+  const total = leftVotes + rightVotes;
+  const pA = total > 0 ? Math.round((leftVotes / total) * 100) : 50;
+  const pB = total > 0 ? (100 - pA) : 50;
+  const leftSrc = v.leftMedia || generateCityPostVisualDataUrl(cA.id, getCityName(cA, 'en'));
+  const rightSrc = v.rightMedia || generateCityPostVisualDataUrl(cB.id, getCityName(cB, 'en'));
+
+  const now = Date.now();
+  const endsAt = Number(v.endsAt || (p.createdAt ? p.createdAt + (v.durationHours || 24) * 3600000 : now + 86400000));
+  const isExpired = Boolean(v.closed) || (now >= endsAt);
 
   // Auto-close if expired
   let winnerSide = v.winnerSide || null;
@@ -667,11 +709,11 @@ function renderCityVersusDuelStage(p, lang) {
   }
 
   const leftPillText = votedSide === 'left'
-    ? `✓ ${t('versus_you_voted_side')} · ${cA.flag} ${cA.code} (${pA}%)`
+    ? `${t('versus_you_voted_side')} · ${cA.flag} ${cA.code} (${pA}%)`
     : (hasVoted || isExpired ? `${cA.flag} ${cA.code} (${pA}%)` : `🗳️ ${cA.flag} ${cA.code} (${pA}%)`);
 
   const rightPillText = votedSide === 'right'
-    ? `✓ ${t('versus_you_voted_side')} · ${cB.flag} ${cB.code} (${pB}%)`
+    ? `${t('versus_you_voted_side')} · ${cB.flag} ${cB.code} (${pB}%)`
     : (hasVoted || isExpired ? `${cB.flag} ${cB.code} (${pB}%)` : `🗳️ ${cB.flag} ${cB.code} (${pB}%)`);
 
   return `
@@ -1363,124 +1405,61 @@ function getInterCityDistanceBridge(postCity, lang) {
   `;
 }
 
-function renderSocialFeed(searchQuery = '') {
-  renderStoriesAndBanners();
-  if (typeof renderFeedActiveContestsBanner === 'function') {
-    renderFeedActiveContestsBanner();
-  }
-  const grid = document.getElementById('remoPostsGrid');
-  if (!grid) return;
+function computePostRenderSig(p, u, lang) {
+  if (!p || !p.id) return '';
+  const voterKey = (u && u.uid) ? u.uid : (localStorage.getItem('remo_guest_vid') || '');
+  const votedSide = (p.versus && p.versus.voterSides && voterKey && p.versus.voterSides[voterKey]) || localStorage.getItem('remo_versus_side_' + p.id) || '';
+  const dualOpen = (window._openTranslatedPosts && window._openTranslatedPosts[p.id]) ? 1 : 0;
+  const vSig = p.versus ? `${p.versus.leftVotes || 0}:${p.versus.rightVotes || 0}:${p.versus.closed ? 1 : 0}:${votedSide}:${(p.versus.claimedBonus || []).length}` : '';
+  const pollSig = p.poll ? `${(p.poll.voters || []).length}:${(p.poll.options || []).map((o) => o.votes || 0).join(',')}` : '';
+  const btySig = p.bounty ? `${p.bounty.claimed ? 1 : 0}` : '';
+  const capSig = p.secretCapsule ? `${(p.secretCapsule.unlockedBy || []).length}` : '';
+  const liked = (u && (p.likes || []).includes(u.uid)) ? 1 : 0;
+  return `${p.id}_${lang}_${(p.likes || []).length}_${liked}_${(p.comments || []).length}_${p.tipsTotal || 0}_${p.pinned ? 1 : 0}_${p.boosted ? 1 : 0}_${p.founderAward ? 1 : 0}_${p.mintedCard ? 1 : 0}_${dualOpen}_${vSig}_${pollSig}_${btySig}_${capSig}_${Object.keys(p.cityGuesses || {}).length}_${p.leaderboard?.[0]?.score || 0}_${isPostCapsuleSealed(p) ? 1 : 0}_${isAdminXrayOpen(p.id) ? 1 : 0}`;
+}
 
-  const lang = REMO_I18N.getLang();
-  const u = REMO_STORE.getCurrentUser();
-  const isAdm = REMO_STORE.isAdminUnlocked();
-  let posts = (REMO_STORE.state.posts || []).filter((p) => p && p.mediaType !== 'beat_loop');
-
-  // Official Pinned posts float #1, then Boosted posts, then newest
-  posts.sort((a, b) =>
-    (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) ||
-    (b.boosted ? 1 : 0) - (a.boosted ? 1 : 0) ||
-    b.createdAt - a.createdAt
-  );
-
-  if (currentFeedMode === 'following') {
-    const myFollowing = (u && Array.isArray(u.following)) ? u.following : [];
-    posts = posts.filter((p) => p && myFollowing.includes(p.uid));
-  } else if (currentFeedMode === 'mystery') {
-    posts = posts.filter((p) => Boolean(p && p.mysteryCity));
-  } else if (currentFeedMode === 'duets') {
-    posts = posts.filter((p) => Boolean(p.duetOf || p.mediaType === 'city_versus'));
-  } else if (currentFeedMode === 'bounties') {
-    posts = posts.filter((p) => Boolean(p.bounty));
-  } else if (currentFeedMode === 'capsules') {
-    posts = posts.filter((p) => p.wasTimeCapsule || Boolean(p.unlockAt));
-  } else if (currentFeedMode === 'html') {
-    posts = posts.filter((p) => p.mediaType === 'html_app');
-  } else if (currentFeedMode === 'videos') {
-    posts = posts.filter((p) => p.mediaType === 'video' || p.mediaType === 'video_link' || Boolean(p.externalUrl));
-  } else if (currentFeedMode === 'photos') {
-    posts = posts.filter((p) => ['image', 'carousel', 'before_after'].includes(p.mediaType));
-  } else if (currentFeedMode === 'my_city' && u) {
-    posts = posts.filter((p) => p.cityId === u.homeCity);
-  } else if (currentFeedMode === 'trending') {
-    posts.sort((a, b) => ((b.likes || []).length + (b.tipsTotal || 0)) - ((a.likes || []).length + (a.tipsTotal || 0)));
-  } else if (currentFeedMode === 'cards') {
-    posts = posts.filter((p) => p.mintedCard);
-  } else if (currentFeedMode === 'voice') {
-    posts = posts.filter((p) => !!p.voiceUrl);
-  } else if (currentFeedMode === 'saved') {
-    const savedIds = JSON.parse(localStorage.getItem('remo_saved_posts') || '[]');
-    posts = posts.filter((p) => savedIds.includes(p.id));
-  }
-
-  if (currentFeedCityFilter !== 'all') {
-    posts = posts.filter((p) => p.cityId === currentFeedCityFilter);
-  }
-  if (currentFeedVibeFilter !== 'all') {
-    posts = posts.filter((p) => p.vibe === currentFeedVibeFilter);
-  }
-  if (searchQuery.trim()) {
-    const q = searchQuery.toLowerCase();
-    posts = posts.filter((p) =>
-      (p.caption_en || '').toLowerCase().includes(q) ||
-      (p.caption_fr || '').toLowerCase().includes(q) ||
-      (p.authorName || '').toLowerCase().includes(q) ||
-      (p.cityId || '').toLowerCase().includes(q)
-    );
-  }
-
-  if (posts.length === 0) {
-    grid.innerHTML = `<div class="glass-box" style="grid-column:1/-1;text-align:center;padding:40px;">
-      ${lang === 'fr' ? 'Aucun moment trouvé pour ce filtre. Soyez le premier à publier ! ✨' : 'No moments match this filter yet. Be the first to post! ✨'}
-    </div>`;
-    return;
-  }
-
-  const EMOJIS = ['🔥', '⚡', '💎', '🤯', '👑'];
-
-  grid.innerHTML = posts.map((p) => {
-    try {
-      if (!p || !p.id) return '';
-      const city = getCityById(p.cityId) || getCityById('montreal') || { id: 'montreal', name_en: 'Montreal', name_fr: 'Montréal', flag: '⚜️', code: 'MTL' };
-      const wx = (typeof REMO_WEATHER !== 'undefined' && REMO_WEATHER.getCityLiveStatus)
-        ? (REMO_WEATHER.getCityLiveStatus(city) || { icon: '🌤️', tempC: 20, isSurge: false, timeStr: '12:00' })
-        : { icon: '🌤️', tempC: 20, isSurge: false, timeStr: '12:00' };
-      const sealed = isPostCapsuleSealed(p);
-      const xray = isAdminXrayOpen(p.id);
-      const hiddenByCapsule = sealed && !xray;
-      const teaserTxt = lang === 'fr'
-        ? (p.capsuleTeaser_fr || p.capsuleTeaser_en || 'Capsule mystère scellée...')
-        : (p.capsuleTeaser_en || p.capsuleTeaser_fr || 'Mystery capsule sealed...');
-      const rawCap = hiddenByCapsule
-        ? `🔒 ${teaserTxt}`
-        : (lang === 'fr' ? (p.caption_fr || p.caption_en) : (p.caption_en || p.caption_fr));
-      const formattedCap = escapeHtmlStr(rawCap || '').replace(/#([\w\u00C0-\u024F]+)/g, `<span class="hashtag" onclick="renderSocialFeed('#$1')">#$1</span>`);
-      const liked = u && (p.likes || []).includes(u.uid);
-      const interactiveNoTilt = hiddenByCapsule || p.mediaType === 'html_app' || p.mediaType === 'before_after' || p.mediaType === 'video_link' || Boolean(p.externalUrl);
-      const voiceResolved = p.voiceUrl ? RemoMediaDB.resolveSyncOrPlaceholder(p.voiceUrl) : '';
-      const voiceIdbAttr = p.voiceUrl && String(p.voiceUrl).startsWith('idb://') ? `data-idb-src="${p.voiceUrl}"` : '';
-      const rxMap = p.reactions || {};
-      const cityMayor = (REMO_STORE && REMO_STORE.getCityMayor) ? REMO_STORE.getCityMayor(p.cityId) : null;
-      const isMayor = cityMayor && cityMayor.uid === p.uid;
-      const cosm = (REMO_STORE && REMO_STORE.getUserCosmetics) ? REMO_STORE.getUserCosmetics(p.uid) : { frameClass: '', title_fr: '', title_en: '' };
-      const royalTitle = lang === 'fr' ? (cosm.title_fr || '') : (cosm.title_en || '');
-      const dualPair = hiddenByCapsule
-        ? { en: `🔒 ${p.capsuleTeaser_en || teaserTxt}`, fr: `🔒 ${p.capsuleTeaser_fr || teaserTxt}` }
-        : buildPostBilingualPair(p);
-      const isDualOpen = !!(window._openTranslatedPosts && window._openTranslatedPosts[p.id]);
-      const isPostOwner = Boolean(u && (
-        (p.uid && u.uid === p.uid) ||
-        (p.authorUid && u.uid === p.authorUid) ||
-        (u.email && p.authorEmail && u.email.toLowerCase() === p.authorEmail.toLowerCase()) ||
-        (u.name && p.authorName && u.name.trim().toLowerCase() === p.authorName.trim().toLowerCase())
-      ));
-      const mysteryMasked = Boolean(p.mysteryCity && !isPostOwner && typeof isMysteryCityMaskedForViewer === 'function' && isMysteryCityMaskedForViewer(p, u));
-      const cityTagLabel = mysteryMasked
-        ? t('guess_masked_city')
-        : `${city.flag || '🌍'} ${getCityName(city, lang)} · ${wx.icon || '🌤️'} ${wx.tempC ?? 20}°${wx.isSurge ? ' ⚡2X' : ''}`;
+function renderSinglePostCardHtml(p, lang, u, isAdm) {
+  try {
+    if (!p || !p.id) return '';
+    const city = getCityById(p.cityId) || getCityById('montreal') || { id: 'montreal', name_en: 'Montreal', name_fr: 'Montréal', flag: '⚜️', code: 'MTL' };
+    const wx = (typeof REMO_WEATHER !== 'undefined' && REMO_WEATHER.getCityLiveStatus)
+      ? (REMO_WEATHER.getCityLiveStatus(city) || { icon: '🌤️', tempC: 20, isSurge: false, timeStr: '12:00' })
+      : { icon: '🌤️', tempC: 20, isSurge: false, timeStr: '12:00' };
+    const sealed = isPostCapsuleSealed(p);
+    const xray = isAdminXrayOpen(p.id);
+    const hiddenByCapsule = sealed && !xray;
+    const teaserTxt = lang === 'fr'
+      ? (p.capsuleTeaser_fr || p.capsuleTeaser_en || 'Capsule mystère scellée...')
+      : (p.capsuleTeaser_en || p.capsuleTeaser_fr || 'Mystery capsule sealed...');
+    const rawCap = hiddenByCapsule
+      ? `🔒 ${teaserTxt}`
+      : String((lang === 'fr' ? (p.caption_fr || p.caption_en) : (p.caption_en || p.caption_fr)) || '').replace(/^(?:🇬🇧|🇫🇷)\s+/u, '');
+    const formattedCap = escapeHtmlStr(rawCap || '').replace(/#([\w\u00C0-\u024F]+)/g, `<span class="hashtag" onclick="renderSocialFeed('#$1', true)">#$1</span>`);
+    const liked = Boolean(u && (p.likes || []).includes(u.uid));
+    const interactiveNoTilt = hiddenByCapsule || p.mediaType === 'html_app' || p.mediaType === 'before_after' || p.mediaType === 'video_link' || Boolean(p.externalUrl);
+    const voiceResolved = p.voiceUrl ? RemoMediaDB.resolveSyncOrPlaceholder(p.voiceUrl) : '';
+    const voiceIdbAttr = p.voiceUrl && String(p.voiceUrl).startsWith('idb://') ? `data-idb-src="${p.voiceUrl}"` : '';
+    const cityMayor = (REMO_STORE && REMO_STORE.getCityMayor) ? REMO_STORE.getCityMayor(p.cityId) : null;
+    const isMayor = cityMayor && cityMayor.uid === p.uid;
+    const cosm = (REMO_STORE && REMO_STORE.getUserCosmetics) ? REMO_STORE.getUserCosmetics(p.uid) : { frameClass: '', title_fr: '', title_en: '' };
+    const royalTitle = lang === 'fr' ? (cosm.title_fr || '') : (cosm.title_en || '');
+    const dualPair = hiddenByCapsule
+      ? { en: `🔒 ${p.capsuleTeaser_en || teaserTxt}`, fr: `🔒 ${p.capsuleTeaser_fr || teaserTxt}` }
+      : buildPostBilingualPair(p);
+    const isDualOpen = !!(window._openTranslatedPosts && window._openTranslatedPosts[p.id]);
+    const isPostOwner = Boolean(u && (
+      (p.uid && u.uid === p.uid) ||
+      (p.authorUid && u.uid === p.authorUid) ||
+      (u.email && p.authorEmail && u.email.toLowerCase() === p.authorEmail.toLowerCase()) ||
+      (u.name && p.authorName && u.name.trim().toLowerCase() === p.authorName.trim().toLowerCase())
+    ));
+    const mysteryMasked = Boolean(p.mysteryCity && !isPostOwner && typeof isMysteryCityMaskedForViewer === 'function' && isMysteryCityMaskedForViewer(p, u));
+    const cityTagLabel = mysteryMasked
+      ? t('guess_masked_city')
+      : `${city.flag || '🌍'} ${getCityName(city, lang)} · ${wx.icon || '🌤️'} ${wx.tempC ?? 20}°${wx.isSurge ? ' ⚡2X' : ''}`;
 
     return `
-      <article id="post_card_${p.id}" class="post-card ${p.boosted || p.pinned || sealed ? 'boosted' : ''} ${p.mediaType === 'html_app' ? 'is-html-app' : ''}" ${interactiveNoTilt ? '' : 'onmousemove="applyHoloTilt(event, this)" onmouseleave="resetHoloTilt(this)"'}>
+      <article id="post_card_${p.id}" class="post-card ${p.boosted || p.pinned || sealed ? 'boosted' : ''} ${p.mediaType === 'html_app' ? 'is-html-app' : ''} ${p.mediaType === 'city_versus' ? 'is-city-versus' : ''}" ${interactiveNoTilt ? '' : 'onmousemove="applyHoloTilt(event, this)" onmouseleave="resetHoloTilt(this)"'}>
         <div class="post-head">
           <div style="display:flex;align-items:center;gap:6px;min-width:0;">
             <div class="post-author" style="cursor:pointer;" onclick="openCitizenProfileModal('${p.uid || ''}', '${escapeHtmlStr(p.authorName || '')}')" title="🪪 @${escapeHtmlStr(p.authorName)}">
@@ -1516,7 +1495,7 @@ function renderSocialFeed(searchQuery = '') {
               <div class="post-face-front">
                 <div class="post-badges-top">
                   ${sealed ? `<span class="pbadge capsule">${t('capsule_locked_badge')}${xray ? ' · 👁️ X-RAY' : ''}</span>` : (p.wasTimeCapsule ? `<span class="pbadge unsealed">${t('capsule_unsealed_badge')}</span>` : '')}
-                  ${p.duetOf || p.mediaType === 'city_versus' ? `<span class="pbadge duet">${t('post_duet_badge')}</span>` : ''}
+                  ${p.duetOf ? `<span class="pbadge duet">${t('post_duet_badge')}</span>` : ''}
                   ${p.isWorldWindow || (p.duetOf && p.duetOf.isWorldWindow) ? `<span class="window-live-badge">${t('win_badge_live')}</span>` : ''}
                   ${p.pinned ? `<span class="pbadge pinned">${t('post_pinned_badge')}</span>` : ''}
                   ${p.founderAward ? `<span class="pbadge founder">${t('post_founder_award_badge')}</span>` : ''}
@@ -1608,19 +1587,21 @@ function renderSocialFeed(searchQuery = '') {
         <div class="tiktok-overlay-info">
           ${renderAdminPostBar(p)}
           <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
-            <span style="font-weight:900;font-size:0.98rem;cursor:pointer;" onclick="openCitizenProfileModal('${p.uid || ''}', '${escapeHtmlStr(p.authorName || '')}')">@${escapeHtmlStr(p.authorName)}</span>
+            <span style="font-weight:900;font-size:0.96rem;color:#fff;cursor:pointer;text-shadow:0 2px 8px rgba(0,0,0,0.85);" onclick="openCitizenProfileModal('${p.uid || ''}', '${escapeHtmlStr(p.authorName || '')}')">@${escapeHtmlStr(p.authorName)}</span>
+            ${p.authorVerified ? '<span style="color:#38bdf8;font-weight:900;">✓</span>' : ''}
             ${(!isPostOwner && p.uid) ? `<button type="button" class="post-author-dm-mini" onclick="event.stopPropagation();openDirectChatWithUser('${p.uid || ''}')">💌</button>` : ''}
             ${!mysteryMasked && isMayor ? `<span class="mayor-tag">${t('mayor_badge')}</span>` : ''}
             ${royalTitle ? `<span class="royal-title-pill">${escapeHtmlStr(royalTitle)}</span>` : ''}
             <span class="city-tag" onclick="${mysteryMasked ? '' : `filterFeedByCityFromMap('${city.id}')`}">${cityTagLabel}</span>
-            <button type="button" class="translate-pill-btn ${isDualOpen ? 'active' : ''}" onclick="togglePostAutoTranslate('${p.id}')">${t('post_translate_btn')}</button>
+            <button type="button" class="translate-pill-btn ${isDualOpen ? 'active' : ''}" onclick="togglePostAutoTranslate('${p.id}')">${isDualOpen ? t('post_translate_hide') : t('post_translate_btn')}</button>
           </div>
-          <div style="font-size:0.86rem;line-height:1.4;color:#f1f5f9;">${formattedCap}</div>
+          ${formattedCap ? `<div class="tk-caption-text">${formattedCap}</div>` : ''}
           <div class="bilingual-dual-box ${isDualOpen ? 'open' : ''}">
             <div><b style="color:#38bdf8;">🇬🇧</b> ${escapeHtmlStr(dualPair.en)}</div>
             <div><b style="color:#fbbf24;">🇫🇷</b> ${escapeHtmlStr(dualPair.fr)}</div>
           </div>
           ${!hiddenByCapsule && typeof renderMysteryCityWidget === 'function' ? renderMysteryCityWidget(p, city, lang, u, isPostOwner) : ''}
+          ${renderFeedBountyWidget(p, lang)}
           ${hiddenByCapsule ? '' : renderPostPollWidget(p, lang, u)}
           ${hiddenByCapsule ? '' : renderSecretCapsuleWidget(p, lang, u)}
           ${hiddenByCapsule ? '' : renderViralGoalWidget(p, lang, isAdm)}
@@ -1629,25 +1610,197 @@ function renderSocialFeed(searchQuery = '') {
 
         <!-- Mobile TikTok Right Floating Rail -->
         <div class="tiktok-rail">
-          <button class="tk-btn" onclick="toggleLikePost('${p.id}')">❤️<span class="tk-cnt">${(p.likes || []).length}</span></button>
-          <button class="tk-btn" onclick="openCommentsModal('${p.id}')">💬<span class="tk-cnt">${(p.comments || []).length}</span></button>
-          <button class="tk-btn" onclick="tipPostAuthor('${p.id}')">🪙<span class="tk-cnt">${p.tipsTotal || 0}</span></button>
-          <button class="tk-btn" onclick="startCityDuetFromPost('${p.id}')" title="City Duet">🎭</button>
-          <button class="tk-btn" onclick="sharePostLink('${p.id}')" title="${lang === 'fr' ? 'Partager' : 'Share'}">🔗</button>
-          ${p.mediaType === 'html_app'
-            ? `<button class="tk-btn" onclick="openHtmlFullscreenModal('${p.id}')" title="Fullscreen">⛶</button>`
-            : `${(isPostOwner || p.mintedCard) ? `<button class="tk-btn" onclick="mintPostAsCityCard('${p.id}')" title="${p.mintedCard ? (lang === 'fr' ? 'Voir Carte 4D' : 'View 4D Card') : (lang === 'fr' ? 'Créer Carte 4D' : 'Mint 4D Card')}">🎴</button>` : ''}
-               <button class="tk-btn" onclick="switchRemoView('arena')" title="Duel">⚔️</button>`}
-          <div class="tk-disc" onclick="toggleHeaderRadio()">🎵</div>
-          ${(isPostOwner || isAdm) ? `<button class="tk-btn" onclick="userDeleteOwnPost('${p.id}')" title="${lang === 'fr' ? 'Supprimer' : 'Delete'}" style="color:#f43f5e;">🗑️</button>` : ''}
+          <div class="tk-avatar-wrap" onclick="openCitizenProfileModal('${p.uid || ''}', '${escapeHtmlStr(p.authorName || '')}')" title="@${escapeHtmlStr(p.authorName)}">
+            <div class="avatar-circle ${cosm.frameClass}" style="width:42px;height:42px;font-size:0.95rem;border:2px solid #fff;">${escapeHtmlStr((p.authorName || 'R')[0].toUpperCase())}</div>
+            <span class="tk-avatar-plus">+</span>
+          </div>
+          <button type="button" class="tk-btn ${liked ? 'liked' : ''}" onclick="toggleLikePost('${p.id}')">
+            <span class="tk-ic">❤️</span>
+            <span class="tk-cnt">${(p.likes || []).length}</span>
+          </button>
+          <button type="button" class="tk-btn" onclick="openCommentsModal('${p.id}')">
+            <span class="tk-ic">💬</span>
+            <span class="tk-cnt">${(p.comments || []).length}</span>
+          </button>
+          <button type="button" class="tk-btn" onclick="tipPostAuthor('${p.id}')">
+            <span class="tk-ic">🪙</span>
+            <span class="tk-cnt">${p.tipsTotal || 0}</span>
+          </button>
+          <button type="button" class="tk-btn" onclick="flipPost3DCard('${p.id}')" title="${t('post_3d_flip')}">
+            <span class="tk-ic">🔄</span>
+            <span class="tk-cnt">3D</span>
+          </button>
+          <button type="button" class="tk-btn" onclick="sharePostLink('${p.id}')" title="${lang === 'fr' ? 'Partager' : 'Share'}">
+            <span class="tk-ic">🔗</span>
+            <span class="tk-cnt">${lang === 'fr' ? 'Lien' : 'Share'}</span>
+          </button>
+          <button type="button" class="tk-btn" onclick="openPostActionsSheet('${p.id}')" title="${lang === 'fr' ? 'Options' : 'More'}">
+            <span class="tk-ic">⋯</span>
+          </button>
+          <div class="tk-disc" onclick="toggleHeaderRadio()" title="World Radio">🎵</div>
         </div>
       </article>
     `;
-    } catch (err) {
-      console.warn('Post card render error:', p?.id, err);
-      return '';
+  } catch (err) {
+    console.warn('Post card render error:', p?.id, err);
+    return '';
+  }
+}
+
+function rerenderSinglePostCard(postId) {
+  if (!postId) return;
+  const existingEl = document.getElementById('post_card_' + postId);
+  const p = (REMO_STORE.state.posts || []).find((x) => x && x.id === postId);
+  if (!existingEl || !p) {
+    renderSocialFeed('', true);
+    return;
+  }
+  const wasFlipped = Boolean(existingEl.querySelector('.post-flip-inner')?.classList.contains('flipped'));
+  const lang = REMO_I18N.getLang();
+  const u = REMO_STORE.getCurrentUser();
+  const isAdm = REMO_STORE.isAdminUnlocked();
+  const newHtml = renderSinglePostCardHtml(p, lang, u, isAdm);
+  if (!newHtml) return;
+
+  existingEl.outerHTML = newHtml;
+  const updatedEl = document.getElementById('post_card_' + postId);
+  if (updatedEl) {
+    if (wasFlipped) {
+      updatedEl.querySelector('.post-flip-inner')?.classList.add('flipped');
     }
-  }).join('');
+    RemoMediaDB.hydrateDom(updatedEl);
+  }
+  // Keep feed signature synchronized so subsequent cloud snapshots don't trigger a redundant full rebuild
+  window._lastRenderedFeedSignature = computeVisibleFeedSignature('');
+}
+window.rerenderSinglePostCard = rerenderSinglePostCard;
+
+function getFilteredSortedFeedPosts(searchQuery = '') {
+  const u = REMO_STORE.getCurrentUser();
+  let posts = (REMO_STORE.state.posts || []).filter((p) => p && p.mediaType !== 'beat_loop');
+
+  // Official Pinned posts float #1, then Boosted posts, then newest
+  posts.sort((a, b) =>
+    (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) ||
+    (b.boosted ? 1 : 0) - (a.boosted ? 1 : 0) ||
+    b.createdAt - a.createdAt
+  );
+
+  if (currentFeedMode === 'following') {
+    const myFollowing = (u && Array.isArray(u.following)) ? u.following : [];
+    posts = posts.filter((p) => p && myFollowing.includes(p.uid));
+  } else if (currentFeedMode === 'mystery') {
+    posts = posts.filter((p) => Boolean(p && p.mysteryCity));
+  } else if (currentFeedMode === 'duets') {
+    posts = posts.filter((p) => Boolean(p.duetOf || p.mediaType === 'city_versus'));
+  } else if (currentFeedMode === 'bounties') {
+    posts = posts.filter((p) => Boolean(p.bounty));
+  } else if (currentFeedMode === 'capsules') {
+    posts = posts.filter((p) => p.wasTimeCapsule || Boolean(p.unlockAt));
+  } else if (currentFeedMode === 'html') {
+    posts = posts.filter((p) => p.mediaType === 'html_app');
+  } else if (currentFeedMode === 'videos') {
+    posts = posts.filter((p) => p.mediaType === 'video' || p.mediaType === 'video_link' || Boolean(p.externalUrl));
+  } else if (currentFeedMode === 'photos') {
+    posts = posts.filter((p) => ['image', 'carousel', 'before_after'].includes(p.mediaType));
+  } else if (currentFeedMode === 'my_city' && u) {
+    posts = posts.filter((p) => p.cityId === u.homeCity);
+  } else if (currentFeedMode === 'trending') {
+    posts.sort((a, b) => ((b.likes || []).length + (b.tipsTotal || 0)) - ((a.likes || []).length + (a.tipsTotal || 0)));
+  } else if (currentFeedMode === 'cards') {
+    posts = posts.filter((p) => p.mintedCard);
+  } else if (currentFeedMode === 'voice') {
+    posts = posts.filter((p) => !!p.voiceUrl);
+  } else if (currentFeedMode === 'saved') {
+    const savedIds = JSON.parse(localStorage.getItem('remo_saved_posts') || '[]');
+    posts = posts.filter((p) => savedIds.includes(p.id));
+  }
+
+  if (currentFeedCityFilter !== 'all') {
+    posts = posts.filter((p) => p.cityId === currentFeedCityFilter);
+  }
+  if (currentFeedVibeFilter !== 'all') {
+    posts = posts.filter((p) => p.vibe === currentFeedVibeFilter);
+  }
+  if (searchQuery && searchQuery.trim()) {
+    const q = searchQuery.toLowerCase();
+    posts = posts.filter((p) =>
+      (p.caption_en || '').toLowerCase().includes(q) ||
+      (p.caption_fr || '').toLowerCase().includes(q) ||
+      (p.authorName || '').toLowerCase().includes(q) ||
+      (p.cityId || '').toLowerCase().includes(q)
+    );
+  }
+  return posts;
+}
+
+function computeVisibleFeedSignature(searchQuery = '', prefilteredPosts = null) {
+  const lang = REMO_I18N.getLang();
+  const u = REMO_STORE.getCurrentUser();
+  const isAdm = REMO_STORE.isAdminUnlocked();
+  const posts = prefilteredPosts || getFilteredSortedFeedPosts(searchQuery);
+  return `${lang}_${isAdm ? 1 : 0}_${u?.uid || 'guest'}_${u?.homeCity || ''}_${currentFeedMode}_${currentFeedCityFilter}_${currentFeedVibeFilter}_${searchQuery || ''}::` +
+    posts.map((p) => computePostRenderSig(p, u, lang)).join('|');
+}
+
+function toggleMobileFeedLayoutMode() {
+  const isClassic = document.body.classList.toggle('mobile-feed-classic');
+  try {
+    localStorage.setItem('remo_mobile_feed_mode', isClassic ? 'classic' : 'tiktok');
+  } catch (e) {}
+  syncMobileFeedLayoutModeUI();
+  RemoAudio.play('click');
+}
+window.toggleMobileFeedLayoutMode = toggleMobileFeedLayoutMode;
+
+function syncMobileFeedLayoutModeUI() {
+  try {
+    const saved = localStorage.getItem('remo_mobile_feed_mode');
+    if (saved === 'classic') {
+      document.body.classList.add('mobile-feed-classic');
+    } else {
+      document.body.classList.remove('mobile-feed-classic');
+    }
+  } catch (e) {}
+  const btn = document.getElementById('mobileFeedLayoutToggleBtn');
+  if (btn) {
+    const lang = REMO_I18N.getLang();
+    const isClassic = document.body.classList.contains('mobile-feed-classic');
+    btn.innerHTML = isClassic
+      ? `📱 <span>${lang === 'fr' ? 'Mode TikTok' : 'TikTok View'}</span>`
+      : `📰 <span>${lang === 'fr' ? 'Vue Classique' : 'Classic View'}</span>`;
+  }
+}
+
+function renderSocialFeed(searchQuery = '', forceFull = false) {
+  renderStoriesAndBanners();
+  if (typeof renderFeedActiveContestsBanner === 'function') {
+    renderFeedActiveContestsBanner();
+  }
+  syncMobileFeedLayoutModeUI();
+  const grid = document.getElementById('remoPostsGrid');
+  if (!grid) return;
+
+  const lang = REMO_I18N.getLang();
+  const u = REMO_STORE.getCurrentUser();
+  const isAdm = REMO_STORE.isAdminUnlocked();
+  const posts = getFilteredSortedFeedPosts(searchQuery);
+
+  if (posts.length === 0) {
+    window._lastRenderedFeedSignature = 'empty_' + lang + '_' + currentFeedMode + '_' + currentFeedCityFilter + '_' + currentFeedVibeFilter + '_' + searchQuery;
+    grid.innerHTML = `<div class="glass-box" style="grid-column:1/-1;text-align:center;padding:40px;">
+      ${lang === 'fr' ? 'Aucun moment trouvé pour ce filtre. Soyez le premier à publier ! ✨' : 'No moments match this filter yet. Be the first to post! ✨'}
+    </div>`;
+    return;
+  }
+
+  const nextSig = computeVisibleFeedSignature(searchQuery, posts);
+  if (!forceFull && grid.children.length === posts.length && window._lastRenderedFeedSignature === nextSig) {
+    return;
+  }
+  window._lastRenderedFeedSignature = nextSig;
+
+  grid.innerHTML = posts.map((p) => renderSinglePostCardHtml(p, lang, u, isAdm)).join('');
 
   // Asynchronously attach any IndexedDB video/photo/audio Blobs
   RemoMediaDB.hydrateDom(grid);
@@ -1728,7 +1881,8 @@ function toggleLikePost(postId) {
   }
   REMO_STORE.syncPostToCloud(p);
   REMO_STORE.save(true, 'like');
-  renderSocialFeed();
+  rerenderSinglePostCard(p.id);
+  syncHeaderAndSidebars();
 }
 
 function tipPostAuthor(postId) {
@@ -1774,7 +1928,7 @@ function tipPostAuthor(postId) {
   REMO_STORE.save(true, 'tip');
   spawnRemoCoinsFX(8);
   syncHeaderAndSidebars();
-  renderSocialFeed();
+  rerenderSinglePostCard(p.id);
 }
 
 function boostPost24h(postId) {
@@ -2329,8 +2483,10 @@ function voteOnPostPoll(postId, optIdx) {
   p.poll.voters.push(u.uid);
   p.poll.options[optIdx].votes = (p.poll.options[optIdx].votes || 0) + 1;
   REMO_STORE.addCoins(u.uid, 5, 5);
+  REMO_STORE.syncPostToCloud(p);
   REMO_STORE.save(true, 'poll_vote');
-  renderSocialFeed();
+  rerenderSinglePostCard(p.id);
+  syncHeaderAndSidebars();
   remoToast(lang === 'fr' ? '📊 Vote enregistré (+5 🪙) !' : '📊 Poll vote counted (+5 🪙)!', 'coin');
 }
 
@@ -2356,9 +2512,11 @@ function unlockSecretCapsule(postId, freeCityPass = false) {
   }
 
   sc.unlockedBy.push(u.uid);
+  REMO_STORE.syncPostToCloud(p);
   REMO_STORE.save(true, 'capsule_unlock');
   spawnRemoCoinsFX(6);
-  renderSocialFeed();
+  rerenderSinglePostCard(p.id);
+  syncHeaderAndSidebars();
   remoToast(
     lang === 'fr' ? '🔓 Capsule secrète débloquée !' : '🔓 Secret Creator Capsule unlocked!',
     'fanfare'
@@ -2386,7 +2544,7 @@ function reactEmojiToPost(postId, emoji) {
   }
   REMO_STORE.syncPostToCloud(p);
   REMO_STORE.save(true, 'reaction');
-  renderSocialFeed();
+  rerenderSinglePostCard(p.id);
 }
 
 /* ── 4. MULTI-FORMAT CREATOR STUDIO (PHOTO / 60S VIDEO / LIVE HTML / REEL) ── */
@@ -5110,7 +5268,7 @@ window.addEventListener('remo:stateupdate', (ev) => {
     if (opened) window._pendingProfileDeepLink = '';
   }
 
-  // Keep running HTML mini-game iframes & videos uninterrupted when scores, war taps or presence update
+  // Keep running HTML mini-game iframes & videos uninterrupted when scores, war taps, single-post actions or non-feed events update
   if (reason === 'war_pulse') {
     if (typeof renderRightSidebarWidgets === 'function') renderRightSidebarWidgets();
     if (typeof renderMobileCityWarStrip === 'function') renderMobileCityWarStrip();
@@ -5123,6 +5281,16 @@ window.addEventListener('remo:stateupdate', (ev) => {
   }
   if (reason === 'cloud_users') {
     if (typeof renderLivePresenceStrip === 'function') renderLivePresenceStrip();
+    return;
+  }
+  const singlePostOrNonFeedReasons = new Set([
+    'like', 'tip', 'versus_vote', 'versus_claim_bonus', 'admin_conclude_duel',
+    'poll_vote', 'capsule_unlock', 'bounty_feed_claimed', 'reaction', 'card_save',
+    'dm', 'cloud_dms', 'notification', 'notif_read_all', 'city_stock_buy', 'city_stock_sell',
+    'vip_order', 'vip_equip', 'vip_item_added', 'vip_item_del', 'vip_order_delivered',
+    'bounty_new', 'bounty_sub', 'bounty_paid', 'bounty_del'
+  ]);
+  if (singlePostOrNonFeedReasons.has(reason) && currentRemoView === 'feed') {
     return;
   }
 
@@ -6134,8 +6302,8 @@ function adminMarkVipOrderDelivered(orderId) {
 
 /* ── 10. #10 INSTANT 1-CLICK EN ⇄ FR AUTO-TRANSLATE & VIRAL CO-PILOT STUDIO ── */
 function buildPostBilingualPair(p) {
-  const enRaw = (p.caption_en || '').trim();
-  const frRaw = (p.caption_fr || '').trim();
+  const enRaw = (p.caption_en || '').trim().replace(/^(?:🇬🇧|🇫🇷)\s+/u, '');
+  const frRaw = (p.caption_fr || '').trim().replace(/^(?:🇬🇧|🇫🇷)\s+/u, '');
   if (enRaw && frRaw && enRaw !== frRaw) {
     return { en: enRaw, fr: frRaw };
   }
@@ -6146,7 +6314,7 @@ function togglePostAutoTranslate(postId) {
   window._openTranslatedPosts = window._openTranslatedPosts || {};
   window._openTranslatedPosts[postId] = !window._openTranslatedPosts[postId];
   RemoAudio.play('click');
-  renderSocialFeed();
+  rerenderSinglePostCard(postId);
 }
 
 function copilotGenerateViralIdea() {
