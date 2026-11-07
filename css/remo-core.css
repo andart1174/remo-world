@@ -2088,36 +2088,23 @@ button, input, select, textarea {
 
   .left-rail, .right-rail { display: none !important; }
 
-  /* ── 📱 DEFAULT MOBILE FEED: FULL-SCREEN TIKTOK VERTICAL SNAP-SCROLL (1 POST PER SCREEN, 100% VISIBLE) ── */
-  body:not(.mobile-feed-classic):has(#view-feed.active) {
+  /* ── 📱 PERMANENT MOBILE FEED: FULL-SCREEN TIKTOK VERTICAL SNAP-SCROLL (1 POST PER SCREEN, 100% VISIBLE) ── */
+  body:has(#view-feed.active) {
     height: 100dvh !important;
     max-height: 100dvh !important;
     overflow: hidden !important;
   }
-  body:not(.mobile-feed-classic):has(#view-feed.active) .remo-megaphone,
-  body:not(.mobile-feed-classic):has(#view-feed.active) .genesis-fomo-bar,
-  body:not(.mobile-feed-classic):has(#view-feed.active) .world-chest-alert-banner {
+  body:has(#view-feed.active) .remo-megaphone,
+  body:has(#view-feed.active) .genesis-fomo-bar,
+  body:has(#view-feed.active) .world-chest-alert-banner {
     display: none !important;
   }
-  body:not(.mobile-feed-classic):has(#view-feed.active) .remo-shell {
+  body:has(#view-feed.active) .remo-shell {
     padding-bottom: 0 !important;
   }
 
   .mobile-only-layout-btn {
-    display: inline-flex !important;
-    align-items: center;
-    gap: 4px;
-    padding: 5px 9px;
-    margin-bottom: 5px;
-    border-radius: 10px;
-    background: linear-gradient(135deg, rgba(236, 72, 153, 0.22), rgba(56, 189, 248, 0.2));
-    border: 1px solid rgba(244, 114, 182, 0.55);
-    color: #fff;
-    font-size: 0.68rem;
-    font-weight: 800;
-    white-space: nowrap;
-    cursor: pointer;
-    flex-shrink: 0;
+    display: none !important;
   }
 
   #view-feed.active .feed-top-widgets {
@@ -2127,19 +2114,19 @@ button, input, select, textarea {
     flex-shrink: 0;
   }
   #view-feed.active .clean-feed-pulse-toggle {
-    padding: 5px 9px;
-    margin-bottom: 5px;
-    font-size: 0.69rem;
+    padding: 4px 9px;
+    margin-bottom: 4px;
+    font-size: 0.68rem;
     border-radius: 10px;
   }
   #view-feed.active .filter-row {
     gap: 5px;
-    padding-bottom: 3px;
+    padding-bottom: 2px;
     margin-bottom: 2px;
   }
   #view-feed.active .fchip {
     padding: 4px 9px;
-    font-size: 0.69rem;
+    font-size: 0.68rem;
   }
   #view-feed.active .stories-bar { margin-bottom: 4px; padding: 4px; }
   #view-feed.active .story-ring { width: 42px; height: 42px; }
@@ -2148,7 +2135,8 @@ button, input, select, textarea {
   #view-feed.active .time-capsule-vault { padding-bottom: 24px; }
   #view-feed.active .duet-city-pill { bottom: auto; top: 44px; }
 
-  body:not(.mobile-feed-classic) #view-feed.active {
+  #view-feed.active {
+    --tiktok-stage-h: calc(100dvh - var(--header-h) - var(--mb-nav-h) - 70px - env(safe-area-inset-bottom, 0px));
     display: flex !important;
     flex-direction: column !important;
     height: calc(100dvh - var(--header-h) - var(--mb-nav-h) - env(safe-area-inset-bottom, 0px)) !important;
@@ -2156,21 +2144,20 @@ button, input, select, textarea {
     overflow: hidden !important;
   }
 
-  body:not(.mobile-feed-classic) #view-feed.active #feedActiveContestsBanner,
-  body:not(.mobile-feed-classic) #view-feed.active #newCitizenWelcomeBar,
-  body:not(.mobile-feed-classic) #view-feed.active #livePresenceStrip,
-  body:not(.mobile-feed-classic) #view-feed.active #gameChallengeHeroBar {
+  #view-feed.active #feedActiveContestsBanner,
+  #view-feed.active #newCitizenWelcomeBar,
+  #view-feed.active #livePresenceStrip,
+  #view-feed.active #gameChallengeHeroBar {
     display: none !important;
   }
 
-  body:not(.mobile-feed-classic) #view-feed.active .posts-grid {
+  #view-feed.active .posts-grid {
     display: flex !important;
     flex-direction: column !important;
     gap: 0 !important;
-    flex: 1 1 0 !important;
-    min-height: 0 !important;
-    height: 100% !important;
-    max-height: 100% !important;
+    height: var(--tiktok-stage-h) !important;
+    min-height: var(--tiktok-stage-h) !important;
+    max-height: var(--tiktok-stage-h) !important;
     overflow-y: scroll !important;
     overflow-x: hidden !important;
     scroll-snap-type: y mandatory !important;
@@ -2183,12 +2170,12 @@ button, input, select, textarea {
   }
   #view-feed.active .posts-grid::-webkit-scrollbar { display: none; }
 
-  body:not(.mobile-feed-classic) #view-feed.active .post-card {
+  #view-feed.active .post-card {
     width: 100% !important;
-    height: 100% !important;
-    min-height: 100% !important;
-    max-height: 100% !important;
-    flex: 0 0 100% !important;
+    height: var(--tiktok-stage-h) !important;
+    min-height: var(--tiktok-stage-h) !important;
+    max-height: var(--tiktok-stage-h) !important;
+    flex: 0 0 var(--tiktok-stage-h) !important;
     scroll-snap-align: start !important;
     scroll-snap-stop: always !important;
     border-radius: 0 !important;
@@ -2201,12 +2188,12 @@ button, input, select, textarea {
     box-shadow: none !important;
   }
 
-  body:not(.mobile-feed-classic) #view-feed.active .post-head,
-  body:not(.mobile-feed-classic) #view-feed.active .post-body {
+  #view-feed.active .post-head,
+  #view-feed.active .post-body {
     display: none !important;
   }
 
-  body:not(.mobile-feed-classic) #view-feed.active .post-media-wrap {
+  #view-feed.active .post-media-wrap {
     position: absolute !important;
     inset: 0 !important;
     width: 100% !important;
@@ -2216,8 +2203,8 @@ button, input, select, textarea {
     background: #030612 !important;
   }
 
-  body:not(.mobile-feed-classic) #view-feed.active .post-media-wrap img,
-  body:not(.mobile-feed-classic) #view-feed.active .post-media-wrap video {
+  #view-feed.active .post-media-wrap img,
+  #view-feed.active .post-media-wrap video {
     width: 100% !important;
     height: 100% !important;
     max-height: none !important;
@@ -2225,36 +2212,36 @@ button, input, select, textarea {
     border-radius: 0 !important;
   }
 
-  body:not(.mobile-feed-classic) #view-feed.active .post-face-front,
-  body:not(.mobile-feed-classic) #view-feed.active .post-face-back {
+  #view-feed.active .post-face-front,
+  #view-feed.active .post-face-back {
     border-radius: 0 !important;
   }
 
   /* Keep City Versus vote pills clear of the right-side TikTok rail and 100% visible above bottom bar */
-  body:not(.mobile-feed-classic) #view-feed.active .post-card.is-city-versus .versus-city-pill {
-    bottom: 12px !important;
+  #view-feed.active .post-card.is-city-versus .versus-city-pill {
+    bottom: 14px !important;
     top: auto !important;
     z-index: 16 !important;
     font-size: 0.74rem !important;
     padding: 5px 10px !important;
   }
-  body:not(.mobile-feed-classic) #view-feed.active .post-card.is-city-versus .versus-city-pill.right {
+  #view-feed.active .post-card.is-city-versus .versus-city-pill.right {
     right: 54px !important;
   }
 
-  body:not(.mobile-feed-classic) #view-feed.active .tiktok-overlay-info {
+  #view-feed.active .tiktok-overlay-info {
     display: none !important;
   }
 
-  body:not(.mobile-feed-classic) #view-feed.active .tiktok-rail {
+  #view-feed.active .tiktok-rail {
     position: absolute !important;
     right: 6px !important;
-    bottom: 10px !important;
+    bottom: 12px !important;
     z-index: 18 !important;
     display: flex !important;
     flex-direction: column !important;
     align-items: center !important;
-    gap: 5px !important;
+    gap: 4px !important;
   }
 
   .tk-avatar-wrap {
@@ -2264,21 +2251,21 @@ button, input, select, textarea {
     filter: drop-shadow(0 3px 8px rgba(0, 0, 0, 0.7));
   }
   .tk-avatar-wrap .avatar-circle {
-    width: 36px !important;
-    height: 36px !important;
-    font-size: 0.84rem !important;
+    width: 34px !important;
+    height: 34px !important;
+    font-size: 0.82rem !important;
   }
   .tk-avatar-plus {
     position: absolute;
     bottom: -4px;
     left: 50%;
     transform: translateX(-50%);
-    width: 15px;
-    height: 15px;
+    width: 14px;
+    height: 14px;
     border-radius: 50%;
     background: #f43f5e;
     color: #fff;
-    font-size: 0.65rem;
+    font-size: 0.62rem;
     font-weight: 900;
     display: flex;
     align-items: center;
@@ -2292,9 +2279,9 @@ button, input, select, textarea {
     border: 1px solid rgba(255, 255, 255, 0.2);
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
-    border-radius: 12px;
-    width: 40px;
-    padding: 3px 0;
+    border-radius: 11px;
+    width: 38px;
+    padding: 2px 0;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -2314,80 +2301,30 @@ button, input, select, textarea {
     box-shadow: 0 0 12px rgba(244, 63, 94, 0.45);
   }
   .tk-btn .tk-ic {
-    font-size: 0.98rem;
+    font-size: 0.92rem;
     line-height: 1.05;
     filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.65));
   }
   .tk-btn .tk-cnt {
-    font-size: 0.6rem;
+    font-size: 0.58rem;
     font-weight: 800;
     color: #f1f5f9;
     line-height: 1;
   }
   .tk-disc {
-    width: 34px;
-    height: 34px;
+    width: 34px !important;
+    height: 34px !important;
     border-radius: 50%;
     background: radial-gradient(circle, #fbbf24 18%, #1e293b 22%, #090d1f 68%);
-    border: 2px solid rgba(251, 191, 36, 0.65);
-    display: flex;
+    border: 2px solid rgba(251, 191, 36, 0.75);
+    display: flex !important;
     align-items: center;
     justify-content: center;
     font-size: 0.84rem;
     cursor: pointer;
     box-shadow: 0 3px 10px rgba(0, 0, 0, 0.75);
     animation: vinylSpinV60 4s linear infinite;
-  }
-
-  /* ── 📰 OPTIONAL MOBILE CLASSIC INLINE CARD FLOW (body.mobile-feed-classic) ── */
-  body.mobile-feed-classic #view-feed.active .posts-grid {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-    height: auto;
-    overflow-y: visible;
-    padding: 6px 10px 50px;
-    scroll-snap-type: none;
-    width: 100%;
-    box-sizing: border-box;
-  }
-  body.mobile-feed-classic #view-feed.active .post-card {
-    min-height: auto;
-    border-radius: 20px;
-    border: 1px solid rgba(255, 255, 255, 0.09);
-    background: rgba(15, 23, 42, 0.88);
-    backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
-    margin-bottom: 8px;
-    position: relative;
-    overflow: hidden;
-    scroll-snap-align: none;
-    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
-  }
-  body.mobile-feed-classic #view-feed.active .post-head {
-    display: flex !important;
-    padding: 12px 14px;
-  }
-  body.mobile-feed-classic #view-feed.active .post-body {
-    display: flex !important;
-    padding: 12px 14px 16px;
-  }
-  body.mobile-feed-classic #view-feed.active .post-media-wrap {
-    position: relative;
-    inset: auto;
-    width: 100%;
-    max-height: 420px;
-    aspect-ratio: 4 / 5;
-    height: auto;
-  }
-  body.mobile-feed-classic #view-feed.active .post-media-wrap img,
-  body.mobile-feed-classic #view-feed.active .post-media-wrap video {
-    max-height: 420px;
-    object-fit: cover;
-  }
-  body.mobile-feed-classic #view-feed.active .tiktok-overlay-info,
-  body.mobile-feed-classic #view-feed.active .tiktok-rail {
-    display: none !important;
+    flex-shrink: 0;
   }
 
   /* Non-feed views padding on mobile */

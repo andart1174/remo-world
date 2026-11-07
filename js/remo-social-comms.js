@@ -1751,31 +1751,21 @@ function computeVisibleFeedSignature(searchQuery = '', prefilteredPosts = null) 
 }
 
 function toggleMobileFeedLayoutMode() {
-  const isClassic = document.body.classList.toggle('mobile-feed-classic');
+  document.body.classList.remove('mobile-feed-classic');
   try {
-    localStorage.setItem('remo_mobile_feed_mode', isClassic ? 'classic' : 'tiktok');
+    localStorage.removeItem('remo_mobile_feed_mode');
   } catch (e) {}
-  syncMobileFeedLayoutModeUI();
-  RemoAudio.play('click');
 }
 window.toggleMobileFeedLayoutMode = toggleMobileFeedLayoutMode;
 
 function syncMobileFeedLayoutModeUI() {
+  document.body.classList.remove('mobile-feed-classic');
   try {
-    const saved = localStorage.getItem('remo_mobile_feed_mode');
-    if (saved === 'classic') {
-      document.body.classList.add('mobile-feed-classic');
-    } else {
-      document.body.classList.remove('mobile-feed-classic');
-    }
+    localStorage.removeItem('remo_mobile_feed_mode');
   } catch (e) {}
   const btn = document.getElementById('mobileFeedLayoutToggleBtn');
   if (btn) {
-    const lang = REMO_I18N.getLang();
-    const isClassic = document.body.classList.contains('mobile-feed-classic');
-    btn.innerHTML = isClassic
-      ? `📱 <span>${lang === 'fr' ? 'Mode TikTok' : 'TikTok View'}</span>`
-      : `📰 <span>${lang === 'fr' ? 'Vue Classique' : 'Classic View'}</span>`;
+    btn.style.display = 'none';
   }
 }
 
