@@ -4090,9 +4090,13 @@ const REMO_STORE = {
               const mergedVoters = Array.from(new Set([...(cv.voters || []), ...(lv.voters || [])]));
               const mergedClaimed = Array.from(new Set([...(cv.claimedBonus || []), ...(lv.claimedBonus || [])]));
               const mergedSides = Object.assign({}, cv.voterSides || {}, lv.voterSides || {});
+              const sideValues = Object.values(mergedSides);
+              const sideLeft = sideValues.filter((s) => s === 'left').length;
+              const sideRight = sideValues.filter((s) => s === 'right').length;
+              const useExactMap = (sideLeft + sideRight) > 0 && mergedVoters.length <= (sideLeft + sideRight);
               cp.versus = Object.assign({}, lv, cv, {
-                leftVotes: Math.max(Number(cv.leftVotes || 0), Number(lv.leftVotes || 0)),
-                rightVotes: Math.max(Number(cv.rightVotes || 0), Number(lv.rightVotes || 0)),
+                leftVotes: useExactMap ? sideLeft : Math.max(Number(cv.leftVotes || 0), Number(lv.leftVotes || 0), sideLeft),
+                rightVotes: useExactMap ? sideRight : Math.max(Number(cv.rightVotes || 0), Number(lv.rightVotes || 0), sideRight),
                 voters: mergedVoters,
                 voterSides: mergedSides,
                 claimedBonus: mergedClaimed,

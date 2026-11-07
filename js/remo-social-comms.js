@@ -407,45 +407,62 @@ function voteCityVersusDuel(postId, choice, ev) {
   const prevSide = v.voterSides[voterKey] || localStorage.getItem('remo_versus_side_' + p.id) || '';
   const alreadyVoted = v.voters.includes(voterKey) || Boolean(localStorage.getItem('remo_versus_voted_' + p.id));
 
-  if (alreadyVoted && prevSide === choice) {
-    // Ensure vote count is at least 1 for the chosen side if legacy data had 0
-    if (choice === 'left' && (!v.leftVotes || v.leftVotes < 1)) v.leftVotes = 1;
-    if (choice === 'right' && (!v.rightVotes || v.rightVotes < 1)) v.rightVotes = 1;
+  if (alreadyVoted) {
+    const lockedSide = prevSide || choice;
+    if (voterKey) {
+      if (!v.voters.includes(voterKey)) v.voters.push(voterKey);
+      v.voterSides[voterKey] = lockedSide;
+    }
+    localStorage.setItem('remo_versus_voted_' + p.id, '1');
+    localStorage.setItem('remo_versus_side_' + p.id, lockedSide);
+
+    const sideValues = Object.values(v.voterSides || {});
+    const mapLeft = sideValues.filter((s) => s === 'left').length;
+    const mapRight = sideValues.filter((s) => s === 'right').length;
+    if ((mapLeft + mapRight) > 0 && v.voters.length <= (mapLeft + mapRight)) {
+      v.leftVotes = mapLeft;
+      v.rightVotes = mapRight;
+    } else {
+      if (lockedSide === 'left' && (!v.leftVotes || v.leftVotes < 1)) v.leftVotes = 1;
+      if (lockedSide === 'right' && (!v.rightVotes || v.rightVotes < 1)) v.rightVotes = 1;
+    }
     REMO_STORE.syncPostToCloud(p);
     rerenderSinglePostCard(p.id);
     remoToast(t('versus_already_voted'));
     return;
   }
 
-  if (alreadyVoted && prevSide && prevSide !== choice) {
-    // Switching vote from one city to the other
-    if (prevSide === 'left') {
-      v.leftVotes = Math.max(0, (Number(v.leftVotes) || 1) - 1);
-    } else if (prevSide === 'right') {
-      v.rightVotes = Math.max(0, (Number(v.rightVotes) || 1) - 1);
-    }
-  } else if (!v.voters.includes(voterKey)) {
+  if (!v.voters.includes(voterKey)) {
     v.voters.push(voterKey);
   }
-
   v.voterSides[voterKey] = choice;
   localStorage.setItem('remo_versus_voted_' + p.id, '1');
   localStorage.setItem('remo_versus_side_' + p.id, choice);
 
-  if (choice === 'left') {
+  const sideValuesAfter = Object.values(v.voterSides || {});
+  const mapLeftAfter = sideValuesAfter.filter((s) => s === 'left').length;
+  const mapRightAfter = sideValuesAfter.filter((s) => s === 'right').length;
+  if ((mapLeftAfter + mapRightAfter) > 0 && v.voters.length <= (mapLeftAfter + mapRightAfter)) {
+    v.leftVotes = mapLeftAfter;
+    v.rightVotes = mapRightAfter;
+  } else if (choice === 'left') {
     v.leftVotes = (Number(v.leftVotes) || 0) + 1;
-    if (!alreadyVoted) REMO_STORE.addCityScore(v.leftCityId || 'montreal', 50);
   } else {
     v.rightVotes = (Number(v.rightVotes) || 0) + 1;
-    if (!alreadyVoted) REMO_STORE.addCityScore(v.rightCityId || 'paris', 50);
   }
 
-  if (!alreadyVoted && u && u.uid) {
+  if (choice === 'left') {
+    REMO_STORE.addCityScore(v.leftCityId || 'montreal', 50);
+  } else {
+    REMO_STORE.addCityScore(v.rightCityId || 'paris', 50);
+  }
+
+  if (u && u.uid) {
     REMO_STORE.addCoins(u.uid, 10, 10);
   }
   REMO_STORE.syncPostToCloud(p);
   REMO_STORE.save(true, 'versus_vote');
-  if (!alreadyVoted) spawnRemoCoinsFX(10);
+  spawnRemoCoinsFX(10);
   RemoAudio.play('coin');
   try { if (navigator.vibrate) navigator.vibrate(15); } catch (e) {}
 
@@ -613,18 +630,30 @@ function renderCityVersusDuelStage(p, lang) {
   );
   const votedSide = (v.voterSides && voterKey && v.voterSides[voterKey]) || localStorage.getItem('remo_versus_side_' + p.id) || '';
 
-  // Ensure local vote is always reflected in the tally even if a legacy duel was created before cloud vote sync
-  const leftVotes = Math.max(Number(v.leftVotes || 0), votedSide === 'left' ? 1 : 0);
-  const rightVotes = Math.max(Number(v.rightVotes || 0), votedSide === 'right' ? 1 : 0);
+  // Ensure local vote is always reflected in the tally and self-heal any inflated count from voterSides
+  if (voterKey && votedSide) {
+    if (!Array.isArray(v.voters)) v.voters = [];
+    if (!v.voters.includes(voterKey)) v.voters.push(voterKey);
+    if (!v.voterSides) v.voterSides = {};
+    if (!v.voterSides[voterKey]) v.voterSides[voterKey] = votedSide;
+  }
+  const sideValues = Object.values(v.voterSides || {});
+  const mapLeft = sideValues.filter((s) => s === 'left').length;
+  const mapRight = sideValues.filter((s) => s === 'right').length;
+  const voterCount = Array.isArray(v.voters) ? v.voters.length : 0;
+
+  let leftVotes = Number(v.leftVotes || 0);
+  let rightVotes = Number(v.rightVotes || 0);
+  if ((mapLeft + mapRight) > 0 && voterCount <= (mapLeft + mapRight)) {
+    leftVotes = mapLeft;
+    rightVotes = mapRight;
+  } else {
+    leftVotes = Math.max(leftVotes, mapLeft, votedSide === 'left' ? 1 : 0);
+    rightVotes = Math.max(rightVotes, mapRight, votedSide === 'right' ? 1 : 0);
+  }
   if (leftVotes !== Number(v.leftVotes || 0) || rightVotes !== Number(v.rightVotes || 0)) {
     v.leftVotes = leftVotes;
     v.rightVotes = rightVotes;
-    if (voterKey) {
-      if (!Array.isArray(v.voters)) v.voters = [];
-      if (!v.voters.includes(voterKey)) v.voters.push(voterKey);
-      if (!v.voterSides) v.voterSides = {};
-      if (votedSide) v.voterSides[voterKey] = votedSide;
-    }
     if (REMO_STORE && typeof REMO_STORE.syncPostToCloud === 'function') {
       REMO_STORE.syncPostToCloud(p);
     }
