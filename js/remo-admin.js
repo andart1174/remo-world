@@ -31,17 +31,16 @@ function unlockAdminOffice(ev) {
   if (ev) ev.preventDefault();
   const lang = REMO_I18N.getLang();
   const inp = document.getElementById('admPinInput')?.value.trim();
-  const masterPin = REMO_STORE.state.settings.adminPin || '2026';
-  if (inp === masterPin) {
+  if (REMO_STORE.verifyAdminPin(inp)) {
     if (!REMO_STORE.isCurrentUserAdmin()) {
       REMO_STORE.ensureGuestOrCitizen('REMO Founder', 'andart1174@gmail.com', 'montreal', true);
     }
     REMO_STORE.setAdminUnlocked(true);
     checkAdminSession();
     RemoAudio.play('fanfare');
-    admToast(lang === 'fr' ? '🛡️ Bureau Exécutif Admin & Mode Dieu déverrouillés !' : '🛡️ Admin Executive Office & God-Mode unlocked!');
+    admToast(lang === 'fr' ? '🛡️ Bureau Exécutif Admin déverrouillé !' : '🛡️ Admin Executive Office unlocked!');
   } else {
-    alert(lang === 'fr' ? 'Code PIN incorrect ! (Défaut : 2026)' : 'Invalid Admin PIN! (Default: 2026)');
+    alert(lang === 'fr' ? 'Code PIN Administrateur incorrect !' : 'Invalid Admin PIN!');
   }
 }
 
@@ -1329,7 +1328,8 @@ function adminSaveSystemSettings() {
 
   const newPin = document.getElementById('admNewPin')?.value.trim();
   if (newPin && newPin.length >= 4) {
-    REMO_STORE.state.settings.adminPin = newPin;
+    REMO_STORE.state.settings.adminPinHash = REMO_STORE._hashAdminPin(newPin);
+    delete REMO_STORE.state.settings.adminPin;
     REMO_STORE.save(true, 'pin');
   }
   admToast('⚙️ System Settings saved!');

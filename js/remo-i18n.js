@@ -452,7 +452,7 @@ const REMO_DICT = {
     adm_lock_btn: '🔒 Lock Office',
     adm_unlock_title: '🛡️ Admin Executive Access',
     adm_unlock_sub: 'Enter your Master Admin PIN to unlock full control of REMO & the City Card Studio.',
-    adm_pin_ph: 'Admin PIN (Default: 2026)',
+    adm_pin_ph: 'Enter Master Admin PIN',
     adm_unlock_btn: 'Unlock Command Center',
     adm_tab_overview: '📊 Overview & Live',
     adm_tab_cards: '🎴 City Card Studio',
@@ -488,7 +488,7 @@ const REMO_DICT = {
 
     // Urban Geo-Vaults (Real-World AR Treasure Hunts)
     radar_vaults_btn: '🗺️ 🎁 World Treasure Hunt',
-    radar_bury_vault_btn: '👑 🎁 Plant Secret Chest (God-Mode)',
+    radar_bury_vault_btn: '👑 🎁 Plant Secret Chest',
     vault_address_search_lbl: '🔍 Address / Street / Global Location:',
     vault_btn_find_gps: '🔍 Find GPS',
     vault_modal_title: '💎 World City Geo-Vault — AR Treasure Hunt',
@@ -611,9 +611,9 @@ const REMO_DICT = {
     pred_opt_yes: 'YES',
     pred_opt_no: 'NO',
 
-    // 🎁 Idea 3: World Treasure Hunt & Admin God-Mode
-    adm_drop_chest_btn: '👑 🎁 Plant Secret Chest (God-Mode)',
-    adm_drop_chest_title: '👑 Plant Secret Treasure Chest (Admin God-Mode)',
+    // 🎁 Idea 3: World Treasure Hunt & Admin Drops
+    adm_drop_chest_btn: '👑 🎁 Plant Secret Chest',
+    adm_drop_chest_title: '👑 Plant Secret Treasure Chest (Admin)',
     adm_drop_chest_sub: 'Drop a real-time secret chest anywhere on Earth. Set loot, clue, and trigger world alert!',
     chest_tier_wood: '🪵 Urban Wooden Chest (100 🪙)',
     chest_tier_gold: '🪙 Founder Gold Chest (250 🪙)',
@@ -1305,7 +1305,7 @@ const REMO_DICT = {
     adm_lock_btn: '🔒 Verrouiller Bureau',
     adm_unlock_title: '🛡️ Accès Exécutif Administrateur',
     adm_unlock_sub: 'Entrez votre code PIN Maître pour contrôler tout REMO et le Studio de Cartes des Villes.',
-    adm_pin_ph: 'Code PIN Admin (Défaut : 2026)',
+    adm_pin_ph: 'Entrez le code PIN Admin',
     adm_unlock_btn: 'Déverrouiller le Bureau',
     adm_tab_overview: '📊 Vue Globale & Live',
     adm_tab_cards: '🎴 Studio Cartes Villes',
@@ -1341,7 +1341,7 @@ const REMO_DICT = {
 
     // Urban Geo-Vaults (Real-World AR Treasure Hunts)
     radar_vaults_btn: '🗺️ 🎁 Chasse aux Trésors Mondiale',
-    radar_bury_vault_btn: '👑 🎁 Déposer un Coffre Secret (God-Mode)',
+    radar_bury_vault_btn: '👑 🎁 Déposer un Coffre Secret',
     vault_address_search_lbl: '🔍 Adresse / Rue / Lieu dans le Monde :',
     vault_btn_find_gps: '🔍 Trouver GPS',
     vault_modal_title: '💎 Géo-Coffre Urbain — Chasse aux Trésors AR',
@@ -1464,9 +1464,9 @@ const REMO_DICT = {
     pred_opt_yes: 'OUI',
     pred_opt_no: 'NON',
 
-    // 🎁 Idea 3: World Treasure Hunt & Admin God-Mode
-    adm_drop_chest_btn: '👑 🎁 Déposer un Coffre Secret (God-Mode)',
-    adm_drop_chest_title: '👑 Déposer un Coffre au Trésor Secret (God-Mode)',
+    // 🎁 Idea 3: World Treasure Hunt & Admin Drops
+    adm_drop_chest_btn: '👑 🎁 Déposer un Coffre Secret',
+    adm_drop_chest_title: '👑 Déposer un Coffre au Trésor Secret (Admin)',
     adm_drop_chest_sub: 'Déposez un coffre secret en temps réel n’importe où sur Terre. Définissez le butin, l’énigme et l’alerte mondiale !',
     chest_tier_wood: '🪵 Coffre en Bois Urbain (100 🪙)',
     chest_tier_gold: '🪙 Coffre d’Or Fondateur (250 🪙)',

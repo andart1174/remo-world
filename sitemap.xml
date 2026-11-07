@@ -56,42 +56,6 @@
     <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/guess-the-city.html"/>
   </url>
   <url>
-    <loc>https://remoworld.com/terms.html</loc>
-    <lastmod>2026-11-03</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.70</priority>
-    <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/terms.html"/>
-    <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/terms.html"/>
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/terms.html"/>
-  </url>
-  <url>
-    <loc>https://remoworld.com/fr/terms.html</loc>
-    <lastmod>2026-11-03</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.70</priority>
-    <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/terms.html"/>
-    <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/terms.html"/>
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/terms.html"/>
-  </url>
-  <url>
-    <loc>https://remoworld.com/privacy.html</loc>
-    <lastmod>2026-11-03</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.70</priority>
-    <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/privacy.html"/>
-    <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/privacy.html"/>
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/privacy.html"/>
-  </url>
-  <url>
-    <loc>https://remoworld.com/fr/privacy.html</loc>
-    <lastmod>2026-11-03</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.70</priority>
-    <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/privacy.html"/>
-    <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/privacy.html"/>
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/privacy.html"/>
-  </url>
-  <url>
     <loc>https://remoworld.com/fr/guess-the-city.html</loc>
     <lastmod>2026-11-02</lastmod>
     <changefreq>weekly</changefreq>

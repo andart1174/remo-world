@@ -2423,6 +2423,10 @@ function switchCreateStudioTab(tabId) {
     remoToast(REMO_I18N.getLang() === 'fr' ? 'La création de Beats est réservée aux administrateurs !' : 'Beat creation is reserved for administrators!');
     tabId = 'photo';
   }
+  if (tabId === 'html' && !isAdm) {
+    remoToast(REMO_I18N.getLang() === 'fr' ? 'Le studio HTML Live est réservé aux administrateurs !' : 'Live HTML Studio is reserved for administrators!');
+    tabId = 'photo';
+  }
   activeCreateStudioTab = tabId;
   document.querySelectorAll('.studio-tab-btn').forEach((b) => {
     b.classList.toggle('active', b.getAttribute('data-studio-tab') === tabId);
@@ -2511,7 +2515,9 @@ function openCreatePostModal(prefillTag = '') {
   if (versusTabBtn) versusTabBtn.style.display = isAdm ? 'inline-flex' : 'none';
   const beatTabBtn = document.getElementById('studioTabBeatBtn');
   if (beatTabBtn) beatTabBtn.style.display = isAdm ? 'inline-flex' : 'none';
-  if (!isAdm && (activeCreateStudioTab === 'versus' || activeCreateStudioTab === 'beat')) {
+  const htmlTabBtn = document.getElementById('studioTabHtmlBtn');
+  if (htmlTabBtn) htmlTabBtn.style.display = isAdm ? 'inline-flex' : 'none';
+  if (!isAdm && (activeCreateStudioTab === 'versus' || activeCreateStudioTab === 'beat' || activeCreateStudioTab === 'html')) {
     switchCreateStudioTab('photo');
   }
 
@@ -2934,6 +2940,11 @@ async function publishNewRemoPost() {
     mediaUrl = await uploadMediaToCloudOrDataUrl(pendingStudioVideoBlob, 'posts');
     videoDuration = pendingStudioVideoDuration || 60;
   } else if (activeCreateStudioTab === 'html') {
+    const isAdm = REMO_STORE.isAdminUnlocked() || REMO_STORE.isCurrentUserAdmin();
+    if (!isAdm) {
+      remoToast(lang === 'fr' ? 'Seul l’administrateur peut publier une application HTML Live !' : 'Only the administrator can publish a Live HTML mini-app!');
+      return;
+    }
     const rawHtml = document.getElementById('createHtmlCodeArea')?.value.trim() || '';
     if (!rawHtml) {
       remoToast(lang === 'fr' ? 'Entrez votre code HTML/JS ou choisissez un modèle !' : 'Please enter HTML/JS code or choose a template!');
@@ -4356,11 +4367,10 @@ async function submitUniversalAuth(ev) {
   if (isTargetingAdmin) {
     const pin = prompt(
       lang === 'fr'
-        ? '🔐 Compte Fondateur & Administrateur (andart1174@gmail.com)\nEntrez le code PIN Admin (défaut : 2026) :'
-        : '🔐 Founder & Admin Account (andart1174@gmail.com)\nEnter Admin Master PIN (default: 2026):'
+        ? '🔐 Compte Fondateur & Administrateur\nEntrez votre code PIN Maître :'
+        : '🔐 Founder & Admin Account\nEnter your Master Admin PIN:'
     );
-    const masterPin = REMO_STORE.state?.settings?.adminPin || '2026';
-    if (!pin || pin.trim() !== masterPin) {
+    if (!pin || !REMO_STORE.verifyAdminPin(pin)) {
       remoToast(lang === 'fr' ? '❌ Code PIN Admin incorrect ! Connexion refusée.' : '❌ Invalid Admin PIN! Access denied.');
       return;
     }
@@ -4956,12 +4966,14 @@ document.addEventListener('DOMContentLoaded', () => {
     else if (e.key.toLowerCase() === 'a') switchRemoView('arena');
   });
 
-  // 🌐 Holographic Onboarding Welcome Splash Screen (Auto-trigger for new users or ?welcome=1)
-  setTimeout(() => {
-    if (typeof showWelcomeSplashScreen === 'function') {
-      showWelcomeSplashScreen();
-    }
-  }, 400);
+  // 🌐 Holographic Onboarding Welcome Splash Screen (Only when explicitly requested via ?welcome=1 or ?onboarding=1)
+  if (params.has('welcome') || params.has('onboarding')) {
+    setTimeout(() => {
+      if (typeof showWelcomeSplashScreen === 'function') {
+        showWelcomeSplashScreen(true);
+      }
+    }, 400);
+  }
 });
 
 window.addEventListener('remo:langchange', () => {
@@ -5064,18 +5076,18 @@ function openAdminQuickModal(preselectUid = '') {
 
 function unlockAdminGodModeInline() {
   const lang = REMO_I18N.getLang();
+  if (!REMO_STORE.isCurrentUserAdmin()) {
+    remoToast(lang === 'fr' ? '🔒 Accès réservé au compte Fondateur.' : '🔒 Access restricted to Founder account.');
+    return;
+  }
   const pin = document.getElementById('admQuickPinInput')?.value.trim();
-  const master = REMO_STORE.state.settings.adminPin || '2026';
-  if (pin !== master) {
+  if (!REMO_STORE.verifyAdminPin(pin)) {
     remoToast(lang === 'fr' ? '❌ Code PIN Admin incorrect !' : '❌ Invalid Admin PIN!');
     return;
   }
-  if (!REMO_STORE.isCurrentUserAdmin()) {
-    REMO_STORE.ensureGuestOrCitizen('REMO Founder', 'andart1174@gmail.com', 'montreal', true);
-  }
   REMO_STORE.setAdminUnlocked(true);
   RemoAudio.play('fanfare');
-  remoToast(lang === 'fr' ? '👑 Mode Admin activé sur tout REMO !' : '👑 Admin God-Mode unlocked across REMO!', 'fanfare');
+  remoToast(lang === 'fr' ? '👑 Mode Admin activé sur tout REMO !' : '👑 Admin Mode unlocked across REMO!', 'fanfare');
   syncHeaderAndSidebars();
   openAdminQuickModal();
   renderSocialFeed();

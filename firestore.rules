@@ -14,7 +14,6 @@ service cloud.firestore {
     function isAdmin() {
       return isAuthenticated() && (
         request.auth.token.email == 'andart1174@gmail.com' ||
-        request.auth.uid == 'u_admin_founder' ||
         request.auth.token.admin == true
       );
     }
@@ -34,10 +33,20 @@ service cloud.firestore {
       );
     }
 
-    // 2. Citizen Profiles & Passports
+    // 2. Citizen Profiles & Passports (Role & Coin Delta Protected)
     match /remo_users/{userId} {
       allow read: if true;
-      allow create, update: if isOwner(userId) || isAdmin();
+      allow create: if isAdmin() || (
+        isAuthenticated() &&
+        request.auth.uid == userId &&
+        (!('role' in request.resource.data) || request.resource.data.role != 'admin') &&
+        (!('coins' in request.resource.data) || request.resource.data.coins <= 1000)
+      );
+      allow update: if isAdmin() || (
+        isOwner(userId) &&
+        (!('role' in request.resource.data) || request.resource.data.role == resource.data.role || request.resource.data.role != 'admin') &&
+        (!('coins' in request.resource.data) || !('coins' in resource.data) || (request.resource.data.coins - resource.data.coins) <= 2500)
+      );
       allow delete: if isOwner(userId) || isAdmin();
     }
 

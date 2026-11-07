@@ -151,11 +151,11 @@
       <span class="happy-hour-pill" id="hdrHappyHourBadge" style="display:none;" data-i18n="happy_hour_badge">⚡ 2X REWARDS HAPPY HOUR</span>
 
       <button class="btn-ghost" id="btnRadioToggle" onclick="toggleHeaderRadio()">📻 Radio</button>
-      <button class="btn-ghost" id="btnHeaderStoryToggle" onclick="openStoriesHubModal()" title="24h City Stories" style="position:relative;display:inline-flex;align-items:center;gap:5px;border-color:rgba(236,72,153,0.45);">
+      <button class="btn-ghost hide-mobile" id="btnHeaderStoryToggle" onclick="openStoriesHubModal()" title="24h City Stories" style="position:relative;display:inline-flex;align-items:center;gap:5px;border-color:rgba(236,72,153,0.45);">
         <span data-i18n="hdr_story_btn">📸 Story</span>
         <span id="hdrStoryCountBadge" style="background:linear-gradient(135deg,#ec4899,#f59e0b);color:#fff;font-size:0.65rem;font-weight:900;border-radius:99px;padding:1px 6px;line-height:1.2;">4</span>
       </button>
-      <button class="btn-ghost" id="btnWishingWellToggle" onclick="openWishingWellModal()" title="Wishing Well" data-i18n="hdr_wishing_well">⛲ Fontaine</button>
+      <button class="btn-ghost hide-mobile" id="btnWishingWellToggle" onclick="openWishingWellModal()" title="Wishing Well" data-i18n="hdr_wishing_well">⛲ Fontaine</button>
 
       <!-- 🔔 Notifications Bell Hub -->
       <button class="btn-ghost notif-bell-btn" id="btnHeaderNotif" onclick="toggleNotificationsModal()" title="Notifications" style="position:relative;padding:7px 11px;">
@@ -164,7 +164,7 @@
       </button>
 
       <!-- 🔥 Daily Passport Streak Pill -->
-      <button type="button" class="streak-hdr-pill" id="hdrStreakBtn" onclick="openDailyStreakModal()" title="Daily Passport Streak">
+      <button type="button" class="streak-hdr-pill hide-mobile" id="hdrStreakBtn" onclick="openDailyStreakModal()" title="Daily Passport Streak">
         <span>🔥</span>
         <span id="hdrStreakVal">1d</span>
       </button>
@@ -183,7 +183,7 @@
   </header>
 
   <!-- 🔥 Genesis Passports Urgency Ticker (#0001–#0500 Allocation) -->
-  <div class="genesis-fomo-bar" id="genesisFomoBar">
+  <div class="genesis-fomo-bar" id="genesisFomoBar" style="display:none;">
     <div class="genesis-fomo-inner" onclick="switchRemoView('passport')" title="Genesis Passport Allocation" style="display:flex;align-items:center;gap:8px;flex:1;cursor:pointer;">
       <span class="genesis-fomo-fire">🔥</span>
       <span class="genesis-fomo-txt">
@@ -356,6 +356,37 @@
         </div>
 
         <div class="posts-grid" id="remoPostsGrid"></div>
+
+        <!-- 🌐 Crawlable SEO World Cities & Free Tools Directory -->
+        <footer class="glass-box" style="margin-top:24px;padding:16px 18px;border-color:rgba(56,189,248,0.2);" aria-label="REMO World Cities Directory">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px;">
+            <strong style="font-family:'Orbitron',sans-serif;font-size:0.82rem;color:#38bdf8;">🌐 REMO WORLD CITIES &amp; FREE WEB TOOLS</strong>
+            <div style="display:flex;gap:10px;font-size:0.75rem;">
+              <a href="cities/index.html" style="color:#fde047;text-decoration:none;font-weight:700;">All 24 Cities (EN) →</a>
+              <a href="fr/cities/index.html" style="color:#38bdf8;text-decoration:none;font-weight:700;">24 Villes (FR) →</a>
+            </div>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">
+            <a href="world-radio.html" class="fchip" style="text-decoration:none;font-size:0.73rem;">📻 Live World Radio</a>
+            <a href="boarding-pass.html" class="fchip" style="text-decoration:none;font-size:0.73rem;">🎫 9:16 Boarding Pass</a>
+            <a href="guess-the-city.html" class="fchip" style="text-decoration:none;font-size:0.73rem;">🕵️‍♂️ Guess The City</a>
+            <a href="beat-maker.html" class="fchip" style="text-decoration:none;font-size:0.73rem;">🎛️ 4D Beat Maker</a>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;font-size:0.72rem;">
+            <a href="cities/montreal.html" style="color:#94a3b8;text-decoration:none;padding:3px 8px;background:rgba(15,23,42,0.6);border-radius:6px;">⚜️ Montréal</a>
+            <a href="cities/paris.html" style="color:#94a3b8;text-decoration:none;padding:3px 8px;background:rgba(15,23,42,0.6);border-radius:6px;">🗼 Paris</a>
+            <a href="cities/chisinau.html" style="color:#94a3b8;text-decoration:none;padding:3px 8px;background:rgba(15,23,42,0.6);border-radius:6px;">🍇 Chișinău</a>
+            <a href="cities/bucharest.html" style="color:#94a3b8;text-decoration:none;padding:3px 8px;background:rgba(15,23,42,0.6);border-radius:6px;">🏛️ Bucharest</a>
+            <a href="cities/london.html" style="color:#94a3b8;text-decoration:none;padding:3px 8px;background:rgba(15,23,42,0.6);border-radius:6px;">🎡 London</a>
+            <a href="cities/newyork.html" style="color:#94a3b8;text-decoration:none;padding:3px 8px;background:rgba(15,23,42,0.6);border-radius:6px;">🗽 New York</a>
+            <a href="cities/tokyo.html" style="color:#94a3b8;text-decoration:none;padding:3px 8px;background:rgba(15,23,42,0.6);border-radius:6px;">⛩️ Tokyo</a>
+            <a href="cities/dubai.html" style="color:#94a3b8;text-decoration:none;padding:3px 8px;background:rgba(15,23,42,0.6);border-radius:6px;">🐪 Dubai</a>
+            <a href="cities/rome.html" style="color:#94a3b8;text-decoration:none;padding:3px 8px;background:rgba(15,23,42,0.6);border-radius:6px;">🏛️ Rome</a>
+            <a href="cities/barcelona.html" style="color:#94a3b8;text-decoration:none;padding:3px 8px;background:rgba(15,23,42,0.6);border-radius:6px;">☀️ Barcelona</a>
+            <a href="cities/berlin.html" style="color:#94a3b8;text-decoration:none;padding:3px 8px;background:rgba(15,23,42,0.6);border-radius:6px;">🐻 Berlin</a>
+            <a href="cities/seoul.html" style="color:#94a3b8;text-decoration:none;padding:3px 8px;background:rgba(15,23,42,0.6);border-radius:6px;">🏮 Seoul</a>
+          </div>
+        </footer>
       </div>
 
       <!-- 2. REMO EARTH™ LIVE RADAR MAP -->
@@ -367,7 +398,7 @@
               <p style="font-size:0.82rem;color:var(--muted);margin-top:3px;" data-i18n="radar_subtitle"></p>
             </div>
             <div style="display:flex;gap:8px;flex-wrap:wrap;">
-              <button class="btn-cyber btn-gold" id="btnRadarBuryVault" style="display:none;background:linear-gradient(135deg,#f59e0b,#fbbf24);color:#0f172a;font-weight:900;box-shadow:0 0 16px rgba(245,158,11,0.5);" onclick="openBuryGeoVaultModal()" data-i18n="radar_bury_vault_btn">👑 🎁 Plant Secret Chest (God-Mode)</button>
+              <button class="btn-cyber btn-gold" id="btnRadarBuryVault" style="display:none;background:linear-gradient(135deg,#f59e0b,#fbbf24);color:#0f172a;font-weight:900;box-shadow:0 0 16px rgba(245,158,11,0.5);" onclick="openBuryGeoVaultModal()" data-i18n="radar_bury_vault_btn">👑 🎁 Plant Secret Chest</button>
               <button class="btn-cyber" style="background:linear-gradient(135deg,#06b6d4,#3b82f6);font-weight:900;box-shadow:0 0 16px rgba(6,182,212,0.4);" onclick="locateNearestGeoVault()" data-i18n="radar_vaults_btn">🗺️ 🎁 World Treasure Hunt (<span id="radarVaultsBadge">6</span>)</button>
               <button class="btn-cyber" style="background:linear-gradient(135deg,#10b981,#059669);" onclick="openAddUserCityModal()" data-i18n="add_city_btn">🌍 + Add Missing City (+75 🪙)</button>
               <button class="btn-ghost" onclick="locateMeOnRadar()" data-i18n="radar_near_me">📍 Near Me (GPS)</button>
@@ -794,7 +825,7 @@
         <button class="btn-ghost" onclick="switchRemoView('bottles')" style="border-color:#38bdf8;color:#7dd3fc;">🍾 <span data-i18n="nav_bottles">City Bottle</span></button>
         <button class="btn-ghost" onclick="switchRemoView('wheel')">🎡 <span data-i18n="nav_wheel">Lucky Spin</span></button>
         <button class="btn-ghost" onclick="document.getElementById('mobileHubModal').classList.remove('open');openRemoRadioModal();" style="border-color:#10b981;color:#6ee7b7;"><span id="mbRadioBtnTxt">📻 Radio du Monde</span></button>
-        <button class="btn-ghost" id="mbHubAdminGodBtn" style="display:none;" onclick="document.getElementById('mobileHubModal').classList.remove('open');openAdminQuickModal();">👑 Admin God-Mode</button>
+        <button class="btn-ghost" id="mbHubAdminGodBtn" style="display:none;" onclick="document.getElementById('mobileHubModal').classList.remove('open');openAdminQuickModal();">👑 Admin Studio</button>
         <a href="admin.html" id="mbHubAdminOfficeBtn" class="btn-cyber btn-gold" style="display:none;justify-content:center;">🛡️ Admin Office</a>
         <button class="btn-ghost" onclick="document.getElementById('mobileHubModal').classList.remove('open');userSignOutAction();" style="border-color:#f43f5e;color:#fda4af;grid-column:1/-1;">🚪 Déconnexion / Sign Out</button>
       </div>
@@ -1150,7 +1181,7 @@
         <button type="button" class="studio-tab-btn active" data-studio-tab="photo" onclick="switchCreateStudioTab('photo')" data-i18n="create_tab_photo">📷 Photo Studio</button>
         <button type="button" class="studio-tab-btn" data-studio-tab="video" onclick="switchCreateStudioTab('video')" data-i18n="create_tab_video">🎬 Video (Max 60s)</button>
         <button type="button" class="studio-tab-btn" data-studio-tab="beat" id="studioTabBeatBtn" style="display:none;" onclick="switchCreateStudioTab('beat')" data-i18n="create_tab_beat">🎛️ Beat Studio</button>
-        <button type="button" class="studio-tab-btn" data-studio-tab="html" onclick="switchCreateStudioTab('html')" data-i18n="create_tab_html">💻 Live HTML Code</button>
+        <button type="button" class="studio-tab-btn" data-studio-tab="html" id="studioTabHtmlBtn" style="display:none;" onclick="switchCreateStudioTab('html')" data-i18n="create_tab_html">💻 Live HTML Code</button>
         <button type="button" class="studio-tab-btn" data-studio-tab="art" onclick="switchCreateStudioTab('art')" data-i18n="create_tab_art">🏙️ City Poster</button>
         <button type="button" class="studio-tab-btn" data-studio-tab="versus" id="studioTabVersusBtn" style="display:none;" onclick="switchCreateStudioTab('versus')" data-i18n="create_tab_versus">👑 ⚔️ City Versus Duel</button>
       </div>
@@ -1964,7 +1995,7 @@
       <form onsubmit="submitBuryGeoVault(event)">
         <div style="background:rgba(245,158,11,0.12);border:1px dashed #f59e0b;border-radius:12px;padding:10px 14px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
           <div>
-            <div style="font-weight:900;color:#fbbf24;font-size:0.85rem;">👑 God-Mode Quick Drop</div>
+            <div style="font-weight:900;color:#fbbf24;font-size:0.85rem;">👑 Admin Quick Drop</div>
             <div style="font-size:0.75rem;color:#cbd5e1;">Click anywhere on the radar map to pinpoint exact coordinates!</div>
           </div>
           <button type="button" class="btn-cyber btn-gold" onclick="startAdminPickChestLocation()" style="font-size:0.78rem;padding:6px 12px;">🎯 Click Location on Map</button>
@@ -2150,13 +2181,13 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 
   <!-- REMO Modular Engines -->
-  <script src="js/remo-i18n.js?v=78"></script>
-  <script src="js/remo-cities-data.js?v=78"></script>
-  <script src="js/remo-store.js?v=78"></script>
-  <script src="js/remo-card-engine.js?v=78"></script>
-  <script src="js/remo-radar-arena.js?v=78"></script>
-  <script src="js/remo-social-comms.js?v=78"></script>
-  <script src="js/remo-radio-engine.js?v=78"></script>
+  <script src="js/remo-i18n.js?v=79"></script>
+  <script src="js/remo-cities-data.js?v=79"></script>
+  <script src="js/remo-store.js?v=79"></script>
+  <script src="js/remo-card-engine.js?v=79"></script>
+  <script src="js/remo-radar-arena.js?v=79"></script>
+  <script src="js/remo-social-comms.js?v=79"></script>
+  <script src="js/remo-radio-engine.js?v=79"></script>
 
   <noscript>
     <nav aria-label="REMO World Static Directory" style="padding:20px;background:#050816;color:#f8fafc;">

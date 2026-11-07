@@ -239,16 +239,16 @@ footer{margin-top:34px;padding-top:20px;border-top:1px solid rgba(255,255,255,0.
               ▶️ Listen
             </button>
           </div>
-          <div class="radio-item" data-q="cyber-lofi remo (zero-fail) offline synth live real-time chord synthesizer (100% offline) synthétiseur d’accords en temps réel (100% hors-ligne)">
+          <div class="radio-item" data-q="cyber-lofi remo 4d cyber lofi cyber-lofi synth, chillwave &amp; futuristic beats 24/7 synthé cyber-lofi, chillwave &amp; beats futuristes 24/7">
             <div>
-              <strong style="color:#fff;">🤖 Cyber-Lofi REMO (Zero-Fail)</strong>
-              <span class="pill" style="padding:2px 8px;font-size:0.68rem;margin-left:6px;">OFFLINE SYNTH</span>
-              <div style="font-size:0.8rem;color:var(--muted);">Live Real-Time Chord Synthesizer (100% Offline)</div>
+              <strong style="color:#fff;">🤖 Cyber-Lofi REMO 4D</strong>
+              <span class="pill" style="padding:2px 8px;font-size:0.68rem;margin-left:6px;">CYBER LOFI</span>
+              <div style="font-size:0.8rem;color:var(--muted);">Cyber-Lofi Synth, Chillwave &amp; Futuristic Beats 24/7</div>
             </div>
             <button type="button" class="radio-btn" data-seo-rbtn="1"
               data-play-lbl="▶️ Listen"
               data-stop-lbl="⏸️ Pause"
-              onclick="playSeoStream('remo_synth_offline','internal://synth','',this)">
+              onclick="playSeoStream('remo_synth_offline','https://ice1.somafm.com/vaporwaves-128-mp3','https://ice1.somafm.com/groovesalad-128-mp3',this)">
               ▶️ Listen
             </button>
           </div>
@@ -629,69 +629,18 @@ footer{margin-top:34px;padding-top:20px;border-top:1px solid rgba(255,255,255,0.
 (function(){
   var audio = new Audio();
   audio.preload = 'none';
-  audio.setAttribute('playsinline', '');
   var activeId = '';
-  var activeBtn = null;
-
-  function getAllButtons(){
-    return Array.prototype.slice.call(document.querySelectorAll('[data-seo-rbtn]'));
-  }
-
-  function updateCarMediaSession(btn, isPlaying){
-    if(!('mediaSession' in navigator) || !btn) return;
-    try {
-      var item = btn.closest('.radio-item');
-      var titleEl = item ? item.querySelector('strong') : null;
-      var descEl = item ? item.querySelector('div div') : null;
-      var stTitle = titleEl ? titleEl.textContent.trim() : 'REMO World Radio';
-      var stDesc = descEl ? descEl.textContent.trim() : '38 Live World Cities Radio';
-      var base = (window.location && window.location.origin && window.location.origin.indexOf('http') === 0) ? window.location.origin : 'https://remoworld.com';
-      navigator.mediaSession.metadata = new MediaMetadata({
-        title: stTitle,
-        artist: 'REMO World • remoworld.com',
-        album: stDesc,
-        artwork: [
-          { src: base + '/img/remo_brand_coin.png', sizes: '512x512', type: 'image/png' },
-          { src: base + '/img/remo_coin_front.png', sizes: '512x512', type: 'image/png' },
-          { src: base + '/img/remo_icon_512.png', sizes: '512x512', type: 'image/png' },
-          { src: base + '/img/remo_icon_192.png', sizes: '192x192', type: 'image/png' }
-        ]
-      });
-      navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
-      var stepStation = function(dir){
-        var btns = getAllButtons();
-        if(!btns.length) return;
-        var idx = activeBtn ? btns.indexOf(activeBtn) : 0;
-        var nextIdx = (idx + dir + btns.length) % btns.length;
-        btns[nextIdx].click();
-      };
-      navigator.mediaSession.setActionHandler('play', function(){ if(activeBtn && audio.paused){ audio.play().catch(function(){}); updateCarMediaSession(activeBtn, true); } });
-      navigator.mediaSession.setActionHandler('pause', function(){ audio.pause(); updateCarMediaSession(activeBtn, false); });
-      navigator.mediaSession.setActionHandler('previoustrack', function(){ stepStation(-1); });
-      navigator.mediaSession.setActionHandler('nexttrack', function(){ stepStation(1); });
-      navigator.mediaSession.setActionHandler('seekbackward', function(){ stepStation(-1); });
-      navigator.mediaSession.setActionHandler('seekforward', function(){ stepStation(1); });
-    } catch(e){}
-  }
-
-  audio.addEventListener('playing', function(){
-    if(activeBtn) updateCarMediaSession(activeBtn, true);
-  });
-
   window.playSeoStream = function(id, url, fallback, btn){
     if(activeId === id && !audio.paused){
       audio.pause();
       activeId = '';
-      updateCarMediaSession(btn, false);
-      getAllButtons().forEach(function(b){ b.classList.remove('playing'); b.textContent = b.getAttribute('data-play-lbl'); });
+      document.querySelectorAll('[data-seo-rbtn]').forEach(function(b){ b.classList.remove('playing'); b.textContent = b.getAttribute('data-play-lbl'); });
       return;
     }
     activeId = id;
-    activeBtn = btn;
-    getAllButtons().forEach(function(b){ b.classList.remove('playing'); b.textContent = b.getAttribute('data-play-lbl'); });
+    document.querySelectorAll('[data-seo-rbtn]').forEach(function(b){ b.classList.remove('playing'); b.textContent = b.getAttribute('data-play-lbl'); });
     btn.classList.add('playing');
     btn.textContent = btn.getAttribute('data-stop-lbl');
-    updateCarMediaSession(btn, true);
     var triedFallback = false;
     audio.onerror = function(){
       if(!triedFallback && fallback && fallback !== url){
@@ -701,9 +650,7 @@ footer{margin-top:34px;padding-top:20px;border-top:1px solid rgba(255,255,255,0.
       }
     };
     audio.src = url;
-    audio.play().then(function(){
-      updateCarMediaSession(btn, true);
-    }).catch(function(){
+    audio.play().catch(function(){
       if(!triedFallback && fallback){ triedFallback = true; audio.src = fallback; audio.play().catch(function(){}); }
     });
   };
