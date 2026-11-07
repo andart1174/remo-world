@@ -115,7 +115,7 @@
   <noscript><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"></noscript>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
 
-  <link rel="stylesheet" href="css/remo-core.css?v=84">
+  <link rel="stylesheet" href="css/remo-core.css?v=85">
 </head>
 <body>
 
@@ -1069,6 +1069,51 @@
           </button>
           <button type="button" class="btn-ghost" style="justify-content:center;padding:9px;border-color:#38bdf8;color:#7dd3fc;" onclick="copyMyReferralInviteLink()" data-i18n="boarding_copy_btn">
             🔗 Copier Mon Lien
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 📲 Viral Post & City Duel 9:16 Story Share Studio Modal -->
+  <div class="remo-modal-backdrop" id="viralPostShareModal" onclick="if(event.target===this)closeViralPostShareModal()">
+    <div class="remo-modal" style="max-width:440px;text-align:center;">
+      <div class="modal-hdr">
+        <b id="viralPostModalTitle" style="font-family:'Orbitron',sans-serif;color:#38bdf8;font-size:0.92rem;">📲 Share &amp; 9:16 Viral Story (+25 🪙)</b>
+        <button class="modal-close" onclick="closeViralPostShareModal()">✕</button>
+      </div>
+      <p id="viralPostModalSub" style="font-size:0.78rem;color:var(--muted);margin-bottom:10px;">
+        Share this City Moment or Duel on TikTok, Instagram Stories, WhatsApp or Telegram &amp; earn +25 🪙!
+      </p>
+
+      <div style="display:flex;justify-content:center;margin-bottom:12px;">
+        <canvas id="viralPostStoryCanvas" width="540" height="960" style="width:100%;max-width:235px;aspect-ratio:9/16;border-radius:16px;box-shadow:0 14px 36px rgba(0,0,0,0.85);border:2px solid rgba(56,189,248,0.55);background:#050816;"></canvas>
+      </div>
+
+      <div style="display:flex;gap:8px;flex-direction:column;">
+        <button type="button" id="viralPostNativeShareBtn" class="btn-cyber" style="width:100%;justify-content:center;padding:10px;background:linear-gradient(135deg,#0284c7,#06b6d4);color:#fff;font-size:0.84rem;" onclick="shareViralPostStoryNative()">
+          📲 Share 9:16 Story (TikTok / Insta / Native)
+        </button>
+
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;">
+          <button type="button" class="btn-ghost" style="justify-content:center;padding:8px 4px;font-size:0.74rem;border-color:rgba(16,185,129,0.55);color:#6ee7b7;" onclick="shareViralPostToSocial('whatsapp')">
+            🟢 WhatsApp
+          </button>
+          <button type="button" class="btn-ghost" style="justify-content:center;padding:8px 4px;font-size:0.74rem;border-color:rgba(56,189,248,0.55);color:#7dd3fc;" onclick="shareViralPostToSocial('telegram')">
+            ✈️ Telegram
+          </button>
+          <button type="button" class="btn-ghost" style="justify-content:center;padding:8px 4px;font-size:0.74rem;border-color:rgba(96,165,250,0.55);color:#93c5fd;" onclick="shareViralPostToSocial('facebook')">
+            📘 Facebook
+          </button>
+          <button type="button" class="btn-cyber btn-gold" style="justify-content:center;padding:8px 4px;font-size:0.74rem;" onclick="downloadViralPostStoryPNG()">
+            📥 PNG 9:16
+          </button>
+        </div>
+
+        <div style="display:flex;gap:6px;align-items:center;margin-top:2px;">
+          <input type="text" id="viralPostDirectLinkInput" class="remo-input" readonly style="flex:1;padding:7px 9px;font-size:0.75rem;color:#cbd5e1;" onclick="this.select()">
+          <button type="button" id="viralPostCopyLinkBtn" class="btn-ghost" style="padding:7px 11px;font-size:0.76rem;border-color:#fbbf24;color:#fde047;white-space:nowrap;" onclick="copyViralPostDirectLink()">
+            🔗 Copy (+25 🪙)
           </button>
         </div>
       </div>
@@ -2128,13 +2173,13 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 
   <!-- REMO Modular Engines -->
-  <script src="js/remo-i18n.js?v=84"></script>
-  <script src="js/remo-cities-data.js?v=84"></script>
-  <script src="js/remo-store.js?v=84"></script>
-  <script src="js/remo-card-engine.js?v=84"></script>
-  <script src="js/remo-radar-arena.js?v=84"></script>
-  <script src="js/remo-social-comms.js?v=84"></script>
-  <script src="js/remo-radio-engine.js?v=84"></script>
+  <script src="js/remo-i18n.js?v=85"></script>
+  <script src="js/remo-cities-data.js?v=85"></script>
+  <script src="js/remo-store.js?v=85"></script>
+  <script src="js/remo-card-engine.js?v=85"></script>
+  <script src="js/remo-radar-arena.js?v=85"></script>
+  <script src="js/remo-social-comms.js?v=85"></script>
+  <script src="js/remo-radio-engine.js?v=85"></script>
 
   <noscript>
     <nav aria-label="REMO World Static Directory" style="padding:20px;background:#050816;color:#f8fafc;">

@@ -1682,10 +1682,12 @@ window.rerenderSinglePostCard = rerenderSinglePostCard;
 
 function getFilteredSortedFeedPosts(searchQuery = '') {
   const u = REMO_STORE.getCurrentUser();
+  const deepId = window._deepLinkedPostId || '';
   let posts = (REMO_STORE.state.posts || []).filter((p) => p && p.mediaType !== 'beat_loop');
 
-  // Official Pinned posts float #1, then Boosted posts, then newest
+  // Deep-linked shared post (?post=ID) floats #1 on arrival, then Official Pinned posts, then Boosted posts, then newest
   posts.sort((a, b) =>
+    (deepId && b.id === deepId ? 1 : 0) - (deepId && a.id === deepId ? 1 : 0) ||
     (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) ||
     (b.boosted ? 1 : 0) - (a.boosted ? 1 : 0) ||
     b.createdAt - a.createdAt
@@ -2289,30 +2291,458 @@ function toggleHtmlCodeView(postId, btnEl) {
 }
 
 let currentFullscreenPostId = null;
+window._activeViralSharePostId = null;
 
-function sharePostLink(postId) {
+function getViralPostShareData(postId) {
   const lang = REMO_I18N.getLang();
-  const post = (REMO_STORE.state.posts || []).find((p) => p.id === postId);
-  const cleanId = encodeURIComponent(postId);
+  const isFr = lang === 'fr';
+  const post = (REMO_STORE.state.posts || []).find((p) => p && p.id === postId);
+  const u = REMO_STORE.getCurrentUser();
+  const refCode = (u && (u.referralCode || u.passportNum)) ? String(u.referralCode || ('REMO-' + u.passportNum)) : '';
+  const cleanId = encodeURIComponent(postId || '');
   let baseOrigin = (window.location && window.location.origin && window.location.origin !== 'null') ? window.location.origin : 'https://remoworld.com';
   if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
     baseOrigin = 'https://remoworld.com';
   }
-  const url = `${baseOrigin}/?post=${cleanId}#post_${cleanId}`;
-  const title = post ? (lang === 'fr' ? (post.caption_fr || post.caption_en) : (post.caption_en || post.caption_fr)) : 'REMO World';
+  const refParam = refCode ? `&ref=${encodeURIComponent(refCode)}` : '';
+  const url = `${baseOrigin}/?post=${cleanId}${refParam}#post_${cleanId}`;
 
-  if (navigator.share) {
-    navigator.share({
-      url: url
-    }).then(() => {
-      remoToast(lang === 'fr' ? '🔗 Lien partagé avec succès !' : '🔗 Link shared successfully!');
-    }).catch(() => {
-      copyPostUrlToClipboard(url, lang);
-    });
-  } else {
-    copyPostUrlToClipboard(url, lang);
+  let title = 'REMO World 🌐 4D World Cities';
+  let shareText = isFr
+    ? '🌐 Découvre ce moment en direct sur REMO World et gagne +100 🪙 !'
+    : '🌐 Check out this live city moment on REMO World & claim +100 🪙!';
+
+  if (post && post.versus) {
+    const cA = getCityById(post.versus.leftCityId || 'montreal');
+    const cB = getCityById(post.versus.rightCityId || 'paris');
+    const nA = getCityName(cA, lang);
+    const nB = getCityName(cB, lang);
+    title = `⚔️ ${cA.flag} ${nA} vs ${cB.flag} ${nB} — REMO City Duel`;
+    shareText = isFr
+      ? `⚔️ Duel des Villes en direct : ${cA.flag} ${nA} vs ${cB.flag} ${nB} sur REMO World ! Vote pour notre ville (+10 🪙) 👉`
+      : `⚔️ Live City Duel: ${cA.flag} ${nA} vs ${cB.flag} ${nB} on REMO World! Vote for our city (+10 🪙) 👉`;
+  } else if (post) {
+    const city = getCityById(post.cityId || 'montreal');
+    const cityName = getCityName(city, lang);
+    const cap = isFr ? (post.caption_fr || post.caption_en || '') : (post.caption_en || post.caption_fr || '');
+    const shortCap = cap.length > 90 ? cap.slice(0, 87) + '...' : cap;
+    title = `${city.flag} ${cityName} • @${post.authorName || 'Citizen'} on REMO World`;
+    shareText = shortCap
+      ? `${city.flag} ${cityName} — "${shortCap}" 🌐 REMO World 👉`
+      : (isFr ? `${city.flag} En direct de ${cityName} sur REMO World 👉` : `${city.flag} Live from ${cityName} on REMO World 👉`);
+  }
+
+  return { post, url, title, shareText, lang, isFr, u };
+}
+
+function rewardViralShareOnce(postId) {
+  if (!postId) return;
+  const key = 'remo_viral_shared_' + postId;
+  if (localStorage.getItem(key)) return;
+  localStorage.setItem(key, '1');
+  const u = REMO_STORE.getCurrentUser();
+  if (u && u.uid) {
+    REMO_STORE.addCoins(u.uid, 25, 15);
+    REMO_STORE.save(true, 'viral_post_share');
+    if (typeof spawnRemoCoinsFX === 'function') spawnRemoCoinsFX(12);
+    if (typeof syncHeaderAndSidebars === 'function') syncHeaderAndSidebars();
   }
 }
+
+function sharePostLink(postId) {
+  window._activeViralSharePostId = postId;
+  const modal = document.getElementById('viralPostShareModal');
+  if (modal) {
+    openViralPostShareModal(postId);
+    return;
+  }
+  const { url, lang } = getViralPostShareData(postId);
+  copyPostUrlToClipboard(url, lang);
+}
+
+function openViralPostShareModal(postId) {
+  window._activeViralSharePostId = postId;
+  const modal = document.getElementById('viralPostShareModal');
+  if (!modal) return;
+  const { post, url, isFr } = getViralPostShareData(postId);
+
+  const titleEl = document.getElementById('viralPostModalTitle');
+  const subEl = document.getElementById('viralPostModalSub');
+  const nativeBtn = document.getElementById('viralPostNativeShareBtn');
+  const copyBtn = document.getElementById('viralPostCopyLinkBtn');
+  const linkInp = document.getElementById('viralPostDirectLinkInput');
+
+  if (titleEl) {
+    titleEl.textContent = isFr
+      ? '📲 Partager & Story Virale 9:16 (+25 🪙)'
+      : '📲 Share & 9:16 Viral Story (+25 🪙)';
+  }
+  if (subEl) {
+    subEl.textContent = post && post.versus
+      ? (isFr
+          ? 'Invitez vos amis à voter dans ce Duel de Villes sur TikTok, Instagram, WhatsApp ou Telegram et gagnez +25 🪙 !'
+          : 'Invite friends to vote in this City Duel on TikTok, Instagram, WhatsApp or Telegram & earn +25 🪙!')
+      : (isFr
+          ? 'Partagez ce moment sur TikTok, Instagram Stories, WhatsApp ou Telegram et gagnez +25 🪙 !'
+          : 'Share this City Moment on TikTok, Instagram Stories, WhatsApp or Telegram & earn +25 🪙!');
+  }
+  if (nativeBtn) {
+    nativeBtn.textContent = isFr
+      ? '📲 Partager Story 9:16 (TikTok / Insta / Natif)'
+      : '📲 Share 9:16 Story (TikTok / Insta / Native)';
+  }
+  if (copyBtn) {
+    copyBtn.textContent = isFr ? '🔗 Copier (+25 🪙)' : '🔗 Copy (+25 🪙)';
+  }
+  if (linkInp) {
+    linkInp.value = url;
+  }
+
+  modal.classList.add('open');
+  drawViralPostStoryCanvas(postId);
+}
+window.openViralPostShareModal = openViralPostShareModal;
+
+function closeViralPostShareModal() {
+  const modal = document.getElementById('viralPostShareModal');
+  if (modal) modal.classList.remove('open');
+}
+window.closeViralPostShareModal = closeViralPostShareModal;
+
+function drawViralPostStoryCanvas(postId) {
+  const cv = document.getElementById('viralPostStoryCanvas');
+  if (!cv) return;
+  const ctx = cv.getContext('2d');
+  const W = 540;
+  const H = 960;
+  cv.width = W;
+  cv.height = H;
+
+  const { post, isFr, u } = getViralPostShareData(postId);
+  const lang = isFr ? 'fr' : 'en';
+
+  const renderFrame = (imgLeft, imgRight) => {
+    // 1. Cyber Dark Background
+    const bgGrad = ctx.createLinearGradient(0, 0, W, H);
+    bgGrad.addColorStop(0, '#050816');
+    bgGrad.addColorStop(0.5, '#0b132b');
+    bgGrad.addColorStop(1, '#050816');
+    ctx.fillStyle = bgGrad;
+    ctx.fillRect(0, 0, W, H);
+
+    // Outer neon border
+    ctx.strokeStyle = 'rgba(56, 189, 248, 0.55)';
+    ctx.lineWidth = 4;
+    ctx.strokeRect(14, 14, W - 28, H - 28);
+
+    // 2. Top Brand Header
+    ctx.fillStyle = '#38bdf8';
+    ctx.font = '900 22px Orbitron, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('🌐 REMOWORLD.COM', W / 2, 62);
+
+    ctx.fillStyle = '#fde047';
+    ctx.font = '800 14px sans-serif';
+    ctx.fillText(
+      post && post.versus
+        ? (isFr ? '⚔️ DUEL OFFICIEL DES VILLES DU MONDE' : '⚔️ OFFICIAL WORLD CITY DUEL')
+        : (isFr ? '✨ LE MÉTAVERS SOCIAL DES VILLES 4D' : '✨ THE 4D WORLD CITIES SOCIAL NETWORK'),
+      W / 2,
+      88
+    );
+
+    if (post && post.versus) {
+      const v = post.versus;
+      const cA = getCityById(v.leftCityId || 'montreal');
+      const cB = getCityById(v.rightCityId || 'paris');
+      const nA = getCityName(cA, lang).toUpperCase();
+      const nB = getCityName(cB, lang).toUpperCase();
+      const lVotes = Number(v.leftVotes || 0);
+      const rVotes = Number(v.rightVotes || 0);
+      const tot = lVotes + rVotes;
+      const pA = tot > 0 ? Math.round((lVotes / tot) * 100) : 50;
+      const pB = tot > 0 ? (100 - pA) : 50;
+
+      // Split Image Stage (Y: 115 to 645)
+      const stageX = 32;
+      const stageY = 115;
+      const stageW = W - 64;
+      const stageH = 520;
+      const halfW = stageW / 2;
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.roundRect(stageX, stageY, stageW, stageH, 22);
+      ctx.clip();
+
+      if (imgLeft) {
+        ctx.drawImage(imgLeft, stageX, stageY, halfW, stageH);
+      } else {
+        ctx.fillStyle = '#1e293b';
+        ctx.fillRect(stageX, stageY, halfW, stageH);
+      }
+      if (imgRight) {
+        ctx.drawImage(imgRight, stageX + halfW, stageY, halfW, stageH);
+      } else {
+        ctx.fillStyle = '#0f172a';
+        ctx.fillRect(stageX + halfW, stageY, halfW, stageH);
+      }
+
+      // Center Lightning Divider
+      ctx.strokeStyle = '#fbbf24';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.moveTo(W / 2, stageY);
+      ctx.lineTo(W / 2, stageY + stageH);
+      ctx.stroke();
+
+      // Dark bottom gradient inside stage
+      const botGrad = ctx.createLinearGradient(0, stageY + stageH - 130, 0, stageY + stageH);
+      botGrad.addColorStop(0, 'rgba(5,8,22,0)');
+      botGrad.addColorStop(1, 'rgba(5,8,22,0.92)');
+      ctx.fillStyle = botGrad;
+      ctx.fillRect(stageX, stageY + stageH - 130, stageW, 130);
+      ctx.restore();
+
+      // VS Bolt Circle
+      ctx.fillStyle = '#050816';
+      ctx.beginPath();
+      ctx.arc(W / 2, stageY + stageH / 2, 28, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#fbbf24';
+      ctx.lineWidth = 3;
+      ctx.stroke();
+      ctx.fillStyle = '#fde047';
+      ctx.font = '900 22px Orbitron, sans-serif';
+      ctx.fillText('⚡', W / 2, stageY + stageH / 2 + 8);
+
+      // City Names & Percentages inside stage bottom
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '900 18px Orbitron, sans-serif';
+      ctx.fillText(`${cA.flag} ${nA}`, stageX + halfW / 2, stageY + stageH - 52);
+      ctx.fillText(`${cB.flag} ${nB}`, stageX + halfW + halfW / 2, stageY + stageH - 52);
+
+      ctx.fillStyle = '#38bdf8';
+      ctx.font = '900 26px Orbitron, sans-serif';
+      ctx.fillText(`${pA}%`, stageX + halfW / 2, stageY + stageH - 18);
+      ctx.fillStyle = '#f43f5e';
+      ctx.fillText(`${pB}%`, stageX + halfW + halfW / 2, stageY + stageH - 18);
+
+      // Score Bar below stage
+      const barY = 660;
+      const barW = W - 64;
+      ctx.fillStyle = '#f43f5e';
+      ctx.fillRect(32, barY, barW, 14);
+      ctx.fillStyle = '#38bdf8';
+      ctx.fillRect(32, barY, Math.round((barW * pA) / 100), 14);
+
+      ctx.fillStyle = '#f8fafc';
+      ctx.font = '900 22px Orbitron, sans-serif';
+      ctx.fillText(
+        isFr ? 'QUELLE VILLE GAGNE CE DUEL ?' : 'WHICH CITY WINS THIS DUEL?',
+        W / 2,
+        718
+      );
+    } else {
+      // Regular Post 9:16 Card
+      const city = getCityById((post && post.cityId) || 'montreal');
+      const cityName = getCityName(city, lang).toUpperCase();
+      const stageX = 32;
+      const stageY = 115;
+      const stageW = W - 64;
+      const stageH = 490;
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.roundRect(stageX, stageY, stageW, stageH, 22);
+      ctx.clip();
+      if (imgLeft) {
+        ctx.drawImage(imgLeft, stageX, stageY, stageW, stageH);
+      } else {
+        ctx.fillStyle = '#1e293b';
+        ctx.fillRect(stageX, stageY, stageW, stageH);
+      }
+      const botGrad = ctx.createLinearGradient(0, stageY + stageH - 120, 0, stageY + stageH);
+      botGrad.addColorStop(0, 'rgba(5,8,22,0)');
+      botGrad.addColorStop(1, 'rgba(5,8,22,0.92)');
+      ctx.fillStyle = botGrad;
+      ctx.fillRect(stageX, stageY + stageH - 120, stageW, 120);
+      ctx.restore();
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '900 22px Orbitron, sans-serif';
+      ctx.fillText(`${city.flag} ${cityName}`, W / 2, stageY + stageH - 46);
+      ctx.fillStyle = '#38bdf8';
+      ctx.font = '800 16px sans-serif';
+      ctx.fillText(`@${(post && post.authorName) || 'REMO Citizen'}`, W / 2, stageY + stageH - 18);
+
+      const cap = post ? (isFr ? (post.caption_fr || post.caption_en || '') : (post.caption_en || post.caption_fr || '')) : '';
+      const shortCap = cap.length > 68 ? cap.slice(0, 65) + '...' : cap;
+      ctx.fillStyle = '#e2e8f0';
+      ctx.font = '700 17px sans-serif';
+      ctx.fillText(shortCap || (isFr ? 'En direct sur REMO World' : 'Live on REMO World'), W / 2, 655);
+
+      ctx.fillStyle = '#fde047';
+      ctx.font = '900 18px Orbitron, sans-serif';
+      ctx.fillText(
+        isFr ? '24 VILLES • RADIO LIVE • PASSEPORT 4D' : '24 CITIES • LIVE RADIO • 4D PASSPORT',
+        W / 2,
+        705
+      );
+    }
+
+    // 3. Call-To-Action Viral Footer Box
+    ctx.fillStyle = 'rgba(56, 189, 248, 0.14)';
+    ctx.strokeStyle = '#38bdf8';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.roundRect(36, 755, W - 72, 130, 18);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '900 19px Orbitron, sans-serif';
+    ctx.fillText(
+      post && post.versus
+        ? (isFr ? '🗳️ VOTEZ EN DIRECT SUR :' : '🗳️ VOTE LIVE NOW AT:')
+        : (isFr ? '🌍 REJOIGNEZ LA VILLE SUR :' : '🌍 JOIN YOUR CITY LIVE AT:'),
+      W / 2,
+      795
+    );
+
+    ctx.fillStyle = '#fde047';
+    ctx.font = '900 28px Orbitron, sans-serif';
+    ctx.fillText('REMOWORLD.COM', W / 2, 835);
+
+    const inviterCode = (u && (u.referralCode || u.passportNum)) ? String(u.referralCode || ('REMO-' + u.passportNum)) : 'REMO-0001';
+    ctx.fillStyle = '#7dd3fc';
+    ctx.font = '800 14px sans-serif';
+    ctx.fillText(
+      isFr
+        ? `🎁 Code Invité : ${inviterCode} (+100 🪙 Bonus Gratuits)`
+        : `🎁 Invite Code: ${inviterCode} (+100 🪙 Free Welcome Bonus)`,
+      W / 2,
+      868
+    );
+
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = '700 12px sans-serif';
+    ctx.fillText('TikTok • Instagram Stories • WhatsApp • REMO 4D World', W / 2, 922);
+  };
+
+  // Initial immediate draw
+  renderFrame(null, null);
+
+  // Load images asynchronously if available
+  const loadImg = (src) => new Promise((resolve) => {
+    if (!src) return resolve(null);
+    const im = new Image();
+    im.crossOrigin = 'anonymous';
+    im.onload = () => resolve(im);
+    im.onerror = () => resolve(null);
+    im.src = src;
+  });
+
+  if (post && post.versus) {
+    const v = post.versus;
+    const cA = getCityById(v.leftCityId || 'montreal');
+    const cB = getCityById(v.rightCityId || 'paris');
+    const srcA = v.leftMedia || generateCityPostVisualDataUrl(cA.id, getCityName(cA, 'en'));
+    const srcB = v.rightMedia || generateCityPostVisualDataUrl(cB.id, getCityName(cB, 'en'));
+    Promise.all([loadImg(srcA), loadImg(srcB)]).then(([imA, imB]) => {
+      renderFrame(imA, imB);
+    });
+  } else if (post) {
+    const city = getCityById(post.cityId || 'montreal');
+    const src = (post.mediaUrl && !String(post.mediaUrl).startsWith('idb://') && post.mediaType === 'image')
+      ? post.mediaUrl
+      : (post.thumbnailUrl || generateCityPostVisualDataUrl(city.id, getCityName(city, 'en')));
+    loadImg(src).then((im) => {
+      renderFrame(im, null);
+    });
+  }
+}
+
+async function shareViralPostStoryNative() {
+  const postId = window._activeViralSharePostId;
+  const { url, title, shareText, isFr } = getViralPostShareData(postId);
+  const cv = document.getElementById('viralPostStoryCanvas');
+  rewardViralShareOnce(postId);
+
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    try { await navigator.clipboard.writeText(url); } catch (e) {}
+  }
+
+  if (cv && navigator.share) {
+    try {
+      const blob = await new Promise((res) => cv.toBlob(res, 'image/png'));
+      if (blob) {
+        const file = new File([blob], `REMO_Story_${postId || 'moment'}.png`, { type: 'image/png' });
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          await navigator.share({
+            files: [file],
+            title,
+            text: `${shareText} ${url}`
+          });
+          remoToast(isFr ? '📲 Story 9:16 partagée ! +25 🪙' : '📲 9:16 Story shared! +25 🪙', 'coin');
+          return;
+        }
+      }
+      await navigator.share({ title, text: shareText, url });
+      remoToast(isFr ? '🔗 Lien partagé avec succès ! +25 🪙' : '🔗 Link shared successfully! +25 🪙', 'coin');
+      return;
+    } catch (e) {}
+  }
+  downloadViralPostStoryPNG();
+}
+window.shareViralPostStoryNative = shareViralPostStoryNative;
+
+function downloadViralPostStoryPNG() {
+  const postId = window._activeViralSharePostId;
+  const { isFr } = getViralPostShareData(postId);
+  const cv = document.getElementById('viralPostStoryCanvas');
+  if (!cv) return;
+  rewardViralShareOnce(postId);
+  try {
+    const a = document.createElement('a');
+    a.download = `REMO_Story_9x16_${postId || Date.now()}.png`;
+    a.href = cv.toDataURL('image/png');
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    remoToast(isFr ? '📥 Story 9:16 HD téléchargée ! Prête pour TikTok / Insta (+25 🪙)' : '📥 9:16 HD Story downloaded! Ready for TikTok / Insta (+25 🪙)', 'coin');
+  } catch (e) {
+    copyViralPostDirectLink();
+  }
+}
+window.downloadViralPostStoryPNG = downloadViralPostStoryPNG;
+
+function shareViralPostToSocial(platform) {
+  const postId = window._activeViralSharePostId;
+  const { url, shareText } = getViralPostShareData(postId);
+  rewardViralShareOnce(postId);
+  const fullMsg = `${shareText} ${url}`;
+  let targetUrl = '';
+  if (platform === 'whatsapp') {
+    targetUrl = `https://wa.me/?text=${encodeURIComponent(fullMsg)}`;
+  } else if (platform === 'telegram') {
+    targetUrl = `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(shareText)}`;
+  } else if (platform === 'facebook') {
+    targetUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`;
+  }
+  if (targetUrl) {
+    window.open(targetUrl, '_blank', 'noopener,noreferrer');
+  }
+}
+window.shareViralPostToSocial = shareViralPostToSocial;
+
+function copyViralPostDirectLink() {
+  const postId = window._activeViralSharePostId;
+  const { url, lang } = getViralPostShareData(postId);
+  rewardViralShareOnce(postId);
+  copyPostUrlToClipboard(url, lang);
+}
+window.copyViralPostDirectLink = copyViralPostDirectLink;
 
 function copyPostUrlToClipboard(url, lang) {
   if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -5128,13 +5558,31 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   const targetPost = params.get('post') || (window.location.hash ? window.location.hash.replace('#post_', '').replace('#', '') : null);
   if (targetPost) {
+    window._deepLinkedPostId = targetPost;
+    currentFeedMode = 'all';
+    currentFeedCityFilter = 'all';
+    renderSocialFeed('', true);
     const scrollToTargetPost = () => {
+      renderSocialFeed('', true);
       const card = document.getElementById(`post_card_${targetPost}`);
       if (card) {
         card.scrollIntoView({ behavior: 'smooth', block: 'center' });
         card.style.transition = 'all 0.5s ease';
         card.style.boxShadow = '0 0 35px rgba(56, 189, 248, 0.7)';
         setTimeout(() => { if (card) card.style.boxShadow = ''; }, 3500);
+      }
+      if (!window._deepLinkToastShown) {
+        const pObj = (REMO_STORE.state.posts || []).find((x) => x && x.id === targetPost);
+        if (pObj) {
+          window._deepLinkToastShown = true;
+          const isFrNow = REMO_I18N.getLang() === 'fr';
+          remoToast(
+            pObj.versus
+              ? (isFrNow ? '⚔️ Duel de Villes en direct ! Touchez une ville pour voter (+10 🪙) !' : '⚔️ Live City Duel! Tap a city photo to cast your vote (+10 🪙)!')
+              : (isFrNow ? '🌐 Moment de ville partagé en direct sur REMO World !' : '🌐 Shared live City Moment on REMO World!'),
+            'coin'
+          );
+        }
       }
     };
     setTimeout(scrollToTargetPost, 600);
@@ -7461,8 +7909,8 @@ function showWelcomeSplashScreen(force = false) {
   const params = new URLSearchParams(window.location.search);
   const hasWelcomeParam = params.has('welcome') || params.has('onboarding');
   const hasRefParam = params.has('ref');
-  const isDirectSeoEntry = params.get('from') === 'seo' || params.has('open');
-  if (!force && isDirectSeoEntry && !hasWelcomeParam && !hasRefParam) {
+  const isDirectSeoEntry = params.get('from') === 'seo' || params.has('open') || params.has('post');
+  if (!force && (params.has('post') || (isDirectSeoEntry && !hasWelcomeParam && !hasRefParam))) {
     localStorage.setItem('remo_welcome_splash_seen', '1');
     return;
   }
