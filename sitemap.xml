@@ -11,6 +11,24 @@
     <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/"/>
   </url>
   <url>
+    <loc>https://remoworld.com/world-ranking.html</loc>
+    <lastmod>2026-11-08</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.95</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/world-ranking.html"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/world-ranking.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/world-ranking.html"/>
+  </url>
+  <url>
+    <loc>https://remoworld.com/fr/world-ranking.html</loc>
+    <lastmod>2026-11-08</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.95</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/world-ranking.html"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/world-ranking.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/world-ranking.html"/>
+  </url>
+  <url>
     <loc>https://remoworld.com/city-versus.html</loc>
     <lastmod>2026-11-08</lastmod>
     <changefreq>daily</changefreq>
