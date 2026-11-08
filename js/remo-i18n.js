@@ -880,7 +880,8 @@ const REMO_DICT = {
     contact_sent_toast: '✅ Message delivered directly to REMO Administration! Watch your 🔔 Notifications & 💌 Messenger for the reply.',
     amb_diploma_btn: '🏅 Official City Ambassador Diploma (+25 🪙)',
     amb_modal_title: '🏅 Official City Ambassador 9:16 Diploma',
-    amb_modal_sub: 'Customize & share your Official City Ambassador Diploma on Facebook groups, WhatsApp, TikTok or Instagram Stories (+25 🪙)!',
+    amb_modal_sub: 'Official Sovereign Diploma locked to your Home City & Earned Rank. Add your photo and share on Facebook, WhatsApp, TikTok or Instagram (+25 🪙)!',
+    amb_upload_photo_btn: '📷 Add My Photo to Diploma',
     amb_share_native: '📲 Share 9:16 Diploma (TikTok / Insta / Native)'
   },
 
@@ -1759,7 +1760,8 @@ const REMO_DICT = {
     contact_sent_toast: '✅ Message transmis directement à l’Administration REMO ! Surveillez vos Notifications 🔔 et votre Messagerie 💌.',
     amb_diploma_btn: '🏅 Diplôme d’Ambassadeur de Ville (+25 🪙)',
     amb_modal_title: '🏅 Diplôme Officiel d’Ambassadeur 9:16',
-    amb_modal_sub: 'Personnalisez et partagez votre Diplôme Officiel d’Ambassadeur sur les groupes Facebook, WhatsApp, TikTok ou Instagram (+25 🪙) !',
+    amb_modal_sub: 'Diplôme Souverain Officiel certifié pour votre Ville et votre Rang réel. Ajoutez votre photo et partagez sur Facebook, WhatsApp, TikTok ou Instagram (+25 🪙) !',
+    amb_upload_photo_btn: '📷 Ajouter Ma Photo au Diplôme',
     amb_share_native: '📲 Partager le Diplôme 9:16 (TikTok / Insta / Natif)'
   }
 };

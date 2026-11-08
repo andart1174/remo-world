@@ -2440,7 +2440,26 @@ function drawViralPostStoryCanvas(postId) {
     }
   };
 
+  const roundRectSafe = (x, y, w, h, r) => {
+    const rad = Math.min(r, w / 2, h / 2);
+    ctx.beginPath();
+    if (typeof ctx.roundRect === 'function') {
+      ctx.roundRect(x, y, w, h, rad);
+    } else {
+      ctx.moveTo(x + rad, y);
+      ctx.arcTo(x + w, y, x + w, y + h, rad);
+      ctx.arcTo(x + w, y + h, x, y + h, rad);
+      ctx.arcTo(x, y + h, x, y, rad);
+      ctx.arcTo(x, y, x + w, y, rad);
+      ctx.closePath();
+    }
+  };
+
   const renderFrame = (imgLeft, imgRight) => {
+    // Reset canvas dimensions before drawing to clear any prior CORS taint state
+    cv.width = W;
+    cv.height = H;
+
     // 1. Cyber Dark Background
     const bgGrad = ctx.createLinearGradient(0, 0, W, H);
     bgGrad.addColorStop(0, '#050816');
@@ -2490,8 +2509,7 @@ function drawViralPostStoryCanvas(postId) {
       const halfW = stageW / 2;
 
       ctx.save();
-      ctx.beginPath();
-      ctx.roundRect(stageX, stageY, stageW, stageH, 22);
+      roundRectSafe(stageX, stageY, stageW, stageH, 22);
       ctx.clip();
 
       if (!drawCoverImg(imgLeft, stageX, stageY, halfW, stageH)) {
@@ -2568,8 +2586,7 @@ function drawViralPostStoryCanvas(postId) {
       const stageH = 490;
 
       ctx.save();
-      ctx.beginPath();
-      ctx.roundRect(stageX, stageY, stageW, stageH, 22);
+      roundRectSafe(stageX, stageY, stageW, stageH, 22);
       ctx.clip();
       if (!drawCoverImg(imgLeft, stageX, stageY, stageW, stageH)) {
         ctx.fillStyle = '#1e293b';
@@ -2608,8 +2625,7 @@ function drawViralPostStoryCanvas(postId) {
     ctx.fillStyle = 'rgba(56, 189, 248, 0.14)';
     ctx.strokeStyle = '#38bdf8';
     ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.roundRect(36, 755, W - 72, 130, 18);
+    roundRectSafe(36, 755, W - 72, 130, 18);
     ctx.fill();
     ctx.stroke();
 
@@ -2651,13 +2667,14 @@ function drawViralPostStoryCanvas(postId) {
     ? domImgEl
     : ((domVidEl && domVidEl.readyState >= 2) ? domVidEl : null);
 
-  // Initial immediate draw (using already-loaded DOM image if available for instant display!)
+  // Initial immediate draw
   renderFrame(post && !post.versus ? readyDomMedia : null, null);
 
-  // Load images asynchronously with automatic fallback when remote server lacks CORS headers
+  // Load images asynchronously with CORS-clean proxy fallback so PNG export keeps the real photo 100% of the time
   const loadImg = (src, fallbackEl = null) => new Promise((resolve) => {
     if (!src) return resolve(fallbackEl);
-    const isDataOrBlob = String(src).startsWith('data:') || String(src).startsWith('blob:');
+    const strSrc = String(src);
+    const isDataOrBlob = strSrc.startsWith('data:') || strSrc.startsWith('blob:');
     const im = new Image();
     if (!isDataOrBlob) {
       im.crossOrigin = 'anonymous';
@@ -2665,13 +2682,26 @@ function drawViralPostStoryCanvas(postId) {
     im.onload = () => resolve(im);
     im.onerror = () => {
       if (isDataOrBlob) return resolve(fallbackEl);
-      // Retry without crossOrigin so Firebase Storage / external images always render in the 9:16 preview
+      // Try CORS-friendly image proxy so Firebase Storage / external images export cleanly to PNG without tainting
+      if (strSrc.startsWith('http://') || strSrc.startsWith('https://')) {
+        const proxyIm = new Image();
+        proxyIm.crossOrigin = 'anonymous';
+        proxyIm.onload = () => resolve(proxyIm);
+        proxyIm.onerror = () => {
+          const imNoCors = new Image();
+          imNoCors.onload = () => resolve(imNoCors);
+          imNoCors.onerror = () => resolve(fallbackEl);
+          imNoCors.src = strSrc;
+        };
+        proxyIm.src = `https://wsrv.nl/?url=${encodeURIComponent(strSrc)}&output=jpg`;
+        return;
+      }
       const imNoCors = new Image();
       imNoCors.onload = () => resolve(imNoCors);
       imNoCors.onerror = () => resolve(fallbackEl);
-      imNoCors.src = src;
+      imNoCors.src = strSrc;
     };
-    im.src = src;
+    im.src = strSrc;
   });
 
   if (post && post.versus) {
@@ -2680,7 +2710,7 @@ function drawViralPostStoryCanvas(postId) {
     const cB = getCityById(v.rightCityId || 'paris');
     const srcA = v.leftMedia || generateCityPostVisualDataUrl(cA.id, getCityName(cA, 'en'));
     const srcB = v.rightMedia || generateCityPostVisualDataUrl(cB.id, getCityName(cB, 'en'));
-    Promise.all([loadImg(srcA), loadImg(srcB)]).then(([imA, imB]) => {
+    window._viralStoryRenderPromise = Promise.all([loadImg(srcA), loadImg(srcB)]).then(([imA, imB]) => {
       renderFrame(imA, imB);
     });
   } else if (post) {
@@ -2695,11 +2725,11 @@ function drawViralPostStoryCanvas(postId) {
     }
     const fallbackArt = generateCityPostVisualDataUrl(city.id, post.visualHeadline || getCityName(city, 'en'), post.visualSub || '');
     const src = rawSrc || fallbackArt;
-    loadImg(src, readyDomMedia).then((im) => {
+    window._viralStoryRenderPromise = loadImg(src, readyDomMedia).then((im) => {
       if (im) {
         renderFrame(im, null);
       } else {
-        loadImg(fallbackArt).then((artIm) => renderFrame(artIm, null));
+        return loadImg(fallbackArt).then((artIm) => renderFrame(artIm, null));
       }
     });
   }
@@ -2708,14 +2738,22 @@ function drawViralPostStoryCanvas(postId) {
 async function exportViralStoryCanvasDataUrl(postId) {
   const cv = document.getElementById('viralPostStoryCanvas');
   if (!cv) return '';
+  if (window._viralStoryRenderPromise) {
+    try { await window._viralStoryRenderPromise; } catch (e) {}
+  }
   try {
     return cv.toDataURL('image/png');
   } catch (secErr) {
-    // If external non-CORS image tainted the canvas, re-render with taint-free procedural city art for export
+    // If external non-CORS image still tainted the canvas, try fetching via wsrv.nl CORS proxy first before procedural art
     const { post } = getViralPostShareData(postId);
     if (post && !post.versus) {
       const city = getCityById(post.cityId || 'montreal');
-      const artUrl = generateCityPostVisualDataUrl(city.id, post.visualHeadline || getCityName(city, 'en'), post.visualSub || '');
+      const domCard = postId ? document.getElementById('post_card_' + postId) : null;
+      const domImgEl = domCard ? domCard.querySelector('.post-media img') : null;
+      const rawUrl = post.mediaUrl || (Array.isArray(post.mediaUrls) && post.mediaUrls[0]) || (domImgEl && domImgEl.src) || '';
+      const proxyOrArtUrl = (rawUrl && (String(rawUrl).startsWith('http://') || String(rawUrl).startsWith('https://')))
+        ? `https://wsrv.nl/?url=${encodeURIComponent(rawUrl)}&output=jpg`
+        : generateCityPostVisualDataUrl(city.id, post.visualHeadline || getCityName(city, 'en'), post.visualSub || '');
       const cleanCv = document.createElement('canvas');
       cleanCv.width = 540;
       cleanCv.height = 960;
@@ -2725,9 +2763,12 @@ async function exportViralStoryCanvasDataUrl(postId) {
       cleanCv.style.display = 'none';
       document.body.appendChild(cleanCv);
       const savedMediaUrl = post.mediaUrl;
-      post.mediaUrl = artUrl;
+      post.mediaUrl = proxyOrArtUrl;
       drawViralPostStoryCanvas(postId);
-      await new Promise((r) => setTimeout(r, 60));
+      if (window._viralStoryRenderPromise) {
+        try { await window._viralStoryRenderPromise; } catch (e) {}
+      }
+      await new Promise((r) => setTimeout(r, 80));
       let out = '';
       try { out = cleanCv.toDataURL('image/png'); } catch (e) {}
       post.mediaUrl = savedMediaUrl;
@@ -2797,9 +2838,9 @@ async function downloadViralPostStoryPNG() {
 }
 window.downloadViralPostStoryPNG = downloadViralPostStoryPNG;
 
-function shareViralPostToSocial(platform) {
+async function shareViralPostToSocial(platform) {
   const postId = window._activeViralSharePostId;
-  const { url, shareText } = getViralPostShareData(postId);
+  const { url, shareText, isFr } = getViralPostShareData(postId);
   rewardViralShareOnce(postId);
   const fullMsg = `${shareText} ${url}`;
   let targetUrl = '';
@@ -2808,7 +2849,43 @@ function shareViralPostToSocial(platform) {
   } else if (platform === 'telegram') {
     targetUrl = `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(shareText)}`;
   } else if (platform === 'facebook') {
-    targetUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`;
+    targetUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}&quote=${encodeURIComponent(shareText)}`;
+    // Copy the 9:16 Story PNG image directly to the clipboard so the user can press Ctrl+V in Facebook
+    try {
+      const dataUrl = await exportViralStoryCanvasDataUrl(postId);
+      if (dataUrl) {
+        let copiedImg = false;
+        if (navigator.clipboard && window.ClipboardItem) {
+          try {
+            const res = await fetch(dataUrl);
+            const blob = await res.blob();
+            await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+            copiedImg = true;
+          } catch (clipErr) {}
+        }
+        if (copiedImg) {
+          remoToast(
+            isFr
+              ? '📋 Photo 9:16 copiée ! Appuyez sur Ctrl+V (Coller) dans Facebook pour publier la vraie photo ! (+25 🪙)'
+              : '📋 9:16 Photo copied! Press Ctrl+V (Paste) in Facebook to post the real photo! (+25 🪙)',
+            'fanfare'
+          );
+        } else {
+          const a = document.createElement('a');
+          a.download = `REMO_Story_9x16_${postId || Date.now()}.png`;
+          a.href = dataUrl;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          remoToast(
+            isFr
+              ? '📥 Photo 9:16 téléchargée ! Ajoutez-la à votre publication Facebook (+25 🪙)'
+              : '📥 9:16 Photo downloaded! Attach it to your Facebook post (+25 🪙)',
+            'coin'
+          );
+        }
+      }
+    } catch (e) {}
   }
   if (targetUrl) {
     window.open(targetUrl, '_blank', 'noopener,noreferrer');
@@ -12894,36 +12971,132 @@ window.replySupportTicketInline = replySupportTicketInline;
 window.deleteSupportTicketInline = deleteSupportTicketInline;
 
 /* ── 🏅 OFFICIAL CITY AMBASSADOR 9:16 HOLOGRAPHIC DIPLOMA STUDIO ── */
+function computeCitizenOfficialDiplomaRank(u, city, lang) {
+  const isFr = lang === 'fr';
+  const cityName = getCityName(city, lang).toUpperCase();
+  if (REMO_STORE.isFounder && REMO_STORE.isFounder(u)) {
+    return {
+      icon: '👑',
+      badgeText: isFr ? `FONDATEUR SOUVERAIN • ${cityName}` : `SOVEREIGN FOUNDER • ${cityName}`,
+      uiLabel: isFr ? '👑 Fondateur Souverain & Grand Maire' : '👑 Sovereign Founder & Grand Mayor'
+    };
+  }
+  if (REMO_STORE.isCityMayor && u && REMO_STORE.isCityMayor(u.uid, city.id)) {
+    return {
+      icon: '👑',
+      badgeText: isFr ? `MAIRE OFFICIEL DE ${cityName}` : `OFFICIAL MAYOR OF ${cityName}`,
+      uiLabel: isFr ? `👑 Maire Officiel de ${getCityName(city, lang)}` : `👑 Official Mayor of ${getCityName(city, lang)}`
+    };
+  }
+  if (REMO_STORE.getEquippedTitle && u) {
+    const eq = REMO_STORE.getEquippedTitle(u);
+    if (eq && (eq.title_en || eq.title_fr)) {
+      const tStr = (isFr ? (eq.title_fr || eq.title_en) : (eq.title_en || eq.title_fr)).toUpperCase();
+      return {
+        icon: '💎',
+        badgeText: `${tStr} • ${cityName}`,
+        uiLabel: `💎 ${isFr ? (eq.title_fr || eq.title_en) : (eq.title_en || eq.title_fr)}`
+      };
+    }
+  }
+  const passInt = parseInt(String((u && u.passportNum) || '9999').replace(/\D/g, ''), 10) || 9999;
+  if (passInt <= 500) {
+    return {
+      icon: '🌟',
+      badgeText: isFr ? `AMBASSADEUR PIONNIER GENESIS • ${cityName}` : `GENESIS PIONEER AMBASSADOR • ${cityName}`,
+      uiLabel: isFr ? '🌟 Ambassadeur Pionnier Genesis' : '🌟 Genesis Pioneer Ambassador'
+    };
+  }
+  if (((u && u.coins) || 0) >= 250 || ((u && u.xp) || 0) >= 80) {
+    return {
+      icon: '🏅',
+      badgeText: isFr ? `AMBASSADEUR OFFICIEL DE ${cityName}` : `OFFICIAL AMBASSADOR OF ${cityName}`,
+      uiLabel: isFr ? '🏅 Ambassadeur Officiel de la Ville' : '🏅 Official City Ambassador'
+    };
+  }
+  return {
+    icon: '🛂',
+    badgeText: isFr ? `CITOYEN AMBASSADEUR 4D • ${cityName}` : `4D CITIZEN AMBASSADOR • ${cityName}`,
+    uiLabel: isFr ? '🛂 Citoyen Ambassadeur 4D Vérifié' : '🛂 Verified 4D Citizen Ambassador'
+  };
+}
+
+function getAmbassadorDiplomaPhotoDataUrl(u) {
+  const key = 'remo_diploma_photo_' + ((u && u.uid) || 'guest');
+  const saved = localStorage.getItem(key);
+  if (saved && saved.startsWith('data:image/')) return saved;
+  if (u && u.avatar && String(u.avatar).startsWith('data:image/')) return u.avatar;
+  return '';
+}
+
+function handleAmbassadorDiplomaPhotoUpload(event) {
+  const file = event && event.target && event.target.files && event.target.files[0];
+  if (!file) return;
+  const lang = REMO_I18N.getLang();
+  const isFr = lang === 'fr';
+  const u = REMO_STORE.getCurrentUser() || REMO_STORE.ensureGuestOrCitizen('REMO Pioneer', '', 'montreal');
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    const im = new Image();
+    im.onload = () => {
+      const sq = document.createElement('canvas');
+      const S = 320;
+      sq.width = S;
+      sq.height = S;
+      const sCtx = sq.getContext('2d');
+      const minSide = Math.min(im.naturalWidth || im.width, im.naturalHeight || im.height);
+      const sx = Math.max(0, ((im.naturalWidth || im.width) - minSide) / 2);
+      const sy = Math.max(0, ((im.naturalHeight || im.height) - minSide) / 2);
+      sCtx.drawImage(im, sx, sy, minSide, minSide, 0, 0, S, S);
+      const compressed = sq.toDataURL('image/jpeg', 0.88);
+      try {
+        localStorage.setItem('remo_diploma_photo_' + (u.uid || 'guest'), compressed);
+      } catch (err) {}
+      const resetBtn = document.getElementById('ambResetPhotoBtn');
+      if (resetBtn) resetBtn.style.display = 'inline-flex';
+      renderCityAmbassadorDiplomaCanvas();
+      remoToast(
+        isFr ? '📸 Votre photo officielle a été gravée sur le Diplôme !' : '📸 Your official photo has been engraved on the Diploma!',
+        'fanfare'
+      );
+    };
+    im.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function resetAmbassadorDiplomaPhoto() {
+  const lang = REMO_I18N.getLang();
+  const isFr = lang === 'fr';
+  const u = REMO_STORE.getCurrentUser() || REMO_STORE.ensureGuestOrCitizen('REMO Pioneer', '', 'montreal');
+  localStorage.removeItem('remo_diploma_photo_' + (u.uid || 'guest'));
+  const inp = document.getElementById('ambDiplomaPhotoInput');
+  if (inp) inp.value = '';
+  const resetBtn = document.getElementById('ambResetPhotoBtn');
+  if (resetBtn) resetBtn.style.display = 'none';
+  renderCityAmbassadorDiplomaCanvas();
+  remoToast(isFr ? '🗑️ Photo retirée du Diplôme.' : '🗑️ Photo removed from Diploma.');
+}
+
 function openCityAmbassadorModal() {
   const modal = document.getElementById('cityAmbassadorModal');
   if (!modal) return;
   const lang = REMO_I18N.getLang();
   const u = REMO_STORE.getCurrentUser() || REMO_STORE.ensureGuestOrCitizen('REMO Pioneer', '', 'montreal');
-  const citySel = document.getElementById('ambDiplomaCitySel');
-  const titleSel = document.getElementById('ambDiplomaTitleSel');
+  const city = getCityById(u.homeCity || 'montreal') || getCityById('montreal');
+  const rankObj = computeCitizenOfficialDiplomaRank(u, city, lang);
 
-  if (citySel) {
-    const myCity = u.homeCity || 'montreal';
-    citySel.innerHTML = getRemoCities().map((c) =>
-      `<option value="${c.id}" ${c.id === myCity ? 'selected' : ''}>${c.flag} ${getCityName(c, lang)}</option>`
-    ).join('');
+  const cityLbl = document.getElementById('ambDiplomaLockedCityLbl');
+  if (cityLbl) {
+    cityLbl.textContent = `🔒 ${city.flag} ${getCityName(city, lang)}`;
   }
-
-  if (titleSel) {
-    const curVal = titleSel.value || 'ambassador';
-    titleSel.innerHTML = lang === 'fr'
-      ? `
-        <option value="ambassador" ${curVal === 'ambassador' ? 'selected' : ''}>🏅 Ambassadeur Officiel de la Ville</option>
-        <option value="pioneer" ${curVal === 'pioneer' ? 'selected' : ''}>👑 Pionnier Fondateur & Envoyé Culturel</option>
-        <option value="champion" ${curVal === 'champion' ? 'selected' : ''}>⚔️ Défenseur — Coupe du Monde des Villes</option>
-        <option value="sovereign" ${curVal === 'sovereign' ? 'selected' : ''}>💎 Citoyen Souverain 4D VIP</option>
-      `
-      : `
-        <option value="ambassador" ${curVal === 'ambassador' ? 'selected' : ''}>🏅 Official City Ambassador</option>
-        <option value="pioneer" ${curVal === 'pioneer' ? 'selected' : ''}>👑 Founding Cultural Envoy</option>
-        <option value="champion" ${curVal === 'champion' ? 'selected' : ''}>⚔️ World City Cup Defender</option>
-        <option value="sovereign" ${curVal === 'sovereign' ? 'selected' : ''}>💎 VIP Sovereign 4D Citizen</option>
-      `;
+  const rankLbl = document.getElementById('ambDiplomaLockedRankLbl');
+  if (rankLbl) {
+    rankLbl.textContent = rankObj.uiLabel;
+  }
+  const resetBtn = document.getElementById('ambResetPhotoBtn');
+  if (resetBtn) {
+    resetBtn.style.display = localStorage.getItem('remo_diploma_photo_' + (u.uid || 'guest')) ? 'inline-flex' : 'none';
   }
 
   REMO_I18N.applyDOM(modal);
@@ -12935,8 +13108,8 @@ function renderCityAmbassadorDiplomaCanvas() {
   const cv = document.getElementById('cityAmbassadorCanvas');
   if (!cv) return;
   const ctx = cv.getContext('2d');
-  const W = cv.width;  // 540
-  const H = cv.height; // 960
+  const W = 540;
+  const H = 960;
   const roundRectCanvas = (c, x, y, w, h, r) => {
     const rad = Math.min(r, w / 2, h / 2);
     c.beginPath();
@@ -12954,209 +13127,302 @@ function renderCityAmbassadorDiplomaCanvas() {
   const lang = REMO_I18N.getLang();
   const isFr = lang === 'fr';
   const u = REMO_STORE.getCurrentUser() || REMO_STORE.ensureGuestOrCitizen('REMO Pioneer', '', 'montreal');
-  const selCityId = document.getElementById('ambDiplomaCitySel')?.value || u.homeCity || 'montreal';
-  const selTitleKey = document.getElementById('ambDiplomaTitleSel')?.value || 'ambassador';
-  const city = getCityById(selCityId) || getCityById('montreal');
+  // Strictly locked to the citizen's Home City & Real Earned Rank
+  const city = getCityById(u.homeCity || 'montreal') || getCityById('montreal');
   const cityName = getCityName(city, lang).toUpperCase();
+  const rankObj = computeCitizenOfficialDiplomaRank(u, city, lang);
   const cityPts = Number((REMO_STORE.state.cityScores && REMO_STORE.state.cityScores[city.id]) || 10000);
   const passportNum = u.passportNum || '0001';
   const inviteCode = u.referralCode || `REMO-${passportNum}`;
   const citizenName = (u.name || 'REMO Citizen').toUpperCase();
+  const regSerial = `REG № ${city.id.slice(0, 3).toUpperCase()}-${passportNum}-2026`;
+  const photoDataUrl = getAmbassadorDiplomaPhotoDataUrl(u);
 
-  const titleLabels = {
-    ambassador: isFr ? `AMBASSADEUR OFFICIEL DE ${cityName}` : `OFFICIAL AMBASSADOR OF ${cityName}`,
-    pioneer: isFr ? `ENVOYÉ CULTUREL & PIONNIER DE ${cityName}` : `CULTURAL ENVOY & PIONEER OF ${cityName}`,
-    champion: isFr ? `DÉFENSEUR OFFICIEL • COUPE MONDIALE` : `WORLD CITY CUP CHAMPION DEFENDER`,
-    sovereign: isFr ? `CITOYEN SOUVERAIN 4D • ${cityName}` : `SOVEREIGN 4D CITIZEN • ${cityName}`
-  };
-  const chosenTitleText = titleLabels[selTitleKey] || titleLabels.ambassador;
+  const drawDiplomaWithPortrait = (portraitImg) => {
+    cv.width = W;
+    cv.height = H;
 
-  // 1. Deep Royal Obsidian & Radial Nebula Background
-  const bg = ctx.createLinearGradient(0, 0, 0, H);
-  bg.addColorStop(0, '#040714');
-  bg.addColorStop(0.5, '#0b1332');
-  bg.addColorStop(1, '#050818');
-  ctx.fillStyle = bg;
-  ctx.fillRect(0, 0, W, H);
+    // 1. Deep Royal Obsidian & Radial Nebula Background
+    const bg = ctx.createLinearGradient(0, 0, 0, H);
+    bg.addColorStop(0, '#040714');
+    bg.addColorStop(0.5, '#0b1332');
+    bg.addColorStop(1, '#050818');
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, W, H);
 
-  const glowTop = ctx.createRadialGradient(W / 2, 230, 20, W / 2, 230, 280);
-  glowTop.addColorStop(0, 'rgba(251, 191, 36, 0.24)');
-  glowTop.addColorStop(0.6, 'rgba(56, 189, 248, 0.08)');
-  glowTop.addColorStop(1, 'transparent');
-  ctx.fillStyle = glowTop;
-  ctx.fillRect(0, 0, W, H);
+    const glowTop = ctx.createRadialGradient(W / 2, 210, 20, W / 2, 210, 280);
+    glowTop.addColorStop(0, 'rgba(251, 191, 36, 0.26)');
+    glowTop.addColorStop(0.6, 'rgba(56, 189, 248, 0.08)');
+    glowTop.addColorStop(1, 'transparent');
+    ctx.fillStyle = glowTop;
+    ctx.fillRect(0, 0, W, H);
 
-  // 2. Double Royal Gold Filigree Certificate Frame
-  ctx.strokeStyle = 'rgba(251, 191, 36, 0.85)';
-  ctx.lineWidth = 3;
-  roundRectCanvas(ctx, 20, 20, W - 40, H - 40, 26);
-  ctx.stroke();
+    // 2. Double Royal Gold Filigree Certificate Frame
+    ctx.strokeStyle = 'rgba(251, 191, 36, 0.85)';
+    ctx.lineWidth = 3;
+    roundRectCanvas(ctx, 20, 20, W - 40, H - 40, 26);
+    ctx.stroke();
 
-  ctx.strokeStyle = 'rgba(56, 189, 248, 0.45)';
-  ctx.lineWidth = 1.5;
-  roundRectCanvas(ctx, 30, 30, W - 60, H - 60, 20);
-  ctx.stroke();
+    ctx.strokeStyle = 'rgba(56, 189, 248, 0.45)';
+    ctx.lineWidth = 1.5;
+    roundRectCanvas(ctx, 30, 30, W - 60, H - 60, 20);
+    ctx.stroke();
 
-  // 3. Top Header Crest
-  ctx.textAlign = 'center';
-  ctx.fillStyle = '#38bdf8';
-  ctx.font = '900 18px system-ui, -apple-system, sans-serif';
-  ctx.fillText('🌐 REMOWORLD.COM', W / 2, 68);
+    // 3. Top Header Crest & Official Serial Number
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#38bdf8';
+    ctx.font = '900 18px system-ui, -apple-system, sans-serif';
+    ctx.fillText('🌐 REMOWORLD.COM', W / 2, 64);
 
-  ctx.fillStyle = '#fbbf24';
-  ctx.font = '800 13px system-ui, -apple-system, sans-serif';
-  ctx.fillText(isFr ? '★ DIPLÔME SOUVERAIN OFFICIEL 4D ★' : '★ OFFICIAL 4D SOVEREIGN CITY DIPLOMA ★', W / 2, 92);
+    ctx.fillStyle = '#fbbf24';
+    ctx.font = '800 13px system-ui, -apple-system, sans-serif';
+    ctx.fillText(isFr ? '★ DIPLÔME SOUVERAIN OFFICIEL 4D ★' : '★ OFFICIAL 4D SOVEREIGN CITY DIPLOMA ★', W / 2, 87);
 
-  // 4. Giant Illuminated City Medallion
-  ctx.save();
-  ctx.beginPath();
-  ctx.arc(W / 2, 205, 76, 0, Math.PI * 2);
-  const medalGrad = ctx.createLinearGradient(W / 2 - 70, 130, W / 2 + 70, 280);
-  medalGrad.addColorStop(0, 'rgba(251, 191, 36, 0.26)');
-  medalGrad.addColorStop(1, 'rgba(15, 23, 42, 0.92)');
-  ctx.fillStyle = medalGrad;
-  ctx.fill();
-  ctx.lineWidth = 3.5;
-  ctx.strokeStyle = '#fbbf24';
-  ctx.stroke();
-  ctx.restore();
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = '800 11px monospace';
+    ctx.fillText(regSerial, W / 2, 106);
 
-  ctx.font = '68px system-ui, "Segoe UI Emoji", "Apple Color Emoji", sans-serif';
-  ctx.fillText(city.flag || '🌍', W / 2, 226);
+    // 4. Giant Illuminated City Medallion (or Citizen Portrait + City Seal)
+    const medX = W / 2;
+    const medY = 205;
+    const medR = 76;
 
-  // City Name Banner
-  ctx.fillStyle = '#ffffff';
-  ctx.font = '900 32px system-ui, -apple-system, sans-serif';
-  ctx.fillText(cityName, W / 2, 326);
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(medX, medY, medR, 0, Math.PI * 2);
+    const medalGrad = ctx.createLinearGradient(medX - 70, medY - 75, medX + 70, medY + 75);
+    medalGrad.addColorStop(0, 'rgba(251, 191, 36, 0.28)');
+    medalGrad.addColorStop(1, 'rgba(15, 23, 42, 0.94)');
+    ctx.fillStyle = medalGrad;
+    ctx.fill();
+    if (portraitImg) {
+      ctx.clip();
+      ctx.drawImage(portraitImg, medX - medR, medY - medR, medR * 2, medR * 2);
+    }
+    ctx.restore();
 
-  ctx.fillStyle = '#7dd3fc';
-  ctx.font = '800 14px system-ui, -apple-system, sans-serif';
-  ctx.fillText(`🏆 ${cityPts.toLocaleString()} PTS • WORLD CITY CUP`, W / 2, 352);
+    // Outer Gold Ring around Medallion
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(medX, medY, medR, 0, Math.PI * 2);
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = '#fbbf24';
+    ctx.stroke();
+    ctx.restore();
 
-  // Ornamental Divider Line
-  const divGrad = ctx.createLinearGradient(70, 0, W - 70, 0);
-  divGrad.addColorStop(0, 'transparent');
-  divGrad.addColorStop(0.5, '#fbbf24');
-  divGrad.addColorStop(1, 'transparent');
-  ctx.strokeStyle = divGrad;
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(70, 378);
-  ctx.lineTo(W - 70, 378);
-  ctx.stroke();
+    if (portraitImg) {
+      // Corner City Flag Emblem Badge on the bottom-right of the portrait
+      const badgeX = medX + 54;
+      const badgeY = medY + 52;
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(badgeX, badgeY, 26, 0, Math.PI * 2);
+      ctx.fillStyle = '#090d16';
+      ctx.fill();
+      ctx.lineWidth = 2.5;
+      ctx.strokeStyle = '#fbbf24';
+      ctx.stroke();
+      ctx.restore();
+      ctx.font = '26px system-ui, "Segoe UI Emoji", "Apple Color Emoji", sans-serif';
+      ctx.fillText(city.flag || '🌍', badgeX, badgeY + 9);
+    } else {
+      ctx.font = '68px system-ui, "Segoe UI Emoji", "Apple Color Emoji", sans-serif';
+      ctx.fillText(city.flag || '🌍', medX, medY + 22);
+    }
 
-  // 5. Certificate Proclamation Text
-  ctx.fillStyle = '#cbd5e1';
-  ctx.font = '700 14px system-ui, -apple-system, sans-serif';
-  ctx.fillText(isFr ? 'CE CERTIFICAT OFFICIEL ATTESTE QUE' : 'THIS OFFICIAL DIPLOMA CERTIFIES THAT', W / 2, 416);
+    // City Name Banner
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '900 32px system-ui, -apple-system, sans-serif';
+    ctx.fillText(cityName, W / 2, 326);
 
-  // Citizen Name Highlight Box
-  ctx.fillStyle = 'rgba(251, 191, 36, 0.12)';
-  ctx.strokeStyle = 'rgba(251, 191, 36, 0.55)';
-  ctx.lineWidth = 2;
-  roundRectCanvas(ctx, 52, 434, W - 104, 72, 16);
-  ctx.fill();
-  ctx.stroke();
+    ctx.fillStyle = '#7dd3fc';
+    ctx.font = '800 14px system-ui, -apple-system, sans-serif';
+    ctx.fillText(`🏆 ${cityPts.toLocaleString()} PTS • WORLD CITY CUP`, W / 2, 352);
 
-  ctx.fillStyle = '#fde047';
-  ctx.font = '900 28px system-ui, -apple-system, sans-serif';
-  ctx.fillText(`@${citizenName.slice(0, 22)}`, W / 2, 480);
+    // Ornamental Divider Line
+    const divGrad = ctx.createLinearGradient(70, 0, W - 70, 0);
+    divGrad.addColorStop(0, 'transparent');
+    divGrad.addColorStop(0.5, '#fbbf24');
+    divGrad.addColorStop(1, 'transparent');
+    ctx.strokeStyle = divGrad;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(70, 378);
+    ctx.lineTo(W - 70, 378);
+    ctx.stroke();
 
-  ctx.fillStyle = '#cbd5e1';
-  ctx.font = '700 13px system-ui, -apple-system, sans-serif';
-  ctx.fillText(isFr ? 'EST HONORÉ(E) DU RANG OFFICIEL DE :' : 'IS APPOINTED TO THE HONORARY RANK OF:', W / 2, 536);
+    // 5. Certificate Proclamation Text
+    ctx.fillStyle = '#cbd5e1';
+    ctx.font = '700 13px system-ui, -apple-system, sans-serif';
+    ctx.fillText(
+      isFr ? 'CE DIPLÔME SOUVERAIN CERTIFIE OFFICIELLEMENT QUE' : 'THIS SOVEREIGN DIPLOMA OFFICIALLY CERTIFIES THAT',
+      W / 2,
+      414
+    );
 
-  // Rank Pill
-  const rankGrad = ctx.createLinearGradient(46, 552, W - 46, 608);
-  rankGrad.addColorStop(0, 'rgba(14, 165, 233, 0.25)');
-  rankGrad.addColorStop(0.5, 'rgba(99, 102, 241, 0.35)');
-  rankGrad.addColorStop(1, 'rgba(236, 72, 153, 0.25)');
-  ctx.fillStyle = rankGrad;
-  ctx.strokeStyle = '#38bdf8';
-  ctx.lineWidth = 2;
-  roundRectCanvas(ctx, 46, 552, W - 92, 54, 999);
-  ctx.fill();
-  ctx.stroke();
-
-  ctx.fillStyle = '#ffffff';
-  ctx.font = '900 16px system-ui, -apple-system, sans-serif';
-  ctx.fillText(`🏅 ${chosenTitleText.slice(0, 38)}`, W / 2, 585);
-
-  // 6. Official Passport Stats Grid (3 Columns)
-  const statY = 630;
-  const statW = 136;
-  const cols = [
-    { x: 46, lbl: isFr ? 'PASSEPORT 4D' : '4D PASSPORT', val: `#${passportNum}` },
-    { x: 202, lbl: isFr ? 'PIÈCES REMO' : 'REMO COINS', val: `🪙 ${(u.coins || 150).toLocaleString()}` },
-    { x: 358, lbl: isFr ? 'STATUT' : 'CITIZEN STATUS', val: '✓ VERIFIED' }
-  ];
-  cols.forEach((st) => {
-    ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
-    ctx.lineWidth = 1.2;
-    roundRectCanvas(ctx, st.x, statY, statW, 64, 14);
+    // Citizen Name Highlight Box
+    ctx.fillStyle = 'rgba(251, 191, 36, 0.12)';
+    ctx.strokeStyle = 'rgba(251, 191, 36, 0.55)';
+    ctx.lineWidth = 2;
+    roundRectCanvas(ctx, 52, 430, W - 104, 70, 16);
     ctx.fill();
     ctx.stroke();
 
+    ctx.fillStyle = '#fde047';
+    ctx.font = '900 28px system-ui, -apple-system, sans-serif';
+    ctx.fillText(`@${citizenName.slice(0, 22)}`, W / 2, 475);
+
+    ctx.fillStyle = '#cbd5e1';
+    ctx.font = '700 13px system-ui, -apple-system, sans-serif';
+    ctx.fillText(
+      isFr ? 'DÉTIENT LE TITRE & RANG OFFICIEL VÉRIFIÉ DE :' : 'HOLDS THE VERIFIED OFFICIAL RANK & TITLE OF:',
+      W / 2,
+      530
+    );
+
+    // Rank Pill (Locked to Citizen's Real Earned Rank)
+    const rankGrad = ctx.createLinearGradient(44, 546, W - 44, 602);
+    rankGrad.addColorStop(0, 'rgba(14, 165, 233, 0.25)');
+    rankGrad.addColorStop(0.5, 'rgba(99, 102, 241, 0.38)');
+    rankGrad.addColorStop(1, 'rgba(251, 191, 36, 0.25)');
+    ctx.fillStyle = rankGrad;
+    ctx.strokeStyle = '#fbbf24';
+    ctx.lineWidth = 2;
+    roundRectCanvas(ctx, 44, 546, W - 88, 54, 999);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '900 15px system-ui, -apple-system, sans-serif';
+    ctx.fillText(`${rankObj.icon} ${rankObj.badgeText.slice(0, 40)}`, W / 2, 579);
+
+    // 6. Official Passport Stats Grid (3 Columns)
+    const statY = 622;
+    const statW = 136;
+    const cols = [
+      { x: 46, lbl: isFr ? 'PASSEPORT 4D' : '4D PASSPORT', val: `#${passportNum}` },
+      { x: 202, lbl: isFr ? 'PIÈCES REMO' : 'REMO COINS', val: `🪙 ${(u.coins || 150).toLocaleString()}` },
+      { x: 358, lbl: isFr ? 'VILLE NATALE' : 'HOME CITY', val: `${city.flag} ${getCityName(city, lang).slice(0, 10)}` }
+    ];
+    cols.forEach((st) => {
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+      ctx.lineWidth = 1.2;
+      roundRectCanvas(ctx, st.x, statY, statW, 64, 14);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = '#94a3b8';
+      ctx.font = '800 10px system-ui, -apple-system, sans-serif';
+      ctx.fillText(st.lbl, st.x + statW / 2, statY + 23);
+
+      ctx.fillStyle = '#fbbf24';
+      ctx.font = '900 15px system-ui, -apple-system, sans-serif';
+      ctx.fillText(st.val, st.x + statW / 2, statY + 47);
+    });
+
+    // 7. Golden Wax Seal & Official Sovereign Signature
     ctx.fillStyle = '#94a3b8';
-    ctx.font = '800 10px system-ui, -apple-system, sans-serif';
-    ctx.fillText(st.lbl, st.x + statW / 2, statY + 23);
+    ctx.font = 'italic 600 12px Georgia, serif';
+    ctx.fillText(isFr ? 'Certifié par le Conseil Souverain' : 'Certified by the Sovereign Council', 142, 736);
+    ctx.fillStyle = '#fde68a';
+    ctx.font = 'italic 700 15px Georgia, serif';
+    ctx.fillText('✒️ REMO World Council', 142, 756);
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(W / 2, 742, 30, 0, Math.PI * 2);
+    ctx.fillStyle = '#f59e0b';
+    ctx.fill();
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = '#fef08a';
+    ctx.stroke();
+    ctx.restore();
+
+    ctx.fillStyle = '#090d16';
+    ctx.font = '900 13px system-ui, -apple-system, sans-serif';
+    ctx.fillText('REMO', W / 2, 740);
+    ctx.font = '900 10px system-ui, -apple-system, sans-serif';
+    ctx.fillText('SEAL', W / 2, 753);
+
+    ctx.fillStyle = '#38bdf8';
+    ctx.font = '800 11px monospace';
+    ctx.fillText('✓ 4D AUTHENTIC', 402, 742);
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = '700 10px monospace';
+    ctx.fillText(new Date().toISOString().slice(0, 10), 402, 757);
+
+    // 8. Bottom Viral Invite CTA Box + Cyber QR Matrix
+    ctx.fillStyle = 'rgba(14, 165, 233, 0.14)';
+    ctx.strokeStyle = '#38bdf8';
+    ctx.lineWidth = 2;
+    roundRectCanvas(ctx, 44, 792, W - 88, 114, 20);
+    ctx.fill();
+    ctx.stroke();
+
+    const ctaCenterX = 232;
+    ctx.fillStyle = '#e0f2fe';
+    ctx.font = '800 13px system-ui, -apple-system, sans-serif';
+    ctx.fillText(
+      isFr ? `🌍 REJOIGNEZ ${cityName} EN DIRECT SUR :` : `🌍 REPRESENT ${cityName} LIVE AT:`,
+      ctaCenterX,
+      822
+    );
 
     ctx.fillStyle = '#fbbf24';
-    ctx.font = '900 15px system-ui, -apple-system, sans-serif';
-    ctx.fillText(st.val, st.x + statW / 2, statY + 47);
-  });
+    ctx.font = '900 26px system-ui, -apple-system, sans-serif';
+    ctx.fillText('REMOWORLD.COM', ctaCenterX, 856);
 
-  // 7. Golden Wax Seal & Signature
-  ctx.save();
-  ctx.beginPath();
-  ctx.arc(W / 2, 742, 30, 0, Math.PI * 2);
-  ctx.fillStyle = '#f59e0b';
-  ctx.fill();
-  ctx.lineWidth = 3;
-  ctx.strokeStyle = '#fef08a';
-  ctx.stroke();
-  ctx.restore();
+    ctx.fillStyle = '#7dd3fc';
+    ctx.font = '800 12px system-ui, -apple-system, sans-serif';
+    ctx.fillText(
+      isFr
+        ? `🎁 Code : ${inviteCode} (+100 🪙 Bonus Gratuit)`
+        : `🎁 Code: ${inviteCode} (+100 🪙 Free Welcome Bonus)`,
+      ctaCenterX,
+      884
+    );
 
-  ctx.fillStyle = '#090d16';
-  ctx.font = '900 13px system-ui, -apple-system, sans-serif';
-  ctx.fillText('REMO', W / 2, 740);
-  ctx.font = '900 10px system-ui, -apple-system, sans-serif';
-  ctx.fillText('SEAL', W / 2, 753);
+    // Cyber QR Code Matrix on the right side of the CTA Box
+    const qrX = 408;
+    const qrY = 807;
+    const qrS = 78;
+    ctx.fillStyle = '#040714';
+    ctx.strokeStyle = '#fbbf24';
+    ctx.lineWidth = 1.5;
+    roundRectCanvas(ctx, qrX, qrY, qrS, qrS, 10);
+    ctx.fill();
+    ctx.stroke();
 
-  // 8. Bottom Viral Invite CTA Box
-  ctx.fillStyle = 'rgba(14, 165, 233, 0.14)';
-  ctx.strokeStyle = '#38bdf8';
-  ctx.lineWidth = 2;
-  roundRectCanvas(ctx, 44, 792, W - 88, 114, 20);
-  ctx.fill();
-  ctx.stroke();
+    const cell = 8;
+    const startX = qrX + 7;
+    const startY = qrY + 7;
+    const seedStr = `${city.id}-${passportNum}-${citizenName}`;
+    for (let r = 0; r < 8; r++) {
+      for (let c = 0; c < 8; c++) {
+        const isCorner = (r < 2 && c < 2) || (r < 2 && c > 5) || (r > 5 && c < 2);
+        const charCode = seedStr.charCodeAt((r * 8 + c) % seedStr.length) || 7;
+        const on = isCorner || ((charCode + r * 3 + c * 5) % 2 === 0);
+        if (on) {
+          ctx.fillStyle = isCorner ? '#fbbf24' : '#38bdf8';
+          ctx.fillRect(startX + c * cell, startY + r * cell, cell - 1.5, cell - 1.5);
+        }
+      }
+    }
 
-  ctx.fillStyle = '#e0f2fe';
-  ctx.font = '800 14px system-ui, -apple-system, sans-serif';
-  ctx.fillText(
-    isFr ? `🌍 REJOIGNEZ ${cityName} EN DIRECT SUR :` : `🌍 REPRESENT ${cityName} LIVE AT:`,
-    W / 2,
-    822
-  );
+    ctx.fillStyle = '#64748b';
+    ctx.font = '700 11px system-ui, -apple-system, sans-serif';
+    ctx.fillText('24 World Cities • 38 Live Radios • 4D Cards • World City Cup', W / 2, 928);
+  };
 
-  ctx.fillStyle = '#fbbf24';
-  ctx.font = '900 28px system-ui, -apple-system, sans-serif';
-  ctx.fillText('REMOWORLD.COM', W / 2, 858);
-
-  ctx.fillStyle = '#7dd3fc';
-  ctx.font = '800 13px system-ui, -apple-system, sans-serif';
-  ctx.fillText(
-    isFr
-      ? `🎁 Code Invité : ${inviteCode} (+100 🪙 Bonus Gratuit)`
-      : `🎁 Invite Code: ${inviteCode} (+100 🪙 Free Welcome Bonus)`,
-    W / 2,
-    886
-  );
-
-  ctx.fillStyle = '#64748b';
-  ctx.font = '700 11px system-ui, -apple-system, sans-serif';
-  ctx.fillText('24 World Cities • 38 Live Radios • 4D Cards • World City Cup', W / 2, 926);
+  if (photoDataUrl) {
+    const pIm = new Image();
+    pIm.onload = () => drawDiplomaWithPortrait(pIm);
+    pIm.onerror = () => drawDiplomaWithPortrait(null);
+    pIm.src = photoDataUrl;
+  } else {
+    drawDiplomaWithPortrait(null);
+  }
 }
 
 function awardAmbassadorDiplomaShareCoins() {
@@ -13177,8 +13443,7 @@ async function shareCityAmbassadorDiploma(channel = 'native') {
   const cv = document.getElementById('cityAmbassadorCanvas');
   if (!cv) return;
   const u = REMO_STORE.getCurrentUser() || REMO_STORE.ensureGuestOrCitizen('REMO Pioneer', '', 'montreal');
-  const selCityId = document.getElementById('ambDiplomaCitySel')?.value || u.homeCity || 'montreal';
-  const city = getCityById(selCityId) || getCityById('montreal');
+  const city = getCityById(u.homeCity || 'montreal') || getCityById('montreal');
   const cityName = getCityName(city, lang);
   const inviteCode = u.referralCode || `REMO-${u.passportNum || '0001'}`;
   const shareUrl = `https://remoworld.com/?ref=${encodeURIComponent(inviteCode)}&city=${encodeURIComponent(city.id)}`;
@@ -13211,8 +13476,38 @@ async function shareCityAmbassadorDiploma(channel = 'native') {
   }
 
   if (channel === 'facebook') {
-    window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}&quote=${encodeURIComponent(shareText)}`, '_blank', 'noopener');
-    remoToast((isFr ? '📘 Prêt à partager sur Facebook !' : '📘 Ready to share on Facebook!') + bonusTxt);
+    // Copy the 9:16 Diploma PNG image directly to clipboard so the user can press Ctrl+V inside Facebook
+    try {
+      const dataUrl = cv.toDataURL('image/png');
+      let copied = false;
+      if (navigator.clipboard && window.ClipboardItem) {
+        try {
+          const res = await fetch(dataUrl);
+          const blob = await res.blob();
+          await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+          copied = true;
+        } catch (clipErr) {}
+      }
+      if (!copied) {
+        const a = document.createElement('a');
+        a.href = dataUrl;
+        a.download = `REMO-Ambassador-${city.id}-9x16.png`;
+        a.click();
+      }
+      window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}&quote=${encodeURIComponent(shareText)}`, '_blank', 'noopener');
+      remoToast(
+        (copied
+          ? (isFr
+            ? '📋 Diplôme 9:16 copié ! Appuyez sur Ctrl+V (Coller) dans Facebook pour publier votre Diplôme !'
+            : '📋 9:16 Diploma copied! Press Ctrl+V (Paste) in Facebook to post your Diploma!')
+          : (isFr
+            ? '📥 Diplôme 9:16 téléchargé ! Ajoutez-le à votre publication Facebook !'
+            : '📥 9:16 Diploma downloaded! Attach it to your Facebook post!')) + bonusTxt,
+        'fanfare'
+      );
+    } catch (e) {
+      window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}&quote=${encodeURIComponent(shareText)}`, '_blank', 'noopener');
+    }
     return;
   }
 
@@ -13248,6 +13543,8 @@ async function shareCityAmbassadorDiploma(channel = 'native') {
 
 window.openCityAmbassadorModal = openCityAmbassadorModal;
 window.renderCityAmbassadorDiplomaCanvas = renderCityAmbassadorDiplomaCanvas;
+window.handleAmbassadorDiplomaPhotoUpload = handleAmbassadorDiplomaPhotoUpload;
+window.resetAmbassadorDiplomaPhoto = resetAmbassadorDiplomaPhoto;
 window.shareCityAmbassadorDiploma = shareCityAmbassadorDiploma;
 
 if (typeof window !== 'undefined') {
