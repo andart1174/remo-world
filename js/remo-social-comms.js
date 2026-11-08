@@ -3827,6 +3827,7 @@ async function publishNewRemoPost() {
   const newPost = {
     id: 'post_' + Date.now(),
     uid: u.uid,
+    authorUid: u.uid,
     authorName: u.name,
     authorEmail: u.email || '',
     authorVerified: true,
@@ -5851,6 +5852,11 @@ function openAdminQuickModal(preselectUid = '') {
     remoToast(lang === 'fr' ? '🔒 Accès réservé au compte Fondateur (andart1174@gmail.com).' : '🔒 Access restricted to Founder account (andart1174@gmail.com).');
     return;
   }
+
+  const titleEl = document.getElementById('admQuickTitleEl');
+  const subEl = document.getElementById('admQuickSubEl');
+  if (titleEl) titleEl.textContent = t('adm_quick_title');
+  if (subEl) subEl.textContent = t('adm_unlock_sub');
 
   const isAdm = REMO_STORE.isAdminUnlocked();
   if (pinBox) pinBox.style.display = isAdm ? 'none' : 'block';

@@ -2551,9 +2551,28 @@ const REMO_STORE = {
   verifyAdminPin(inputPin = '') {
     const p = String(inputPin || '').trim();
     if (!p) return false;
+    try {
+      const lockUntil = Number(localStorage.getItem('remo_adm_lock_until') || 0);
+      if (lockUntil > Date.now()) {
+        return false;
+      }
+    } catch (e) {}
     const customHash = this.state && this.state.settings && this.state.settings.adminPinHash;
     const targetHash = customHash || '170dacfe9990ca';
-    return this._hashAdminPin(p) === targetHash;
+    const isOk = this._hashAdminPin(p) === targetHash;
+    try {
+      if (isOk) {
+        localStorage.removeItem('remo_adm_fail_cnt');
+        localStorage.removeItem('remo_adm_lock_until');
+      } else {
+        const fails = Number(localStorage.getItem('remo_adm_fail_cnt') || 0) + 1;
+        localStorage.setItem('remo_adm_fail_cnt', String(fails));
+        if (fails >= 5) {
+          localStorage.setItem('remo_adm_lock_until', String(Date.now() + 15 * 60 * 1000));
+        }
+      }
+    } catch (e) {}
+    return isOk;
   },
 
   isCurrentUserAdmin() {
@@ -3296,7 +3315,10 @@ const REMO_STORE = {
   addCoins(uid, delta, addCityPoints = 0) {
     const u = this.state.users.find((x) => x.uid === uid);
     if (!u || u.banned) return false;
-    const finalDelta = (delta > 0 && addCityPoints > 0 && this.state.settings.happyHour2x) ? delta * 2 : delta;
+    const rawDelta = Number(delta) || 0;
+    const isAdm = this.isCurrentUserAdmin() || this.isAdminUnlocked();
+    const cappedDelta = (!isAdm && rawDelta > 500) ? 500 : rawDelta;
+    const finalDelta = (cappedDelta > 0 && addCityPoints > 0 && this.state.settings.happyHour2x) ? Math.min(500, cappedDelta * 2) : cappedDelta;
     if (finalDelta < 0 && u.coins + finalDelta < 0) return false;
     u.coins += finalDelta;
     if (finalDelta > 0) u.lifetimeCoins = (u.lifetimeCoins || 0) + finalDelta;
@@ -3380,6 +3402,13 @@ const REMO_STORE = {
     if (v.unlockedBy.includes(u.uid)) {
       return { success: false, reason: 'already_claimed', vault: v };
     }
+
+    // Cooldown anti-spoofing guard between GPS vault claims
+    const nowTs = Date.now();
+    if (!isSimulated && this._lastVaultClaimTs && (nowTs - this._lastVaultClaimTs) < 12000) {
+      return { success: false, reason: 'cooldown', vault: v };
+    }
+    this._lastVaultClaimTs = nowTs;
 
     const distKm = this._calcGeoDistKm(userLat, userLng, v.lat, v.lng);
     const radiusKm = (v.radiusMeters || 350) / 1000;
@@ -4388,6 +4417,7 @@ const REMO_STORE = {
       // Sanitize undefined fields so Firestore doesn't reject write
       const cleanPost = JSON.parse(JSON.stringify(post));
       if (!cleanPost.createdAt) cleanPost.createdAt = Date.now();
+      if (cleanPost.uid && !cleanPost.authorUid) cleanPost.authorUid = cleanPost.uid;
       this.fbDb.collection('remo_posts').doc(post.id).set(cleanPost, { merge: true })
         .catch((err) => console.warn('Firestore post sync notice:', err.message));
     } catch (e) {

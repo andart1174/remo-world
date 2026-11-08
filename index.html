@@ -115,7 +115,7 @@
   <noscript><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"></noscript>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
 
-  <link rel="stylesheet" href="css/remo-core.css?v=87">
+  <link rel="stylesheet" href="css/remo-core.css?v=88">
 </head>
 <body>
 
@@ -293,6 +293,13 @@
           <a class="nav-btn" href="world-radio.html" style="text-decoration:none;">
             <span class="nav-ic">📻</span> <span data-i18n="nav_free_radio_hub">38 Live Radios Hub</span>
           </a>
+          <div style="display:flex;flex-wrap:wrap;gap:6px 10px;padding:10px 10px 4px;margin-top:6px;border-top:1px solid rgba(255,255,255,0.07);font-size:0.72rem;color:var(--muted);">
+            <a href="terms.html" style="color:var(--muted);text-decoration:none;" data-i18n="nav_terms">Terms of Service</a>
+            <span>·</span>
+            <a href="privacy.html" style="color:var(--muted);text-decoration:none;" data-i18n="nav_privacy">Privacy &amp; GDPR</a>
+            <span>·</span>
+            <a href="mailto:contact@remoworld.com" style="color:var(--muted);text-decoration:none;" data-i18n="nav_contact">Contact &amp; Support</a>
+          </div>
         </nav>
       </div>
 
@@ -805,6 +812,15 @@
       <div style="display:flex;gap:6px;">
         <input type="text" id="mbPromoInput" class="remo-input" style="padding:8px 11px;text-transform:uppercase;" data-i18n-placeholder="promo_redeem_ph" placeholder="REMO2026">
         <button class="btn-cyber" onclick="redeemPromoCodeInput('mbPromoInput')" data-i18n="promo_redeem_btn">Claim</button>
+      </div>
+      <div style="display:flex;justify-content:center;flex-wrap:wrap;gap:8px;margin-top:12px;padding-top:10px;border-top:1px solid rgba(255,255,255,0.08);font-size:0.72rem;color:var(--muted);">
+        <a href="cities/index.html" style="color:var(--muted);text-decoration:none;" data-i18n="nav_city_directory">All 24 Cities Guide</a>
+        <span>·</span>
+        <a href="terms.html" style="color:var(--muted);text-decoration:none;" data-i18n="nav_terms">Terms of Service</a>
+        <span>·</span>
+        <a href="privacy.html" style="color:var(--muted);text-decoration:none;" data-i18n="nav_privacy">Privacy &amp; GDPR</a>
+        <span>·</span>
+        <a href="mailto:contact@remoworld.com" style="color:var(--muted);text-decoration:none;" data-i18n="nav_contact">Contact &amp; Support</a>
       </div>
     </div>
   </div>
@@ -1792,19 +1808,19 @@
     </div>
   </div>
 
-  <!-- 👑 Live Admin Quick-Command & Custom Coin Transfer Modal -->
+  <!-- ⚡ Executive Quick-Command Modal (Founder-gated) -->
   <div class="remo-modal-backdrop" id="adminQuickModal" onclick="if(event.target===this)this.classList.remove('open')">
     <div class="remo-modal" style="max-width:600px;border-color:#fbbf24;">
       <div class="modal-hdr">
-        <b style="font-family:'Orbitron',sans-serif;color:#fbbf24;" data-i18n="adm_quick_title">👑 Founder &amp; Admin Live Command Bar</b>
+        <b id="admQuickTitleEl" style="font-family:'Orbitron',sans-serif;color:#fbbf24;">⚡ Executive Studio</b>
         <button class="modal-close" onclick="document.getElementById('adminQuickModal').classList.remove('open')">✕</button>
       </div>
 
-      <!-- PIN Gate inside index.html -->
+      <!-- Verification Gate -->
       <div id="admQuickPinBox" style="display:none;text-align:center;padding:12px 0;">
-        <p style="font-size:0.84rem;color:var(--muted);margin-bottom:12px;" data-i18n="adm_unlock_sub"></p>
+        <p id="admQuickSubEl" style="font-size:0.84rem;color:var(--muted);margin-bottom:12px;"></p>
         <div style="display:flex;gap:8px;max-width:340px;margin:0 auto;">
-          <input type="password" id="admQuickPinInput" class="remo-input" style="text-align:center;font-weight:900;letter-spacing:3px;" value="" placeholder="Enter Secret Admin PIN" onkeydown="if(event.key==='Enter')unlockAdminGodModeInline()">
+          <input type="password" id="admQuickPinInput" class="remo-input" style="text-align:center;font-weight:900;letter-spacing:3px;" value="" autocomplete="off" placeholder="••••" onkeydown="if(event.key==='Enter')unlockAdminGodModeInline()">
           <button class="btn-cyber btn-gold" onclick="unlockAdminGodModeInline()">🔓 Unlock</button>
         </div>
       </div>
@@ -2173,13 +2189,13 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 
   <!-- REMO Modular Engines -->
-  <script src="js/remo-i18n.js?v=87"></script>
-  <script src="js/remo-cities-data.js?v=87"></script>
-  <script src="js/remo-store.js?v=87"></script>
-  <script src="js/remo-card-engine.js?v=87"></script>
-  <script src="js/remo-radar-arena.js?v=87"></script>
-  <script src="js/remo-social-comms.js?v=87"></script>
-  <script src="js/remo-radio-engine.js?v=87"></script>
+  <script src="js/remo-i18n.js?v=88"></script>
+  <script src="js/remo-cities-data.js?v=88"></script>
+  <script src="js/remo-store.js?v=88"></script>
+  <script src="js/remo-card-engine.js?v=88"></script>
+  <script src="js/remo-radar-arena.js?v=88"></script>
+  <script src="js/remo-social-comms.js?v=88"></script>
+  <script src="js/remo-radio-engine.js?v=88"></script>
 
   <noscript>
     <nav aria-label="REMO World Static Directory" style="padding:20px;background:#050816;color:#f8fafc;">

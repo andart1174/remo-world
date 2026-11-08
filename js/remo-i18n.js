@@ -856,7 +856,13 @@ const REMO_DICT = {
     hdr_story_btn: '📸 Story',
     nav_story_btn: '24h City Stories',
     story_modal_title: '📸 REMO 24h City Stories',
-    story_add_new_btn: '📸 + Add My 24h Story (+10 🪙)'
+    story_add_new_btn: '📸 + Add My 24h Story (+10 🪙)',
+    nav_sec_discover: '🌐 Global Directory',
+    nav_city_directory: 'All 24 Cities Guide',
+    nav_free_radio_hub: '38 Live Radios Hub',
+    nav_terms: 'Terms of Service',
+    nav_privacy: 'Privacy & GDPR',
+    nav_contact: 'Contact & Support'
   },
 
   fr: {
@@ -1711,7 +1717,13 @@ const REMO_DICT = {
     hdr_story_btn: '📸 Story',
     nav_story_btn: 'Stories Villes 24h',
     story_modal_title: '📸 Stories Villes 24h REMO',
-    story_add_new_btn: '📸 + Ajouter ma Story 24h (+10 🪙)'
+    story_add_new_btn: '📸 + Ajouter ma Story 24h (+10 🪙)',
+    nav_sec_discover: '🌐 Répertoire Mondial',
+    nav_city_directory: 'Guide des 24 Villes',
+    nav_free_radio_hub: '38 Radios en Direct',
+    nav_terms: 'Conditions d’Utilisation',
+    nav_privacy: 'Confidentialité & RGPD',
+    nav_contact: 'Contact & Support'
   }
 };
 
