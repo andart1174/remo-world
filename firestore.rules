@@ -84,7 +84,33 @@ service cloud.firestore {
       allow write: if isAuthenticated() || isAdmin();
     }
 
-    // 5. Default Fallback Gatekeeper
+    // 5. Direct Messages & Support Tickets
+    match /remo_direct_messages/{dmId} {
+      allow read: if isAuthenticated() || isAdmin();
+      allow create, update: if isAuthenticated() || isAdmin() || (
+        request.resource.data.toUid == 'u_admin_founder' &&
+        request.resource.data.text is string &&
+        request.resource.data.text.size() <= 2500
+      );
+      allow delete: if isAdmin();
+    }
+
+    match /remo_notifications/{notifId} {
+      allow read: if isAuthenticated() || isAdmin();
+      allow create, update: if isAuthenticated() || isAdmin() || (
+        request.resource.data.toUid == 'u_admin_founder' &&
+        request.resource.data.text is string &&
+        request.resource.data.text.size() <= 2500
+      );
+      allow delete: if isAdmin();
+    }
+
+    match /remo_presence/{userId} {
+      allow read: if true;
+      allow write: if isAuthenticated() || isAdmin();
+    }
+
+    // 6. Default Fallback Gatekeeper
     match /{document=**} {
       allow read: if true;
       allow write: if isAdmin();

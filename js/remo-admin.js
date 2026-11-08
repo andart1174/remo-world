@@ -1083,12 +1083,18 @@ function renderAdminModerationPanel() {
           <td><b style="color:#fbbf24;">@${escapeHtmlStr(toU.name || d.toUid)}</b></td>
           <td><span style="color:#f8fafc;">${d.text ? escapeHtmlStr(d.text) : (d.voiceUrl ? '🎤 Note Vocale' : (d.envelopeCoins ? '🧧 Enveloppe ' + d.envelopeCoins + '🪙' : '✉️ Message'))}</span></td>
           <td style="color:var(--muted);font-size:0.75rem;">${dateStr}</td>
-          <td>
+          <td style="display:flex;gap:5px;">
+            <button class="adm-btn indigo" style="padding:4px 8px;" onclick="adminReplyDmFromOffice('${d.id}')">💬 Reply</button>
             <button class="adm-btn rose" style="padding:4px 8px;" onclick="adminDeleteDmFromOffice('${d.id}')">🗑️</button>
           </td>
         </tr>
       `;
     }).join('') : `<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:14px;">Aucun message privé pour le moment.</td></tr>`;
+  }
+
+  // Official Support & Contact Tickets (Overview + Moderation tabs)
+  if (typeof renderAdminSupportTicketsTables === 'function') {
+    renderAdminSupportTicketsTables();
   }
 
   const pBody = document.getElementById('admPostsTable');
@@ -1956,3 +1962,109 @@ window.adminStopMonumentVaultFromOffice = adminStopMonumentVaultFromOffice;
 window.adminToggleCreatorBourseFromOffice = adminToggleCreatorBourseFromOffice;
 window.adminAddCreatorStockFromOffice = adminAddCreatorStockFromOffice;
 window.adminPayDividendToCreatorFromOffice = adminPayDividendToCreatorFromOffice;
+
+/* ── 📩 OFFICIAL SUPPORT & CONTACT INBOX IN ADMIN OFFICE ── */
+function renderAdminSupportTicketsTables() {
+  const tickets = (REMO_STORE.state.supportTickets || []).slice().sort((a, b) => Number(b.ts || 0) - Number(a.ts || 0));
+  const openCount = tickets.filter((t) => t && t.status !== 'replied').length;
+
+  ['admSupportOverviewBadge', 'admSupportModBadge'].forEach((id) => {
+    const b = document.getElementById(id);
+    if (b) {
+      b.style.display = openCount > 0 ? 'inline-block' : 'none';
+      b.textContent = String(openCount);
+    }
+  });
+
+  const rowsHtml = tickets.length
+    ? tickets.map((tk) => {
+        const c = getCityById(tk.cityId || 'montreal') || { flag: '🌐' };
+        const dateStr = tk.ts ? new Date(tk.ts).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+        const isReplied = tk.status === 'replied';
+        return `
+          <tr>
+            <td>
+              <b style="color:#7dd3fc;">${c.flag} ${escapeHtmlStr(tk.senderName || 'Citizen')}</b>
+              ${tk.passportNum ? `<br><small style="color:var(--muted);">#${escapeHtmlStr(tk.passportNum)}</small>` : ''}
+            </td>
+            <td><span style="color:#fbbf24;font-weight:800;font-size:0.78rem;">${escapeHtmlStr(tk.categoryLabel || tk.category || 'Support')}</span></td>
+            <td>
+              <div style="color:#f8fafc;white-space:pre-wrap;margin-bottom:4px;">${escapeHtmlStr(tk.message || '')}</div>
+              ${tk.replyText ? `<div style="background:rgba(16,185,129,0.14);border-left:3px solid #10b981;padding:4px 8px;border-radius:6px;color:#a7f3d0;font-size:0.76rem;">🛡️ <b>Réponse REMO :</b> ${escapeHtmlStr(tk.replyText)}</div>` : ''}
+            </td>
+            <td style="color:var(--muted);font-size:0.75rem;">${dateStr}</td>
+            <td style="display:flex;gap:6px;flex-wrap:wrap;">
+              <button class="adm-btn ${isReplied ? 'emerald' : 'gold'}" style="padding:5px 10px;" onclick="adminReplySupportTicketFromOffice('${tk.id}')">💬 ${isReplied ? 'Répondre encore' : 'Répondre'}</button>
+              <button class="adm-btn rose" style="padding:5px 8px;" onclick="adminDeleteSupportTicketFromOffice('${tk.id}')">🗑️</button>
+            </td>
+          </tr>
+        `;
+      }).join('')
+    : `<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:14px;">Aucun ticket de support ou contact pour le moment ✨</td></tr>`;
+
+  ['admSupportOverviewTable', 'admSupportModTable'].forEach((id) => {
+    const tb = document.getElementById(id);
+    if (tb) tb.innerHTML = rowsHtml;
+  });
+}
+
+function adminReplySupportTicketFromOffice(ticketId) {
+  const tk = (REMO_STORE.state.supportTickets || []).find((x) => x && x.id === ticketId);
+  if (!tk) return;
+  const reply = window.prompt(
+    `🛡️ Réponse officielle de l'Administration REMO à ${tk.senderName} (livrée dans ses Notifications 🔔 et sa Messagerie 💌 sans exposer de Gmail) :`,
+    tk.replyText || ''
+  );
+  if (!reply || !reply.trim()) return;
+  REMO_STORE.replySupportTicket(ticketId, reply.trim());
+  admToast(`✅ Réponse officielle envoyée à ${tk.senderName} dans REMO !`);
+  refreshAllAdminPanels();
+}
+
+function adminDeleteSupportTicketFromOffice(ticketId) {
+  REMO_STORE.deleteSupportTicket(ticketId);
+  admToast('🗑️ Ticket supprimé.');
+  refreshAllAdminPanels();
+}
+
+function adminReplyDmFromOffice(dmId) {
+  const d = (REMO_STORE.state.directMessages || []).find((x) => x && x.id === dmId);
+  if (!d) return;
+  const targetUid = d.fromUid === 'u_admin_founder' ? d.toUid : d.fromUid;
+  const targetName = d.fromName || 'Citoyen';
+  const reply = window.prompt(`🛡️ Répondre dans la Messagerie REMO à @${targetName} :`, '');
+  if (!reply || !reply.trim()) return;
+  const now = Date.now();
+  const dmReply = {
+    id: 'dm_adm_' + now,
+    fromUid: 'u_admin_founder',
+    fromName: '🛡️ REMO Official Support',
+    fromCity: 'montreal',
+    toUid: targetUid,
+    text: `🛡️ [REMO Official Support]: ${reply.trim()}`,
+    isRoyalAdmin: true,
+    read: false,
+    ts: now
+  };
+  REMO_STORE.state.directMessages.unshift(dmReply);
+  REMO_STORE.syncDmToCloud(dmReply);
+  REMO_STORE.addNotification({
+    id: 'notif_adm_' + now,
+    toUid: targetUid,
+    fromUid: 'u_admin_founder',
+    fromName: '🛡️ REMO Official Support',
+    fromCity: 'montreal',
+    type: 'message',
+    text: `🛡️ REMO Support: ${reply.trim().slice(0, 100)}`,
+    rawPreview: reply.trim().slice(0, 120),
+    ts: now
+  });
+  REMO_STORE.save(true, 'admin_dm_reply');
+  admToast(`✅ Message envoyé à @${targetName} dans REMO !`);
+  refreshAllAdminPanels();
+}
+
+window.renderAdminSupportTicketsTables = renderAdminSupportTicketsTables;
+window.adminReplySupportTicketFromOffice = adminReplySupportTicketFromOffice;
+window.adminDeleteSupportTicketFromOffice = adminDeleteSupportTicketFromOffice;
+window.adminReplyDmFromOffice = adminReplyDmFromOffice;

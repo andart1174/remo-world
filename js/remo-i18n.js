@@ -862,7 +862,20 @@ const REMO_DICT = {
     nav_free_radio_hub: '38 Live Radios Hub',
     nav_terms: 'Terms of Service',
     nav_privacy: 'Privacy & GDPR',
-    nav_contact: 'Contact & Support'
+    nav_contact: 'Contact & Support',
+    contact_modal_title: '📩 Official REMO Support & Contact',
+    contact_modal_sub: 'Send a direct message to the REMO Administration. Replies arrive directly in your REMO Notifications 🔔 & Messenger 💌.',
+    contact_cat_lbl: 'Category / Topic',
+    contact_cat_support: '🛠️ Technical Support / Bug Report',
+    contact_cat_partner: '🤝 Advertising & Brand Partnership',
+    contact_cat_privacy: '🛡️ Privacy / GDPR / Content Report',
+    contact_cat_idea: '💡 Feature Idea & Suggestion',
+    contact_sender_lbl: 'Your Citizen @Handle or Name',
+    contact_sender_ph: '@YourName or Citizen ID',
+    contact_msg_lbl: 'Your Message to REMO Administration',
+    contact_msg_ph: 'Write your message, question, or request here...',
+    contact_submit_btn: '🚀 Send to REMO Administration',
+    contact_sent_toast: '✅ Message delivered directly to REMO Administration! Watch your 🔔 Notifications & 💌 Messenger for the reply.'
   },
 
   fr: {
@@ -1723,7 +1736,20 @@ const REMO_DICT = {
     nav_free_radio_hub: '38 Radios en Direct',
     nav_terms: 'Conditions d’Utilisation',
     nav_privacy: 'Confidentialité & RGPD',
-    nav_contact: 'Contact & Support'
+    nav_contact: 'Contact & Support',
+    contact_modal_title: '📩 Support & Contact Officiel REMO',
+    contact_modal_sub: 'Envoyez un message direct à l’Administration REMO. Les réponses arrivent directement dans vos Notifications 🔔 et votre Messagerie 💌.',
+    contact_cat_lbl: 'Catégorie / Sujet',
+    contact_cat_support: '🛠️ Support Technique / Signaler un Bug',
+    contact_cat_partner: '🤝 Publicité & Partenariat de Marque',
+    contact_cat_privacy: '🛡️ Confidentialité / RGPD / Signalement',
+    contact_cat_idea: '💡 Idée & Suggestion pour REMO',
+    contact_sender_lbl: 'Votre @Pseudo Citoyen ou Nom',
+    contact_sender_ph: '@VotreNom ou Passeport Citoyen',
+    contact_msg_lbl: 'Votre Message pour l’Administration REMO',
+    contact_msg_ph: 'Écrivez votre message, question ou demande ici...',
+    contact_submit_btn: '🚀 Envoyer à l’Administration REMO',
+    contact_sent_toast: '✅ Message transmis directement à l’Administration REMO ! Surveillez vos Notifications 🔔 et votre Messagerie 💌.'
   }
 };
 

@@ -5849,7 +5849,7 @@ function openAdminQuickModal(preselectUid = '') {
   const isAdmUser = REMO_STORE.isCurrentUserAdmin();
   if (!isAdmUser) {
     const lang = REMO_I18N.getLang();
-    remoToast(lang === 'fr' ? '🔒 Accès réservé au compte Fondateur (andart1174@gmail.com).' : '🔒 Access restricted to Founder account (andart1174@gmail.com).');
+    remoToast(lang === 'fr' ? '🔒 Accès réservé à l’Administration Officielle REMO.' : '🔒 Access restricted to Official REMO Administration.');
     return;
   }
 
@@ -5889,6 +5889,9 @@ function openAdminQuickModal(preselectUid = '') {
       hhBtn.textContent = REMO_STORE.state.settings.happyHour2x
         ? (lang === 'fr' ? '🟢 Happy Hour 2X : ACTIF (Désactiver)' : '🟢 2X Happy Hour: ACTIVE (Turn Off)')
         : (lang === 'fr' ? '⚡ Activer Happy Hour 2X Pièces' : '⚡ Activate 2X Rewards Happy Hour');
+    }
+    if (typeof renderInlineAdminSupportInbox === 'function') {
+      renderInlineAdminSupportInbox();
     }
   }
   modal.classList.add('open');
@@ -12763,3 +12766,137 @@ function citizenSellCreatorShare(creatorUid) {
   renderViralContestsView();
 }
 window.citizenSellCreatorShare = citizenSellCreatorShare;
+
+/* ── 📩 OFFICIAL IN-APP CONTACT & SUPPORT DESK (Zero External Email Needed) ── */
+function openContactSupportModal(defaultCategory = 'support') {
+  const modal = document.getElementById('remoContactSupportModal');
+  if (!modal) return;
+  const u = REMO_STORE.getCurrentUser();
+  const senderInp = document.getElementById('contactSupportSenderInp');
+  const catSel = document.getElementById('contactSupportCategorySel');
+  const msgInp = document.getElementById('contactSupportMsgInp');
+  if (catSel && defaultCategory) catSel.value = defaultCategory;
+  if (senderInp && !senderInp.value) {
+    if (u && u.name && u.role !== 'guest') {
+      senderInp.value = `@${u.name}${u.passportNum ? ' (#' + u.passportNum + ')' : ''}`;
+    }
+  }
+  if (msgInp) msgInp.value = '';
+  REMO_I18N.applyDOM(modal);
+  modal.classList.add('open');
+}
+
+function submitContactSupportTicket(e) {
+  if (e && typeof e.preventDefault === 'function') e.preventDefault();
+  const lang = REMO_I18N.getLang();
+  const category = document.getElementById('contactSupportCategorySel')?.value || 'support';
+  const senderName = document.getElementById('contactSupportSenderInp')?.value.trim() || 'Citizen';
+  const message = document.getElementById('contactSupportMsgInp')?.value.trim() || '';
+
+  if (!message) {
+    remoToast(lang === 'fr' ? '⚠️ Veuillez écrire votre message.' : '⚠️ Please write your message.');
+    return;
+  }
+
+  const res = REMO_STORE.submitSupportTicket({ category, senderName, message });
+  if (!res || !res.ok) {
+    remoToast(
+      res && res.error === 'cooldown'
+        ? (lang === 'fr' ? '⏳ Patientez quelques secondes avant un nouveau message.' : '⏳ Please wait a few seconds before sending another message.')
+        : (lang === 'fr' ? '⚠️ Impossible d’envoyer le message.' : '⚠️ Could not send message.')
+    );
+    return;
+  }
+
+  document.getElementById('remoContactSupportModal')?.classList.remove('open');
+  if (typeof RemoAudio !== 'undefined' && RemoAudio.play) RemoAudio.play('fanfare');
+  remoToast(t('contact_sent_toast'), 'fanfare');
+  syncHeaderAndSidebars();
+  if (typeof updateUnreadBadges === 'function') updateUnreadBadges();
+  if (typeof renderInlineAdminSupportInbox === 'function') renderInlineAdminSupportInbox();
+}
+
+function renderInlineAdminSupportInbox() {
+  const listEl = document.getElementById('admQuickSupportList');
+  const badgeEl = document.getElementById('admQuickSupportCountBadge');
+  if (!listEl) return;
+  const lang = REMO_I18N.getLang();
+  const tickets = (REMO_STORE.state.supportTickets || []).slice().sort((a, b) => Number(b.ts || 0) - Number(a.ts || 0));
+  const openCount = tickets.filter((t) => t && t.status !== 'replied').length;
+
+  if (badgeEl) {
+    badgeEl.style.display = openCount > 0 ? 'inline-block' : 'none';
+    badgeEl.textContent = String(openCount);
+  }
+
+  if (tickets.length === 0) {
+    listEl.innerHTML = `<div style="color:var(--muted);text-align:center;padding:10px;">${lang === 'fr' ? 'Aucun message de support pour le moment ✨' : 'No support messages yet ✨'}</div>`;
+    return;
+  }
+
+  listEl.innerHTML = tickets.map((tk) => {
+    const c = getCityById(tk.cityId || 'montreal') || { flag: '🌐' };
+    const timeStr = tk.ts ? new Date(tk.ts).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+    const isReplied = tk.status === 'replied';
+    return `
+      <div style="background:rgba(15,23,42,0.75);border:1px solid ${isReplied ? 'rgba(16,185,129,0.35)' : 'rgba(56,189,248,0.45)'};border-radius:12px;padding:9px 11px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:4px;">
+          <span style="font-weight:900;color:#7dd3fc;">${c.flag} ${escapeHtmlStr(tk.senderName || 'Citizen')} <span style="color:#fbbf24;font-size:0.72rem;">· ${escapeHtmlStr(tk.categoryLabel || tk.category || 'Support')}</span></span>
+          <span style="font-size:0.68rem;color:var(--muted);">${timeStr}</span>
+        </div>
+        <div style="color:#f8fafc;line-height:1.4;margin-bottom:6px;white-space:pre-wrap;">${escapeHtmlStr(tk.message || '')}</div>
+        ${tk.replyText ? `<div style="background:rgba(16,185,129,0.12);border-left:3px solid #10b981;padding:5px 8px;border-radius:6px;color:#a7f3d0;font-size:0.74rem;margin-bottom:6px;">🛡️ <b>REMO Reply:</b> ${escapeHtmlStr(tk.replyText)}</div>` : ''}
+        <div style="display:flex;gap:6px;justify-content:flex-end;">
+          <button type="button" class="btn-cyber" style="padding:4px 10px;font-size:0.72rem;" onclick="replySupportTicketInline('${tk.id}')">💬 ${isReplied ? (lang === 'fr' ? 'Répondre encore' : 'Reply Again') : (lang === 'fr' ? 'Répondre dans REMO' : 'Reply in REMO')}</button>
+          <button type="button" class="btn-ghost" style="padding:4px 8px;font-size:0.72rem;border-color:#f43f5e;color:#fda4af;" onclick="deleteSupportTicketInline('${tk.id}')">🗑️</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function replySupportTicketInline(ticketId) {
+  if (!REMO_STORE.isCurrentUserAdmin()) return;
+  const lang = REMO_I18N.getLang();
+  const tk = (REMO_STORE.state.supportTickets || []).find((x) => x && x.id === ticketId);
+  if (!tk) return;
+  const reply = window.prompt(
+    lang === 'fr'
+      ? `🛡️ Répondre officiellement à ${tk.senderName} dans REMO (Notifications 🔔 & Messagerie 💌) :`
+      : `🛡️ Send official REMO Support reply to ${tk.senderName} (delivered to their Notifications 🔔 & Messenger 💌):`,
+    tk.replyText || ''
+  );
+  if (!reply || !reply.trim()) return;
+  REMO_STORE.replySupportTicket(ticketId, reply.trim());
+  remoToast(
+    lang === 'fr'
+      ? `✅ Réponse officielle envoyée à ${tk.senderName} dans REMO !`
+      : `✅ Official reply delivered to ${tk.senderName} in REMO!`
+  );
+  renderInlineAdminSupportInbox();
+  syncHeaderAndSidebars();
+}
+
+function deleteSupportTicketInline(ticketId) {
+  if (!REMO_STORE.isCurrentUserAdmin()) return;
+  REMO_STORE.deleteSupportTicket(ticketId);
+  renderInlineAdminSupportInbox();
+  syncHeaderAndSidebars();
+}
+
+window.openContactSupportModal = openContactSupportModal;
+window.submitContactSupportTicket = submitContactSupportTicket;
+window.renderInlineAdminSupportInbox = renderInlineAdminSupportInbox;
+window.replySupportTicketInline = replySupportTicketInline;
+window.deleteSupportTicketInline = deleteSupportTicketInline;
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('DOMContentLoaded', () => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('contact') === '1') {
+        setTimeout(() => openContactSupportModal(), 350);
+      }
+    } catch (e) {}
+  });
+}

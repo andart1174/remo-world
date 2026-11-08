@@ -1259,6 +1259,7 @@ function createDefaultState() {
     cityPredictions: getDefaultCityPredictions(now),
     viralContests: getDefaultViralContests(),
     worldSystems: getDefaultUniqueWorldSystems(),
+    supportTickets: [],
     notifications: []
   };
 }
@@ -3301,6 +3302,135 @@ const REMO_STORE = {
     }
   },
 
+  submitSupportTicket({ category = 'support', senderName = '', message = '' } = {}) {
+    const cleanMsg = String(message || '').trim().slice(0, 1800);
+    if (!cleanMsg) return { ok: false, error: 'empty' };
+    const now = Date.now();
+    if (this._lastSupportTicketTs && (now - this._lastSupportTicketTs) < 8000) {
+      return { ok: false, error: 'cooldown' };
+    }
+    this._lastSupportTicketTs = now;
+
+    const u = this.getCurrentUser();
+    const isAdm = this.isCurrentUserAdmin();
+    const cleanSender = String(senderName || (u && u.name) || 'Citizen').trim().slice(0, 60) || 'Citizen';
+    const cleanCat = String(category || 'support').trim();
+    const catLabels = {
+      support: '🛠️ Tech Support',
+      partnership: '🤝 Ad & Partnership',
+      privacy: '🛡️ Privacy / GDPR',
+      idea: '💡 Feature Idea'
+    };
+    const catBadge = catLabels[cleanCat] || '📩 Support';
+
+    const ticket = {
+      id: 'tkt_' + now + '_' + Math.random().toString(36).slice(2, 6),
+      uid: u ? u.uid : ('u_visitor_' + now),
+      senderName: cleanSender,
+      passportNum: u ? (u.passportNum || '') : '',
+      cityId: u ? (u.homeCity || 'montreal') : 'montreal',
+      category: cleanCat,
+      categoryLabel: catBadge,
+      message: cleanMsg,
+      status: 'open',
+      replyText: '',
+      repliedAt: 0,
+      read: false,
+      ts: now
+    };
+
+    if (!Array.isArray(this.state.supportTickets)) this.state.supportTickets = [];
+    this.state.supportTickets.unshift(ticket);
+    if (this.state.supportTickets.length > 60) {
+      this.state.supportTickets = this.state.supportTickets.slice(0, 60);
+    }
+
+    // Also deliver directly to Founder's Messenger & Notification Bell (using 'u_support_desk' if Founder is testing from own session so it shows up as unread)
+    const dmFromUid = (isAdm || !u || u.uid === 'u_admin_founder') ? 'u_support_desk' : u.uid;
+    const dmFromName = (isAdm || !u || u.uid === 'u_admin_founder') ? ('📩 ' + cleanSender) : cleanSender;
+    const dmObj = {
+      id: 'dm_' + ticket.id,
+      fromUid: dmFromUid,
+      fromName: dmFromName,
+      fromCity: ticket.cityId,
+      toUid: 'u_admin_founder',
+      text: `🎫 [${catBadge}] (${cleanSender}${ticket.passportNum ? ' #' + ticket.passportNum : ''}): ${cleanMsg}`,
+      read: false,
+      ts: now
+    };
+    if (!Array.isArray(this.state.directMessages)) this.state.directMessages = [];
+    this.state.directMessages.unshift(dmObj);
+    this.syncDmToCloud(dmObj);
+
+    this.addNotification({
+      id: 'notif_' + ticket.id,
+      toUid: 'u_admin_founder',
+      fromUid: dmFromUid,
+      fromName: dmFromName,
+      fromCity: ticket.cityId,
+      type: 'message',
+      text: `🎫 [${catBadge}] ${cleanSender}: ${cleanMsg.slice(0, 90)}`,
+      rawPreview: cleanMsg.slice(0, 120),
+      ts: now
+    });
+
+    this.save(true, 'support_ticket_created');
+    return { ok: true, ticket };
+  },
+
+  replySupportTicket(ticketId, replyText) {
+    const cleanReply = String(replyText || '').trim().slice(0, 1800);
+    if (!ticketId || !cleanReply) return { ok: false };
+    if (!Array.isArray(this.state.supportTickets)) this.state.supportTickets = [];
+    const tkt = this.state.supportTickets.find((x) => x && x.id === ticketId);
+    if (!tkt) return { ok: false };
+
+    const now = Date.now();
+    tkt.status = 'replied';
+    tkt.replyText = cleanReply;
+    tkt.repliedAt = now;
+    tkt.read = true;
+
+    const targetUid = tkt.uid || '';
+    if (targetUid) {
+      const dmReply = {
+        id: 'dm_reply_' + now + '_' + Math.random().toString(36).slice(2, 5),
+        fromUid: 'u_admin_founder',
+        fromName: '🛡️ REMO Official Support',
+        fromCity: 'montreal',
+        toUid: targetUid,
+        text: `🛡️ [REMO Official Support]: ${cleanReply}`,
+        isRoyalAdmin: true,
+        read: false,
+        ts: now
+      };
+      if (!Array.isArray(this.state.directMessages)) this.state.directMessages = [];
+      this.state.directMessages.unshift(dmReply);
+      this.syncDmToCloud(dmReply);
+
+      this.addNotification({
+        id: 'notif_reply_' + now,
+        toUid: targetUid,
+        fromUid: 'u_admin_founder',
+        fromName: '🛡️ REMO Official Support',
+        fromCity: 'montreal',
+        type: 'message',
+        text: `🛡️ REMO Support: ${cleanReply.slice(0, 100)}`,
+        rawPreview: cleanReply.slice(0, 120),
+        ts: now
+      });
+    }
+
+    this.save(true, 'support_ticket_replied');
+    return { ok: true, ticket: tkt };
+  },
+
+  deleteSupportTicket(ticketId) {
+    if (!ticketId || !Array.isArray(this.state.supportTickets)) return;
+    this.state.supportTickets = this.state.supportTickets.filter((x) => x && x.id !== ticketId);
+    this.save(true, 'support_ticket_deleted');
+  },
+
   signOut() {
     localStorage.removeItem(this.USER_KEY);
     localStorage.removeItem(this.ADMIN_MODE_KEY);
@@ -4291,6 +4421,20 @@ const REMO_STORE = {
           });
           if (typeof renderViralContestsView === 'function') renderViralContestsView();
           if (typeof renderFeedActiveContestsBanner === 'function') renderFeedActiveContestsBanner();
+        }
+        if (Array.isArray(data.supportTickets)) {
+          const localMap = new Map();
+          (this.state.supportTickets || []).forEach((t) => {
+            if (t && t.id) localMap.set(t.id, t);
+          });
+          data.supportTickets.forEach((ct) => {
+            if (!ct || !ct.id) return;
+            const lt = localMap.get(ct.id);
+            if (!lt || Number(ct.repliedAt || ct.ts || 0) >= Number(lt.repliedAt || lt.ts || 0)) {
+              localMap.set(ct.id, Object.assign({}, lt || {}, ct));
+            }
+          });
+          this.state.supportTickets = Array.from(localMap.values()).sort((a, b) => Number(b.ts || 0) - Number(a.ts || 0)).slice(0, 60);
         }
       };
       
@@ -6194,6 +6338,7 @@ const REMO_STORE = {
           auctions: cleanAuctions,
           geoVaults: (this.state.geoVaults || []).slice(0, 35),
           stories: (this.state.stories || []).slice(0, 15),
+          supportTickets: (this.state.supportTickets || []).slice(0, 60),
           viralContests: this.state.viralContests || getDefaultViralContests(),
           worldSystems: this.state.worldSystems || getDefaultUniqueWorldSystems(),
           deletedPostIds: [...(this.deletedPostIds || [])].slice(-100),

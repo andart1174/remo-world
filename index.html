@@ -115,7 +115,7 @@
   <noscript><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"></noscript>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
 
-  <link rel="stylesheet" href="css/remo-core.css?v=88">
+  <link rel="stylesheet" href="css/remo-core.css?v=89">
 </head>
 <body>
 
@@ -298,7 +298,7 @@
             <span>·</span>
             <a href="privacy.html" style="color:var(--muted);text-decoration:none;" data-i18n="nav_privacy">Privacy &amp; GDPR</a>
             <span>·</span>
-            <a href="mailto:contact@remoworld.com" style="color:var(--muted);text-decoration:none;" data-i18n="nav_contact">Contact &amp; Support</a>
+            <a href="javascript:void(0)" onclick="openContactSupportModal()" style="color:#7dd3fc;font-weight:700;text-decoration:none;" data-i18n="nav_contact">Contact &amp; Support</a>
           </div>
         </nav>
       </div>
@@ -820,7 +820,7 @@
         <span>·</span>
         <a href="privacy.html" style="color:var(--muted);text-decoration:none;" data-i18n="nav_privacy">Privacy &amp; GDPR</a>
         <span>·</span>
-        <a href="mailto:contact@remoworld.com" style="color:var(--muted);text-decoration:none;" data-i18n="nav_contact">Contact &amp; Support</a>
+        <a href="javascript:void(0)" onclick="document.getElementById('mobileHubModal').classList.remove('open');openContactSupportModal();" style="color:#7dd3fc;font-weight:700;text-decoration:none;" data-i18n="nav_contact">Contact &amp; Support</a>
       </div>
     </div>
   </div>
@@ -1874,6 +1874,15 @@
           <button class="btn-cyber" style="width:100%;justify-content:center;" onclick="createPromoCodeInline()" data-i18n="adm_promo_btn">🎟️ Generate Code</button>
         </div>
 
+        <!-- 3B. Live Contact & Support Inbox inside Quick Studio -->
+        <div style="background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.38);border-radius:16px;padding:12px;">
+          <div style="font-weight:900;font-size:0.84rem;color:#34d399;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
+            <span>📩 Support &amp; Contact Inbox</span>
+            <span id="admQuickSupportCountBadge" style="background:#ef4444;color:#fff;border-radius:99px;padding:1px 8px;font-size:0.72rem;display:none;">0</span>
+          </div>
+          <div id="admQuickSupportList" style="max-height:190px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;font-size:0.78rem;"></div>
+        </div>
+
         <!-- 4. Footer Links -->
         <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;padding-top:6px;border-top:1px solid var(--border);">
           <a href="admin.html" class="btn-cyber btn-gold">🛡️ Full Admin Office &amp; 300 DPI Card Studio</a>
@@ -2179,6 +2188,41 @@
     </div>
   </div>
 
+  <!-- 📩 Official In-App Contact & Support Modal (Zero External Email Needed) -->
+  <div class="remo-modal-backdrop" id="remoContactSupportModal" onclick="if(event.target===this)this.classList.remove('open')">
+    <div class="remo-modal" style="max-width:520px;border-color:#38bdf8;">
+      <div class="modal-hdr">
+        <b style="font-family:'Orbitron',sans-serif;color:#38bdf8;font-size:0.95rem;" data-i18n="contact_modal_title">📩 Official REMO Support &amp; Contact</b>
+        <button class="modal-close" onclick="document.getElementById('remoContactSupportModal').classList.remove('open')">✕</button>
+      </div>
+      <p style="font-size:0.8rem;color:#cbd5e1;margin-bottom:14px;line-height:1.45;" data-i18n="contact_modal_sub">
+        Send a direct message to the REMO Administration. Replies arrive directly in your REMO Notifications 🔔 &amp; Messenger 💌.
+      </p>
+      <form onsubmit="submitContactSupportTicket(event)" style="display:flex;flex-direction:column;gap:12px;">
+        <div class="form-field">
+          <label data-i18n="contact_cat_lbl" style="font-size:0.76rem;font-weight:800;color:#7dd3fc;">Category / Topic</label>
+          <select id="contactSupportCategorySel" class="remo-input">
+            <option value="support" data-i18n="contact_cat_support">🛠️ Technical Support / Bug Report</option>
+            <option value="partnership" data-i18n="contact_cat_partner">🤝 Advertising &amp; Brand Partnership</option>
+            <option value="privacy" data-i18n="contact_cat_privacy">🛡️ Privacy / GDPR / Content Report</option>
+            <option value="idea" data-i18n="contact_cat_idea">💡 Feature Idea &amp; Suggestion</option>
+          </select>
+        </div>
+        <div class="form-field">
+          <label data-i18n="contact_sender_lbl" style="font-size:0.76rem;font-weight:800;color:#7dd3fc;">Your Citizen @Handle or Name</label>
+          <input type="text" id="contactSupportSenderInp" class="remo-input" data-i18n-placeholder="contact_sender_ph" placeholder="@YourName or Citizen ID" maxlength="60" required>
+        </div>
+        <div class="form-field">
+          <label data-i18n="contact_msg_lbl" style="font-size:0.76rem;font-weight:800;color:#7dd3fc;">Your Message to REMO Administration</label>
+          <textarea id="contactSupportMsgInp" class="remo-input" rows="4" data-i18n-placeholder="contact_msg_ph" placeholder="Write your message, question, or request here..." maxlength="1800" required style="resize:vertical;"></textarea>
+        </div>
+        <button type="submit" class="btn-cyber" style="width:100%;justify-content:center;padding:11px;font-weight:900;background:linear-gradient(135deg,#0284c7,#6366f1);" data-i18n="contact_submit_btn">
+          🚀 Send to REMO Administration
+        </button>
+      </form>
+    </div>
+  </div>
+
   <!-- Toast Container -->
   <div class="remo-toast-box" id="remoToastBox"></div>
 
@@ -2189,13 +2233,13 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 
   <!-- REMO Modular Engines -->
-  <script src="js/remo-i18n.js?v=88"></script>
-  <script src="js/remo-cities-data.js?v=88"></script>
-  <script src="js/remo-store.js?v=88"></script>
-  <script src="js/remo-card-engine.js?v=88"></script>
-  <script src="js/remo-radar-arena.js?v=88"></script>
-  <script src="js/remo-social-comms.js?v=88"></script>
-  <script src="js/remo-radio-engine.js?v=88"></script>
+  <script src="js/remo-i18n.js?v=89"></script>
+  <script src="js/remo-cities-data.js?v=89"></script>
+  <script src="js/remo-store.js?v=89"></script>
+  <script src="js/remo-card-engine.js?v=89"></script>
+  <script src="js/remo-radar-arena.js?v=89"></script>
+  <script src="js/remo-social-comms.js?v=89"></script>
+  <script src="js/remo-radio-engine.js?v=89"></script>
 
   <noscript>
     <nav aria-label="REMO World Static Directory" style="padding:20px;background:#050816;color:#f8fafc;">
