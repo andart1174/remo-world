@@ -884,7 +884,14 @@ const REMO_DICT = {
     amb_modal_title: '🏅 Official City Ambassador 9:16 Diploma',
     amb_modal_sub: 'Official Sovereign Diploma locked to your Home City & Earned Rank. Add your photo and share on Facebook, WhatsApp, TikTok or Instagram (+25 🪙)!',
     amb_upload_photo_btn: '📷 Add My Photo to Diploma',
-    amb_share_native: '📲 Share 9:16 Diploma (TikTok / Insta / Native)'
+    amb_share_native: '📲 Share 9:16 Diploma (TikTok / Insta / Native)',
+    nav_scratch_card: 'Golden Scratch-Card',
+    scratch_right_btn: '🎟️ Scratch & Win Gold (+500 🪙)',
+    scratch_modal_title: '🎟️ 24K Golden City Scratch-Card',
+    scratch_modal_sub: 'Scratch the 24K Gold Foil with your finger or mouse to reveal your guaranteed REMO Coin prize (+35 to +500 🪙)!',
+    scratch_instant_btn: '⚡ Instant Scratch & Claim Prize',
+    scratch_unlock_title: '🎁 Unlock Your 2nd Golden Scratch-Card!',
+    scratch_unlock_sub: 'Share REMO World with friends on Facebook, WhatsApp or Telegram to unlock a 2nd Golden Scratch-Card right now!'
   },
 
   fr: {
@@ -1765,7 +1772,14 @@ const REMO_DICT = {
     amb_modal_title: '🏅 Diplôme Officiel d’Ambassadeur 9:16',
     amb_modal_sub: 'Diplôme Souverain Officiel certifié pour votre Ville et votre Rang réel. Ajoutez votre photo et partagez sur Facebook, WhatsApp, TikTok ou Instagram (+25 🪙) !',
     amb_upload_photo_btn: '📷 Ajouter Ma Photo au Diplôme',
-    amb_share_native: '📲 Partager le Diplôme 9:16 (TikTok / Insta / Natif)'
+    amb_share_native: '📲 Partager le Diplôme 9:16 (TikTok / Insta / Natif)',
+    nav_scratch_card: 'Ticket d’Or à Gratter',
+    scratch_right_btn: '🎟️ Gratter & Gagner (+500 🪙)',
+    scratch_modal_title: '🎟️ Ticket d’Or 24K des Villes à Gratter',
+    scratch_modal_sub: 'Grattez la feuille d’Or 24K avec le doigt ou la souris pour révéler votre gain garanti en Pièces REMO (+35 à +500 🪙) !',
+    scratch_instant_btn: '⚡ Gratter Instantanément & Encaisser',
+    scratch_unlock_title: '🎁 Débloquez Votre 2e Ticket d’Or !',
+    scratch_unlock_sub: 'Partagez REMO World avec vos amis sur Facebook, WhatsApp ou Telegram pour débloquer un 2e Ticket d’Or immédiatement !'
   }
 };
 

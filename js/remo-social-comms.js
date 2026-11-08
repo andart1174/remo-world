@@ -13547,6 +13547,309 @@ window.handleAmbassadorDiplomaPhotoUpload = handleAmbassadorDiplomaPhotoUpload;
 window.resetAmbassadorDiplomaPhoto = resetAmbassadorDiplomaPhoto;
 window.shareCityAmbassadorDiploma = shareCityAmbassadorDiploma;
 
+/* ── 🎟️ 24K GOLDEN CITY SCRATCH-CARD ENGINE (DAILY + SHARE-TO-UNLOCK #2) ── */
+let _activeScratchPrize = null;
+let _scratchRevealed = false;
+let _scratchBound = false;
+
+function getGoldenScratchDayState() {
+  const day = new Date().toISOString().slice(0, 10);
+  const usedCount = Number(localStorage.getItem('remo_scratch_used_' + day) || 0);
+  const sharedUnlocked = localStorage.getItem('remo_scratch_shared_' + day) === '1';
+  return { day, usedCount, sharedUnlocked };
+}
+
+function rollGoldenScratchPrize(city, lang) {
+  const isFr = lang === 'fr';
+  const cityName = getCityName(city, lang);
+  const flag = city.flag || '⚜️';
+  const roll = Math.random();
+  if (roll < 0.12) {
+    return {
+      coins: 500,
+      pts: 50,
+      symbols: `${flag} ${flag} ${flag}`,
+      title: isFr ? '🏆 JACKPOT ROYAL : +500 🪙 !' : '🏆 ROYAL JACKPOT: +500 🪙!',
+      sub: isFr ? `🔥 +50 PTS pour ${cityName}` : `🔥 +50 PTS for ${cityName}`
+    };
+  }
+  if (roll < 0.38) {
+    return {
+      coins: 150,
+      pts: 25,
+      symbols: `${flag} ${flag} 🪙`,
+      title: isFr ? '✨ GAIN D’OR 24K : +150 🪙 !' : '✨ 24K GOLD WIN: +150 🪙!',
+      sub: isFr ? `🏆 +25 PTS pour ${cityName}` : `🏆 +25 PTS for ${cityName}`
+    };
+  }
+  if (roll < 0.72) {
+    return {
+      coins: 75,
+      pts: 15,
+      symbols: `${flag} 🗼 🪙`,
+      title: isFr ? '🎉 PRIX CITOYEN : +75 🪙 !' : '🎉 CITIZEN PRIZE: +75 🪙!',
+      sub: isFr ? `⚡ +15 PTS pour ${cityName}` : `⚡ +15 PTS for ${cityName}`
+    };
+  }
+  return {
+    coins: 35,
+    pts: 10,
+    symbols: `${flag} 🗽 🌟`,
+    title: isFr ? '🪙 BONUS DU JOUR : +35 🪙 !' : '🪙 DAILY BONUS: +35 🪙!',
+    sub: isFr ? `🌍 +10 PTS pour ${cityName}` : `🌍 +10 PTS for ${cityName}`
+  };
+}
+
+function paintGoldenScratchFoilCanvas(isLockedTicket) {
+  const cv = document.getElementById('goldenScratchCanvas');
+  if (!cv) return;
+  const ctx = cv.getContext('2d');
+  const W = 360;
+  const H = 200;
+  cv.width = W;
+  cv.height = H;
+  cv.style.opacity = '1';
+  cv.style.pointerEvents = isLockedTicket ? 'none' : 'auto';
+
+  ctx.globalCompositeOperation = 'source-over';
+  const foilGrad = ctx.createLinearGradient(0, 0, W, H);
+  foilGrad.addColorStop(0, '#b45309');
+  foilGrad.addColorStop(0.25, '#fbbf24');
+  foilGrad.addColorStop(0.5, '#fef08a');
+  foilGrad.addColorStop(0.75, '#f59e0b');
+  foilGrad.addColorStop(1, '#92400e');
+  ctx.fillStyle = foilGrad;
+  ctx.fillRect(0, 0, W, H);
+
+  // Diagonal metallic sheen lines
+  ctx.strokeStyle = 'rgba(255,255,255,0.22)';
+  ctx.lineWidth = 2;
+  for (let x = -H; x < W + H; x += 22) {
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x - H, H);
+    ctx.stroke();
+  }
+
+  // Inner embossed gold border
+  ctx.strokeStyle = 'rgba(9, 13, 22, 0.45)';
+  ctx.lineWidth = 3;
+  ctx.strokeRect(10, 10, W - 20, H - 20);
+
+  const isFr = REMO_I18N.getLang() === 'fr';
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#090d16';
+  ctx.font = '900 18px system-ui, -apple-system, sans-serif';
+  if (isLockedTicket) {
+    ctx.fillText(
+      isFr ? '🔒 TICKET DU JOUR DÉJÀ UTILISÉ' : '🔒 DAILY TICKETS COMPLETED',
+      W / 2,
+      H / 2 - 6
+    );
+    ctx.font = '800 13px system-ui, -apple-system, sans-serif';
+    ctx.fillText(
+      isFr ? 'Revenez demain pour 2 nouveaux Tickets d’Or !' : 'Come back tomorrow for 2 new Golden Tickets!',
+      W / 2,
+      H / 2 + 20
+    );
+  } else {
+    ctx.fillText(
+      isFr ? '✨ GRATTEZ ICI (DOIGT / SOURIS) ✨' : '✨ SCRATCH HERE (FINGER / MOUSE) ✨',
+      W / 2,
+      H / 2 - 8
+    );
+    ctx.font = '800 13px system-ui, -apple-system, sans-serif';
+    ctx.fillText(
+      isFr ? '🎟️ GAIN GARANTI : +35 À +500 🪙' : '🎟️ GUARANTEED PRIZE: +35 TO +500 🪙',
+      W / 2,
+      H / 2 + 18
+    );
+  }
+}
+
+function bindGoldenScratchPointerEvents() {
+  if (_scratchBound) return;
+  const cv = document.getElementById('goldenScratchCanvas');
+  if (!cv) return;
+  _scratchBound = true;
+  let drawing = false;
+  let strokes = 0;
+
+  const scratchAt = (clientX, clientY) => {
+    if (_scratchRevealed) return;
+    const rect = cv.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+    const x = ((clientX - rect.left) / rect.width) * cv.width;
+    const y = ((clientY - rect.top) / rect.height) * cv.height;
+    const ctx = cv.getContext('2d');
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.beginPath();
+    ctx.arc(x, y, 26, 0, Math.PI * 2);
+    ctx.fill();
+    strokes++;
+    if (strokes >= 18) {
+      revealGoldenScratchCardPrize(false);
+    }
+  };
+
+  cv.addEventListener('pointerdown', (e) => {
+    if (_scratchRevealed) return;
+    drawing = true;
+    strokes = 0;
+    scratchAt(e.clientX, e.clientY);
+  });
+  cv.addEventListener('pointermove', (e) => {
+    if (!drawing || _scratchRevealed) return;
+    scratchAt(e.clientX, e.clientY);
+  });
+  window.addEventListener('pointerup', () => {
+    drawing = false;
+  });
+}
+
+function openGoldenScratchModal() {
+  const modal = document.getElementById('goldenScratchModal');
+  if (!modal) return;
+  const lang = REMO_I18N.getLang();
+  const isFr = lang === 'fr';
+  const u = REMO_STORE.getCurrentUser() || REMO_STORE.ensureGuestOrCitizen('REMO Pioneer', '', 'montreal');
+  const city = getCityById(u.homeCity || 'montreal') || getCityById('montreal');
+  const { usedCount, sharedUnlocked } = getGoldenScratchDayState();
+
+  REMO_I18N.applyDOM(modal);
+  modal.classList.add('open');
+  bindGoldenScratchPointerEvents();
+
+  const badge = document.getElementById('scratchTicketStatusBadge');
+  const instantBtn = document.getElementById('scratchInstantRevealBtn');
+  const unlockBox = document.getElementById('goldenScratchShareUnlockBox');
+
+  if (usedCount === 0) {
+    // Ticket #1 ready
+    _scratchRevealed = false;
+    _activeScratchPrize = rollGoldenScratchPrize(city, lang);
+    document.getElementById('goldenScratchSymbols').textContent = _activeScratchPrize.symbols;
+    document.getElementById('goldenScratchPrizeTitle').textContent = _activeScratchPrize.title;
+    document.getElementById('goldenScratchPrizeSub').textContent = _activeScratchPrize.sub;
+    if (badge) badge.textContent = isFr ? '🎟️ Ticket d’Or Gratuit #1 / 2 Prêt' : '🎟️ Free Daily Golden Ticket #1 / 2 Ready';
+    if (instantBtn) instantBtn.style.display = 'inline-flex';
+    if (unlockBox) unlockBox.style.display = 'none';
+    paintGoldenScratchFoilCanvas(false);
+  } else if (usedCount === 1 && !sharedUnlocked) {
+    // Ticket #1 used, waiting for Share to unlock Ticket #2
+    _scratchRevealed = true;
+    if (badge) badge.textContent = isFr ? '🔓 Partagez REMO pour débloquer le Ticket #2 !' : '🔓 Share REMO below to unlock Ticket #2!';
+    if (instantBtn) instantBtn.style.display = 'none';
+    if (unlockBox) unlockBox.style.display = 'block';
+    const cv = document.getElementById('goldenScratchCanvas');
+    if (cv) {
+      cv.style.opacity = '0';
+      cv.style.pointerEvents = 'none';
+    }
+  } else if (usedCount === 1 && sharedUnlocked) {
+    // Ticket #2 ready!
+    _scratchRevealed = false;
+    _activeScratchPrize = rollGoldenScratchPrize(city, lang);
+    document.getElementById('goldenScratchSymbols').textContent = _activeScratchPrize.symbols;
+    document.getElementById('goldenScratchPrizeTitle').textContent = _activeScratchPrize.title;
+    document.getElementById('goldenScratchPrizeSub').textContent = _activeScratchPrize.sub;
+    if (badge) badge.textContent = isFr ? '🔥 Ticket Bonus #2 / 2 Débloqué ! Grattez maintenant' : '🔥 Bonus Ticket #2 / 2 Unlocked! Scratch Now';
+    if (instantBtn) instantBtn.style.display = 'inline-flex';
+    if (unlockBox) unlockBox.style.display = 'none';
+    paintGoldenScratchFoilCanvas(false);
+  } else {
+    // Both tickets used today
+    _scratchRevealed = true;
+    if (badge) badge.textContent = isFr ? '✓ 2 / 2 Tickets d’Or grattés aujourd’hui' : '✓ 2 / 2 Golden Tickets scratched today';
+    if (instantBtn) instantBtn.style.display = 'none';
+    if (unlockBox) unlockBox.style.display = 'none';
+    paintGoldenScratchFoilCanvas(true);
+  }
+}
+
+function revealGoldenScratchCardPrize(isInstant) {
+  if (_scratchRevealed || !_activeScratchPrize) return;
+  _scratchRevealed = true;
+  const lang = REMO_I18N.getLang();
+  const isFr = lang === 'fr';
+  const u = REMO_STORE.getCurrentUser() || REMO_STORE.ensureGuestOrCitizen('REMO Pioneer', '', 'montreal');
+  const { day, usedCount, sharedUnlocked } = getGoldenScratchDayState();
+
+  const cv = document.getElementById('goldenScratchCanvas');
+  if (cv) {
+    cv.style.transition = 'opacity 0.35s ease';
+    cv.style.opacity = '0';
+    cv.style.pointerEvents = 'none';
+  }
+
+  const nextUsed = usedCount + 1;
+  localStorage.setItem('remo_scratch_used_' + day, String(nextUsed));
+
+  REMO_STORE.addCoins(u.uid, _activeScratchPrize.coins, _activeScratchPrize.pts);
+  if (typeof spawnRemoCoinsFX === 'function') spawnRemoCoinsFX(18);
+  syncHeaderAndSidebars();
+
+  const instantBtn = document.getElementById('scratchInstantRevealBtn');
+  if (instantBtn) instantBtn.style.display = 'none';
+
+  const badge = document.getElementById('scratchTicketStatusBadge');
+  const unlockBox = document.getElementById('goldenScratchShareUnlockBox');
+
+  if (nextUsed === 1 && !sharedUnlocked) {
+    if (badge) badge.textContent = isFr ? '🎉 Ticket #1 Encaissé ! Débloquez le Ticket #2 ci-dessous :' : '🎉 Ticket #1 Claimed! Unlock Ticket #2 below:';
+    if (unlockBox) unlockBox.style.display = 'block';
+  } else {
+    if (badge) badge.textContent = isFr ? '✓ 2 / 2 Tickets d’Or encaissés aujourd’hui !' : '✓ 2 / 2 Golden Tickets claimed today!';
+    if (unlockBox) unlockBox.style.display = 'none';
+  }
+
+  remoToast(
+    isFr
+      ? `🎟️ Bravo ! Vous avez gagné +${_activeScratchPrize.coins} 🪙 au Ticket d’Or !`
+      : `🎟️ Congrats! You won +${_activeScratchPrize.coins} 🪙 on the Golden Scratch-Card!`,
+    'fanfare'
+  );
+}
+
+async function shareToUnlockSecondScratchCard(platform) {
+  const lang = REMO_I18N.getLang();
+  const isFr = lang === 'fr';
+  const u = REMO_STORE.getCurrentUser() || REMO_STORE.ensureGuestOrCitizen('REMO Pioneer', '', 'montreal');
+  const city = getCityById(u.homeCity || 'montreal') || getCityById('montreal');
+  const cityName = getCityName(city, lang);
+  const inviteCode = u.referralCode || `REMO-${u.passportNum || '0001'}`;
+  const shareUrl = `https://remoworld.com/?ref=${encodeURIComponent(inviteCode)}&city=${encodeURIComponent(city.id)}`;
+  const shareText = isFr
+    ? `🎟️ Je viens de gagner des Pièces d'Or au Ticket à Gratter 24K pour ${city.flag} ${cityName} sur REMO World ! Gratte ton ticket gratuit et reçois +100 🪙 avec mon code ${inviteCode} : ${shareUrl}`
+    : `🎟️ I just won Gold Coins on the 24K City Scratch-Card for ${city.flag} ${cityName} on REMO World! Scratch your free ticket & claim +100 🪙 with my code ${inviteCode}: ${shareUrl}`;
+
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    try { await navigator.clipboard.writeText(shareText); } catch (e) {}
+  }
+
+  if (platform === 'whatsapp') {
+    window.open(`https://wa.me/?text=${encodeURIComponent(shareText)}`, '_blank', 'noopener');
+  } else if (platform === 'telegram') {
+    window.open(`https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(shareText)}`, '_blank', 'noopener');
+  } else {
+    window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}&quote=${encodeURIComponent(shareText)}`, '_blank', 'noopener');
+  }
+
+  const { day } = getGoldenScratchDayState();
+  localStorage.setItem('remo_scratch_shared_' + day, '1');
+  openGoldenScratchModal();
+  remoToast(
+    isFr
+      ? '🔓 Ticket d’Or #2 Débloqué ! Grattez maintenant pour un 2e gain garanti !'
+      : '🔓 Golden Scratch-Card #2 Unlocked! Scratch now for your 2nd guaranteed win!',
+    'fanfare'
+  );
+}
+
+window.openGoldenScratchModal = openGoldenScratchModal;
+window.revealGoldenScratchCardPrize = revealGoldenScratchCardPrize;
+window.shareToUnlockSecondScratchCard = shareToUnlockSecondScratchCard;
+
 if (typeof window !== 'undefined') {
   window.addEventListener('DOMContentLoaded', () => {
     try {
