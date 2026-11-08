@@ -877,7 +877,11 @@ const REMO_DICT = {
     contact_msg_lbl: 'Your Message to REMO Administration',
     contact_msg_ph: 'Write your message, question, or request here...',
     contact_submit_btn: '🚀 Send to REMO Administration',
-    contact_sent_toast: '✅ Message delivered directly to REMO Administration! Watch your 🔔 Notifications & 💌 Messenger for the reply.'
+    contact_sent_toast: '✅ Message delivered directly to REMO Administration! Watch your 🔔 Notifications & 💌 Messenger for the reply.',
+    amb_diploma_btn: '🏅 Official City Ambassador Diploma (+25 🪙)',
+    amb_modal_title: '🏅 Official City Ambassador 9:16 Diploma',
+    amb_modal_sub: 'Customize & share your Official City Ambassador Diploma on Facebook groups, WhatsApp, TikTok or Instagram Stories (+25 🪙)!',
+    amb_share_native: '📲 Share 9:16 Diploma (TikTok / Insta / Native)'
   },
 
   fr: {
@@ -1752,7 +1756,11 @@ const REMO_DICT = {
     contact_msg_lbl: 'Votre Message pour l’Administration REMO',
     contact_msg_ph: 'Écrivez votre message, question ou demande ici...',
     contact_submit_btn: '🚀 Envoyer à l’Administration REMO',
-    contact_sent_toast: '✅ Message transmis directement à l’Administration REMO ! Surveillez vos Notifications 🔔 et votre Messagerie 💌.'
+    contact_sent_toast: '✅ Message transmis directement à l’Administration REMO ! Surveillez vos Notifications 🔔 et votre Messagerie 💌.',
+    amb_diploma_btn: '🏅 Diplôme d’Ambassadeur de Ville (+25 🪙)',
+    amb_modal_title: '🏅 Diplôme Officiel d’Ambassadeur 9:16',
+    amb_modal_sub: 'Personnalisez et partagez votre Diplôme Officiel d’Ambassadeur sur les groupes Facebook, WhatsApp, TikTok ou Instagram (+25 🪙) !',
+    amb_share_native: '📲 Partager le Diplôme 9:16 (TikTok / Insta / Natif)'
   }
 };
 

@@ -2124,7 +2124,7 @@ function renderPassportView() {
               <span>${home.flag} <b>${escapeHtmlStr(getCityName(home, lang))}</b></span>
               <span>•</span>
               <span style="color:#cbd5e1;">#${escapeHtmlStr(u.passportNum || '0001')}</span>
-              ${u.email ? `<span>•</span> <span style="font-size:0.75rem;color:#64748b;">${escapeHtmlStr(u.email)}</span>` : ''}
+              ${(u.email && u.role !== 'admin') ? `<span>•</span> <span style="font-size:0.75rem;color:#64748b;">${escapeHtmlStr(u.email)}</span>` : ''}
             </div>
             <div style="font-size:0.83rem;color:#e2e8f0;margin-top:6px;font-style:italic;">
               "${escapeHtmlStr(u.bio || (lang === 'fr' ? 'Citoyen explorateur de REMO World 🌍' : 'Exploring the cities of REMO World 🌍'))}"
@@ -2132,6 +2132,9 @@ function renderPassportView() {
           </div>
         </div>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <button class="btn-cyber btn-gold" style="padding:8px 14px;font-size:0.82rem;font-weight:900;" onclick="openCityAmbassadorModal()">
+            🏅 ${lang === 'fr' ? 'Diplôme d’Ambassadeur (+25 🪙)' : 'Ambassador Diploma (+25 🪙)'}
+          </button>
           <button class="btn-cyber" style="padding:8px 14px;font-size:0.82rem;" onclick="openEditProfileModal()">
             ✏️ ${lang === 'fr' ? 'Modifier Profil' : 'Edit Profile'}
           </button>

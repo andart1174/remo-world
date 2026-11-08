@@ -115,7 +115,7 @@
   <noscript><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"></noscript>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
 
-  <link rel="stylesheet" href="css/remo-core.css?v=90">
+  <link rel="stylesheet" href="css/remo-core.css?v=91">
 </head>
 <body>
 
@@ -794,6 +794,7 @@
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
         <button class="btn-cyber btn-gold" onclick="document.getElementById('mobileHubModal').classList.remove('open');exportPassportStory();" style="grid-column:1/-1;justify-content:center;background:linear-gradient(135deg,#f59e0b,#ec4899);border-color:#fbbf24;color:#fff;font-weight:900;padding:10px;font-size:0.85rem;">📲 <span data-i18n="passport_share_story">Story 9:16 (TikTok &amp; Insta)</span></button>
+        <button class="btn-cyber btn-gold" onclick="document.getElementById('mobileHubModal').classList.remove('open');openCityAmbassadorModal();" style="grid-column:1/-1;justify-content:center;padding:10px;font-size:0.84rem;" data-i18n="amb_diploma_btn">🏅 Official City Ambassador Diploma (+25 🪙)</button>
         <button class="btn-ghost" onclick="switchRemoView('shop')" style="border-color:#f472b6;color:#fbcfe8;">🛍️ <span data-i18n="nav_shop">VIP Boutique</span></button>
         <button class="btn-ghost" onclick="switchRemoView('passport')" style="border-color:#38bdf8;color:#bae6fd;">👤 <span data-i18n="nav_passport">Profil Citoyen &amp; ID</span></button>
         <button class="btn-ghost" onclick="document.getElementById('mobileHubModal').classList.remove('open');openAddUserCityModal();" style="border-color:#10b981;color:#6ee7b7;grid-column:1/-1;">🌍 <span data-i18n="add_city_btn">+ Add Missing City (+75 🪙)</span></button>
@@ -2226,6 +2227,54 @@
     </div>
   </div>
 
+  <!-- 🏅 Official City Ambassador 9:16 Holographic Diploma Studio -->
+  <div class="remo-modal-backdrop" id="cityAmbassadorModal" onclick="if(event.target===this)this.classList.remove('open')">
+    <div class="remo-modal" style="max-width:540px;border-color:#fbbf24;text-align:center;">
+      <div class="modal-hdr">
+        <b style="font-family:'Orbitron',sans-serif;color:#fbbf24;font-size:0.95rem;" data-i18n="amb_modal_title">🏅 Official City Ambassador 9:16 Diploma</b>
+        <button class="modal-close" onclick="document.getElementById('cityAmbassadorModal').classList.remove('open')">✕</button>
+      </div>
+      <p style="font-size:0.79rem;color:#cbd5e1;margin-bottom:10px;line-height:1.4;" data-i18n="amb_modal_sub">
+        Customize &amp; share your Official City Ambassador Diploma on Facebook groups, WhatsApp, TikTok or Instagram Stories (+25 🪙)!
+      </p>
+
+      <!-- Customization Controls -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;text-align:left;">
+        <div>
+          <label style="font-size:0.7rem;font-weight:800;color:#fbbf24;display:block;margin-bottom:3px;">🌍 City / Ville</label>
+          <select id="ambDiplomaCitySel" class="remo-input" style="padding:7px 10px;font-size:0.8rem;" onchange="renderCityAmbassadorDiplomaCanvas()"></select>
+        </div>
+        <div>
+          <label style="font-size:0.7rem;font-weight:800;color:#fbbf24;display:block;margin-bottom:3px;">🏅 Rank / Titre</label>
+          <select id="ambDiplomaTitleSel" class="remo-input" style="padding:7px 10px;font-size:0.8rem;" onchange="renderCityAmbassadorDiplomaCanvas()">
+            <option value="ambassador">🏅 Official City Ambassador</option>
+            <option value="pioneer">👑 Founding Cultural Envoy</option>
+            <option value="champion">⚔️ World City Cup Defender</option>
+            <option value="sovereign">💎 VIP Sovereign Citizen</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- 9:16 Diploma Canvas Preview -->
+      <div style="display:flex;justify-content:center;margin-bottom:12px;">
+        <canvas id="cityAmbassadorCanvas" width="540" height="960" style="width:min(100%,270px);aspect-ratio:9/16;border-radius:18px;border:2px solid rgba(251,191,36,0.65);box-shadow:0 14px 36px rgba(0,0,0,0.75);background:#050816;"></canvas>
+      </div>
+
+      <!-- Viral Share Actions -->
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <button type="button" class="btn-cyber btn-gold" style="width:100%;justify-content:center;padding:11px;font-weight:900;font-size:0.88rem;" onclick="shareCityAmbassadorDiploma('native')" data-i18n="amb_share_native">
+          📲 Share 9:16 Diploma (TikTok / Insta / Native)
+        </button>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;">
+          <button type="button" class="btn-ghost" style="justify-content:center;border-color:#22c55e;color:#86efac;padding:8px 6px;font-size:0.76rem;font-weight:800;" onclick="shareCityAmbassadorDiploma('whatsapp')">🟢 WhatsApp</button>
+          <button type="button" class="btn-ghost" style="justify-content:center;border-color:#38bdf8;color:#7dd3fc;padding:8px 6px;font-size:0.76rem;font-weight:800;" onclick="shareCityAmbassadorDiploma('telegram')">✈️ Telegram</button>
+          <button type="button" class="btn-ghost" style="justify-content:center;border-color:#3b82f6;color:#93c5fd;padding:8px 6px;font-size:0.76rem;font-weight:800;" onclick="shareCityAmbassadorDiploma('facebook')">📘 Facebook</button>
+          <button type="button" class="btn-cyber btn-gold" style="justify-content:center;padding:8px 6px;font-size:0.76rem;font-weight:900;" onclick="shareCityAmbassadorDiploma('download')">📥 PNG 9:16</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Toast Container -->
   <div class="remo-toast-box" id="remoToastBox"></div>
 
@@ -2236,13 +2285,13 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 
   <!-- REMO Modular Engines -->
-  <script src="js/remo-i18n.js?v=90"></script>
-  <script src="js/remo-cities-data.js?v=90"></script>
-  <script src="js/remo-store.js?v=90"></script>
-  <script src="js/remo-card-engine.js?v=90"></script>
-  <script src="js/remo-radar-arena.js?v=90"></script>
-  <script src="js/remo-social-comms.js?v=90"></script>
-  <script src="js/remo-radio-engine.js?v=90"></script>
+  <script src="js/remo-i18n.js?v=91"></script>
+  <script src="js/remo-cities-data.js?v=91"></script>
+  <script src="js/remo-store.js?v=91"></script>
+  <script src="js/remo-card-engine.js?v=91"></script>
+  <script src="js/remo-radar-arena.js?v=91"></script>
+  <script src="js/remo-social-comms.js?v=91"></script>
+  <script src="js/remo-radio-engine.js?v=91"></script>
 
   <noscript>
     <nav aria-label="REMO World Static Directory" style="padding:20px;background:#050816;color:#f8fafc;">

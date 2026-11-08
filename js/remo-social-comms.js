@@ -242,7 +242,10 @@ function syncHeaderAndSidebars() {
           <div style="font-size:0.74rem;color:#7dd3fc;font-weight:800;margin-top:2px;">${wx.icon} ${wx.tempC}°C · ${escapeHtmlStr(condTxt)}</div>
           <div style="font-size:0.75rem;color:#fbbf24;font-weight:800;margin-top:2px;">🏆 ${pts.toLocaleString()} PTS</div>
         </div>
-        <button class="btn-ghost" onclick="switchRemoView('passport')">🛂</button>
+        <div style="display:flex;flex-direction:column;gap:5px;">
+          <button class="btn-ghost" title="4D Citizen Passport" onclick="switchRemoView('passport')">🛂</button>
+          <button class="btn-ghost" style="border-color:rgba(251,191,36,0.55);color:#fbbf24;" title="Official City Ambassador 9:16 Diploma (+25 🪙)" onclick="openCityAmbassadorModal()">🏅</button>
+        </div>
       </div>
     `;
   }
@@ -12889,6 +12892,349 @@ window.submitContactSupportTicket = submitContactSupportTicket;
 window.renderInlineAdminSupportInbox = renderInlineAdminSupportInbox;
 window.replySupportTicketInline = replySupportTicketInline;
 window.deleteSupportTicketInline = deleteSupportTicketInline;
+
+/* ── 🏅 OFFICIAL CITY AMBASSADOR 9:16 HOLOGRAPHIC DIPLOMA STUDIO ── */
+function openCityAmbassadorModal() {
+  const modal = document.getElementById('cityAmbassadorModal');
+  if (!modal) return;
+  const lang = REMO_I18N.getLang();
+  const u = REMO_STORE.getCurrentUser() || REMO_STORE.ensureGuestOrCitizen('REMO Pioneer', '', 'montreal');
+  const citySel = document.getElementById('ambDiplomaCitySel');
+  const titleSel = document.getElementById('ambDiplomaTitleSel');
+
+  if (citySel) {
+    const myCity = u.homeCity || 'montreal';
+    citySel.innerHTML = getRemoCities().map((c) =>
+      `<option value="${c.id}" ${c.id === myCity ? 'selected' : ''}>${c.flag} ${getCityName(c, lang)}</option>`
+    ).join('');
+  }
+
+  if (titleSel) {
+    const curVal = titleSel.value || 'ambassador';
+    titleSel.innerHTML = lang === 'fr'
+      ? `
+        <option value="ambassador" ${curVal === 'ambassador' ? 'selected' : ''}>🏅 Ambassadeur Officiel de la Ville</option>
+        <option value="pioneer" ${curVal === 'pioneer' ? 'selected' : ''}>👑 Pionnier Fondateur & Envoyé Culturel</option>
+        <option value="champion" ${curVal === 'champion' ? 'selected' : ''}>⚔️ Défenseur — Coupe du Monde des Villes</option>
+        <option value="sovereign" ${curVal === 'sovereign' ? 'selected' : ''}>💎 Citoyen Souverain 4D VIP</option>
+      `
+      : `
+        <option value="ambassador" ${curVal === 'ambassador' ? 'selected' : ''}>🏅 Official City Ambassador</option>
+        <option value="pioneer" ${curVal === 'pioneer' ? 'selected' : ''}>👑 Founding Cultural Envoy</option>
+        <option value="champion" ${curVal === 'champion' ? 'selected' : ''}>⚔️ World City Cup Defender</option>
+        <option value="sovereign" ${curVal === 'sovereign' ? 'selected' : ''}>💎 VIP Sovereign 4D Citizen</option>
+      `;
+  }
+
+  REMO_I18N.applyDOM(modal);
+  modal.classList.add('open');
+  renderCityAmbassadorDiplomaCanvas();
+}
+
+function renderCityAmbassadorDiplomaCanvas() {
+  const cv = document.getElementById('cityAmbassadorCanvas');
+  if (!cv) return;
+  const ctx = cv.getContext('2d');
+  const W = cv.width;  // 540
+  const H = cv.height; // 960
+  const lang = REMO_I18N.getLang();
+  const isFr = lang === 'fr';
+  const u = REMO_STORE.getCurrentUser() || REMO_STORE.ensureGuestOrCitizen('REMO Pioneer', '', 'montreal');
+  const selCityId = document.getElementById('ambDiplomaCitySel')?.value || u.homeCity || 'montreal';
+  const selTitleKey = document.getElementById('ambDiplomaTitleSel')?.value || 'ambassador';
+  const city = getCityById(selCityId) || getCityById('montreal');
+  const cityName = getCityName(city, lang).toUpperCase();
+  const cityPts = Number((REMO_STORE.state.cityScores && REMO_STORE.state.cityScores[city.id]) || 10000);
+  const passportNum = u.passportNum || '0001';
+  const inviteCode = u.referralCode || `REMO-${passportNum}`;
+  const citizenName = (u.name || 'REMO Citizen').toUpperCase();
+
+  const titleLabels = {
+    ambassador: isFr ? `AMBASSADEUR OFFICIEL DE ${cityName}` : `OFFICIAL AMBASSADOR OF ${cityName}`,
+    pioneer: isFr ? `ENVOYÉ CULTUREL & PIONNIER DE ${cityName}` : `CULTURAL ENVOY & PIONEER OF ${cityName}`,
+    champion: isFr ? `DÉFENSEUR OFFICIEL • COUPE MONDIALE` : `WORLD CITY CUP CHAMPION DEFENDER`,
+    sovereign: isFr ? `CITOYEN SOUVERAIN 4D • ${cityName}` : `SOVEREIGN 4D CITIZEN • ${cityName}`
+  };
+  const chosenTitleText = titleLabels[selTitleKey] || titleLabels.ambassador;
+
+  // 1. Deep Royal Obsidian & Radial Nebula Background
+  const bg = ctx.createLinearGradient(0, 0, 0, H);
+  bg.addColorStop(0, '#040714');
+  bg.addColorStop(0.5, '#0b1332');
+  bg.addColorStop(1, '#050818');
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, W, H);
+
+  const glowTop = ctx.createRadialGradient(W / 2, 230, 20, W / 2, 230, 280);
+  glowTop.addColorStop(0, 'rgba(251, 191, 36, 0.24)');
+  glowTop.addColorStop(0.6, 'rgba(56, 189, 248, 0.08)');
+  glowTop.addColorStop(1, 'transparent');
+  ctx.fillStyle = glowTop;
+  ctx.fillRect(0, 0, W, H);
+
+  // 2. Double Royal Gold Filigree Certificate Frame
+  ctx.strokeStyle = 'rgba(251, 191, 36, 0.85)';
+  ctx.lineWidth = 3;
+  roundRectCanvas(ctx, 20, 20, W - 40, H - 40, 26);
+  ctx.stroke();
+
+  ctx.strokeStyle = 'rgba(56, 189, 248, 0.45)';
+  ctx.lineWidth = 1.5;
+  roundRectCanvas(ctx, 30, 30, W - 60, H - 60, 20);
+  ctx.stroke();
+
+  // 3. Top Header Crest
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#38bdf8';
+  ctx.font = '900 18px system-ui, -apple-system, sans-serif';
+  ctx.fillText('🌐 REMOWORLD.COM', W / 2, 68);
+
+  ctx.fillStyle = '#fbbf24';
+  ctx.font = '800 13px system-ui, -apple-system, sans-serif';
+  ctx.fillText(isFr ? '★ DIPLÔME SOUVERAIN OFFICIEL 4D ★' : '★ OFFICIAL 4D SOVEREIGN CITY DIPLOMA ★', W / 2, 92);
+
+  // 4. Giant Illuminated City Medallion
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(W / 2, 205, 76, 0, Math.PI * 2);
+  const medalGrad = ctx.createLinearGradient(W / 2 - 70, 130, W / 2 + 70, 280);
+  medalGrad.addColorStop(0, 'rgba(251, 191, 36, 0.26)');
+  medalGrad.addColorStop(1, 'rgba(15, 23, 42, 0.92)');
+  ctx.fillStyle = medalGrad;
+  ctx.fill();
+  ctx.lineWidth = 3.5;
+  ctx.strokeStyle = '#fbbf24';
+  ctx.stroke();
+  ctx.restore();
+
+  ctx.font = '68px system-ui, "Segoe UI Emoji", "Apple Color Emoji", sans-serif';
+  ctx.fillText(city.flag || '🌍', W / 2, 226);
+
+  // City Name Banner
+  ctx.fillStyle = '#ffffff';
+  ctx.font = '900 32px system-ui, -apple-system, sans-serif';
+  ctx.fillText(cityName, W / 2, 326);
+
+  ctx.fillStyle = '#7dd3fc';
+  ctx.font = '800 14px system-ui, -apple-system, sans-serif';
+  ctx.fillText(`🏆 ${cityPts.toLocaleString()} PTS • WORLD CITY CUP`, W / 2, 352);
+
+  // Ornamental Divider Line
+  const divGrad = ctx.createLinearGradient(70, 0, W - 70, 0);
+  divGrad.addColorStop(0, 'transparent');
+  divGrad.addColorStop(0.5, '#fbbf24');
+  divGrad.addColorStop(1, 'transparent');
+  ctx.strokeStyle = divGrad;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(70, 378);
+  ctx.lineTo(W - 70, 378);
+  ctx.stroke();
+
+  // 5. Certificate Proclamation Text
+  ctx.fillStyle = '#cbd5e1';
+  ctx.font = '700 14px system-ui, -apple-system, sans-serif';
+  ctx.fillText(isFr ? 'CE CERTIFICAT OFFICIEL ATTESTE QUE' : 'THIS OFFICIAL DIPLOMA CERTIFIES THAT', W / 2, 416);
+
+  // Citizen Name Highlight Box
+  ctx.fillStyle = 'rgba(251, 191, 36, 0.12)';
+  ctx.strokeStyle = 'rgba(251, 191, 36, 0.55)';
+  ctx.lineWidth = 2;
+  roundRectCanvas(ctx, 52, 434, W - 104, 72, 16);
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.fillStyle = '#fde047';
+  ctx.font = '900 28px system-ui, -apple-system, sans-serif';
+  ctx.fillText(`@${citizenName.slice(0, 22)}`, W / 2, 480);
+
+  ctx.fillStyle = '#cbd5e1';
+  ctx.font = '700 13px system-ui, -apple-system, sans-serif';
+  ctx.fillText(isFr ? 'EST HONORÉ(E) DU RANG OFFICIEL DE :' : 'IS APPOINTED TO THE HONORARY RANK OF:', W / 2, 536);
+
+  // Rank Pill
+  const rankGrad = ctx.createLinearGradient(46, 552, W - 46, 608);
+  rankGrad.addColorStop(0, 'rgba(14, 165, 233, 0.25)');
+  rankGrad.addColorStop(0.5, 'rgba(99, 102, 241, 0.35)');
+  rankGrad.addColorStop(1, 'rgba(236, 72, 153, 0.25)');
+  ctx.fillStyle = rankGrad;
+  ctx.strokeStyle = '#38bdf8';
+  ctx.lineWidth = 2;
+  roundRectCanvas(ctx, 46, 552, W - 92, 54, 999);
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.fillStyle = '#ffffff';
+  ctx.font = '900 16px system-ui, -apple-system, sans-serif';
+  ctx.fillText(`🏅 ${chosenTitleText.slice(0, 38)}`, W / 2, 585);
+
+  // 6. Official Passport Stats Grid (3 Columns)
+  const statY = 630;
+  const statW = 136;
+  const cols = [
+    { x: 46, lbl: isFr ? 'PASSEPORT 4D' : '4D PASSPORT', val: `#${passportNum}` },
+    { x: 202, lbl: isFr ? 'PIÈCES REMO' : 'REMO COINS', val: `🪙 ${(u.coins || 150).toLocaleString()}` },
+    { x: 358, lbl: isFr ? 'STATUT' : 'CITIZEN STATUS', val: '✓ VERIFIED' }
+  ];
+  cols.forEach((st) => {
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+    ctx.lineWidth = 1.2;
+    roundRectCanvas(ctx, st.x, statY, statW, 64, 14);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = '800 10px system-ui, -apple-system, sans-serif';
+    ctx.fillText(st.lbl, st.x + statW / 2, statY + 23);
+
+    ctx.fillStyle = '#fbbf24';
+    ctx.font = '900 15px system-ui, -apple-system, sans-serif';
+    ctx.fillText(st.val, st.x + statW / 2, statY + 47);
+  });
+
+  // 7. Golden Wax Seal & Signature
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(W / 2, 742, 30, 0, Math.PI * 2);
+  ctx.fillStyle = '#f59e0b';
+  ctx.fill();
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = '#fef08a';
+  ctx.stroke();
+  ctx.restore();
+
+  ctx.fillStyle = '#090d16';
+  ctx.font = '900 13px system-ui, -apple-system, sans-serif';
+  ctx.fillText('REMO', W / 2, 740);
+  ctx.font = '900 10px system-ui, -apple-system, sans-serif';
+  ctx.fillText('SEAL', W / 2, 753);
+
+  // 8. Bottom Viral Invite CTA Box
+  ctx.fillStyle = 'rgba(14, 165, 233, 0.14)';
+  ctx.strokeStyle = '#38bdf8';
+  ctx.lineWidth = 2;
+  roundRectCanvas(ctx, 44, 792, W - 88, 114, 20);
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.fillStyle = '#e0f2fe';
+  ctx.font = '800 14px system-ui, -apple-system, sans-serif';
+  ctx.fillText(
+    isFr ? `🌍 REJOIGNEZ ${cityName} EN DIRECT SUR :` : `🌍 REPRESENT ${cityName} LIVE AT:`,
+    W / 2,
+    822
+  );
+
+  ctx.fillStyle = '#fbbf24';
+  ctx.font = '900 28px system-ui, -apple-system, sans-serif';
+  ctx.fillText('REMOWORLD.COM', W / 2, 858);
+
+  ctx.fillStyle = '#7dd3fc';
+  ctx.font = '800 13px system-ui, -apple-system, sans-serif';
+  ctx.fillText(
+    isFr
+      ? `🎁 Code Invité : ${inviteCode} (+100 🪙 Bonus Gratuit)`
+      : `🎁 Invite Code: ${inviteCode} (+100 🪙 Free Welcome Bonus)`,
+    W / 2,
+    886
+  );
+
+  ctx.fillStyle = '#64748b';
+  ctx.font = '700 11px system-ui, -apple-system, sans-serif';
+  ctx.fillText('24 World Cities • 38 Live Radios • 4D Cards • World City Cup', W / 2, 926);
+}
+
+function awardAmbassadorDiplomaShareCoins() {
+  const u = REMO_STORE.getCurrentUser();
+  if (!u) return false;
+  const todayKey = 'remo_amb_diploma_' + new Date().toISOString().slice(0, 10);
+  if (localStorage.getItem(todayKey)) return false;
+  localStorage.setItem(todayKey, '1');
+  REMO_STORE.addCoins(u.uid, 25, 10);
+  if (typeof spawnRemoCoinsFX === 'function') spawnRemoCoinsFX(12);
+  syncHeaderAndSidebars();
+  return true;
+}
+
+async function shareCityAmbassadorDiploma(channel = 'native') {
+  const lang = REMO_I18N.getLang();
+  const isFr = lang === 'fr';
+  const cv = document.getElementById('cityAmbassadorCanvas');
+  if (!cv) return;
+  const u = REMO_STORE.getCurrentUser() || REMO_STORE.ensureGuestOrCitizen('REMO Pioneer', '', 'montreal');
+  const selCityId = document.getElementById('ambDiplomaCitySel')?.value || u.homeCity || 'montreal';
+  const city = getCityById(selCityId) || getCityById('montreal');
+  const cityName = getCityName(city, lang);
+  const inviteCode = u.referralCode || `REMO-${u.passportNum || '0001'}`;
+  const shareUrl = `https://remoworld.com/?ref=${encodeURIComponent(inviteCode)}&city=${encodeURIComponent(city.id)}`;
+  const shareText = isFr
+    ? `🏅 Fier d'être Ambassadeur Officiel de ${city.flag} ${cityName} sur REMO World ! Rejoignez notre ville dans la Coupe Mondiale (+100 🪙 offerts avec le code ${inviteCode}) : ${shareUrl}`
+    : `🏅 Proud Official Ambassador of ${city.flag} ${cityName} on REMO World! Join our city in the World City Cup (+100 🪙 free bonus with code ${inviteCode}): ${shareUrl}`;
+
+  const earned = awardAmbassadorDiplomaShareCoins();
+  const bonusTxt = earned ? ' (+25 🪙!)' : '';
+
+  if (channel === 'download') {
+    const a = document.createElement('a');
+    a.href = cv.toDataURL('image/png');
+    a.download = `REMO-Ambassador-${city.id}-9x16.png`;
+    a.click();
+    remoToast((isFr ? '📥 Diplôme 9:16 téléchargé !' : '📥 9:16 Diploma downloaded!') + bonusTxt, 'fanfare');
+    return;
+  }
+
+  if (channel === 'whatsapp') {
+    window.open(`https://wa.me/?text=${encodeURIComponent(shareText)}`, '_blank', 'noopener');
+    remoToast((isFr ? '🟢 Prêt à partager sur WhatsApp !' : '🟢 Ready to share on WhatsApp!') + bonusTxt);
+    return;
+  }
+
+  if (channel === 'telegram') {
+    window.open(`https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(shareText)}`, '_blank', 'noopener');
+    remoToast((isFr ? '✈️ Prêt à partager sur Telegram !' : '✈️ Ready to share on Telegram!') + bonusTxt);
+    return;
+  }
+
+  if (channel === 'facebook') {
+    window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}&quote=${encodeURIComponent(shareText)}`, '_blank', 'noopener');
+    remoToast((isFr ? '📘 Prêt à partager sur Facebook !' : '📘 Ready to share on Facebook!') + bonusTxt);
+    return;
+  }
+
+  // Native Share with PNG file for TikTok / Instagram / Mobile
+  try {
+    const blob = await new Promise((resolve) => cv.toBlob(resolve, 'image/png'));
+    if (blob && navigator.canShare) {
+      const file = new File([blob], `REMO-Ambassador-${city.id}.png`, { type: 'image/png' });
+      if (navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          title: `REMO World — ${cityName} Ambassador`,
+          text: shareText,
+          files: [file]
+        });
+        remoToast((isFr ? '📲 Diplôme partagé avec succès !' : '📲 Diploma shared successfully!') + bonusTxt, 'fanfare');
+        return;
+      }
+    }
+    if (navigator.share) {
+      await navigator.share({ title: `REMO World — ${cityName}`, text: shareText, url: shareUrl });
+      return;
+    }
+  } catch (e) {}
+
+  // Fallback on Desktop: download the 9:16 PNG and copy invite text
+  const a = document.createElement('a');
+  a.href = cv.toDataURL('image/png');
+  a.download = `REMO-Ambassador-${city.id}-9x16.png`;
+  a.click();
+  try { await navigator.clipboard.writeText(shareText); } catch (e) {}
+  remoToast((isFr ? '📥 Diplôme 9:16 téléchargé & lien copié !' : '📥 9:16 Diploma downloaded & invite link copied!') + bonusTxt, 'fanfare');
+}
+
+window.openCityAmbassadorModal = openCityAmbassadorModal;
+window.renderCityAmbassadorDiplomaCanvas = renderCityAmbassadorDiplomaCanvas;
+window.shareCityAmbassadorDiploma = shareCityAmbassadorDiploma;
 
 if (typeof window !== 'undefined') {
   window.addEventListener('DOMContentLoaded', () => {
