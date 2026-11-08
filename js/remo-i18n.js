@@ -812,6 +812,7 @@ const REMO_DICT = {
     filter_beats: '🎛️ Beats',
     nav_sec_discover: '🌐 Global Directory',
     nav_city_directory: 'All 24 Cities Guide',
+    nav_city_versus: 'City Duels Comparator',
     nav_free_radio_hub: '38 Live Radios Hub',
 
     // 🏆🎤⚽🕵️🎟️⚡ v70: REMO Contests & REMO World Music Contest (60s) — 100% Original REMO Branding
@@ -859,6 +860,7 @@ const REMO_DICT = {
     story_add_new_btn: '📸 + Add My 24h Story (+10 🪙)',
     nav_sec_discover: '🌐 Global Directory',
     nav_city_directory: 'All 24 Cities Guide',
+    nav_city_versus: 'City Duels Comparator',
     nav_free_radio_hub: '38 Live Radios Hub',
     nav_terms: 'Terms of Service',
     nav_privacy: 'Privacy & GDPR',
@@ -1733,6 +1735,7 @@ const REMO_DICT = {
     story_add_new_btn: '📸 + Ajouter ma Story 24h (+10 🪙)',
     nav_sec_discover: '🌐 Répertoire Mondial',
     nav_city_directory: 'Guide des 24 Villes',
+    nav_city_versus: 'Comparateur de Villes',
     nav_free_radio_hub: '38 Radios en Direct',
     nav_terms: 'Conditions d’Utilisation',
     nav_privacy: 'Confidentialité & RGPD',
