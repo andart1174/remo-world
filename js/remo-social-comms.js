@@ -12937,6 +12937,20 @@ function renderCityAmbassadorDiplomaCanvas() {
   const ctx = cv.getContext('2d');
   const W = cv.width;  // 540
   const H = cv.height; // 960
+  const roundRectCanvas = (c, x, y, w, h, r) => {
+    const rad = Math.min(r, w / 2, h / 2);
+    c.beginPath();
+    if (typeof c.roundRect === 'function') {
+      c.roundRect(x, y, w, h, rad);
+    } else {
+      c.moveTo(x + rad, y);
+      c.arcTo(x + w, y, x + w, y + h, rad);
+      c.arcTo(x + w, y + h, x, y + h, rad);
+      c.arcTo(x, y + h, x, y, rad);
+      c.arcTo(x, y, x + w, y, rad);
+      c.closePath();
+    }
+  };
   const lang = REMO_I18N.getLang();
   const isFr = lang === 'fr';
   const u = REMO_STORE.getCurrentUser() || REMO_STORE.ensureGuestOrCitizen('REMO Pioneer', '', 'montreal');
