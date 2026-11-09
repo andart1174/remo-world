@@ -1447,6 +1447,38 @@ function getInterCityDistanceBridge(postCity, lang) {
   `;
 }
 
+function isPostBoostActive(p) {
+  if (!p || !p.boosted) return false;
+  const now = Date.now();
+  if (p.boostedUntil) {
+    if (now < Number(p.boostedUntil)) return true;
+    p.boosted = false;
+    return false;
+  }
+  // Fallback for legacy boosted post without explicit boostedUntil:
+  // if createdAt is within 24h, grant remaining time; otherwise expire immediately!
+  if (p.createdAt && (now - Number(p.createdAt) < 86400000)) {
+    p.boostedUntil = Number(p.createdAt) + 86400000;
+    return true;
+  }
+  p.boosted = false;
+  return false;
+}
+window.isPostBoostActive = isPostBoostActive;
+
+function getPostBoostBadgeHtml(p, lang) {
+  if (!isPostBoostActive(p)) return '';
+  const now = Date.now();
+  const msLeft = Math.max(0, Number(p.boostedUntil || 0) - now);
+  const hoursLeft = Math.floor(msLeft / 3600000);
+  const minsLeft = Math.max(1, Math.floor((msLeft % 3600000) / 60000));
+  const isFr = lang === 'fr';
+  const timeStr = hoursLeft > 0 ? `${hoursLeft}h ${minsLeft}m` : `${minsLeft}m`;
+  const lbl = isFr ? `🚀 BOOSTÉ · ⏳ ${timeStr}` : `🚀 BOOSTED · ⏳ ${timeStr}`;
+  return `<span class="pbadge boost" style="background:linear-gradient(135deg,#f59e0b,#ec4899);color:#fff;font-weight:900;box-shadow:0 0 12px rgba(245,158,11,0.55);border:1px solid rgba(254,240,138,0.55);letter-spacing:0.3px;">${lbl}</span>`;
+}
+window.getPostBoostBadgeHtml = getPostBoostBadgeHtml;
+
 function computePostRenderSig(p, u, lang) {
   if (!p || !p.id) return '';
   const voterKey = (u && u.uid) ? u.uid : (localStorage.getItem('remo_guest_vid') || '');
@@ -1457,7 +1489,8 @@ function computePostRenderSig(p, u, lang) {
   const btySig = p.bounty ? `${p.bounty.claimed ? 1 : 0}` : '';
   const capSig = p.secretCapsule ? `${(p.secretCapsule.unlockedBy || []).length}` : '';
   const liked = (u && (p.likes || []).includes(u.uid)) ? 1 : 0;
-  return `${p.id}_${lang}_${(p.likes || []).length}_${liked}_${(p.comments || []).length}_${p.tipsTotal || 0}_${p.pinned ? 1 : 0}_${p.boosted ? 1 : 0}_${p.founderAward ? 1 : 0}_${p.mintedCard ? 1 : 0}_${dualOpen}_${vSig}_${pollSig}_${btySig}_${capSig}_${Object.keys(p.cityGuesses || {}).length}_${p.leaderboard?.[0]?.score || 0}_${isPostCapsuleSealed(p) ? 1 : 0}_${isAdminXrayOpen(p.id) ? 1 : 0}`;
+  const boostMins = isPostBoostActive(p) ? Math.floor(Math.max(0, Number(p.boostedUntil) - Date.now()) / 60000) : 0;
+  return `${p.id}_${lang}_${(p.likes || []).length}_${liked}_${(p.comments || []).length}_${p.tipsTotal || 0}_${p.pinned ? 1 : 0}_${boostMins}_${p.founderAward ? 1 : 0}_${p.mintedCard ? 1 : 0}_${dualOpen}_${vSig}_${pollSig}_${btySig}_${capSig}_${Object.keys(p.cityGuesses || {}).length}_${p.leaderboard?.[0]?.score || 0}_${isPostCapsuleSealed(p) ? 1 : 0}_${isAdminXrayOpen(p.id) ? 1 : 0}`;
 }
 
 function renderSinglePostCardHtml(p, lang, u, isAdm) {
@@ -1501,7 +1534,7 @@ function renderSinglePostCardHtml(p, lang, u, isAdm) {
       : `${city.flag || '🌍'} ${getCityName(city, lang)} · ${wx.icon || '🌤️'} ${wx.tempC ?? 20}°${wx.isSurge ? ' ⚡2X' : ''}`;
 
     return `
-      <article id="post_card_${p.id}" class="post-card ${p.boosted || p.pinned || sealed ? 'boosted' : ''} ${p.mediaType === 'html_app' ? 'is-html-app' : ''} ${p.mediaType === 'city_versus' ? 'is-city-versus' : ''}" ${interactiveNoTilt ? '' : 'onmousemove="applyHoloTilt(event, this)" onmouseleave="resetHoloTilt(this)"'}>
+      <article id="post_card_${p.id}" class="post-card ${isPostBoostActive(p) || p.pinned || sealed ? 'boosted' : ''} ${p.mediaType === 'html_app' ? 'is-html-app' : ''} ${p.mediaType === 'city_versus' ? 'is-city-versus' : ''}" ${interactiveNoTilt ? '' : 'onmousemove="applyHoloTilt(event, this)" onmouseleave="resetHoloTilt(this)"'}>
         <div class="post-head">
           <div style="display:flex;align-items:center;gap:6px;min-width:0;">
             <div class="post-author" style="cursor:pointer;" onclick="openCitizenProfileModal('${p.uid || ''}', '${escapeHtmlStr(p.authorName || '')}')" title="🪪 @${escapeHtmlStr(p.authorName)}">
@@ -1541,7 +1574,7 @@ function renderSinglePostCardHtml(p, lang, u, isAdm) {
                   ${p.isWorldWindow || (p.duetOf && p.duetOf.isWorldWindow) ? `<span class="window-live-badge">${t('win_badge_live')}</span>` : ''}
                   ${p.pinned ? `<span class="pbadge pinned">${t('post_pinned_badge')}</span>` : ''}
                   ${p.founderAward ? `<span class="pbadge founder">${t('post_founder_award_badge')}</span>` : ''}
-                  ${p.boosted ? `<span class="pbadge boost">${t('post_boosted_badge')}</span>` : ''}
+                  ${getPostBoostBadgeHtml(p, lang)}
                   ${p.bounty && !p.bounty.claimed ? `<span class="pbadge boost" style="background:#f59e0b;color:#000;">🎁 +${p.bounty.coins} 🪙</span>` : ''}
                   
                   ${!hiddenByCapsule && p.mediaType === 'video' ? `<span class="pbadge vid60">${t('post_video60_badge')} · ${formatDurationMMSS(p.videoDuration || 60)}</span>` : ''}
@@ -1702,8 +1735,8 @@ function getFilteredSortedFeedPosts(searchQuery = '') {
   posts.sort((a, b) =>
     (deepId && b.id === deepId ? 1 : 0) - (deepId && a.id === deepId ? 1 : 0) ||
     (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) ||
-    (b.boosted ? 1 : 0) - (a.boosted ? 1 : 0) ||
-    b.createdAt - a.createdAt
+    ((isPostBoostActive(b) ? 1 : 0) - (isPostBoostActive(a) ? 1 : 0)) ||
+    (b.createdAt || 0) - (a.createdAt || 0)
   );
 
   if (currentFeedMode === 'following') {
@@ -1943,21 +1976,86 @@ function tipPostAuthor(postId) {
 
 function boostPost24h(postId) {
   const lang = REMO_I18N.getLang();
+  const isFr = lang === 'fr';
   const u = REMO_STORE.getCurrentUser();
-  if (!u) { openAuthModal(); return; }
-  const cost = REMO_STORE.state.settings.rewards.boostCost || 50;
-  if (!REMO_STORE.addCoins(u.uid, -cost, 20)) {
-    remoToast(lang === 'fr' ? `${cost} Pièces REMO requises pour booster !` : `${cost} REMO Coins needed to boost!`);
+  if (!u || u.role === 'guest') {
+    openAuthModal();
     return;
   }
-  const p = REMO_STORE.state.posts.find((x) => x.id === postId);
-  if (p) p.boosted = true;
+  const isAdm = REMO_STORE.isAdminUnlocked() || REMO_STORE.isCurrentUserAdmin();
+  const p = (REMO_STORE.state.posts || []).find((x) => x.id === postId);
+  if (!p) return;
+
+  const isPostOwner = Boolean(u && (
+    (p.uid && u.uid === p.uid) ||
+    (p.authorUid && u.uid === p.authorUid) ||
+    (u.email && p.authorEmail && u.email.toLowerCase() === p.authorEmail.toLowerCase()) ||
+    (u.name && p.authorName && u.name.trim().toLowerCase() === p.authorName.trim().toLowerCase())
+  ));
+
+  if (!isPostOwner && !isAdm) {
+    remoToast(isFr
+      ? '⚠️ Vous ne pouvez booster que vos propres publications !'
+      : '⚠️ You can only boost your own posts!');
+    return;
+  }
+
+  const cost = isAdm ? 0 : 100;
+  if (cost > 0) {
+    const curCoins = Number(u.coins || 0);
+    if (curCoins < cost) {
+      remoToast(isFr
+        ? `⚠️ 100 Pièces REMO requises pour booster (vous avez ${curCoins} 🪙) !`
+        : `⚠️ 100 REMO Coins required to boost (you have ${curCoins} 🪙)!`);
+      return;
+    }
+    REMO_STORE.addCoins(u.uid, -cost, 20);
+  }
+
+  p.boosted = true;
+  p.boostedAt = Date.now();
+  const baseUntil = (p.boostedUntil && Number(p.boostedUntil) > Date.now()) ? Number(p.boostedUntil) : Date.now();
+  p.boostedUntil = baseUntil + 86400000;
+
   REMO_STORE.syncPostToCloud(p);
   REMO_STORE.save(true, 'boost');
-  spawnRemoCoinsFX(6);
+  if (cost > 0) spawnRemoCoinsFX(8);
+  syncHeaderAndSidebars();
   renderSocialFeed();
-  remoToast(lang === 'fr' ? '🚀 Publication boostée en tête du flux 24h !' : '🚀 Post boosted to top of feed for 24h!', 'fanfare');
+  remoToast(isFr
+    ? '🚀 Publication boostée en tête du fil pendant 24h !'
+    : '🚀 Post boosted to top of feed for 24h!',
+    'fanfare'
+  );
 }
+window.boostPost24h = boostPost24h;
+
+function adminToggleBoostPostInline(postId) {
+  const isAdm = REMO_STORE.isAdminUnlocked() || REMO_STORE.isCurrentUserAdmin();
+  if (!isAdm) return;
+  const lang = REMO_I18N.getLang();
+  const isFr = lang === 'fr';
+  const p = (REMO_STORE.state.posts || []).find((x) => x.id === postId);
+  if (!p) return;
+
+  if (isPostBoostActive(p)) {
+    p.boosted = false;
+    p.boostedUntil = 0;
+    REMO_STORE.syncPostToCloud(p);
+    REMO_STORE.save(true, 'admin_unboost');
+    renderSocialFeed();
+    remoToast(isFr ? '⏸️ Boost annulé par l’Admin.' : '⏸️ Boost cancelled by Admin.');
+  } else {
+    p.boosted = true;
+    p.boostedAt = Date.now();
+    p.boostedUntil = Date.now() + 86400000;
+    REMO_STORE.syncPostToCloud(p);
+    REMO_STORE.save(true, 'admin_boost');
+    renderSocialFeed();
+    remoToast(isFr ? '🚀 Publication boostée 24h par l’Admin !' : '🚀 Post boosted 24h by Admin!', 'fanfare');
+  }
+}
+window.adminToggleBoostPostInline = adminToggleBoostPostInline;
 
 function getCurrentPhotoMintMonthKey() {
   const d = new Date();
@@ -6645,13 +6743,15 @@ function openPostActionsSheet(postId) {
       </button>
       ` : ''}
 
+      ${(isPostOwner || isAdm) ? `
       <button type="button" class="action-sheet-row" onclick="closePostActionsModal(); boostPost24h('${p.id}');">
         <span class="as-icon" style="background:rgba(56,189,248,0.15);color:#38bdf8;">🚀</span>
         <div style="text-align:left;flex:1;">
-          <b style="color:#bae6fd;">${lang === 'fr' ? 'Booster la Publication' : 'Boost Post'}</b>
-          <div style="font-size:0.72rem;color:var(--muted);">${lang === 'fr' ? 'Propulsez ce moment en tête du fil (+100 🪙)' : 'Propel this post to top of global feed'}</div>
+          <b style="color:#bae6fd;">${isPostBoostActive(p) ? (lang === 'fr' ? 'Prolonger le Boost (+24h)' : 'Extend Boost (+24h)') : (lang === 'fr' ? 'Booster la Publication' : 'Boost Post')}</b>
+          <div style="font-size:0.72rem;color:var(--muted);">${isAdm ? (lang === 'fr' ? 'Propulsez en tête du fil (Gratuit Admin)' : 'Propel to top of feed (Free Admin)') : (lang === 'fr' ? 'Propulsez ce moment en tête du fil 24h (100 🪙)' : 'Propel to top of global feed for 24h (100 🪙)')}</div>
         </div>
       </button>
+      ` : ''}
 
       <button type="button" class="action-sheet-row" onclick="closePostActionsModal(); saveBookmarkPost('${p.id}');">
         <span class="as-icon" style="background:rgba(168,85,247,0.15);color:#c084fc;">${isBookmarked ? '⭐' : '🔖'}</span>
@@ -6690,7 +6790,10 @@ function openPostActionsSheet(postId) {
           </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
             <button type="button" class="adm-pbtn gold" onclick="closePostActionsModal(); adminPinPostInline('${p.id}');">
-              📌 ${p.pinned ? 'Désépingler' : 'Épingler'}
+              📌 ${p.pinned ? (lang === 'fr' ? 'Désépingler' : 'Unpin') : (lang === 'fr' ? 'Épingler' : 'Pin')}
+            </button>
+            <button type="button" class="adm-pbtn" style="background:${isPostBoostActive(p) ? 'linear-gradient(135deg,#ef4444,#dc2626)' : 'linear-gradient(135deg,#0284c7,#ec4899)'};color:#fff;" onclick="closePostActionsModal(); adminToggleBoostPostInline('${p.id}');">
+              🚀 ${isPostBoostActive(p) ? (lang === 'fr' ? 'Annuler Boost' : 'Cancel Boost') : (lang === 'fr' ? 'Booster 24h' : 'Boost 24h')}
             </button>
             <button type="button" class="adm-pbtn gold" onclick="closePostActionsModal(); adminAwardFounderCrown('${p.id}');">
               👑 Couronne (+100🪙)
@@ -6698,7 +6801,7 @@ function openPostActionsSheet(postId) {
             <button type="button" class="adm-pbtn" onclick="closePostActionsModal(); adminEditPostInline('${p.id}');">
               ✏️ Modifier Texte
             </button>
-            <button type="button" class="adm-pbtn danger" onclick="closePostActionsModal(); adminDeletePostInline('${p.id}');">
+            <button type="button" class="adm-pbtn danger" style="grid-column:span 2;" onclick="closePostActionsModal(); adminDeletePostInline('${p.id}');">
               🗑️ Supprimer (Admin)
             </button>
           </div>
@@ -6722,12 +6825,17 @@ window.closePostActionsModal = closePostActionsModal;
 function userDeleteOwnPost(postId) {
   const lang = REMO_I18N.getLang();
   const u = REMO_STORE.getCurrentUser();
-  const isAdm = REMO_STORE.isAdminUnlocked();
+  const isAdm = REMO_STORE.isAdminUnlocked() || REMO_STORE.isCurrentUserAdmin();
   const p = (REMO_STORE.state.posts || []).find((x) => x.id === postId);
   if (!p) return;
-  const isPostOwner = Boolean(u && (u.uid === p.uid || (u.email && p.authorEmail && u.email.toLowerCase() === p.authorEmail.toLowerCase())));
+  const isPostOwner = Boolean(u && (
+    (p.uid && u.uid === p.uid) ||
+    (p.authorUid && u.uid === p.authorUid) ||
+    (u.email && p.authorEmail && u.email.toLowerCase() === p.authorEmail.toLowerCase()) ||
+    (u.name && p.authorName && u.name.trim().toLowerCase() === p.authorName.trim().toLowerCase())
+  ));
   if (!isPostOwner && !isAdm) {
-    remoToast(lang === 'fr' ? 'Vous ne pouvez supprimer que vos propres publications.' : 'You can only delete your own posts.');
+    remoToast(lang === 'fr' ? '⚠️ Vous ne pouvez supprimer que vos propres publications.' : '⚠️ You can only delete your own posts.');
     return;
   }
   const confirmMsg = lang === 'fr'
@@ -6744,7 +6852,8 @@ function userDeleteOwnPost(postId) {
 
 /* ── Direct In-Feed Post Moderation Actions (Admin God-Mode) ── */
 function adminDeletePostInline(postId) {
-  if (!REMO_STORE.isAdminUnlocked()) return;
+  const isAdm = REMO_STORE.isAdminUnlocked() || REMO_STORE.isCurrentUserAdmin();
+  if (!isAdm) return;
   const lang = REMO_I18N.getLang();
   if (!confirm(lang === 'fr' ? '🗑️ Supprimer définitivement cette publication ?' : '🗑️ Permanently delete this post?')) return;
   REMO_STORE.state.posts = (REMO_STORE.state.posts || []).filter((p) => p.id !== postId);
@@ -6755,7 +6864,8 @@ function adminDeletePostInline(postId) {
 }
 
 function adminPinPostInline(postId) {
-  if (!REMO_STORE.isAdminUnlocked()) return;
+  const isAdm = REMO_STORE.isAdminUnlocked() || REMO_STORE.isCurrentUserAdmin();
+  if (!isAdm) return;
   const p = (REMO_STORE.state.posts || []).find((x) => x.id === postId);
   if (!p) return;
   p.pinned = !p.pinned;
@@ -6766,7 +6876,8 @@ function adminPinPostInline(postId) {
 }
 
 function adminAwardFounderCrown(postId) {
-  if (!REMO_STORE.isAdminUnlocked()) return;
+  const isAdm = REMO_STORE.isAdminUnlocked() || REMO_STORE.isCurrentUserAdmin();
+  if (!isAdm) return;
   const p = (REMO_STORE.state.posts || []).find((x) => x.id === postId);
   if (!p) return;
   p.founderAward = true;
@@ -6779,7 +6890,7 @@ function adminAwardFounderCrown(postId) {
 }
 
 function adminEditPostInline(postId) {
-  if (!REMO_STORE.isAdminUnlocked()) return;
+  if (!REMO_STORE.isAdminUnlocked() && !REMO_STORE.isCurrentUserAdmin()) return;
   const lang = REMO_I18N.getLang();
   const p = (REMO_STORE.state.posts || []).find((x) => x.id === postId);
   if (!p) return;
@@ -6788,13 +6899,14 @@ function adminEditPostInline(postId) {
   if (edited === null) return;
   p.caption_en = edited;
   p.caption_fr = edited;
+  REMO_STORE.syncPostToCloud(p);
   REMO_STORE.save(true, 'admin_edit_post');
   renderSocialFeed();
   remoToast('✏️ Post updated!');
 }
 
 function adminDeleteCommentInline(postId, commentId) {
-  if (!REMO_STORE.isAdminUnlocked()) return;
+  if (!REMO_STORE.isAdminUnlocked() && !REMO_STORE.isCurrentUserAdmin()) return;
   const p = (REMO_STORE.state.posts || []).find((x) => x.id === postId);
   if (!p || !Array.isArray(p.comments)) return;
   p.comments = p.comments.filter((c) => c.id !== commentId);
@@ -7055,6 +7167,9 @@ window.resetHoloTilt = resetHoloTilt;
 window.toggleLikePost = toggleLikePost;
 window.tipPostAuthor = tipPostAuthor;
 window.boostPost24h = boostPost24h;
+window.adminToggleBoostPostInline = adminToggleBoostPostInline;
+window.isPostBoostActive = isPostBoostActive;
+window.getPostBoostBadgeHtml = getPostBoostBadgeHtml;
 window.mintPostAsCityCard = mintPostAsCityCard;
 window.saveBookmarkPost = saveBookmarkPost;
 window.openCommentsModal = openCommentsModal;
@@ -15277,6 +15392,19 @@ if (typeof window !== 'undefined') {
           setTimeout(() => openVipInviteWelcomeModal(false), 550);
         }
       }
+
+      // Realtime 60s countdown ticker for 24h boosted posts in feed
+      setInterval(() => {
+        try {
+          const feedEl = document.getElementById('view-feed');
+          if (feedEl && feedEl.classList.contains('active')) {
+            const hasBoosted = (REMO_STORE.state?.posts || []).some((p) => p && p.boosted);
+            if (hasBoosted && typeof renderSocialFeed === 'function') {
+              renderSocialFeed(null, false);
+            }
+          }
+        } catch (e) {}
+      }, 60000);
     } catch (e) {}
   });
 }

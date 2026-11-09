@@ -1053,7 +1053,7 @@ function createDefaultState() {
         duelVoteReward: 20,
         pvpWinReward: 35,
         packCost: 150,
-        boostCost: 50,
+        boostCost: 100,
         mintPostCardCost: 100
       },
       dailyPulse: {
@@ -4336,10 +4336,19 @@ const REMO_STORE = {
         const nextSignature = activePosts.map(postSig).join('|');
         const hasContentChanged = prevSignature !== nextSignature;
 
+        const nowPostTs = Date.now();
+        const isBoostVal = (p) => {
+          if (!p || !p.boosted) return 0;
+          if (p.boostedUntil && nowPostTs < Number(p.boostedUntil)) return 1;
+          if (!p.boostedUntil && p.createdAt && (nowPostTs - Number(p.createdAt) < 86400000)) return 1;
+          p.boosted = false;
+          return 0;
+        };
+
         this.state.posts = activePosts;
         this.state.posts.sort((a, b) =>
           (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) ||
-          (b.boosted ? 1 : 0) - (a.boosted ? 1 : 0) ||
+          isBoostVal(b) - isBoostVal(a) ||
           (b.createdAt || 0) - (a.createdAt || 0)
         );
 

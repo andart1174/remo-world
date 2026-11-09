@@ -980,7 +980,7 @@ function adminSaveEconomyRates() {
   r.duelVoteReward = Number(document.getElementById('rwVote')?.value || 20);
   r.pvpWinReward = Number(document.getElementById('rwPvp')?.value || 35);
   r.packCost = Number(document.getElementById('rwPack')?.value || 150);
-  r.boostCost = Number(document.getElementById('rwBoost')?.value || 50);
+  r.boostCost = Number(document.getElementById('rwBoost')?.value || 100);
   r.mintPostCardCost = Number(document.getElementById('rwMint')?.value || 100);
   r.referralBonus = Number(document.getElementById('rwReferral')?.value || 100);
   REMO_STORE.save(true, 'economy');
@@ -1270,7 +1270,18 @@ function adminEditPostCaption(pid) {
 
 function adminToggleBoostPost(pid) {
   const p = REMO_STORE.state.posts.find((x) => x.id === pid);
-  if (p) p.boosted = !p.boosted;
+  if (!p) return;
+  const now = Date.now();
+  const isActive = p.boosted && p.boostedUntil && now < Number(p.boostedUntil);
+  if (isActive) {
+    p.boosted = false;
+    p.boostedUntil = 0;
+  } else {
+    p.boosted = true;
+    p.boostedAt = now;
+    p.boostedUntil = now + 86400000;
+  }
+  REMO_STORE.syncPostToCloud(p);
   REMO_STORE.save(true, 'post_mod');
   renderAdminModerationPanel();
 }
