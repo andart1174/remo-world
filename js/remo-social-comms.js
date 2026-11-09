@@ -14164,12 +14164,623 @@ window.openGoldenScratchModal = openGoldenScratchModal;
 window.revealGoldenScratchCardPrize = revealGoldenScratchCardPrize;
 window.shareToUnlockSecondScratchCard = shareToUnlockSecondScratchCard;
 
+/* ── 🎁 1. VIP REFERRAL & SHARED LINK HOLOGRAPHIC WELCOME CHEST (?ref= / ?promo= / ?invite=) ── */
+let _detectedVipInviteCode = 'REMO2026';
+let _detectedVipCityId = '';
+
+function openVipInviteWelcomeModal(isPreview = false) {
+  const modal = document.getElementById('vipInviteWelcomeModal');
+  if (!modal) return;
+  const lang = REMO_I18N.getLang();
+  const u = REMO_STORE.getCurrentUser();
+  const cities = getRemoCities();
+
+  let params = null;
+  try {
+    params = new URLSearchParams(window.location.search);
+  } catch (e) {}
+
+  const refParam = (params && (params.get('ref') || params.get('invite') || params.get('promo'))) || '';
+  const cityParam = (params && params.get('city')) || '';
+  if (refParam) _detectedVipInviteCode = refParam.toUpperCase().slice(0, 24);
+  else if (u && u.referralCode) _detectedVipInviteCode = u.referralCode;
+  if (cityParam && cities.some((c) => c.id === cityParam)) {
+    _detectedVipCityId = cityParam;
+  }
+
+  const codeEl = document.getElementById('vipInviteCodeVal');
+  if (codeEl) codeEl.textContent = _detectedVipInviteCode || 'REMO2026';
+
+  const sel = document.getElementById('vipInviteCitySelect');
+  const preferredCity = _detectedVipCityId || (u && u.homeCity) || 'montreal';
+  if (sel) {
+    sel.innerHTML = cities.map((c) =>
+      `<option value="${c.id}" ${c.id === preferredCity ? 'selected' : ''}>${c.flag} ${escapeHtmlStr(getCityName(c, lang))} (+50 PTS)</option>`
+    ).join('');
+  }
+
+  const nameInp = document.getElementById('vipInviteNameInput');
+  if (nameInp && u && u.name && !u.name.startsWith('REMO Pioneer') && u.role !== 'guest') {
+    nameInp.value = u.name;
+  }
+
+  REMO_I18N.applyDOM(modal);
+  modal.classList.add('open');
+  if (!isPreview && typeof RemoAudio !== 'undefined') {
+    try { RemoAudio.play('fanfare'); } catch (e) {}
+  }
+}
+window.openVipInviteWelcomeModal = openVipInviteWelcomeModal;
+
+function claimVipInviteWelcomePack() {
+  const lang = REMO_I18N.getLang();
+  const isFr = lang === 'fr';
+  const sel = document.getElementById('vipInviteCitySelect');
+  const nameInp = document.getElementById('vipInviteNameInput');
+  const chosenCityId = (sel && sel.value) || _detectedVipCityId || 'montreal';
+  const rawName = (nameInp && nameInp.value || '').trim().replace(/^@+/, '');
+
+  let u = REMO_STORE.getCurrentUser();
+  if (!u) {
+    u = REMO_STORE.ensureGuestOrCitizen(rawName || 'REMO Citizen', '', chosenCityId);
+  } else {
+    u.homeCity = chosenCityId;
+    if (rawName && rawName.length >= 2) {
+      u.name = rawName;
+    }
+  }
+
+  const alreadyClaimed = localStorage.getItem('remo_vip_invite_claimed') === '1';
+  if (!alreadyClaimed) {
+    localStorage.setItem('remo_vip_invite_claimed', '1');
+    REMO_STORE.addCoins(u.uid, 150, 50);
+    if (_detectedVipInviteCode && typeof REMO_STORE.redeemReferralCode === 'function') {
+      try { REMO_STORE.redeemReferralCode(_detectedVipInviteCode); } catch (e) {}
+    }
+  } else {
+    REMO_STORE.addCoins(u.uid, 25, 15);
+  }
+
+  REMO_STORE.save(true, 'vip_invite_claim');
+  REMO_STORE.syncToFirestore('vip_invite_claim', true);
+  syncHeaderAndSidebars();
+  if (typeof renderSocialFeed === 'function') renderSocialFeed();
+
+  document.getElementById('vipInviteWelcomeModal')?.classList.remove('open');
+  if (typeof spawnRemoCoinsFX === 'function') spawnRemoCoinsFX(22);
+
+  const cityObj = getCityById(chosenCityId);
+  const cityName = getCityName(cityObj, lang);
+  remoToast(
+    isFr
+      ? `🎉 Pack VIP Réclamé ! +150 🪙 dans votre coffre & +50 PTS pour ${cityObj.flag} ${cityName} !`
+      : `🎉 VIP Pack Claimed! +150 🪙 added to your vault & +50 PTS for ${cityObj.flag} ${cityName}!`,
+    'fanfare'
+  );
+}
+window.claimVipInviteWelcomePack = claimVipInviteWelcomePack;
+
+/* ── 📣 2. 1-CLICK VIRAL PROMO STUDIO (16:9 FB GROUP BANNER / 9:16 STORY + 5 VIRAL TEXTS) ── */
+let _viralPromoStudioFormat = '16:9';
+let _viralPromoTemplatesCache = [];
+
+function getSortedCitiesLeaderboard() {
+  const cities = getRemoCities().map((c) => ({
+    city: c,
+    pts: Number(REMO_STORE.getCityScore ? REMO_STORE.getCityScore(c.id) : ((REMO_STORE.state.cityScores && REMO_STORE.state.cityScores[c.id]) || c.baseScore || 1200))
+  }));
+  cities.sort((a, b) => b.pts - a.pts);
+  return cities;
+}
+
+function openViralPromoStudioModal(defaultCityId = '') {
+  const modal = document.getElementById('viralPromoStudioModal');
+  if (!modal) return;
+  const lang = REMO_I18N.getLang();
+  const isFr = lang === 'fr';
+  const u = REMO_STORE.getCurrentUser();
+  const targetCityId = defaultCityId || (u && u.homeCity) || 'montreal';
+  const sorted = getSortedCitiesLeaderboard();
+
+  const citySel = document.getElementById('promoStudioCitySelect');
+  if (citySel) {
+    citySel.innerHTML = sorted.map((item, idx) =>
+      `<option value="${item.city.id}" ${item.city.id === targetCityId ? 'selected' : ''}>#${idx + 1} ${item.city.flag} ${escapeHtmlStr(getCityName(item.city, lang))} (${item.pts.toLocaleString()} PTS)</option>`
+    ).join('');
+  }
+
+  const themeSel = document.getElementById('promoStudioThemeSelect');
+  if (themeSel) {
+    const curVal = themeSel.value || 'ranking';
+    themeSel.innerHTML = `
+      <option value="ranking" ${curVal === 'ranking' ? 'selected' : ''}>${isFr ? '🏆 Alerte Classement Mondial Live' : '🏆 Live World Ranking Alert'}</option>
+      <option value="duel" ${curVal === 'duel' ? 'selected' : ''}>${isFr ? '⚔️ Duel de Fierté entre 2 Villes' : '⚔️ City vs City Pride Duel'}</option>
+      <option value="radio" ${curVal === 'radio' ? 'selected' : ''}>${isFr ? '📻 38 Radios du Monde & Cadeau +150 🪙' : '📻 38 Live Radios & +150 🪙 Gift'}</option>
+    `;
+  }
+
+  REMO_I18N.applyDOM(modal);
+  modal.classList.add('open');
+  renderViralPromoStudioAll();
+}
+window.openViralPromoStudioModal = openViralPromoStudioModal;
+
+function setViralPromoStudioFormat(fmt) {
+  _viralPromoStudioFormat = fmt === '9:16' ? '9:16' : '16:9';
+  const b169 = document.getElementById('promoFmtBtn169');
+  const b916 = document.getElementById('promoFmtBtn916');
+  if (b169 && b916) {
+    if (_viralPromoStudioFormat === '16:9') {
+      b169.className = 'btn-cyber';
+      b916.className = 'btn-ghost';
+    } else {
+      b169.className = 'btn-ghost';
+      b916.className = 'btn-cyber';
+    }
+  }
+  renderViralPromoStudioAll();
+}
+window.setViralPromoStudioFormat = setViralPromoStudioFormat;
+
+function renderViralPromoStudioAll() {
+  renderViralPromoStudioCanvas();
+  renderViralPromoTemplatesList();
+}
+window.renderViralPromoStudioAll = renderViralPromoStudioAll;
+
+function renderViralPromoStudioCanvas() {
+  const cv = document.getElementById('viralPromoStudioCanvas');
+  if (!cv) return;
+  const lang = REMO_I18N.getLang();
+  const isFr = lang === 'fr';
+  const sorted = getSortedCitiesLeaderboard();
+  const selCityId = document.getElementById('promoStudioCitySelect')?.value || 'montreal';
+  const theme = document.getElementById('promoStudioThemeSelect')?.value || 'ranking';
+
+  const focusIdx = Math.max(0, sorted.findIndex((x) => x.city.id === selCityId));
+  const focusEntry = sorted[focusIdx] || sorted[0];
+  const rivalEntry = sorted[focusIdx === 0 ? 1 : focusIdx - 1] || sorted[0];
+
+  const focusCity = focusEntry.city;
+  const rivalCity = rivalEntry.city;
+  const focusName = getCityName(focusCity, lang);
+  const rivalName = getCityName(rivalCity, lang);
+  const rankNum = focusIdx + 1;
+
+  const u = REMO_STORE.getCurrentUser();
+  const inviteCode = (u && u.referralCode) ? u.referralCode : 'REMO2026';
+
+  const isVert = _viralPromoStudioFormat === '9:16';
+  const W = isVert ? 540 : 960;
+  const H = isVert ? 960 : 540;
+  cv.width = W;
+  cv.height = H;
+  const ctx = cv.getContext('2d');
+
+  // Deep 4D Cyber Gradient Background
+  const bg = ctx.createLinearGradient(0, 0, W, H);
+  bg.addColorStop(0, '#040714');
+  bg.addColorStop(0.5, '#0f172a');
+  bg.addColorStop(1, '#1e1b4b');
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, W, H);
+
+  // Subtle Cyber Grid
+  ctx.strokeStyle = 'rgba(56, 189, 248, 0.08)';
+  ctx.lineWidth = 1;
+  for (let x = 0; x < W; x += 48) {
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+  }
+  for (let y = 0; y < H; y += 48) {
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+  }
+
+  // Outer Gold Neon Frame
+  ctx.strokeStyle = 'rgba(251, 191, 36, 0.65)';
+  ctx.lineWidth = 4;
+  ctx.strokeRect(14, 14, W - 28, H - 28);
+
+  if (!isVert) {
+    // ── 16:9 LANDSCAPE BANNER (960×540) FOR FACEBOOK GROUPS / REDDIT / X ──
+    ctx.fillStyle = 'rgba(239, 68, 68, 0.22)';
+    ctx.fillRect(36, 32, 888, 44);
+    ctx.strokeStyle = '#f43f5e';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(36, 32, 888, 44);
+
+    ctx.fillStyle = '#fde047';
+    ctx.font = '900 17px system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    const topAlert = theme === 'duel'
+      ? (isFr ? `⚔️ ALERTE DUEL EN DIRECT : ${focusCity.flag} ${focusName.toUpperCase()} (#${rankNum}) VS ${rivalCity.flag} ${rivalName.toUpperCase()} !` : `⚔️ LIVE CITY DUEL ALERT: ${focusCity.flag} ${focusName.toUpperCase()} (#${rankNum}) VS ${rivalCity.flag} ${rivalName.toUpperCase()}!`)
+      : theme === 'radio'
+        ? (isFr ? `📻 38 RADIOS DU MONDE EN DIRECT + CLASSEMENT OFFICIEL 2026 • REMOWORLD.COM` : `📻 38 LIVE WORLD RADIOS + OFFICIAL 2026 CITY RANKING • REMOWORLD.COM`)
+        : (isFr ? `🔥 CLASSEMENT MONDIAL DES VILLES 2026 EN DIRECT • ${focusCity.flag} ${focusName.toUpperCase()} EST #${rankNum} !` : `🔥 LIVE 2026 WORLD CITIES RANKING • ${focusCity.flag} ${focusName.toUpperCase()} IS CURRENTLY #${rankNum}!`);
+    ctx.fillText(topAlert, W / 2, 60);
+
+    // Left Column: Featured City Spotlight (x: 36..460, y: 92..420)
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
+    ctx.fillRect(36, 92, 430, 328);
+    ctx.strokeStyle = 'rgba(56, 189, 248, 0.55)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(36, 92, 430, 328);
+
+    ctx.font = '64px system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(focusCity.flag || '🌍', 251, 175);
+
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '900 30px system-ui, sans-serif';
+    ctx.fillText(`${focusName.toUpperCase()}`, 251, 222);
+
+    ctx.fillStyle = '#fde047';
+    ctx.font = '900 22px system-ui, sans-serif';
+    ctx.fillText(
+      isFr ? `🏆 RANG MONDIAL #${rankNum} • ${focusEntry.pts.toLocaleString()} PTS` : `🏆 WORLD RANK #${rankNum} • ${focusEntry.pts.toLocaleString()} PTS`,
+      251,
+      260
+    );
+
+    const diffPts = Math.abs(rivalEntry.pts - focusEntry.pts);
+    ctx.fillStyle = '#7dd3fc';
+    ctx.font = '800 16px system-ui, sans-serif';
+    ctx.fillText(
+      focusIdx === 0
+        ? (isFr ? `👑 En tête devant ${rivalCity.flag} ${rivalName} (+${diffPts} PTS)` : `👑 Leading ahead of ${rivalCity.flag} ${rivalName} (+${diffPts} PTS)`)
+        : (isFr ? `⚡ À seulement ${diffPts} PTS de ${rivalCity.flag} ${rivalName} !` : `⚡ Only ${diffPts} PTS behind ${rivalCity.flag} ${rivalName}!`),
+      251,
+      298
+    );
+
+    // Vote CTA button graphic inside Left Box
+    ctx.fillStyle = '#f59e0b';
+    ctx.fillRect(68, 330, 366, 62);
+    ctx.fillStyle = '#050816';
+    ctx.font = '900 19px system-ui, sans-serif';
+    ctx.fillText(
+      isFr ? `🗳️ VOTER POUR ${focusName.toUpperCase()} (+100 PTS)` : `🗳️ VOTE FOR ${focusName.toUpperCase()} (+100 PTS)`,
+      251,
+      368
+    );
+
+    // Right Column: Top 5 World Leaderboard (x: 484..924, y: 92..420)
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
+    ctx.fillRect(484, 92, 440, 328);
+    ctx.strokeStyle = 'rgba(251, 191, 36, 0.45)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(484, 92, 440, 328);
+
+    ctx.fillStyle = '#fde047';
+    ctx.font = '900 18px system-ui, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText(isFr ? '🌍 TOP 5 CLASSEMENT MONDIAL EN DIRECT' : '🌍 LIVE TOP 5 WORLD CITIES STANDINGS', 504, 126);
+
+    sorted.slice(0, 5).forEach((item, idx) => {
+      const y = 144 + idx * 52;
+      const isFocus = item.city.id === focusCity.id;
+      ctx.fillStyle = isFocus ? 'rgba(251, 191, 36, 0.22)' : 'rgba(255, 255, 255, 0.05)';
+      ctx.fillRect(504, y, 400, 42);
+      if (isFocus) {
+        ctx.strokeStyle = '#fbbf24';
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(504, y, 400, 42);
+      }
+      ctx.fillStyle = idx === 0 ? '#fde047' : '#38bdf8';
+      ctx.font = '900 17px system-ui, sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText(`#${idx + 1}  ${item.city.flag} ${getCityName(item.city, lang)}`, 518, y + 27);
+
+      ctx.fillStyle = '#f8fafc';
+      ctx.textAlign = 'right';
+      ctx.font = '900 16px system-ui, sans-serif';
+      ctx.fillText(`${item.pts.toLocaleString()} PTS`, 890, y + 27);
+    });
+
+    // Bottom VIP Gift Banner (x: 36..924, y: 436..506)
+    ctx.fillStyle = 'rgba(2, 132, 199, 0.28)';
+    ctx.fillRect(36, 436, 888, 70);
+    ctx.strokeStyle = '#38bdf8';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(36, 436, 888, 70);
+
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '900 20px system-ui, sans-serif';
+    ctx.fillText(
+      isFr
+        ? `🎁 CADEAU VIP : +150 🪙 PIÈCES D’OR + 1 CARTE DE VILLE 4D GRATUITE SUR REMOWORLD.COM`
+        : `🎁 VIP GIFT: CLAIM +150 🪙 FREE GOLD COINS & 1 4D CITY CARD ON REMOWORLD.COM`,
+      W / 2,
+      466
+    );
+    ctx.fillStyle = '#fde047';
+    ctx.font = '900 16px system-ui, sans-serif';
+    ctx.fillText(
+      isFr
+        ? `👉 Code d’Invitation VIP : ${inviteCode}  •  38 Radios Live  •  Jeux & Duels des Villes`
+        : `👉 VIP Invite Code: ${inviteCode}  •  38 Live Radios  •  World City Games & Duels`,
+      W / 2,
+      494
+    );
+  } else {
+    // ── 9:16 VERTICAL STORY POSTER (540×960) FOR STORIES / TIKTOK / REELS ──
+    ctx.fillStyle = 'rgba(239, 68, 68, 0.24)';
+    ctx.fillRect(32, 34, 476, 56);
+    ctx.strokeStyle = '#f43f5e';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(32, 34, 476, 56);
+
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#fde047';
+    ctx.font = '900 17px system-ui, sans-serif';
+    ctx.fillText(
+      isFr ? '🔥 COUPE MONDIALE DES VILLES 2026' : '🔥 2026 WORLD CITIES LIVE RANKING',
+      W / 2,
+      68
+    );
+
+    // City Spotlight Card
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
+    ctx.fillRect(32, 108, 476, 290);
+    ctx.strokeStyle = '#38bdf8';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(32, 108, 476, 290);
+
+    ctx.font = '68px system-ui, sans-serif';
+    ctx.fillText(focusCity.flag || '🌍', W / 2, 190);
+
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '900 32px system-ui, sans-serif';
+    ctx.fillText(focusName.toUpperCase(), W / 2, 240);
+
+    ctx.fillStyle = '#fde047';
+    ctx.font = '900 22px system-ui, sans-serif';
+    ctx.fillText(
+      isFr ? `🏆 RANG #${rankNum} • ${focusEntry.pts.toLocaleString()} PTS` : `🏆 RANK #${rankNum} • ${focusEntry.pts.toLocaleString()} PTS`,
+      W / 2,
+      280
+    );
+
+    ctx.fillStyle = '#f59e0b';
+    ctx.fillRect(62, 314, 416, 58);
+    ctx.fillStyle = '#050816';
+    ctx.font = '900 18px system-ui, sans-serif';
+    ctx.fillText(
+      isFr ? `🗳️ SOUTENEZ ${focusName.toUpperCase()} (+100 PTS)` : `🗳️ VOTE FOR ${focusName.toUpperCase()} (+100 PTS)`,
+      W / 2,
+      350
+    );
+
+    // Top 5 Standings Box
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
+    ctx.fillRect(32, 416, 476, 336);
+    ctx.strokeStyle = 'rgba(251, 191, 36, 0.45)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(32, 416, 476, 336);
+
+    ctx.fillStyle = '#7dd3fc';
+    ctx.font = '900 18px system-ui, sans-serif';
+    ctx.fillText(isFr ? '🌍 TOP 5 DES VILLES EN DIRECT' : '🌍 LIVE TOP 5 WORLD STANDINGS', W / 2, 450);
+
+    sorted.slice(0, 5).forEach((item, idx) => {
+      const y = 470 + idx * 52;
+      const isFocus = item.city.id === focusCity.id;
+      ctx.fillStyle = isFocus ? 'rgba(251, 191, 36, 0.22)' : 'rgba(255, 255, 255, 0.05)';
+      ctx.fillRect(50, y, 440, 42);
+      ctx.fillStyle = idx === 0 ? '#fde047' : '#f8fafc';
+      ctx.textAlign = 'left';
+      ctx.font = '900 17px system-ui, sans-serif';
+      ctx.fillText(`#${idx + 1}  ${item.city.flag} ${getCityName(item.city, lang)}`, 66, y + 27);
+      ctx.textAlign = 'right';
+      ctx.fillStyle = '#38bdf8';
+      ctx.fillText(`${item.pts.toLocaleString()} PTS`, 474, y + 27);
+    });
+
+    // Bottom VIP Gift CTA
+    ctx.fillStyle = 'rgba(2, 132, 199, 0.3)';
+    ctx.fillRect(32, 772, 476, 152);
+    ctx.strokeStyle = '#fbbf24';
+    ctx.lineWidth = 2.5;
+    ctx.strokeRect(32, 772, 476, 152);
+
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#fde047';
+    ctx.font = '900 20px system-ui, sans-serif';
+    ctx.fillText(
+      isFr ? '🎁 CADEAU VIP : +150 🪙 OFFERTS !' : '🎁 VIP GIFT: +150 🪙 FREE COINS!',
+      W / 2,
+      812
+    );
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '900 22px system-ui, sans-serif';
+    ctx.fillText('🌍 REMOWORLD.COM', W / 2, 852);
+    ctx.fillStyle = '#7dd3fc';
+    ctx.font = '800 16px system-ui, sans-serif';
+    ctx.fillText(
+      isFr ? `Code VIP : ${inviteCode} (+1 Carte 4D Gratuite)` : `VIP Code: ${inviteCode} (+1 Free 4D City Card)`,
+      W / 2,
+      892
+    );
+  }
+}
+
+async function copyAndDownloadViralPromoPoster() {
+  const isFr = REMO_I18N.getLang() === 'fr';
+  const cv = document.getElementById('viralPromoStudioCanvas');
+  if (!cv) return;
+  const selCityId = document.getElementById('promoStudioCitySelect')?.value || 'montreal';
+  const dataUrl = cv.toDataURL('image/png');
+
+  let copied = false;
+  try {
+    if (navigator.clipboard && window.ClipboardItem) {
+      const res = await fetch(dataUrl);
+      const blob = await res.blob();
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+      copied = true;
+    }
+  } catch (e) {}
+
+  const a = document.createElement('a');
+  a.href = dataUrl;
+  a.download = `REMO-Promo-${selCityId}-${_viralPromoStudioFormat.replace(':', 'x')}.png`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+
+  if (typeof rewardViralShareWithDailyCap === 'function') {
+    rewardViralShareWithDailyCap('promo_studio_poster');
+  }
+  remoToast(
+    copied
+      ? (isFr ? '📋 Affiche copiée dans le presse-papiers (Ctrl+V sur Facebook) & téléchargée !' : '📋 Poster copied to clipboard (Ctrl+V on Facebook) & downloaded!')
+      : (isFr ? '📥 Affiche PNG téléchargée !' : '📥 Poster PNG downloaded!'),
+    'fanfare'
+  );
+}
+window.copyAndDownloadViralPromoPoster = copyAndDownloadViralPromoPoster;
+
+function renderViralPromoTemplatesList() {
+  const box = document.getElementById('viralPromoTemplatesBox');
+  if (!box) return;
+  const lang = REMO_I18N.getLang();
+  const isFr = lang === 'fr';
+  const sorted = getSortedCitiesLeaderboard();
+  const selCityId = document.getElementById('promoStudioCitySelect')?.value || 'montreal';
+  const focusIdx = Math.max(0, sorted.findIndex((x) => x.city.id === selCityId));
+  const focusEntry = sorted[focusIdx] || sorted[0];
+  const rivalEntry = sorted[focusIdx === 0 ? 1 : focusIdx - 1] || sorted[0];
+
+  const cName = getCityName(focusEntry.city, lang);
+  const rName = getCityName(rivalEntry.city, lang);
+  const rank = focusIdx + 1;
+  const u = REMO_STORE.getCurrentUser();
+  const inviteCode = (u && u.referralCode) ? u.referralCode : 'REMO2026';
+  const vipUrl = `https://remoworld.com/?ref=${encodeURIComponent(inviteCode)}&city=${encodeURIComponent(focusEntry.city.id)}&promo=vip150`;
+  const rankUrl = `https://remoworld.com/${isFr ? 'fr/' : ''}world-ranking.html?ref=${encodeURIComponent(inviteCode)}&city=${encodeURIComponent(focusEntry.city.id)}`;
+
+  _viralPromoTemplatesCache = isFr ? [
+    {
+      badge: '📘 1. Groupes Facebook (Ville / Expatriés / Diaspora)',
+      text: `🔥 ALERTE FIERTÉ LOCALE : ${focusEntry.city.flag} ${cName} est actuellement #${rank} mondial dans le Classement Live des Villes 2026 (${focusEntry.pts.toLocaleString()} PTS) juste face à ${rivalEntry.city.flag} ${rName} ! 🌍\n🎁 Cliquez ici pour voter pour ${cName} en 5 secondes et recevoir un Pack VIP gratuit de +150 🪙 : ${vipUrl}`,
+      url: vipUrl
+    },
+    {
+      badge: '⚔️ 2. Duel de Villes (Provocation Amicale Virale)',
+      text: `⚔️ DUEL EN DIRECT : ${focusEntry.city.flag} ${cName} vs ${rivalEntry.city.flag} ${rName} ! Qui a la meilleure communauté en 2026 ? 🏆\nVotez gratuitement (+100 PTS pour notre ville + 1 Carte 4D offerte) : ${rankUrl}`,
+      url: rankUrl
+    },
+    {
+      badge: '📻 3. Groupes Radio, Musique & Découverte Web (Reddit / FB)',
+      text: `📻 Découvrez REMO World — 38 Radios des Villes du Monde en direct (Montréal, Paris, Chișinău, Bucarest, Tokyo, New York), Quiz Photo "Devine la Ville" & Cartes 4D gratuites ! 🌐✨\n🎁 +150 🪙 offerts avec le lien VIP : ${vipUrl}`,
+      url: vipUrl
+    },
+    {
+      badge: '📲 4. Légende Courte pour TikTok / Story Instagram & Facebook',
+      text: `${focusEntry.city.flag} ${cName} est #${rank} mondial aujourd'hui sur REMO World ! 🏆 Rejoins notre ville et réclame +150 🪙 + 1 Carte 4D gratuite (Code : ${inviteCode}) 👉 ${vipUrl}`,
+      url: vipUrl
+    },
+    {
+      badge: '🟢 5. Invitation Directe WhatsApp / Telegram (Coffre VIP +150 🪙)',
+      text: `🎁 Salut ! Je t'envoie un Coffre VIP de +150 🪙 Pièces d'Or + 1 Carte de Ville 4D gratuite sur REMO World pour soutenir ${focusEntry.city.flag} ${cName} ! Ouvre ton cadeau en 5 secondes ici : ${vipUrl}`,
+      url: vipUrl
+    }
+  ] : [
+    {
+      badge: '📘 1. Facebook City, Expat & Community Groups',
+      text: `🔥 LIVE CITY RANKING ALERT: ${focusEntry.city.flag} ${cName} is currently #${rank} in the 2026 World Cities Live Standings (${focusEntry.pts.toLocaleString()} PTS) battling ${rivalEntry.city.flag} ${rName}! 🌍\n🎁 Tap here to vote for ${cName} in 5 seconds & claim a free +150 🪙 VIP Welcome Pack: ${vipUrl}`,
+      url: vipUrl
+    },
+    {
+      badge: '⚔️ 2. City vs City Friendly Duel Challenge',
+      text: `⚔️ LIVE CITY DUEL: ${focusEntry.city.flag} ${cName} vs ${rivalEntry.city.flag} ${rName}! Which city has the strongest community in 2026? 🏆\nCast your free +100 PTS city vote & claim a 4D City Card here: ${rankUrl}`,
+      url: rankUrl
+    },
+    {
+      badge: '📻 3. Reddit / Web Games / Radio & Travel Communities',
+      text: `📻 Just found REMO World — stream 38 Live World City Radios (Montréal, Paris, Chișinău, Bucharest, Tokyo, NYC), play Guess The City photo trivia, and collect 4D City Cards for free! 🌐✨\n🎁 Claim +150 🪙 free VIP bonus here: ${vipUrl}`,
+      url: vipUrl
+    },
+    {
+      badge: '📲 4. Short Punchy Caption for TikTok / Insta & FB Stories',
+      text: `${focusEntry.city.flag} ${cName} is #${rank} in the world today on REMO World! 🏆 Represent our city & claim +150 🪙 + 1 Free 4D City Card (Code: ${inviteCode}) 👉 ${vipUrl}`,
+      url: vipUrl
+    },
+    {
+      badge: '🟢 5. WhatsApp / Telegram Direct Friend VIP Chest Invite',
+      text: `🎁 Hey! I sent you a +150 🪙 Golden Welcome Chest + 1 Free 4D City Card on REMO World to help boost ${focusEntry.city.flag} ${cName}! Open your gift in 5 seconds here: ${vipUrl}`,
+      url: vipUrl
+    }
+  ];
+
+  box.innerHTML = _viralPromoTemplatesCache.map((tpl, idx) => `
+    <div style="background:rgba(15,23,42,0.9);border:1px solid rgba(56,189,248,0.28);border-radius:12px;padding:10px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px;">
+        <b style="font-size:0.76rem;color:#fde047;">${escapeHtmlStr(tpl.badge)}</b>
+        <div style="display:flex;gap:5px;">
+          <button type="button" class="adm-pbtn" style="border-color:#fbbf24;color:#fde047;font-weight:900;" onclick="copyViralPromoTemplateText(${idx}, 'copy')">
+            📋 ${isFr ? 'Copier Texte' : 'Copy Text'}
+          </button>
+          <button type="button" class="adm-pbtn" style="border-color:#3b82f6;color:#93c5fd;" onclick="copyViralPromoTemplateText(${idx}, 'facebook')">
+            📘 FB
+          </button>
+          <button type="button" class="adm-pbtn" style="border-color:#22c55e;color:#86efac;" onclick="copyViralPromoTemplateText(${idx}, 'whatsapp')">
+            🟢 WA
+          </button>
+          <button type="button" class="adm-pbtn" style="border-color:#f97316;color:#fdba74;" onclick="copyViralPromoTemplateText(${idx}, 'reddit')">
+            👽 Reddit
+          </button>
+        </div>
+      </div>
+      <div style="font-size:0.75rem;color:#e2e8f0;line-height:1.4;white-space:pre-wrap;background:rgba(5,8,22,0.65);padding:7px 9px;border-radius:8px;border:1px solid rgba(255,255,255,0.06);">${escapeHtmlStr(tpl.text)}</div>
+    </div>
+  `).join('');
+}
+
+async function copyViralPromoTemplateText(idx, platform = 'copy') {
+  const isFr = REMO_I18N.getLang() === 'fr';
+  const tpl = _viralPromoTemplatesCache[idx];
+  if (!tpl) return;
+
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(tpl.text);
+    }
+  } catch (e) {}
+
+  if (typeof rewardViralShareWithDailyCap === 'function') {
+    rewardViralShareWithDailyCap('promo_tpl_' + idx);
+  }
+
+  if (platform === 'facebook') {
+    window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(tpl.url)}&quote=${encodeURIComponent(tpl.text)}`, '_blank', 'noopener');
+  } else if (platform === 'whatsapp') {
+    window.open(`https://wa.me/?text=${encodeURIComponent(tpl.text)}`, '_blank', 'noopener');
+  } else if (platform === 'reddit') {
+    window.open(`https://www.reddit.com/submit?url=${encodeURIComponent(tpl.url)}&title=${encodeURIComponent(tpl.text.split('\n')[0])}`, '_blank', 'noopener');
+  }
+
+  remoToast(
+    isFr
+      ? '📋 Texte viral copié ! Collez-le (Ctrl+V) dans votre publication !'
+      : '📋 Viral text copied! Paste it (Ctrl+V) into your post!',
+    'fanfare'
+  );
+}
+window.copyViralPromoTemplateText = copyViralPromoTemplateText;
+
 if (typeof window !== 'undefined') {
   window.addEventListener('DOMContentLoaded', () => {
     try {
       const params = new URLSearchParams(window.location.search);
       if (params.get('contact') === '1') {
         setTimeout(() => openContactSupportModal(), 350);
+      } else if (params.get('promo_studio') === '1') {
+        setTimeout(() => openViralPromoStudioModal(), 450);
+      } else if (params.get('ref') || params.get('invite') || params.get('promo')) {
+        if (localStorage.getItem('remo_vip_invite_claimed') !== '1') {
+          setTimeout(() => openVipInviteWelcomeModal(false), 550);
+        }
       }
     } catch (e) {}
   });

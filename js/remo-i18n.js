@@ -891,7 +891,21 @@ const REMO_DICT = {
     scratch_modal_sub: 'Scratch the 24K Gold Foil with your finger or mouse to reveal your guaranteed REMO Coin prize (+35 to +500 🪙)!',
     scratch_instant_btn: '⚡ Instant Scratch & Claim Prize',
     scratch_unlock_title: '🎁 Unlock Your 2nd Golden Scratch-Card!',
-    scratch_unlock_sub: 'Share REMO World with friends on Facebook, WhatsApp or Telegram to unlock a 2nd Golden Scratch-Card right now!'
+    scratch_unlock_sub: 'Share REMO World with friends on Facebook, WhatsApp or Telegram to unlock a 2nd Golden Scratch-Card right now!',
+    nav_promo_studio: '📣 Viral Promo Studio',
+    promo_studio_chip: '📣 Promo Studio',
+    promo_studio_title: '📣 1-Click Viral Promo Studio (FB / TikTok / Reddit / X)',
+    promo_studio_sub: 'Generate live city ranking banners (16:9 for Facebook Groups or 9:16 for Stories) and copy 5 ready-to-post viral texts in 1 click!',
+    promo_fmt_169: '🖼️ 16:9 Facebook Group / Reddit Banner',
+    promo_fmt_916: '📲 9:16 Story / TikTok / Reels Poster',
+    promo_copy_img_btn: '📋 Copy Poster Image (Ctrl+V on Facebook) & Download PNG (+25 🪙)',
+    promo_preview_vip_btn: '🎁 Preview VIP Invite Chest (+150 🪙)',
+    vip_invite_badge: '👑 OFFICIAL REMO VIP INVITATION GIFT',
+    vip_invite_title: '🎁 You Received +150 🪙 Gold Coins & 1 Free 4D City Card!',
+    vip_invite_sub: 'Select your Home City below in 5 seconds to claim your Golden Welcome Pack and boost your city in the 2026 World Cup!',
+    vip_invite_city_lbl: '🌍 Choose Your Home City (+50 PTS Boost):',
+    vip_invite_name_lbl: '🪪 Your Citizen Name or @Handle (Optional):',
+    vip_invite_claim_btn: '⚡ Claim My +150 🪙 & Free City Card Now!'
   },
 
   fr: {
@@ -1779,7 +1793,21 @@ const REMO_DICT = {
     scratch_modal_sub: 'Grattez la feuille d’Or 24K avec le doigt ou la souris pour révéler votre gain garanti en Pièces REMO (+35 à +500 🪙) !',
     scratch_instant_btn: '⚡ Gratter Instantanément & Encaisser',
     scratch_unlock_title: '🎁 Débloquez Votre 2e Ticket d’Or !',
-    scratch_unlock_sub: 'Partagez REMO World avec vos amis sur Facebook, WhatsApp ou Telegram pour débloquer un 2e Ticket d’Or immédiatement !'
+    scratch_unlock_sub: 'Partagez REMO World avec vos amis sur Facebook, WhatsApp ou Telegram pour débloquer un 2e Ticket d’Or immédiatement !',
+    nav_promo_studio: '📣 Studio Promo Viral',
+    promo_studio_chip: '📣 Studio Promo',
+    promo_studio_title: '📣 Studio Promo Viral 1-Clic (FB / TikTok / Reddit / X)',
+    promo_studio_sub: 'Générez des affiches en direct du classement des villes (16:9 pour Groupes Facebook ou 9:16 pour Stories) et copiez 5 textes viraux prêts à publier !',
+    promo_fmt_169: '🖼️ Bannière 16:9 Groupe Facebook / Reddit',
+    promo_fmt_916: '📲 Affiche 9:16 Story / TikTok / Reels',
+    promo_copy_img_btn: '📋 Copier l’Affiche (Ctrl+V sur Facebook) & Télécharger PNG (+25 🪙)',
+    promo_preview_vip_btn: '🎁 Aperçu du Coffre VIP d’Invitation (+150 🪙)',
+    vip_invite_badge: '👑 CADEAU D’INVITATION VIP OFFICIEL REMO',
+    vip_invite_title: '🎁 Vous avez reçu +150 🪙 Pièces d’Or & 1 Carte de Ville 4D !',
+    vip_invite_sub: 'Choisissez votre Ville de Cœur en 5 secondes pour réclamer votre Pack d’Or de Bienvenue et propulser votre ville dans la Coupe Mondiale 2026 !',
+    vip_invite_city_lbl: '🌍 Choisissez Votre Ville (+50 PTS Bonus) :',
+    vip_invite_name_lbl: '🪪 Votre Nom Citoyen ou @Pseudo (Optionnel) :',
+    vip_invite_claim_btn: '⚡ Réclamer Mes +150 🪙 & Ma Carte de Ville !'
   }
 };
 

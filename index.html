@@ -115,7 +115,7 @@
   <noscript><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"></noscript>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
 
-  <link rel="stylesheet" href="css/remo-core.css?v=98">
+  <link rel="stylesheet" href="css/remo-core.css?v=99">
 </head>
 <body>
 
@@ -263,6 +263,9 @@
           <button class="nav-btn" onclick="openGoldenScratchModal()" style="border-color:rgba(251,191,36,0.5);background:linear-gradient(135deg,rgba(251,191,36,0.16),rgba(236,72,153,0.1));">
             <span class="nav-ic">🎟️</span> <span style="color:#fde047;font-weight:900;" data-i18n="nav_scratch_card">Golden Scratch-Card</span>
           </button>
+          <button class="nav-btn" onclick="openViralPromoStudioModal()" style="border-color:rgba(56,189,248,0.55);background:linear-gradient(135deg,rgba(2,132,199,0.22),rgba(236,72,153,0.14));">
+            <span class="nav-ic">📣</span> <span style="color:#7dd3fc;font-weight:900;" data-i18n="nav_promo_studio">📣 Viral Promo Studio</span>
+          </button>
           <button class="nav-btn" data-nav-view="passport" onclick="switchRemoView('passport')">
             <span class="nav-ic">👤</span> <span data-i18n="nav_passport">Profil Citoyen &amp; ID</span>
           </button>
@@ -351,6 +354,7 @@
           <div class="filter-row" id="feedModeChips">
             <button class="fchip active" onclick="setFeedMode('all', this)" data-i18n="filter_all">🌍 All World</button>
             <button class="fchip" onclick="openStoriesHubModal()" style="border-color:rgba(236,72,153,0.65);color:#f472b6;font-weight:900;" data-i18n="hdr_story_btn">📸 Story</button>
+            <button class="fchip" onclick="openViralPromoStudioModal()" style="border-color:rgba(56,189,248,0.65);color:#7dd3fc;font-weight:900;" data-i18n="promo_studio_chip">📣 Promo Studio</button>
             <button class="fchip" onclick="switchRemoView('contests')" style="border-color:rgba(251,191,36,0.55);color:#fde047;font-weight:900;" data-i18n="nav_contests">🏆 REMO Contests</button>
             <button class="fchip" onclick="setFeedMode('following', this)" data-i18n="filter_following">👥 Following</button>
             <button class="fchip" onclick="setFeedMode('mystery', this)" data-i18n="filter_mystery">🕵️ Guess City</button>
@@ -804,6 +808,7 @@
         <button class="btn-cyber btn-gold" onclick="document.getElementById('mobileHubModal').classList.remove('open');exportPassportStory();" style="grid-column:1/-1;justify-content:center;background:linear-gradient(135deg,#f59e0b,#ec4899);border-color:#fbbf24;color:#fff;font-weight:900;padding:10px;font-size:0.85rem;">📲 <span data-i18n="passport_share_story">Story 9:16 (TikTok &amp; Insta)</span></button>
         <button class="btn-cyber btn-gold" onclick="document.getElementById('mobileHubModal').classList.remove('open');openCityAmbassadorModal();" style="grid-column:1/-1;justify-content:center;padding:10px;font-size:0.84rem;" data-i18n="amb_diploma_btn">🏅 Official City Ambassador Diploma (+25 🪙)</button>
         <button class="btn-cyber btn-gold" onclick="document.getElementById('mobileHubModal').classList.remove('open');openGoldenScratchModal();" style="grid-column:1/-1;justify-content:center;padding:10px;font-size:0.84rem;background:linear-gradient(135deg,#f59e0b,#fbbf24);color:#090d16;font-weight:900;" data-i18n="scratch_right_btn">🎟️ Scratch &amp; Win Gold (+500 🪙)</button>
+        <button class="btn-cyber" onclick="document.getElementById('mobileHubModal').classList.remove('open');openViralPromoStudioModal();" style="grid-column:1/-1;justify-content:center;padding:10px;font-size:0.84rem;background:linear-gradient(135deg,#0284c7,#6366f1);color:#fff;font-weight:900;" data-i18n="nav_promo_studio">📣 Viral Promo Studio</button>
         <button class="btn-ghost" onclick="switchRemoView('shop')" style="border-color:#f472b6;color:#fbcfe8;">🛍️ <span data-i18n="nav_shop">VIP Boutique</span></button>
         <button class="btn-ghost" onclick="switchRemoView('passport')" style="border-color:#38bdf8;color:#bae6fd;">👤 <span data-i18n="nav_passport">Profil Citoyen &amp; ID</span></button>
         <button class="btn-ghost" onclick="document.getElementById('mobileHubModal').classList.remove('open');openAddUserCityModal();" style="border-color:#10b981;color:#6ee7b7;grid-column:1/-1;">🌍 <span data-i18n="add_city_btn">+ Add Missing City (+75 🪙)</span></button>
@@ -2326,6 +2331,96 @@
     </div>
   </div>
 
+  <!-- 🎁 1. VIP Referral & Shared Link Holographic Welcome Chest Modal (?ref= / ?promo= / ?invite=) -->
+  <div class="remo-modal-backdrop" id="vipInviteWelcomeModal" onclick="if(event.target===this)this.classList.remove('open')">
+    <div class="remo-modal" style="max-width:460px;border:2px solid #fbbf24;background:radial-gradient(circle at 50% 0%,rgba(251,191,36,0.22),#060a1e 72%);text-align:center;box-shadow:0 24px 60px rgba(0,0,0,0.88),0 0 40px rgba(251,191,36,0.28);">
+      <div class="modal-hdr" style="border-bottom-color:rgba(251,191,36,0.25);">
+        <span style="display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:99px;background:rgba(251,191,36,0.16);border:1px solid #fbbf24;color:#fde047;font-size:0.72rem;font-weight:900;letter-spacing:0.6px;" data-i18n="vip_invite_badge">👑 OFFICIAL REMO VIP INVITATION GIFT</span>
+        <button class="modal-close" onclick="document.getElementById('vipInviteWelcomeModal').classList.remove('open')">✕</button>
+      </div>
+
+      <div style="font-size:3.2rem;line-height:1;margin:6px 0 8px;filter:drop-shadow(0 0 18px rgba(251,191,36,0.75));">🎁🪙🎴</div>
+      <h3 style="font-family:'Orbitron',sans-serif;font-size:1.12rem;font-weight:900;color:#fde047;margin:0 0 8px;line-height:1.35;" data-i18n="vip_invite_title">
+        🎁 You Received +150 🪙 Gold Coins &amp; 1 Free 4D City Card!
+      </h3>
+      <p style="font-size:0.8rem;color:#cbd5e1;margin:0 0 12px;line-height:1.45;" data-i18n="vip_invite_sub">
+        Select your Home City below in 5 seconds to claim your Golden Welcome Pack and boost your city in the 2026 World Cup!
+      </p>
+
+      <div id="vipInviteCodeBadgeBar" style="background:rgba(15,23,42,0.85);border:1px dashed rgba(56,189,248,0.55);border-radius:12px;padding:8px 12px;margin-bottom:12px;font-size:0.78rem;color:#7dd3fc;font-weight:800;">
+        🎟️ VIP Code: <b style="color:#fde047;" id="vipInviteCodeVal">REMO2026</b> · <span style="color:#34d399;">+150 🪙 &amp; +50 City PTS Verified</span>
+      </div>
+
+      <div style="text-align:left;display:flex;flex-direction:column;gap:10px;margin-bottom:14px;">
+        <div>
+          <label style="font-size:0.75rem;font-weight:900;color:#fde047;display:block;margin-bottom:4px;" data-i18n="vip_invite_city_lbl">🌍 Choose Your Home City (+50 PTS Boost):</label>
+          <select id="vipInviteCitySelect" class="remo-input" style="font-weight:800;border-color:rgba(251,191,36,0.55);"></select>
+        </div>
+        <div>
+          <label style="font-size:0.75rem;font-weight:800;color:#94a3b8;display:block;margin-bottom:4px;" data-i18n="vip_invite_name_lbl">🪪 Your Citizen Name or @Handle (Optional):</label>
+          <input type="text" id="vipInviteNameInput" class="remo-input" placeholder="@YourName / Pioneer" maxlength="28">
+        </div>
+      </div>
+
+      <button type="button" class="btn-cyber btn-gold" style="width:100%;justify-content:center;padding:13px;font-size:0.94rem;font-weight:900;box-shadow:0 8px 25px rgba(245,158,11,0.5);" onclick="claimVipInviteWelcomePack()" data-i18n="vip_invite_claim_btn">
+        ⚡ Claim My +150 🪙 &amp; Free City Card Now!
+      </button>
+    </div>
+  </div>
+
+  <!-- 📣 2. 1-Click Viral Promo Studio Modal (Facebook Group 16:9 / Story 9:16 + 5 Ready-to-Post Viral Templates) -->
+  <div class="remo-modal-backdrop" id="viralPromoStudioModal" onclick="if(event.target===this)this.classList.remove('open')">
+    <div class="remo-modal" style="max-width:640px;border-color:#38bdf8;">
+      <div class="modal-hdr">
+        <b style="font-family:'Orbitron',sans-serif;color:#38bdf8;font-size:0.95rem;" data-i18n="promo_studio_title">📣 1-Click Viral Promo Studio (FB / TikTok / Reddit / X)</b>
+        <button class="modal-close" onclick="document.getElementById('viralPromoStudioModal').classList.remove('open')">✕</button>
+      </div>
+      <p style="font-size:0.78rem;color:#cbd5e1;margin-bottom:10px;line-height:1.4;" data-i18n="promo_studio_sub">
+        Generate live city ranking banners (16:9 for Facebook Groups or 9:16 for Stories) and copy 5 ready-to-post viral texts in 1 click!
+      </p>
+
+      <!-- Format + City + Theme Controls -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+        <button type="button" id="promoFmtBtn169" class="btn-cyber" style="justify-content:center;padding:8px 10px;font-size:0.76rem;font-weight:900;" onclick="setViralPromoStudioFormat('16:9')" data-i18n="promo_fmt_169">
+          🖼️ 16:9 Facebook Group / Reddit Banner
+        </button>
+        <button type="button" id="promoFmtBtn916" class="btn-ghost" style="justify-content:center;padding:8px 10px;font-size:0.76rem;font-weight:900;border-color:rgba(236,72,153,0.5);color:#f472b6;" onclick="setViralPromoStudioFormat('9:16')" data-i18n="promo_fmt_916">
+          📲 9:16 Story / TikTok / Reels Poster
+        </button>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+        <div>
+          <select id="promoStudioCitySelect" class="remo-input" style="padding:8px 10px;font-size:0.8rem;font-weight:800;" onchange="renderViralPromoStudioAll()"></select>
+        </div>
+        <div>
+          <select id="promoStudioThemeSelect" class="remo-input" style="padding:8px 10px;font-size:0.8rem;font-weight:800;" onchange="renderViralPromoStudioAll()">
+            <option value="ranking">🏆 Live World Ranking Alert</option>
+            <option value="duel">⚔️ City vs City Pride Duel</option>
+            <option value="radio">📻 38 Live Radios &amp; +150 🪙 Gift</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Live Poster Canvas Preview -->
+      <div style="display:flex;justify-content:center;background:rgba(5,8,22,0.85);border:1px solid rgba(56,189,248,0.35);border-radius:16px;padding:10px;margin-bottom:10px;">
+        <canvas id="viralPromoStudioCanvas" width="960" height="540" style="max-width:100%;max-height:270px;width:auto;height:auto;border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,0.75);"></canvas>
+      </div>
+
+      <div style="display:grid;grid-template-columns:2fr 1fr;gap:8px;margin-bottom:14px;">
+        <button type="button" class="btn-cyber btn-gold" style="justify-content:center;padding:10px;font-size:0.8rem;font-weight:900;" onclick="copyAndDownloadViralPromoPoster()" data-i18n="promo_copy_img_btn">
+          📋 Copy Poster Image (Ctrl+V on Facebook) &amp; Download PNG (+25 🪙)
+        </button>
+        <button type="button" class="btn-ghost" style="justify-content:center;padding:10px;font-size:0.75rem;font-weight:800;border-color:#fbbf24;color:#fde047;" onclick="document.getElementById('viralPromoStudioModal').classList.remove('open');openVipInviteWelcomeModal(true);" data-i18n="promo_preview_vip_btn">
+          🎁 Preview VIP Invite Chest (+150 🪙)
+        </button>
+      </div>
+
+      <!-- 5 Ready-to-Post Viral Templates -->
+      <div id="viralPromoTemplatesBox" style="display:flex;flex-direction:column;gap:8px;max-height:250px;overflow-y:auto;padding-right:4px;"></div>
+    </div>
+  </div>
+
   <!-- Toast Container -->
   <div class="remo-toast-box" id="remoToastBox"></div>
 
@@ -2336,13 +2431,13 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 
   <!-- REMO Modular Engines -->
-  <script src="js/remo-i18n.js?v=98"></script>
-  <script src="js/remo-cities-data.js?v=98"></script>
-  <script src="js/remo-store.js?v=98"></script>
-  <script src="js/remo-card-engine.js?v=98"></script>
-  <script src="js/remo-radar-arena.js?v=98"></script>
-  <script src="js/remo-social-comms.js?v=98"></script>
-  <script src="js/remo-radio-engine.js?v=98"></script>
+  <script src="js/remo-i18n.js?v=99"></script>
+  <script src="js/remo-cities-data.js?v=99"></script>
+  <script src="js/remo-store.js?v=99"></script>
+  <script src="js/remo-card-engine.js?v=99"></script>
+  <script src="js/remo-radar-arena.js?v=99"></script>
+  <script src="js/remo-social-comms.js?v=99"></script>
+  <script src="js/remo-radio-engine.js?v=99"></script>
 
   <noscript>
     <nav aria-label="REMO World Static Directory" style="padding:20px;background:#050816;color:#f8fafc;">
