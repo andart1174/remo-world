@@ -115,7 +115,7 @@
   <noscript><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"></noscript>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
 
-  <link rel="stylesheet" href="css/remo-core.css?v=97">
+  <link rel="stylesheet" href="css/remo-core.css?v=98">
 </head>
 <body>
 
@@ -151,9 +151,9 @@
       <span class="happy-hour-pill" id="hdrHappyHourBadge" style="display:none;" data-i18n="happy_hour_badge">⚡ 2X REWARDS HAPPY HOUR</span>
 
       <button class="btn-ghost" id="btnRadioToggle" onclick="toggleHeaderRadio()">📻 Radio</button>
-      <button class="btn-ghost hide-mobile" id="btnHeaderStoryToggle" onclick="openStoriesHubModal()" title="24h City Stories" style="position:relative;display:inline-flex;align-items:center;gap:5px;border-color:rgba(236,72,153,0.45);">
+      <button class="btn-ghost" id="btnHeaderStoryToggle" onclick="openStoriesHubModal()" title="24h City Stories" style="position:relative;display:inline-flex;align-items:center;gap:5px;border-color:rgba(236,72,153,0.55);">
         <span data-i18n="hdr_story_btn">📸 Story</span>
-        <span id="hdrStoryCountBadge" style="background:linear-gradient(135deg,#ec4899,#f59e0b);color:#fff;font-size:0.65rem;font-weight:900;border-radius:99px;padding:1px 6px;line-height:1.2;">4</span>
+        <span id="hdrStoryCountBadge" style="display:none;background:linear-gradient(135deg,#ec4899,#f59e0b);color:#fff;font-size:0.65rem;font-weight:900;border-radius:99px;padding:1px 6px;line-height:1.2;">0</span>
       </button>
       <button class="btn-ghost hide-mobile" id="btnWishingWellToggle" onclick="openWishingWellModal()" title="Wishing Well" data-i18n="hdr_wishing_well">⛲ Fontaine</button>
 
@@ -350,6 +350,7 @@
 
           <div class="filter-row" id="feedModeChips">
             <button class="fchip active" onclick="setFeedMode('all', this)" data-i18n="filter_all">🌍 All World</button>
+            <button class="fchip" onclick="openStoriesHubModal()" style="border-color:rgba(236,72,153,0.65);color:#f472b6;font-weight:900;" data-i18n="hdr_story_btn">📸 Story</button>
             <button class="fchip" onclick="switchRemoView('contests')" style="border-color:rgba(251,191,36,0.55);color:#fde047;font-weight:900;" data-i18n="nav_contests">🏆 REMO Contests</button>
             <button class="fchip" onclick="setFeedMode('following', this)" data-i18n="filter_following">👥 Following</button>
             <button class="fchip" onclick="setFeedMode('mystery', this)" data-i18n="filter_mystery">🕵️ Guess City</button>
@@ -2335,13 +2336,13 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 
   <!-- REMO Modular Engines -->
-  <script src="js/remo-i18n.js?v=97"></script>
-  <script src="js/remo-cities-data.js?v=97"></script>
-  <script src="js/remo-store.js?v=97"></script>
-  <script src="js/remo-card-engine.js?v=97"></script>
-  <script src="js/remo-radar-arena.js?v=97"></script>
-  <script src="js/remo-social-comms.js?v=97"></script>
-  <script src="js/remo-radio-engine.js?v=97"></script>
+  <script src="js/remo-i18n.js?v=98"></script>
+  <script src="js/remo-cities-data.js?v=98"></script>
+  <script src="js/remo-store.js?v=98"></script>
+  <script src="js/remo-card-engine.js?v=98"></script>
+  <script src="js/remo-radar-arena.js?v=98"></script>
+  <script src="js/remo-social-comms.js?v=98"></script>
+  <script src="js/remo-radio-engine.js?v=98"></script>
 
   <noscript>
     <nav aria-label="REMO World Static Directory" style="padding:20px;background:#050816;color:#f8fafc;">
