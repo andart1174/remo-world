@@ -14397,6 +14397,9 @@ function openViralPromoStudioModal(defaultCityId = '') {
   }
 
   REMO_I18N.applyDOM(modal);
+  if (typeof updateIndexNowStatusUI === 'function') {
+    updateIndexNowStatusUI();
+  }
   modal.classList.add('open');
   renderViralPromoStudioAll();
 }
