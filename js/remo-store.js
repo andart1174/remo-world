@@ -4358,6 +4358,76 @@ const REMO_STORE = {
         console.warn('Firestore remo_posts sync notice:', err.message);
       });
 
+      // 3B. Sync & Watch ALL 24H STORIES in Real Time across all devices (Dedicated Collection: remo_stories)
+      this.fbDb.collection('remo_stories').limit(60).onSnapshot((snap) => {
+        if (!snap) return;
+        const nowStoryTs = Date.now();
+        const legacyStoryIds = new Set(['st_1', 'st_2', 'st_3', 'st_4']);
+        const delSet = this.deletedStoryIds || new Set(['st_1', 'st_2', 'st_3', 'st_4']);
+        const cloudStories = [];
+        const cloudStoryIds = new Set();
+
+        snap.forEach((doc) => {
+          const cs = doc.data();
+          if (!cs || !cs.id) return;
+          const isLegacy = legacyStoryIds.has(cs.id);
+          const isDeleted = delSet.has(cs.id);
+          const isExpired = (nowStoryTs - Number(cs.createdAt || 0) > 86400000);
+          if (isLegacy || isDeleted || isExpired) {
+            if (isLegacy || isDeleted) {
+              this.fbDb.collection('remo_stories').doc(cs.id).delete().catch(() => {});
+            }
+            return;
+          }
+          cloudStories.push(cs);
+          cloudStoryIds.add(cs.id);
+        });
+
+        const localStories = Array.isArray(this.state.stories) ? this.state.stories : [];
+        const storyMap = new Map();
+
+        cloudStories.forEach((cs) => {
+          const ls = localStories.find((x) => x && x.id === cs.id);
+          if (ls) {
+            const rxC = cs.reactions || {};
+            const rxL = ls.reactions || {};
+            storyMap.set(cs.id, Object.assign({}, ls, cs, {
+              views: Math.max(Number(cs.views || 0), Number(ls.views || 0)),
+              tipsCoins: Math.max(Number(cs.tipsCoins || 0), Number(ls.tipsCoins || 0)),
+              reactions: {
+                '❤️': Math.max(Number(rxC['❤️'] || 0), Number(rxL['❤️'] || 0)),
+                '🔥': Math.max(Number(rxC['🔥'] || 0), Number(rxL['🔥'] || 0)),
+                '👑': Math.max(Number(rxC['👑'] || 0), Number(rxL['👑'] || 0))
+              }
+            }));
+          } else {
+            storyMap.set(cs.id, cs);
+          }
+        });
+
+        // Also preserve fresh local stories not yet in cloud and push them up
+        localStories.forEach((ls) => {
+          if (!ls || !ls.id || legacyStoryIds.has(ls.id) || delSet.has(ls.id)) return;
+          if (nowStoryTs - Number(ls.createdAt || 0) > 86400000) return;
+          if (!storyMap.has(ls.id)) {
+            storyMap.set(ls.id, ls);
+            this.syncStoryToCloud(ls);
+          }
+        });
+
+        this.state.stories = Array.from(storyMap.values()).sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
+        this.save(false, 'cloud_stories_sync');
+        window.dispatchEvent(new CustomEvent('remo:stateupdate', { detail: { reason: 'cloud_stories' } }));
+        if (typeof updateHeaderStoryBadge === 'function') updateHeaderStoryBadge();
+        const storyModal = document.getElementById('storyViewerModal');
+        if (storyModal && storyModal.classList.contains('open') && typeof renderStoriesModalStripAndStage === 'function') {
+          const activeId = typeof _activeStoryViewerId !== 'undefined' ? _activeStoryViewerId : '';
+          renderStoriesModalStripAndStage(activeId);
+        }
+      }, (err) => {
+        console.warn('Firestore remo_stories sync notice:', err.message);
+      });
+
       // 4. Ecosystem Live State (City Scores, Live Duels, Settings, World Bottles, Auctions & GeoVaults)
       const docRef = this.fbDb.collection('remo_ecosystem').doc('live_state');
       const mergeCloudScoresAndDuels = (data) => {
@@ -4499,6 +4569,7 @@ const REMO_STORE = {
             deletedPostIds: [...(this.deletedPostIds || [])].slice(-100),
             deletedUserIds: [...(this.deletedUserIds || [])].slice(-100),
             deletedDuelIds: [...(this.deletedDuelIds || [])].slice(-100),
+            deletedStoryIds: [...(this.deletedStoryIds || [])].slice(-100),
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
           }).catch((err) => console.log('Firestore seed status:', err.message));
         } else {
@@ -4541,6 +4612,14 @@ const REMO_STORE = {
                 localStorage.setItem('remo_deleted_duels', JSON.stringify([...this.deletedDuelIds]));
               } catch (e) {}
               this.state.duels = (this.state.duels || []).filter((d) => !this.deletedDuelIds.has(d.id));
+            }
+            if (Array.isArray(data.deletedStoryIds)) {
+              if (!this.deletedStoryIds) this.deletedStoryIds = new Set(['st_1', 'st_2', 'st_3', 'st_4']);
+              data.deletedStoryIds.forEach((id) => this.deletedStoryIds.add(id));
+              try {
+                localStorage.setItem('remo_deleted_stories', JSON.stringify([...this.deletedStoryIds]));
+              } catch (e) {}
+              this.state.stories = (this.state.stories || []).filter((s) => !this.deletedStoryIds.has(s.id));
             }
             this.save(false, 'cloud_sync');
             window.dispatchEvent(new CustomEvent('remo:stateupdate', { detail: { reason: 'cloud_sync' } }));
@@ -4591,6 +4670,14 @@ const REMO_STORE = {
             } catch (e) {}
             this.state.duels = (this.state.duels || []).filter((d) => !this.deletedDuelIds.has(d.id));
           }
+          if (Array.isArray(data.deletedStoryIds)) {
+            if (!this.deletedStoryIds) this.deletedStoryIds = new Set(['st_1', 'st_2', 'st_3', 'st_4']);
+            data.deletedStoryIds.forEach((id) => this.deletedStoryIds.add(id));
+            try {
+              localStorage.setItem('remo_deleted_stories', JSON.stringify([...this.deletedStoryIds]));
+            } catch (e) {}
+            this.state.stories = (this.state.stories || []).filter((s) => !this.deletedStoryIds.has(s.id));
+          }
           this.save(false, 'cloud_live_update');
           window.dispatchEvent(new CustomEvent('remo:stateupdate', { detail: { reason: 'cloud_live_update' } }));
         }
@@ -4612,6 +4699,38 @@ const REMO_STORE = {
     } catch (e) {
       console.warn('syncPostToCloud exception:', e);
     }
+  },
+
+  syncStoryToCloud(story) {
+    if (!this.fbDb || !story || !story.id) return;
+    try {
+      const cleanStory = JSON.parse(JSON.stringify(story));
+      if (!cleanStory.createdAt) cleanStory.createdAt = Date.now();
+      this.fbDb.collection('remo_stories').doc(story.id).set(cleanStory, { merge: true })
+        .catch((err) => console.warn('Firestore story sync notice:', err.message));
+    } catch (e) {
+      console.warn('syncStoryToCloud exception:', e);
+    }
+  },
+
+  deleteStoryFromCloud(storyId) {
+    if (!storyId) return;
+    try {
+      if (!this.deletedStoryIds) {
+        this.deletedStoryIds = new Set(['st_1', 'st_2', 'st_3', 'st_4']);
+      }
+      this.deletedStoryIds.add(storyId);
+      try {
+        localStorage.setItem('remo_deleted_stories', JSON.stringify([...this.deletedStoryIds]));
+      } catch (e) {}
+    } catch (e) {}
+    this.state.stories = (this.state.stories || []).filter((s) => s && s.id !== storyId);
+    this.save(true, 'story_del');
+    this.syncToFirestore('story_del', true);
+    if (!this.fbDb) return;
+    try {
+      this.fbDb.collection('remo_stories').doc(storyId).delete().catch(() => {});
+    } catch (e) {}
   },
 
   getLocalReadNotifIds() {
@@ -6382,7 +6501,16 @@ const REMO_STORE = {
           jukeboxTracks: (this.state.jukeboxTracks || []).slice(0, 30),
           auctions: cleanAuctions,
           geoVaults: (this.state.geoVaults || []).slice(0, 35),
-          stories: (this.state.stories || []).slice(0, 15),
+          stories: (this.state.stories || [])
+            .filter((s) => s && s.id && (!this.deletedStoryIds || !this.deletedStoryIds.has(s.id)))
+            .map((s) => ({
+              id: s.id,
+              uid: s.uid || '',
+              author: s.author || '',
+              cityId: s.cityId || '',
+              createdAt: s.createdAt || 0
+            }))
+            .slice(0, 15),
           supportTickets: (this.state.supportTickets || []).slice(0, 60),
           viralContests: this.state.viralContests || getDefaultViralContests(),
           worldSystems: this.state.worldSystems || getDefaultUniqueWorldSystems(),

@@ -4130,6 +4130,54 @@ function getActiveValid24hStories() {
 }
 window.getActiveValid24hStories = getActiveValid24hStories;
 
+function getGroupedAuthorStories() {
+  const stories = getActiveValid24hStories();
+  const groupsMap = new Map();
+
+  stories.forEach((s) => {
+    const key = (s.uid && s.uid !== 'u_guest' && !s.uid.startsWith('u_visitor')) ? s.uid : (s.author || s.id);
+    if (!groupsMap.has(key)) {
+      groupsMap.set(key, {
+        key,
+        uid: s.uid || '',
+        author: s.author || 'Citizen',
+        cityId: s.cityId || 'montreal',
+        stories: [],
+        latestCreatedAt: 0
+      });
+    }
+    const grp = groupsMap.get(key);
+    grp.stories.push(s);
+    const ts = Number(s.createdAt || 0);
+    if (ts > grp.latestCreatedAt) {
+      grp.latestCreatedAt = ts;
+      if (s.cityId) grp.cityId = s.cityId;
+      if (s.author) grp.author = s.author;
+    }
+  });
+
+  const list = Array.from(groupsMap.values());
+  // Sort stories within each author chronologically (oldest to newest)
+  list.forEach((g) => {
+    g.stories.sort((a, b) => Number(a.createdAt || 0) - Number(b.createdAt || 0));
+  });
+  // Sort author groups by most recent activity
+  list.sort((a, b) => b.latestCreatedAt - a.latestCreatedAt);
+  return list;
+}
+window.getGroupedAuthorStories = getGroupedAuthorStories;
+
+function openAuthorStoriesGroup(groupKey) {
+  const groups = getGroupedAuthorStories();
+  const target = groups.find((g) => g.key === groupKey) || groups[0];
+  if (target && target.stories.length > 0) {
+    const firstUnviewed = target.stories.find((s) => !_viewedStoryIdsSession.has(s.id));
+    const storyToOpen = firstUnviewed || target.stories[0];
+    renderStoriesModalStripAndStage(storyToOpen.id);
+  }
+}
+window.openAuthorStoriesGroup = openAuthorStoriesGroup;
+
 function stopStoryAutoPlayTimer() {
   if (_storyAutoPlayInterval) {
     clearInterval(_storyAutoPlayInterval);
@@ -4293,6 +4341,7 @@ function publishCitizen24hStory() {
 
   REMO_STORE.addCoins(u.uid, 10, 10);
   REMO_STORE.save(true, 'story');
+  REMO_STORE.syncStoryToCloud(newStory);
   REMO_STORE.syncToFirestore('story_added', true);
   syncHeaderAndSidebars();
   updateHeaderStoryBadge();
@@ -4307,27 +4356,77 @@ function renderStoriesModalStripAndStage(storyId = '') {
   const box = document.getElementById('storyViewerBody');
   const lang = REMO_I18N.getLang();
   const isFr = lang === 'fr';
-  const stories = getActiveValid24hStories();
-  const activeStory = stories.find((x) => x && x.id === storyId) || stories[0] || null;
-  _activeStoryViewerId = activeStory ? activeStory.id : '';
+  const authorGroups = getGroupedAuthorStories();
+  const allStories = getActiveValid24hStories();
 
+  if (!authorGroups.length || !allStories.length) {
+    _activeStoryViewerId = '';
+    stopStoryAutoPlayTimer();
+    if (strip) {
+      strip.innerHTML = `
+        <div class="story-pill" onclick="toggleStoryCreateDrawer()" style="flex-shrink:0;cursor:pointer;">
+          <div class="story-ring" style="background:linear-gradient(135deg,#ec4899,#6366f1);">
+            <div class="story-ring-inner">+</div>
+          </div>
+          <div class="story-lbl" style="color:#fbcfe8;font-weight:900;">${escapeHtmlStr(t('stories_add'))}</div>
+        </div>
+      `;
+    }
+    if (box) {
+      box.innerHTML = `
+        <div style="text-align:center;padding:28px;color:var(--muted);">
+          📸 ${isFr ? 'Aucune Story active dans les dernières 24h. Cliquez sur + pour publier la première Story (+10 🪙) !' : 'No active Story in the last 24h. Click + to publish the first 24h Story (+10 🪙)!'}
+        </div>
+      `;
+    }
+    return;
+  }
+
+  // Find active author group and active story
+  let activeGroup = null;
+  let activeStory = null;
+
+  if (storyId) {
+    activeGroup = authorGroups.find((g) => g.stories.some((s) => s.id === storyId)) || null;
+    if (activeGroup) {
+      activeStory = activeGroup.stories.find((s) => s.id === storyId) || null;
+    }
+  }
+
+  if (!activeGroup || !activeStory) {
+    activeGroup = authorGroups[0];
+    const unviewed = activeGroup.stories.find((s) => !_viewedStoryIdsSession.has(s.id));
+    activeStory = unviewed || activeGroup.stories[0];
+  }
+
+  _activeStoryViewerId = activeStory.id;
+  const authorStories = activeGroup.stories;
+  const curSubIdx = Math.max(0, authorStories.findIndex((s) => s.id === activeStory.id));
+
+  // Render strictly ONE circle per user in the top avatars strip
   if (strip) {
     strip.innerHTML = `
-      <div class="story-pill" onclick="toggleStoryCreateDrawer()" style="flex-shrink:0;cursor:pointer;">
+      <div class="story-pill" onclick="toggleStoryCreateDrawer()" style="flex-shrink:0;cursor:pointer;text-align:center;">
         <div class="story-ring" style="background:linear-gradient(135deg,#ec4899,#6366f1);">
           <div class="story-ring-inner">+</div>
         </div>
         <div class="story-lbl" style="color:#fbcfe8;font-weight:900;">${escapeHtmlStr(t('stories_add'))}</div>
       </div>
-      ${stories.map((s) => {
-        const c = getCityById(s.cityId);
-        const isSel = activeStory && activeStory.id === s.id;
+      ${authorGroups.map((grp) => {
+        const c = getCityById(grp.cityId);
+        const isSel = (activeGroup && activeGroup.key === grp.key);
+        const count = grp.stories.length;
         return `
-          <div class="story-pill" onclick="renderStoriesModalStripAndStage('${s.id}')" style="flex-shrink:0;cursor:pointer;transform:${isSel ? 'scale(1.06)' : 'none'};">
-            <div class="story-ring" style="background:${isSel ? 'linear-gradient(135deg,#fbbf24,#ec4899)' : 'rgba(255,255,255,0.22)'};box-shadow:${isSel ? '0 0 12px rgba(251,191,36,0.6)' : 'none'};">
+          <div class="story-pill" onclick="openAuthorStoriesGroup('${escapeHtmlStr(grp.key)}')" style="position:relative;flex-shrink:0;cursor:pointer;text-align:center;transform:${isSel ? 'scale(1.06)' : 'none'};transition:transform 0.15s ease;">
+            <div class="story-ring" style="position:relative;background:${isSel ? 'linear-gradient(135deg,#fbbf24,#ec4899)' : 'linear-gradient(135deg,rgba(56,189,248,0.7),rgba(236,72,153,0.7))'};box-shadow:${isSel ? '0 0 14px rgba(251,191,36,0.65)' : 'none'};">
               <div class="story-ring-inner">${c.flag}</div>
+              ${count > 1 ? `
+                <span style="position:absolute;top:-2px;right:-2px;background:linear-gradient(135deg,#ec4899,#f59e0b);color:#fff;font-size:0.62rem;font-weight:900;padding:1px 6px;border-radius:99px;border:1.5px solid #0b1120;box-shadow:0 2px 6px rgba(0,0,0,0.6);line-height:1.2;">
+                  ${count}
+                </span>
+              ` : ''}
             </div>
-            <div class="story-lbl" style="color:${isSel ? '#fde047' : '#cbd5e1'};font-weight:${isSel ? '900' : '700'};">${escapeHtmlStr(s.author)}</div>
+            <div class="story-lbl" style="color:${isSel ? '#fde047' : '#cbd5e1'};font-weight:${isSel ? '900' : '700'};">${escapeHtmlStr(grp.author)}</div>
           </div>
         `;
       }).join('')}
@@ -4335,15 +4434,6 @@ function renderStoriesModalStripAndStage(storyId = '') {
   }
 
   if (!box) return;
-  if (!activeStory) {
-    stopStoryAutoPlayTimer();
-    box.innerHTML = `
-      <div style="text-align:center;padding:28px;color:var(--muted);">
-        📸 ${isFr ? 'Aucune Story active dans les dernières 24h. Cliquez sur + pour publier la première Story (+10 🪙) !' : 'No active Story in the last 24h. Click + to publish the first 24h Story (+10 🪙)!'}
-      </div>
-    `;
-    return;
-  }
 
   if (!_viewedStoryIdsSession.has(activeStory.id)) {
     _viewedStoryIdsSession.add(activeStory.id);
@@ -4352,7 +4442,6 @@ function renderStoriesModalStripAndStage(storyId = '') {
   }
 
   const c = getCityById(activeStory.cityId);
-  const idx = stories.findIndex((x) => x && x.id === activeStory.id);
   const capTxt = isFr ? (activeStory.caption_fr || activeStory.caption_en) : (activeStory.caption_en || activeStory.caption_fr);
   const imgSrc = activeStory.mediaUrl || generateCityPostVisualDataUrl(c.id, activeStory.author, capTxt);
   const rx = activeStory.reactions || { '❤️': 1, '🔥': 1, '👑': 0 };
@@ -4370,12 +4459,12 @@ function renderStoriesModalStripAndStage(storyId = '') {
     <div style="position:relative;border-radius:16px;overflow:hidden;background:#050816;border:1px solid rgba(255,255,255,0.12);"
          onpointerenter="pauseStoryAutoPlay(true)" onpointerleave="pauseStoryAutoPlay(false)"
          ontouchstart="pauseStoryAutoPlay(true)" ontouchend="pauseStoryAutoPlay(false)">
-      <!-- Story Progress Indicators (6s Auto-Play) -->
+      <!-- Story Progress Indicators for Active Author's Stories (6s Auto-Play) -->
       <div style="display:flex;align-items:center;gap:6px;padding:8px 10px;background:rgba(0,0,0,0.72);">
         <div style="display:flex;gap:4px;flex:1;">
-          ${stories.map((st, i) => `
+          ${authorStories.map((st, i) => `
             <div style="flex:1;height:4px;border-radius:99px;background:rgba(255,255,255,0.2);overflow:hidden;">
-              <div ${i === idx ? 'id="storyActiveProgressFill"' : ''} style="height:100%;width:${i < idx ? '100%' : (i === idx ? '0%' : '0%')};background:linear-gradient(90deg,#fbbf24,#ec4899);transition:width 0.06s linear;"></div>
+              <div ${i === curSubIdx ? 'id="storyActiveProgressFill"' : ''} style="height:100%;width:${i < curSubIdx ? '100%' : (i === curSubIdx ? '0%' : '0%')};background:linear-gradient(90deg,#fbbf24,#ec4899);transition:width 0.06s linear;"></div>
             </div>
           `).join('')}
         </div>
@@ -4388,7 +4477,7 @@ function renderStoriesModalStripAndStage(storyId = '') {
           <span style="font-size:1.3rem;">${c.flag}</span>
           <div>
             <div style="font-weight:900;font-size:0.88rem;color:#fff;">@${escapeHtmlStr(activeStory.author)}</div>
-            <div style="font-size:0.72rem;color:#7dd3fc;">${escapeHtmlStr(getCityName(c, lang))} · ${idx + 1}/${stories.length} · ⏳ ${hoursLeft}h ${minsLeft}m</div>
+            <div style="font-size:0.72rem;color:#7dd3fc;">${escapeHtmlStr(getCityName(c, lang))} · ${curSubIdx + 1}/${authorStories.length} · ⏳ ${hoursLeft}h ${minsLeft}m</div>
           </div>
         </div>
         <div style="display:flex;align-items:center;gap:6px;">
@@ -4413,7 +4502,7 @@ function renderStoriesModalStripAndStage(storyId = '') {
         <div style="position:absolute;top:10px;right:10px;padding:4px 10px;border-radius:99px;background:rgba(5,8,22,0.78);backdrop-filter:blur(6px);border:1px solid rgba(251,191,36,0.4);color:#fde047;font-size:0.68rem;font-weight:900;">
           👁️ ${viewsCount}
         </div>
-        ${stories.length > 1 ? `
+        ${(allStories.length > 1) ? `
           <button type="button" onclick="stepStoryViewer(-1)" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);width:36px;height:36px;border-radius:50%;border:1px solid rgba(255,255,255,0.35);background:rgba(0,0,0,0.65);color:#fff;font-size:1.1rem;cursor:pointer;">‹</button>
           <button type="button" onclick="stepStoryViewer(1)" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);width:36px;height:36px;border-radius:50%;border:1px solid rgba(255,255,255,0.35);background:rgba(0,0,0,0.65);color:#fff;font-size:1.1rem;cursor:pointer;">›</button>
         ` : ''}
@@ -4446,11 +4535,32 @@ function openStoryViewer(storyId) {
 window.openStoryViewer = openStoryViewer;
 
 function stepStoryViewer(delta) {
-  const stories = getActiveValid24hStories();
-  if (!stories.length) return;
-  const curIdx = Math.max(0, stories.findIndex((x) => x && x.id === _activeStoryViewerId));
-  const nextIdx = (curIdx + delta + stories.length) % stories.length;
-  renderStoriesModalStripAndStage(stories[nextIdx].id);
+  const authorGroups = getGroupedAuthorStories();
+  if (!authorGroups.length) return;
+
+  let grpIdx = authorGroups.findIndex((g) => g.stories.some((s) => s.id === _activeStoryViewerId));
+  if (grpIdx === -1) grpIdx = 0;
+  const currentGroup = authorGroups[grpIdx];
+  const curSubIdx = currentGroup.stories.findIndex((s) => s.id === _activeStoryViewerId);
+  const nextSubIdx = curSubIdx + delta;
+
+  if (delta > 0) {
+    if (nextSubIdx < currentGroup.stories.length) {
+      renderStoriesModalStripAndStage(currentGroup.stories[nextSubIdx].id);
+    } else {
+      const nextGrpIdx = (grpIdx + 1) % authorGroups.length;
+      const nextGroup = authorGroups[nextGrpIdx];
+      renderStoriesModalStripAndStage(nextGroup.stories[0].id);
+    }
+  } else if (delta < 0) {
+    if (nextSubIdx >= 0) {
+      renderStoriesModalStripAndStage(currentGroup.stories[nextSubIdx].id);
+    } else {
+      const prevGrpIdx = (grpIdx - 1 + authorGroups.length) % authorGroups.length;
+      const prevGroup = authorGroups[prevGrpIdx];
+      renderStoriesModalStripAndStage(prevGroup.stories[prevGroup.stories.length - 1].id);
+    }
+  }
 }
 window.stepStoryViewer = stepStoryViewer;
 
@@ -4461,6 +4571,7 @@ function reactToStory(storyId, emoji) {
   s.reactions[emoji] = Number(s.reactions[emoji] || 0) + 1;
   RemoAudio.play('click');
   REMO_STORE.save(true, 'story_react');
+  REMO_STORE.syncStoryToCloud(s);
   REMO_STORE.syncToFirestore('story_react', false);
   renderStoriesModalStripAndStage(storyId);
 }
@@ -4494,6 +4605,7 @@ function tipStoryAuthor(storyId) {
   RemoAudio.play('coin');
   spawnRemoCoinsFX(8);
   REMO_STORE.save(true, 'story_tip');
+  REMO_STORE.syncStoryToCloud(s);
   REMO_STORE.syncToFirestore('story_tip', true);
   syncHeaderAndSidebars();
   renderStoriesModalStripAndStage(storyId);
@@ -4656,17 +4768,20 @@ function adminDeleteStoryInline(storyId) {
   const isOwnStory = !!(u && u.uid && target && target.uid && u.uid === target.uid);
   if (!isOwnStory && !REMO_STORE.isAdminUnlocked() && !REMO_STORE.isCurrentUserAdmin()) return;
 
-  if (!REMO_STORE.deletedStoryIds) {
-    REMO_STORE.deletedStoryIds = new Set(['st_1', 'st_2', 'st_3', 'st_4']);
+  if (typeof REMO_STORE.deleteStoryFromCloud === 'function') {
+    REMO_STORE.deleteStoryFromCloud(storyId);
+  } else {
+    if (!REMO_STORE.deletedStoryIds) {
+      REMO_STORE.deletedStoryIds = new Set(['st_1', 'st_2', 'st_3', 'st_4']);
+    }
+    REMO_STORE.deletedStoryIds.add(storyId);
+    try {
+      localStorage.setItem('remo_deleted_stories', JSON.stringify([...REMO_STORE.deletedStoryIds]));
+    } catch (e) {}
+    REMO_STORE.state.stories = stories.filter((x) => x && x.id !== storyId && !REMO_STORE.deletedStoryIds.has(x.id));
+    REMO_STORE.save(true, 'story_del');
+    REMO_STORE.syncToFirestore('story_deleted', true);
   }
-  REMO_STORE.deletedStoryIds.add(storyId);
-  try {
-    localStorage.setItem('remo_deleted_stories', JSON.stringify([...REMO_STORE.deletedStoryIds]));
-  } catch (e) {}
-
-  REMO_STORE.state.stories = stories.filter((x) => x && x.id !== storyId && !REMO_STORE.deletedStoryIds.has(x.id));
-  REMO_STORE.save(true, 'story_del');
-  REMO_STORE.syncToFirestore('story_deleted', true);
   updateHeaderStoryBadge();
   renderStoriesModalStripAndStage();
   remoToast(isFr ? '🗑️ Story supprimée définitivement !' : '🗑️ Story permanently deleted!');
