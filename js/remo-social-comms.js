@@ -4096,11 +4096,85 @@ async function record1ClickCityVideoReel() {
 /* ── Stories Hub, Real Photo Upload & Interactive Viewer (Header Button next to Radio) ── */
 let _pendingStoryPhotoDataUrl = '';
 let _activeStoryViewerId = '';
+let _storyAutoPlayInterval = null;
+let _storyAutoPlayProgressPct = 0;
+let _storyAutoPlayPaused = false;
+const _viewedStoryIdsSession = new Set();
+
+function getActiveValid24hStories() {
+  if (!REMO_STORE || !REMO_STORE.state) return [];
+  const raw = Array.isArray(REMO_STORE.state.stories) ? REMO_STORE.state.stories : [];
+  const nowTs = Date.now();
+  const legacyIds = new Set(['st_1', 'st_2', 'st_3', 'st_4']);
+  const delSet = REMO_STORE.deletedStoryIds || new Set();
+  const valid = raw.filter((s) =>
+    s && s.id &&
+    !legacyIds.has(s.id) &&
+    !delSet.has(s.id) &&
+    (nowTs - Number(s.createdAt || 0) <= 86400000)
+  );
+  if (valid.length !== raw.length) {
+    REMO_STORE.state.stories = valid;
+  }
+  return valid;
+}
+window.getActiveValid24hStories = getActiveValid24hStories;
+
+function stopStoryAutoPlayTimer() {
+  if (_storyAutoPlayInterval) {
+    clearInterval(_storyAutoPlayInterval);
+    _storyAutoPlayInterval = null;
+  }
+  _storyAutoPlayProgressPct = 0;
+}
+window.stopStoryAutoPlayTimer = stopStoryAutoPlayTimer;
+
+function pauseStoryAutoPlay(paused) {
+  _storyAutoPlayPaused = !!paused;
+  const badge = document.getElementById('storyAutoPlayStateBadge');
+  if (badge) {
+    const isFr = REMO_I18N.getLang() === 'fr';
+    badge.textContent = _storyAutoPlayPaused ? (isFr ? '⏸️ EN PAUSE' : '⏸️ PAUSED') : '▶ 6s';
+    badge.style.color = _storyAutoPlayPaused ? '#fde047' : '#94a3b8';
+  }
+}
+window.pauseStoryAutoPlay = pauseStoryAutoPlay;
+
+function startStoryAutoPlayTimer() {
+  stopStoryAutoPlayTimer();
+  _storyAutoPlayPaused = false;
+  _storyAutoPlayProgressPct = 0;
+  _storyAutoPlayInterval = setInterval(() => {
+    const modal = document.getElementById('storyViewerModal');
+    if (!modal || !modal.classList.contains('open')) {
+      stopStoryAutoPlayTimer();
+      return;
+    }
+    const drawer = document.getElementById('storyCreateDrawerBox');
+    if (drawer && drawer.style.display !== 'none') return;
+    if (_storyAutoPlayPaused) return;
+
+    _storyAutoPlayProgressPct = Math.min(100, _storyAutoPlayProgressPct + 1);
+    const activeBar = document.getElementById('storyActiveProgressFill');
+    if (activeBar) {
+      activeBar.style.width = `${_storyAutoPlayProgressPct}%`;
+    }
+    if (_storyAutoPlayProgressPct >= 100) {
+      const stories = getActiveValid24hStories();
+      if (stories.length > 1) {
+        stepStoryViewer(1);
+      } else {
+        _storyAutoPlayProgressPct = 0;
+        if (activeBar) activeBar.style.width = '0%';
+      }
+    }
+  }, 60);
+}
 
 function updateHeaderStoryBadge() {
   const badge = document.getElementById('hdrStoryCountBadge');
   if (!badge || !REMO_STORE || !REMO_STORE.state) return;
-  const stories = Array.isArray(REMO_STORE.state.stories) ? REMO_STORE.state.stories : [];
+  const stories = getActiveValid24hStories();
   badge.textContent = String(stories.length);
   badge.style.display = stories.length > 0 ? 'inline-flex' : 'none';
 }
@@ -4117,10 +4191,10 @@ function openStoriesHubModal(initialStoryId = '') {
       `<option value="${c.id}" ${u && u.homeCity === c.id ? 'selected' : ''}>${c.flag} ${escapeHtmlStr(getCityName(c, lang))}</option>`
     ).join('');
   }
-  const stories = Array.isArray(REMO_STORE.state.stories) ? REMO_STORE.state.stories : [];
+  const stories = getActiveValid24hStories();
   const targetId = initialStoryId || (stories[0] && stories[0].id) || '';
-  renderStoriesModalStripAndStage(targetId);
   modal.classList.add('open');
+  renderStoriesModalStripAndStage(targetId);
 }
 window.openStoriesHubModal = openStoriesHubModal;
 
@@ -4194,10 +4268,12 @@ function publishCitizen24hStory() {
     caption_en: finalTxt,
     caption_fr: finalTxt,
     mediaUrl: _pendingStoryPhotoDataUrl || '',
+    views: 1,
+    tipsCoins: 0,
     reactions: { '❤️': 1, '🔥': 1, '👑': 0 },
     createdAt: Date.now()
   };
-  REMO_STORE.state.stories = Array.isArray(REMO_STORE.state.stories) ? REMO_STORE.state.stories : [];
+  REMO_STORE.state.stories = getActiveValid24hStories();
   REMO_STORE.state.stories.unshift(newStory);
   _pendingStoryPhotoDataUrl = '';
   if (capInp) capInp.value = '';
@@ -4221,7 +4297,7 @@ function renderStoriesModalStripAndStage(storyId = '') {
   const box = document.getElementById('storyViewerBody');
   const lang = REMO_I18N.getLang();
   const isFr = lang === 'fr';
-  const stories = Array.isArray(REMO_STORE.state.stories) ? REMO_STORE.state.stories : [];
+  const stories = getActiveValid24hStories();
   const activeStory = stories.find((x) => x && x.id === storyId) || stories[0] || null;
   _activeStoryViewerId = activeStory ? activeStory.id : '';
 
@@ -4250,12 +4326,19 @@ function renderStoriesModalStripAndStage(storyId = '') {
 
   if (!box) return;
   if (!activeStory) {
+    stopStoryAutoPlayTimer();
     box.innerHTML = `
       <div style="text-align:center;padding:28px;color:var(--muted);">
-        📸 ${isFr ? 'Aucune Story active. Cliquez sur + pour publier la première Story (+10 🪙) !' : 'No active Story yet. Click + to publish the first 24h Story (+10 🪙)!'}
+        📸 ${isFr ? 'Aucune Story active dans les dernières 24h. Cliquez sur + pour publier la première Story (+10 🪙) !' : 'No active Story in the last 24h. Click + to publish the first 24h Story (+10 🪙)!'}
       </div>
     `;
     return;
+  }
+
+  if (!_viewedStoryIdsSession.has(activeStory.id)) {
+    _viewedStoryIdsSession.add(activeStory.id);
+    activeStory.views = Number(activeStory.views || 0) + 1;
+    REMO_STORE.save(false, 'story_view');
   }
 
   const c = getCityById(activeStory.cityId);
@@ -4263,53 +4346,87 @@ function renderStoriesModalStripAndStage(storyId = '') {
   const capTxt = isFr ? (activeStory.caption_fr || activeStory.caption_en) : (activeStory.caption_en || activeStory.caption_fr);
   const imgSrc = activeStory.mediaUrl || generateCityPostVisualDataUrl(c.id, activeStory.author, capTxt);
   const rx = activeStory.reactions || { '❤️': 1, '🔥': 1, '👑': 0 };
+  const u = REMO_STORE.getCurrentUser();
   const isAdm = REMO_STORE.isAdminUnlocked() || REMO_STORE.isCurrentUserAdmin();
+  const canDelete = isAdm || (u && u.uid && activeStory.uid && u.uid === activeStory.uid);
+
+  const msLeft = Math.max(0, 86400000 - (Date.now() - Number(activeStory.createdAt || Date.now())));
+  const hoursLeft = Math.floor(msLeft / 3600000);
+  const minsLeft = Math.max(1, Math.floor((msLeft % 3600000) / 60000));
+  const viewsCount = Math.max(1, Number(activeStory.views || 1));
+  const tipsCoins = Number(activeStory.tipsCoins || 0);
 
   box.innerHTML = `
-    <div style="position:relative;border-radius:16px;overflow:hidden;background:#050816;border:1px solid rgba(255,255,255,0.12);">
-      <!-- Story Progress Indicators -->
-      <div style="display:flex;gap:4px;padding:8px 10px;background:rgba(0,0,0,0.65);">
-        ${stories.map((st, i) => `
-          <div style="flex:1;height:3px;border-radius:99px;background:${i <= idx ? '#fbbf24' : 'rgba(255,255,255,0.2)'};"></div>
-        `).join('')}
+    <div style="position:relative;border-radius:16px;overflow:hidden;background:#050816;border:1px solid rgba(255,255,255,0.12);"
+         onpointerenter="pauseStoryAutoPlay(true)" onpointerleave="pauseStoryAutoPlay(false)"
+         ontouchstart="pauseStoryAutoPlay(true)" ontouchend="pauseStoryAutoPlay(false)">
+      <!-- Story Progress Indicators (6s Auto-Play) -->
+      <div style="display:flex;align-items:center;gap:6px;padding:8px 10px;background:rgba(0,0,0,0.72);">
+        <div style="display:flex;gap:4px;flex:1;">
+          ${stories.map((st, i) => `
+            <div style="flex:1;height:4px;border-radius:99px;background:rgba(255,255,255,0.2);overflow:hidden;">
+              <div ${i === idx ? 'id="storyActiveProgressFill"' : ''} style="height:100%;width:${i < idx ? '100%' : (i === idx ? '0%' : '0%')};background:linear-gradient(90deg,#fbbf24,#ec4899);transition:width 0.06s linear;"></div>
+            </div>
+          `).join('')}
+        </div>
+        <span id="storyAutoPlayStateBadge" style="font-size:0.65rem;font-weight:900;color:#94a3b8;letter-spacing:0.4px;">▶ 6s</span>
       </div>
 
       <!-- Story Header -->
-      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:rgba(15,23,42,0.88);">
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:rgba(15,23,42,0.92);flex-wrap:wrap;gap:6px;">
         <div style="display:flex;align-items:center;gap:8px;">
           <span style="font-size:1.3rem;">${c.flag}</span>
           <div>
             <div style="font-weight:900;font-size:0.88rem;color:#fff;">@${escapeHtmlStr(activeStory.author)}</div>
-            <div style="font-size:0.72rem;color:#7dd3fc;">${escapeHtmlStr(getCityName(c, lang))} · ${idx + 1}/${stories.length}</div>
+            <div style="font-size:0.72rem;color:#7dd3fc;">${escapeHtmlStr(getCityName(c, lang))} · ${idx + 1}/${stories.length} · ⏳ ${hoursLeft}h ${minsLeft}m</div>
           </div>
         </div>
-        ${isAdm ? `
-          <button type="button" class="adm-pbtn danger" onclick="adminDeleteStoryInline('${activeStory.id}')">🗑️ Delete</button>
-        ` : ''}
+        <div style="display:flex;align-items:center;gap:6px;">
+          <button type="button" class="adm-pbtn" style="background:linear-gradient(135deg,#0284c7,#6366f1);color:#fff;border:none;font-weight:900;padding:5px 10px;font-size:0.74rem;" onclick="shareActive24hStory916('${activeStory.id}')">
+            📲 ${isFr ? 'Partager 9:16 (+25 🪙)' : 'Share 9:16 (+25 🪙)'}
+          </button>
+          ${canDelete ? `
+            <button type="button" class="adm-pbtn danger" onclick="adminDeleteStoryInline('${activeStory.id}')">🗑️ ${isFr ? 'Supprimer' : 'Delete'}</button>
+          ` : ''}
+        </div>
       </div>
 
-      <!-- Story Image + Prev/Next Controls -->
+      <!-- Story Image + 4D Live City Stamp + Prev/Next Controls -->
       <div style="position:relative;">
         <img src="${imgSrc}" alt="${escapeHtmlStr(capTxt)}" style="width:100%;max-height:52dvh;object-fit:cover;display:block;">
+        <!-- 4D City Holographic Stamp -->
+        <div style="position:absolute;top:10px;left:10px;padding:4px 10px;border-radius:99px;background:rgba(5,8,22,0.78);backdrop-filter:blur(6px);border:1px solid rgba(56,189,248,0.45);color:#f8fafc;font-size:0.68rem;font-weight:900;letter-spacing:0.5px;display:flex;align-items:center;gap:6px;box-shadow:0 4px 14px rgba(0,0,0,0.45);">
+          <span>${c.flag} ${escapeHtmlStr(getCityName(c, lang).toUpperCase())}</span>
+          <span style="color:#38bdf8;">•</span>
+          <span style="color:#fde047;">24H LIVE</span>
+        </div>
+        <div style="position:absolute;top:10px;right:10px;padding:4px 10px;border-radius:99px;background:rgba(5,8,22,0.78);backdrop-filter:blur(6px);border:1px solid rgba(251,191,36,0.4);color:#fde047;font-size:0.68rem;font-weight:900;">
+          👁️ ${viewsCount}
+        </div>
         ${stories.length > 1 ? `
           <button type="button" onclick="stepStoryViewer(-1)" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);width:36px;height:36px;border-radius:50%;border:1px solid rgba(255,255,255,0.35);background:rgba(0,0,0,0.65);color:#fff;font-size:1.1rem;cursor:pointer;">‹</button>
           <button type="button" onclick="stepStoryViewer(1)" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);width:36px;height:36px;border-radius:50%;border:1px solid rgba(255,255,255,0.35);background:rgba(0,0,0,0.65);color:#fff;font-size:1.1rem;cursor:pointer;">›</button>
         ` : ''}
       </div>
 
-      <!-- Story Caption & Quick Reactions -->
+      <!-- Story Caption, Quick Reactions & +5 Coin Tip -->
       <div style="padding:12px;background:rgba(15,23,42,0.95);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
-        <div style="font-weight:800;font-size:0.88rem;color:#fde047;flex:1;">"${escapeHtmlStr(capTxt)}"</div>
-        <div style="display:flex;gap:6px;">
+        <div style="font-weight:800;font-size:0.88rem;color:#fde047;flex:1;min-width:160px;">"${escapeHtmlStr(capTxt)}"</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
           ${['❤️', '🔥', '👑'].map((em) => `
             <button type="button" class="btn-ghost" style="padding:4px 10px;font-size:0.78rem;" onclick="reactToStory('${activeStory.id}','${em}')">
               ${em} ${Number(rx[em] || 0)}
             </button>
           `).join('')}
+          <button type="button" class="btn-ghost" style="padding:4px 10px;font-size:0.78rem;border-color:rgba(251,191,36,0.55);color:#fde047;font-weight:900;background:rgba(251,191,36,0.12);" onclick="tipStoryAuthor('${activeStory.id}')">
+            🪙 +5 ${tipsCoins > 0 ? `(${tipsCoins})` : ''}
+          </button>
         </div>
       </div>
     </div>
   `;
+
+  startStoryAutoPlayTimer();
 }
 window.renderStoriesModalStripAndStage = renderStoriesModalStripAndStage;
 
@@ -4319,7 +4436,7 @@ function openStoryViewer(storyId) {
 window.openStoryViewer = openStoryViewer;
 
 function stepStoryViewer(delta) {
-  const stories = Array.isArray(REMO_STORE.state.stories) ? REMO_STORE.state.stories : [];
+  const stories = getActiveValid24hStories();
   if (!stories.length) return;
   const curIdx = Math.max(0, stories.findIndex((x) => x && x.id === _activeStoryViewerId));
   const nextIdx = (curIdx + delta + stories.length) % stories.length;
@@ -4328,24 +4445,221 @@ function stepStoryViewer(delta) {
 window.stepStoryViewer = stepStoryViewer;
 
 function reactToStory(storyId, emoji) {
-  const s = (REMO_STORE.state.stories || []).find((x) => x && x.id === storyId);
+  const s = getActiveValid24hStories().find((x) => x && x.id === storyId);
   if (!s) return;
   s.reactions = s.reactions || { '❤️': 1, '🔥': 1, '👑': 0 };
   s.reactions[emoji] = Number(s.reactions[emoji] || 0) + 1;
   RemoAudio.play('click');
   REMO_STORE.save(true, 'story_react');
+  REMO_STORE.syncToFirestore('story_react', false);
   renderStoriesModalStripAndStage(storyId);
 }
 window.reactToStory = reactToStory;
 
+function tipStoryAuthor(storyId) {
+  const isFr = REMO_I18N.getLang() === 'fr';
+  const s = getActiveValid24hStories().find((x) => x && x.id === storyId);
+  if (!s) return;
+  const u = REMO_STORE.getCurrentUser();
+  if (!u || u.role === 'guest') {
+    document.getElementById('storyViewerModal')?.classList.remove('open');
+    openAuthModal();
+    return;
+  }
+  if (u.uid && s.uid && u.uid === s.uid) {
+    remoToast(isFr ? '💡 Vous êtes l’auteur de cette Story !' : '💡 You are the author of this Story!');
+    return;
+  }
+  if (Number(u.coins || 0) < 5) {
+    remoToast(isFr ? '⚠️ Il vous faut au moins 5 🪙 pour envoyer un cadeau !' : '⚠️ You need at least 5 🪙 to send a tip!');
+    return;
+  }
+  REMO_STORE.addCoins(u.uid, -5, 5);
+  if (s.uid) {
+    REMO_STORE.addCoins(s.uid, 5, 5);
+  }
+  s.tipsCoins = Number(s.tipsCoins || 0) + 5;
+  s.reactions = s.reactions || { '❤️': 1, '🔥': 1, '👑': 0 };
+  s.reactions['👑'] = Number(s.reactions['👑'] || 0) + 1;
+  RemoAudio.play('coin');
+  spawnRemoCoinsFX(8);
+  REMO_STORE.save(true, 'story_tip');
+  REMO_STORE.syncToFirestore('story_tip', true);
+  syncHeaderAndSidebars();
+  renderStoriesModalStripAndStage(storyId);
+  remoToast(isFr ? `🪙 +5 Coins envoyés à @${s.author} !` : `🪙 +5 Coins sent to @${s.author}!`, 'fanfare');
+}
+window.tipStoryAuthor = tipStoryAuthor;
+
+async function shareActive24hStory916(storyId) {
+  const lang = REMO_I18N.getLang();
+  const isFr = lang === 'fr';
+  const stories = getActiveValid24hStories();
+  const s = stories.find((x) => x && x.id === storyId) || stories[0];
+  if (!s) return;
+
+  pauseStoryAutoPlay(true);
+  const c = getCityById(s.cityId);
+  const cityName = getCityName(c, lang);
+  const capTxt = isFr ? (s.caption_fr || s.caption_en || '') : (s.caption_en || s.caption_fr || '');
+  const u = REMO_STORE.getCurrentUser();
+  const refCode = (u && u.referralCode) ? u.referralCode : 'REMO2026';
+
+  const cv = document.createElement('canvas');
+  cv.width = 540;
+  cv.height = 960;
+  const ctx = cv.getContext('2d');
+
+  const drawBackgroundAndFrame = () => {
+    const bg = ctx.createLinearGradient(0, 0, 540, 960);
+    bg.addColorStop(0, '#050816');
+    bg.addColorStop(0.5, '#0f172a');
+    bg.addColorStop(1, '#1e1b4b');
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, 540, 960);
+
+    ctx.strokeStyle = 'rgba(251, 191, 36, 0.45)';
+    ctx.lineWidth = 4;
+    ctx.strokeRect(18, 18, 504, 924);
+
+    // Top 4D Header Pill
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
+    ctx.fillRect(36, 38, 468, 68);
+    ctx.strokeStyle = 'rgba(56, 189, 248, 0.5)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(36, 38, 468, 68);
+
+    ctx.fillStyle = '#fde047';
+    ctx.font = '900 18px system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(`📸 REMO 24H CITY STORY • ${c.flag} ${cityName.toUpperCase()}`, 270, 68);
+    ctx.fillStyle = '#7dd3fc';
+    ctx.font = '700 14px system-ui, sans-serif';
+    ctx.fillText(`@${s.author} • 👁️ ${Math.max(1, Number(s.views || 1))} • 🪙 +${Number(s.tipsCoins || 0)}`, 270, 92);
+  };
+
+  drawBackgroundAndFrame();
+
+  const imgSrc = s.mediaUrl || generateCityPostVisualDataUrl(c.id, s.author, capTxt);
+  if (imgSrc) {
+    await new Promise((resolve) => {
+      const img = new Image();
+      if (!imgSrc.startsWith('data:')) img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        try {
+          ctx.save();
+          ctx.beginPath();
+          ctx.rect(36, 124, 468, 520);
+          ctx.clip();
+          const scale = Math.max(468 / img.width, 520 / img.height);
+          const dw = img.width * scale;
+          const dh = img.height * scale;
+          ctx.drawImage(img, 36 + (468 - dw) / 2, 124 + (520 - dh) / 2, dw, dh);
+          ctx.restore();
+          ctx.strokeStyle = 'rgba(236, 72, 153, 0.65)';
+          ctx.lineWidth = 3;
+          ctx.strokeRect(36, 124, 468, 520);
+        } catch (err) {
+          drawBackgroundAndFrame();
+        }
+        resolve();
+      };
+      img.onerror = () => resolve();
+      img.src = imgSrc;
+    });
+  }
+
+  // Caption Box
+  ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
+  ctx.fillRect(36, 662, 468, 130);
+  ctx.strokeStyle = 'rgba(251, 191, 36, 0.4)';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(36, 662, 468, 130);
+
+  ctx.fillStyle = '#fde047';
+  ctx.font = '800 20px system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  const shortCap = capTxt.length > 72 ? capTxt.slice(0, 69) + '...' : capTxt;
+  ctx.fillText(`"${shortCap}"`, 270, 718);
+
+  const rx = s.reactions || { '❤️': 1, '🔥': 1, '👑': 0 };
+  ctx.fillStyle = '#f8fafc';
+  ctx.font = '800 17px system-ui, sans-serif';
+  ctx.fillText(`❤️ ${Number(rx['❤️'] || 0)}   🔥 ${Number(rx['🔥'] || 0)}   👑 ${Number(rx['👑'] || 0)}`, 270, 766);
+
+  // Bottom Viral CTA
+  ctx.fillStyle = 'rgba(2, 132, 199, 0.25)';
+  ctx.fillRect(36, 810, 468, 108);
+  ctx.strokeStyle = '#38bdf8';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(36, 810, 468, 108);
+
+  ctx.fillStyle = '#ffffff';
+  ctx.font = '900 20px system-ui, sans-serif';
+  ctx.fillText('🌍 JOIN REMOWORLD.COM (4D METAVERSE)', 270, 848);
+  ctx.fillStyle = '#fde047';
+  ctx.font = '900 17px system-ui, sans-serif';
+  ctx.fillText(isFr ? `Code Invité : ${refCode} (+100 🪙 Bonus)` : `Invite Code: ${refCode} (+100 🪙 Bonus)`, 270, 882);
+
+  let dataUrl = '';
+  try {
+    dataUrl = cv.toDataURL('image/png');
+  } catch (e) {
+    remoToast(isFr ? '⚠️ Erreur export image' : '⚠️ Image export error');
+    return;
+  }
+
+  let copiedImg = false;
+  try {
+    const res = await fetch(dataUrl);
+    const blob = await res.blob();
+    if (navigator.clipboard && window.ClipboardItem) {
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+      copiedImg = true;
+    }
+  } catch (e) {}
+
+  const a = document.createElement('a');
+  a.href = dataUrl;
+  a.download = `remo-story-${c.id}-${Date.now()}.png`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+
+  if (typeof rewardViralShareWithDailyCap === 'function') {
+    rewardViralShareWithDailyCap('story_916');
+  }
+  remoToast(
+    copiedImg
+      ? (isFr ? '📲 Story 9:16 copiée (Ctrl+V sur Facebook) & téléchargée !' : '📲 9:16 Story copied (Ctrl+V on Facebook) & downloaded!')
+      : (isFr ? '📲 Carte Story 9:16 téléchargée !' : '📲 9:16 Story Card downloaded!'),
+    'fanfare'
+  );
+}
+window.shareActive24hStory916 = shareActive24hStory916;
+
 function adminDeleteStoryInline(storyId) {
-  if (!REMO_STORE.isAdminUnlocked() && !REMO_STORE.isCurrentUserAdmin()) return;
-  REMO_STORE.state.stories = (REMO_STORE.state.stories || []).filter((x) => x.id !== storyId);
+  const isFr = REMO_I18N.getLang() === 'fr';
+  const u = REMO_STORE.getCurrentUser();
+  const stories = Array.isArray(REMO_STORE.state.stories) ? REMO_STORE.state.stories : [];
+  const target = stories.find((x) => x && x.id === storyId);
+  const isOwnStory = !!(u && u.uid && target && target.uid && u.uid === target.uid);
+  if (!isOwnStory && !REMO_STORE.isAdminUnlocked() && !REMO_STORE.isCurrentUserAdmin()) return;
+
+  if (!REMO_STORE.deletedStoryIds) {
+    REMO_STORE.deletedStoryIds = new Set(['st_1', 'st_2', 'st_3', 'st_4']);
+  }
+  REMO_STORE.deletedStoryIds.add(storyId);
+  try {
+    localStorage.setItem('remo_deleted_stories', JSON.stringify([...REMO_STORE.deletedStoryIds]));
+  } catch (e) {}
+
+  REMO_STORE.state.stories = stories.filter((x) => x && x.id !== storyId && !REMO_STORE.deletedStoryIds.has(x.id));
   REMO_STORE.save(true, 'story_del');
   REMO_STORE.syncToFirestore('story_deleted', true);
   updateHeaderStoryBadge();
   renderStoriesModalStripAndStage();
-  remoToast('🗑️ Story deleted!');
+  remoToast(isFr ? '🗑️ Story supprimée définitivement !' : '🗑️ Story permanently deleted!');
 }
 window.adminDeleteStoryInline = adminDeleteStoryInline;
 

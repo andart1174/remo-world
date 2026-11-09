@@ -1152,12 +1152,7 @@ function createDefaultState() {
 
     posts: [],
 
-    stories: [
-      { id: 'st_1', author: 'REMO Founder', cityId: 'montreal', caption_en: 'Mont-Royal Flash Drop Live! ⚡', caption_fr: 'Flash Drop Mont-Royal en direct ! ⚡', createdAt: now - 1200000 },
-      { id: 'st_2', author: 'Elena_KIV', cityId: 'chisinau', caption_en: 'Chișinău Night Walk 🇲🇩✨', caption_fr: 'Promenade nocturne à Chișinău 🇲🇩✨', createdAt: now - 2400000 },
-      { id: 'st_3', author: 'Lucas_Paris', cityId: 'paris', caption_en: 'Seine Cruise & Espresso 🗼', caption_fr: 'Croisière sur la Seine 🗼', createdAt: now - 3800000 },
-      { id: 'st_4', author: 'Kenji_Shibuya', cityId: 'tokyo', caption_en: 'Akihabara Card Battle! 🎴', caption_fr: 'Duel de Cartes à Akihabara ! 🎴', createdAt: now - 5100000 }
-    ],
+    stories: [],
 
     duels: [],
 
@@ -2449,6 +2444,7 @@ const REMO_STORE = {
   deletedUserIds: null,
   deletedDuelIds: null,
   deletedAuctionIds: null,
+  deletedStoryIds: null,
 
   init() {
     try {
@@ -2472,6 +2468,12 @@ const REMO_STORE = {
       this.deletedAuctionIds = new Set();
     }
     try {
+      this.deletedStoryIds = new Set(JSON.parse(localStorage.getItem('remo_deleted_stories') || '[]'));
+    } catch (e) {
+      this.deletedStoryIds = new Set();
+    }
+    ['st_1', 'st_2', 'st_3', 'st_4'].forEach((id) => this.deletedStoryIds.add(id));
+    try {
       const raw = localStorage.getItem(this.KEY);
       this.state = raw ? JSON.parse(raw) : createDefaultState();
     } catch (e) {
@@ -2480,6 +2482,15 @@ const REMO_STORE = {
     if (!this.state.settings) this.state = createDefaultState();
     if (Array.isArray(this.state.auctions) && this.deletedAuctionIds && this.deletedAuctionIds.size > 0) {
       this.state.auctions = this.state.auctions.filter((a) => a && a.id && !this.deletedAuctionIds.has(a.id));
+    }
+    // Strip out deleted stories, legacy demo stories (st_1..st_4), and stories older than 24 hours (86400000 ms)
+    const nowInitTs = Date.now();
+    if (Array.isArray(this.state.stories)) {
+      this.state.stories = this.state.stories.filter((s) =>
+        s && s.id &&
+        (!this.deletedStoryIds || !this.deletedStoryIds.has(s.id)) &&
+        (nowInitTs - Number(s.createdAt || 0) <= 86400000)
+      );
     }
     // Strip out deleted city wars / duels and legacy mock wars
     const legacyMockWarIds = new Set(['war_1', 'war_2', 'war_3']);
@@ -4404,8 +4415,42 @@ const REMO_STORE = {
           if (typeof renderViralContestsView === 'function') renderViralContestsView();
           if (typeof renderFeedActiveContestsBanner === 'function') renderFeedActiveContestsBanner();
         }
-        if (Array.isArray(data.stories) && data.stories.length > 0) {
-          this.state.stories = data.stories;
+        if (Array.isArray(data.deletedStoryIds)) {
+          if (!this.deletedStoryIds) this.deletedStoryIds = new Set(['st_1', 'st_2', 'st_3', 'st_4']);
+          data.deletedStoryIds.forEach((id) => this.deletedStoryIds.add(id));
+          try {
+            localStorage.setItem('remo_deleted_stories', JSON.stringify([...this.deletedStoryIds]));
+          } catch (e) {}
+        }
+        if (Array.isArray(data.stories)) {
+          const nowStoryTs = Date.now();
+          const legacyStoryIds = new Set(['st_1', 'st_2', 'st_3', 'st_4']);
+          const localStoryMap = new Map();
+          (this.state.stories || []).forEach((ls) => {
+            if (ls && ls.id && !legacyStoryIds.has(ls.id) && (!this.deletedStoryIds || !this.deletedStoryIds.has(ls.id)) && (nowStoryTs - Number(ls.createdAt || 0) <= 86400000)) {
+              localStoryMap.set(ls.id, ls);
+            }
+          });
+          data.stories.forEach((cs) => {
+            if (!cs || !cs.id || legacyStoryIds.has(cs.id) || (this.deletedStoryIds && this.deletedStoryIds.has(cs.id)) || (nowStoryTs - Number(cs.createdAt || 0) > 86400000)) return;
+            const ls = localStoryMap.get(cs.id);
+            if (!ls) {
+              localStoryMap.set(cs.id, cs);
+            } else {
+              const rxC = cs.reactions || {};
+              const rxL = ls.reactions || {};
+              localStoryMap.set(cs.id, Object.assign({}, ls, cs, {
+                views: Math.max(Number(cs.views || 0), Number(ls.views || 0)),
+                tipsCoins: Math.max(Number(cs.tipsCoins || 0), Number(ls.tipsCoins || 0)),
+                reactions: {
+                  '❤️': Math.max(Number(rxC['❤️'] || 0), Number(rxL['❤️'] || 0)),
+                  '🔥': Math.max(Number(rxC['🔥'] || 0), Number(rxL['🔥'] || 0)),
+                  '👑': Math.max(Number(rxC['👑'] || 0), Number(rxL['👑'] || 0))
+                }
+              }));
+            }
+          });
+          this.state.stories = Array.from(localStoryMap.values()).sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
           if (typeof updateHeaderStoryBadge === 'function') updateHeaderStoryBadge();
         }
         if (data.worldSystems && typeof data.worldSystems === 'object') {
@@ -6345,6 +6390,7 @@ const REMO_STORE = {
           deletedUserIds: [...(this.deletedUserIds || [])].slice(-100),
           deletedDuelIds: [...(this.deletedDuelIds || [])].slice(-100),
           deletedAuctionIds: [...(this.deletedAuctionIds || [])].slice(-100),
+          deletedStoryIds: [...(this.deletedStoryIds || [])].slice(-100),
           updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         }, { merge: true }).catch((err) => {
           console.log('Firestore background sync info:', err.message);
