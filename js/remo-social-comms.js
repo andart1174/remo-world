@@ -164,6 +164,16 @@ function syncHeaderAndSidebars() {
     mbHubAdmGod.style.display = showAdminControls ? 'inline-flex' : 'none';
   }
 
+  const mbHubPromo = document.getElementById('mbHubPromoStudioBtn');
+  if (mbHubPromo) {
+    mbHubPromo.style.display = showAdminControls ? 'inline-flex' : 'none';
+  }
+
+  const feedChipPromo = document.getElementById('feedChipAdminPromoBtn');
+  if (feedChipPromo) {
+    feedChipPromo.style.display = showAdminControls ? 'inline-flex' : 'none';
+  }
+
   const mbHubAdmOffice = document.getElementById('mbHubAdminOfficeBtn');
   if (mbHubAdmOffice) {
     mbHubAdmOffice.style.display = showAdminControls ? 'inline-flex' : 'none';
@@ -14260,9 +14270,12 @@ function claimVipInviteWelcomePack() {
 }
 window.claimVipInviteWelcomePack = claimVipInviteWelcomePack;
 
-/* ── 📣 2. 1-CLICK VIRAL PROMO STUDIO (16:9 FB GROUP BANNER / 9:16 STORY + 5 VIRAL TEXTS) ── */
+/* ── 📣 2. ADMIN-ONLY 1-CLICK VIRAL PROMO STUDIO (CUSTOM PHOTO + 16:9 / 9:16 + 16 VIRAL TEXTS) ── */
 let _viralPromoStudioFormat = '16:9';
 let _viralPromoTemplatesCache = [];
+let _viralPromoActiveCategory = 'all';
+let _promoStudioCustomPhotoImg = null;
+let _promoStudioCustomPhotoDataUrl = '';
 
 function getSortedCitiesLeaderboard() {
   const cities = getRemoCities().map((c) => ({
@@ -14273,7 +14286,59 @@ function getSortedCitiesLeaderboard() {
   return cities;
 }
 
+function handlePromoStudioPhotoUpload(ev) {
+  const file = ev.target && ev.target.files && ev.target.files[0];
+  if (!file) return;
+  const isFr = REMO_I18N.getLang() === 'fr';
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const img = new Image();
+    img.onload = () => {
+      const cv = document.createElement('canvas');
+      const maxDim = 960;
+      let w = img.width;
+      let h = img.height;
+      if (w > maxDim || h > maxDim) {
+        if (w > h) { h = Math.round((h * maxDim) / w); w = maxDim; }
+        else { w = Math.round((w * maxDim) / h); h = maxDim; }
+      }
+      cv.width = w;
+      cv.height = h;
+      cv.getContext('2d').drawImage(img, 0, 0, w, h);
+      _promoStudioCustomPhotoDataUrl = cv.toDataURL('image/jpeg', 0.85);
+      const cleanImg = new Image();
+      cleanImg.onload = () => {
+        _promoStudioCustomPhotoImg = cleanImg;
+        const resetBtn = document.getElementById('promoStudioResetPhotoBtn');
+        if (resetBtn) resetBtn.style.display = 'inline-flex';
+        renderViralPromoStudioCanvas();
+        remoToast(isFr ? '📷 Photo ajoutée sur l’affiche !' : '📷 Photo added to poster!');
+      };
+      cleanImg.src = _promoStudioCustomPhotoDataUrl;
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+window.handlePromoStudioPhotoUpload = handlePromoStudioPhotoUpload;
+
+function resetPromoStudioPhoto() {
+  _promoStudioCustomPhotoImg = null;
+  _promoStudioCustomPhotoDataUrl = '';
+  const inp = document.getElementById('promoStudioPhotoInput');
+  if (inp) inp.value = '';
+  const resetBtn = document.getElementById('promoStudioResetPhotoBtn');
+  if (resetBtn) resetBtn.style.display = 'none';
+  renderViralPromoStudioCanvas();
+}
+window.resetPromoStudioPhoto = resetPromoStudioPhoto;
+
 function openViralPromoStudioModal(defaultCityId = '') {
+  if (!REMO_STORE.isAdminUnlocked() && !REMO_STORE.isCurrentUserAdmin()) {
+    const isFr = REMO_I18N.getLang() === 'fr';
+    remoToast(isFr ? '🔒 Accès réservé à l’Administrateur REMO.' : '🔒 Access restricted to REMO Administrator.');
+    return;
+  }
   const modal = document.getElementById('viralPromoStudioModal');
   if (!modal) return;
   const lang = REMO_I18N.getLang();
@@ -14296,6 +14361,38 @@ function openViralPromoStudioModal(defaultCityId = '') {
       <option value="ranking" ${curVal === 'ranking' ? 'selected' : ''}>${isFr ? '🏆 Alerte Classement Mondial Live' : '🏆 Live World Ranking Alert'}</option>
       <option value="duel" ${curVal === 'duel' ? 'selected' : ''}>${isFr ? '⚔️ Duel de Fierté entre 2 Villes' : '⚔️ City vs City Pride Duel'}</option>
       <option value="radio" ${curVal === 'radio' ? 'selected' : ''}>${isFr ? '📻 38 Radios du Monde & Cadeau +150 🪙' : '📻 38 Live Radios & +150 🪙 Gift'}</option>
+      <option value="guess" ${curVal === 'guess' ? 'selected' : ''}>${isFr ? '🕵️ Défi Photo : Devine la Ville !' : '🕵️ Guess The City Photo Challenge'}</option>
+    `;
+  }
+
+  const upBtn = document.getElementById('promoStudioUploadBtn');
+  if (upBtn) {
+    upBtn.textContent = isFr ? '📷 Ajouter Ma Photo sur Carte / Affiche' : '📷 Upload Photo to Card / Poster';
+  }
+
+  const pmSel = document.getElementById('promoStudioPhotoModeSelect');
+  if (pmSel) {
+    const curPm = pmSel.value || 'card';
+    pmSel.innerHTML = `
+      <option value="card" ${curPm === 'card' ? 'selected' : ''}>${isFr ? '🎴 Photo dans Carte 4D d’Or' : '🎴 Photo Inside 4D Gold Card'}</option>
+      <option value="bg" ${curPm === 'bg' ? 'selected' : ''}>${isFr ? '🌆 Photo en Fond Plein Écran' : '🌆 Full-Screen Background Photo'}</option>
+    `;
+  }
+
+  const titleInp = document.getElementById('promoStudioCustomTitleInp');
+  if (titleInp) {
+    titleInp.placeholder = isFr ? '✍️ Titre personnalisé sur l’affiche (optionnel)...' : '✍️ Optional custom title on poster...';
+  }
+
+  const destSel = document.getElementById('promoStudioDestSelect');
+  if (destSel) {
+    const curDest = destSel.value || 'home';
+    destSel.innerHTML = `
+      <option value="home" ${curDest === 'home' ? 'selected' : ''}>${isFr ? '🎯 Lien : 🏠 Accueil + Coffre VIP (+150 🪙)' : '🎯 Link: 🏠 Home + VIP Chest (+150 🪙)'}</option>
+      <option value="ranking" ${curDest === 'ranking' ? 'selected' : ''}>${isFr ? '🎯 Lien : 🏆 Classement Live des 24 Villes' : '🎯 Link: 🏆 Top 24 Cities Live Ranking'}</option>
+      <option value="guess" ${curDest === 'guess' ? 'selected' : ''}>${isFr ? '🎯 Lien : 🕵️ Jeu Photo Devine la Ville' : '🎯 Link: 🕵️ Guess The City Photo Game'}</option>
+      <option value="radio" ${curDest === 'radio' ? 'selected' : ''}>${isFr ? '🎯 Lien : 📻 38 Radios du Monde Live' : '🎯 Link: 📻 38 Live World Cities Radio'}</option>
+      <option value="versus" ${curDest === 'versus' ? 'selected' : ''}>${isFr ? '🎯 Lien : ⚔️ Comparateur & Duels des Villes' : '🎯 Link: ⚔️ City Duels Comparator'}</option>
     `;
   }
 
@@ -14322,11 +14419,29 @@ function setViralPromoStudioFormat(fmt) {
 }
 window.setViralPromoStudioFormat = setViralPromoStudioFormat;
 
+function setViralPromoCategory(cat) {
+  _viralPromoActiveCategory = cat || 'all';
+  renderViralPromoTemplatesList();
+}
+window.setViralPromoCategory = setViralPromoCategory;
+
 function renderViralPromoStudioAll() {
   renderViralPromoStudioCanvas();
   renderViralPromoTemplatesList();
 }
 window.renderViralPromoStudioAll = renderViralPromoStudioAll;
+
+function drawCoverImageInRect(ctx, img, rx, ry, rw, rh) {
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(rx, ry, rw, rh);
+  ctx.clip();
+  const scale = Math.max(rw / img.width, rh / img.height);
+  const dw = img.width * scale;
+  const dh = img.height * scale;
+  ctx.drawImage(img, rx + (rw - dw) / 2, ry + (rh - dh) / 2, dw, dh);
+  ctx.restore();
+}
 
 function renderViralPromoStudioCanvas() {
   const cv = document.getElementById('viralPromoStudioCanvas');
@@ -14336,6 +14451,8 @@ function renderViralPromoStudioCanvas() {
   const sorted = getSortedCitiesLeaderboard();
   const selCityId = document.getElementById('promoStudioCitySelect')?.value || 'montreal';
   const theme = document.getElementById('promoStudioThemeSelect')?.value || 'ranking';
+  const photoMode = document.getElementById('promoStudioPhotoModeSelect')?.value || 'card';
+  const customHeadline = (document.getElementById('promoStudioCustomTitleInp')?.value || '').trim();
 
   const focusIdx = Math.max(0, sorted.findIndex((x) => x.city.id === selCityId));
   const focusEntry = sorted[focusIdx] || sorted[0];
@@ -14357,32 +14474,37 @@ function renderViralPromoStudioCanvas() {
   cv.height = H;
   const ctx = cv.getContext('2d');
 
-  // Deep 4D Cyber Gradient Background
-  const bg = ctx.createLinearGradient(0, 0, W, H);
-  bg.addColorStop(0, '#040714');
-  bg.addColorStop(0.5, '#0f172a');
-  bg.addColorStop(1, '#1e1b4b');
-  ctx.fillStyle = bg;
-  ctx.fillRect(0, 0, W, H);
+  // Deep 4D Cyber Gradient Background OR Full-Bleed Custom Photo Background
+  if (_promoStudioCustomPhotoImg && photoMode === 'bg') {
+    drawCoverImageInRect(ctx, _promoStudioCustomPhotoImg, 0, 0, W, H);
+    ctx.fillStyle = 'rgba(4, 7, 20, 0.66)';
+    ctx.fillRect(0, 0, W, H);
+  } else {
+    const bg = ctx.createLinearGradient(0, 0, W, H);
+    bg.addColorStop(0, '#040714');
+    bg.addColorStop(0.5, '#0f172a');
+    bg.addColorStop(1, '#1e1b4b');
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, W, H);
 
-  // Subtle Cyber Grid
-  ctx.strokeStyle = 'rgba(56, 189, 248, 0.08)';
-  ctx.lineWidth = 1;
-  for (let x = 0; x < W; x += 48) {
-    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
-  }
-  for (let y = 0; y < H; y += 48) {
-    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+    ctx.strokeStyle = 'rgba(56, 189, 248, 0.08)';
+    ctx.lineWidth = 1;
+    for (let x = 0; x < W; x += 48) {
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+    }
+    for (let y = 0; y < H; y += 48) {
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+    }
   }
 
   // Outer Gold Neon Frame
-  ctx.strokeStyle = 'rgba(251, 191, 36, 0.65)';
+  ctx.strokeStyle = 'rgba(251, 191, 36, 0.72)';
   ctx.lineWidth = 4;
   ctx.strokeRect(14, 14, W - 28, H - 28);
 
   if (!isVert) {
     // ── 16:9 LANDSCAPE BANNER (960×540) FOR FACEBOOK GROUPS / REDDIT / X ──
-    ctx.fillStyle = 'rgba(239, 68, 68, 0.22)';
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.88)';
     ctx.fillRect(36, 32, 888, 44);
     ctx.strokeStyle = '#f43f5e';
     ctx.lineWidth = 1.5;
@@ -14391,60 +14513,99 @@ function renderViralPromoStudioCanvas() {
     ctx.fillStyle = '#fde047';
     ctx.font = '900 17px system-ui, sans-serif';
     ctx.textAlign = 'center';
-    const topAlert = theme === 'duel'
+    const defaultTopAlert = theme === 'duel'
       ? (isFr ? `⚔️ ALERTE DUEL EN DIRECT : ${focusCity.flag} ${focusName.toUpperCase()} (#${rankNum}) VS ${rivalCity.flag} ${rivalName.toUpperCase()} !` : `⚔️ LIVE CITY DUEL ALERT: ${focusCity.flag} ${focusName.toUpperCase()} (#${rankNum}) VS ${rivalCity.flag} ${rivalName.toUpperCase()}!`)
       : theme === 'radio'
         ? (isFr ? `📻 38 RADIOS DU MONDE EN DIRECT + CLASSEMENT OFFICIEL 2026 • REMOWORLD.COM` : `📻 38 LIVE WORLD RADIOS + OFFICIAL 2026 CITY RANKING • REMOWORLD.COM`)
-        : (isFr ? `🔥 CLASSEMENT MONDIAL DES VILLES 2026 EN DIRECT • ${focusCity.flag} ${focusName.toUpperCase()} EST #${rankNum} !` : `🔥 LIVE 2026 WORLD CITIES RANKING • ${focusCity.flag} ${focusName.toUpperCase()} IS CURRENTLY #${rankNum}!`);
-    ctx.fillText(topAlert, W / 2, 60);
+        : theme === 'guess'
+          ? (isFr ? `🕵️ DÉFI PHOTO : 90% ÉCHOUENT À RECONNAÎTRE LA 3E VILLE ! ET VOUS ?` : `🕵️ PHOTO QUIZ: 90% FAIL TO GUESS THE 3RD WORLD CITY! CAN YOU?`)
+          : (isFr ? `🔥 CLASSEMENT MONDIAL DES VILLES 2026 EN DIRECT • ${focusCity.flag} ${focusName.toUpperCase()} EST #${rankNum} !` : `🔥 LIVE 2026 WORLD CITIES RANKING • ${focusCity.flag} ${focusName.toUpperCase()} IS CURRENTLY #${rankNum}!`);
+    ctx.fillText(customHeadline || defaultTopAlert, W / 2, 60);
 
-    // Left Column: Featured City Spotlight (x: 36..460, y: 92..420)
-    ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
+    // Left Column: Featured City Spotlight OR 4D Custom Photo Card (x: 36..466, y: 92..420)
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.88)';
     ctx.fillRect(36, 92, 430, 328);
     ctx.strokeStyle = 'rgba(56, 189, 248, 0.55)';
     ctx.lineWidth = 2;
     ctx.strokeRect(36, 92, 430, 328);
 
-    ctx.font = '64px system-ui, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText(focusCity.flag || '🌍', 251, 175);
+    if (_promoStudioCustomPhotoImg && photoMode === 'card') {
+      // Render Custom Photo inside a 4D Gold Card Frame at top of Left Column
+      drawCoverImageInRect(ctx, _promoStudioCustomPhotoImg, 54, 106, 394, 168);
+      ctx.strokeStyle = '#fbbf24';
+      ctx.lineWidth = 2.5;
+      ctx.strokeRect(54, 106, 394, 168);
 
-    ctx.fillStyle = '#ffffff';
-    ctx.font = '900 30px system-ui, sans-serif';
-    ctx.fillText(`${focusName.toUpperCase()}`, 251, 222);
+      // Pill badge over photo top-left
+      ctx.fillStyle = 'rgba(4, 7, 20, 0.84)';
+      ctx.fillRect(64, 114, 210, 30);
+      ctx.strokeStyle = '#38bdf8';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(64, 114, 210, 30);
+      ctx.fillStyle = '#fde047';
+      ctx.font = '900 13px system-ui, sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText(`${focusCity.flag} ${focusName.toUpperCase()} • #${rankNum}`, 74, 134);
 
-    ctx.fillStyle = '#fde047';
-    ctx.font = '900 22px system-ui, sans-serif';
-    ctx.fillText(
-      isFr ? `🏆 RANG MONDIAL #${rankNum} • ${focusEntry.pts.toLocaleString()} PTS` : `🏆 WORLD RANK #${rankNum} • ${focusEntry.pts.toLocaleString()} PTS`,
-      251,
-      260
-    );
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '900 22px system-ui, sans-serif';
+      ctx.fillText(
+        isFr ? `${focusCity.flag} ${focusName.toUpperCase()} • ${focusEntry.pts.toLocaleString()} PTS` : `${focusCity.flag} ${focusName.toUpperCase()} • ${focusEntry.pts.toLocaleString()} PTS`,
+        251,
+        304
+      );
 
-    const diffPts = Math.abs(rivalEntry.pts - focusEntry.pts);
-    ctx.fillStyle = '#7dd3fc';
-    ctx.font = '800 16px system-ui, sans-serif';
-    ctx.fillText(
-      focusIdx === 0
-        ? (isFr ? `👑 En tête devant ${rivalCity.flag} ${rivalName} (+${diffPts} PTS)` : `👑 Leading ahead of ${rivalCity.flag} ${rivalName} (+${diffPts} PTS)`)
-        : (isFr ? `⚡ À seulement ${diffPts} PTS de ${rivalCity.flag} ${rivalName} !` : `⚡ Only ${diffPts} PTS behind ${rivalCity.flag} ${rivalName}!`),
-      251,
-      298
-    );
+      ctx.fillStyle = '#f59e0b';
+      ctx.fillRect(68, 326, 366, 66);
+      ctx.fillStyle = '#050816';
+      ctx.font = '900 18px system-ui, sans-serif';
+      ctx.fillText(
+        isFr ? `🗳️ VOTER POUR ${focusName.toUpperCase()} (+100 PTS)` : `🗳️ VOTE FOR ${focusName.toUpperCase()} (+100 PTS)`,
+        251,
+        365
+      );
+    } else {
+      ctx.font = '64px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(focusCity.flag || '🌍', 251, 175);
 
-    // Vote CTA button graphic inside Left Box
-    ctx.fillStyle = '#f59e0b';
-    ctx.fillRect(68, 330, 366, 62);
-    ctx.fillStyle = '#050816';
-    ctx.font = '900 19px system-ui, sans-serif';
-    ctx.fillText(
-      isFr ? `🗳️ VOTER POUR ${focusName.toUpperCase()} (+100 PTS)` : `🗳️ VOTE FOR ${focusName.toUpperCase()} (+100 PTS)`,
-      251,
-      368
-    );
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '900 30px system-ui, sans-serif';
+      ctx.fillText(`${focusName.toUpperCase()}`, 251, 222);
+
+      ctx.fillStyle = '#fde047';
+      ctx.font = '900 22px system-ui, sans-serif';
+      ctx.fillText(
+        isFr ? `🏆 RANG MONDIAL #${rankNum} • ${focusEntry.pts.toLocaleString()} PTS` : `🏆 WORLD RANK #${rankNum} • ${focusEntry.pts.toLocaleString()} PTS`,
+        251,
+        260
+      );
+
+      const diffPts = Math.abs(rivalEntry.pts - focusEntry.pts);
+      ctx.fillStyle = '#7dd3fc';
+      ctx.font = '800 16px system-ui, sans-serif';
+      ctx.fillText(
+        focusIdx === 0
+          ? (isFr ? `👑 En tête devant ${rivalCity.flag} ${rivalName} (+${diffPts} PTS)` : `👑 Leading ahead of ${rivalCity.flag} ${rivalName} (+${diffPts} PTS)`)
+          : (isFr ? `⚡ À seulement ${diffPts} PTS de ${rivalCity.flag} ${rivalName} !` : `⚡ Only ${diffPts} PTS behind ${rivalCity.flag} ${rivalName}!`),
+        251,
+        298
+      );
+
+      ctx.fillStyle = '#f59e0b';
+      ctx.fillRect(68, 330, 366, 62);
+      ctx.fillStyle = '#050816';
+      ctx.font = '900 19px system-ui, sans-serif';
+      ctx.fillText(
+        isFr ? `🗳️ VOTER POUR ${focusName.toUpperCase()} (+100 PTS)` : `🗳️ VOTE FOR ${focusName.toUpperCase()} (+100 PTS)`,
+        251,
+        368
+      );
+    }
 
     // Right Column: Top 5 World Leaderboard (x: 484..924, y: 92..420)
-    ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.88)';
     ctx.fillRect(484, 92, 440, 328);
     ctx.strokeStyle = 'rgba(251, 191, 36, 0.45)';
     ctx.lineWidth = 2;
@@ -14477,7 +14638,7 @@ function renderViralPromoStudioCanvas() {
     });
 
     // Bottom VIP Gift Banner (x: 36..924, y: 436..506)
-    ctx.fillStyle = 'rgba(2, 132, 199, 0.28)';
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
     ctx.fillRect(36, 436, 888, 70);
     ctx.strokeStyle = '#38bdf8';
     ctx.lineWidth = 2;
@@ -14504,7 +14665,7 @@ function renderViralPromoStudioCanvas() {
     );
   } else {
     // ── 9:16 VERTICAL STORY POSTER (540×960) FOR STORIES / TIKTOK / REELS ──
-    ctx.fillStyle = 'rgba(239, 68, 68, 0.24)';
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
     ctx.fillRect(32, 34, 476, 56);
     ctx.strokeStyle = '#f43f5e';
     ctx.lineWidth = 2;
@@ -14512,47 +14673,68 @@ function renderViralPromoStudioCanvas() {
 
     ctx.textAlign = 'center';
     ctx.fillStyle = '#fde047';
-    ctx.font = '900 17px system-ui, sans-serif';
+    ctx.font = '900 16px system-ui, sans-serif';
     ctx.fillText(
-      isFr ? '🔥 COUPE MONDIALE DES VILLES 2026' : '🔥 2026 WORLD CITIES LIVE RANKING',
+      customHeadline || (isFr ? '🔥 COUPE MONDIALE DES VILLES 2026' : '🔥 2026 WORLD CITIES LIVE RANKING'),
       W / 2,
       68
     );
 
     // City Spotlight Card
-    ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.88)';
     ctx.fillRect(32, 108, 476, 290);
     ctx.strokeStyle = '#38bdf8';
     ctx.lineWidth = 2;
     ctx.strokeRect(32, 108, 476, 290);
 
-    ctx.font = '68px system-ui, sans-serif';
-    ctx.fillText(focusCity.flag || '🌍', W / 2, 190);
+    if (_promoStudioCustomPhotoImg && photoMode === 'card') {
+      drawCoverImageInRect(ctx, _promoStudioCustomPhotoImg, 48, 120, 444, 165);
+      ctx.strokeStyle = '#fbbf24';
+      ctx.lineWidth = 2.5;
+      ctx.strokeRect(48, 120, 444, 165);
 
-    ctx.fillStyle = '#ffffff';
-    ctx.font = '900 32px system-ui, sans-serif';
-    ctx.fillText(focusName.toUpperCase(), W / 2, 240);
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '900 22px system-ui, sans-serif';
+      ctx.fillText(`${focusCity.flag} ${focusName.toUpperCase()} • #${rankNum} (${focusEntry.pts.toLocaleString()} PTS)`, W / 2, 312);
 
-    ctx.fillStyle = '#fde047';
-    ctx.font = '900 22px system-ui, sans-serif';
-    ctx.fillText(
-      isFr ? `🏆 RANG #${rankNum} • ${focusEntry.pts.toLocaleString()} PTS` : `🏆 RANK #${rankNum} • ${focusEntry.pts.toLocaleString()} PTS`,
-      W / 2,
-      280
-    );
+      ctx.fillStyle = '#f59e0b';
+      ctx.fillRect(62, 328, 416, 54);
+      ctx.fillStyle = '#050816';
+      ctx.font = '900 18px system-ui, sans-serif';
+      ctx.fillText(
+        isFr ? `🗳️ SOUTENEZ ${focusName.toUpperCase()} (+100 PTS)` : `🗳️ VOTE FOR ${focusName.toUpperCase()} (+100 PTS)`,
+        W / 2,
+        361
+      );
+    } else {
+      ctx.font = '68px system-ui, sans-serif';
+      ctx.fillText(focusCity.flag || '🌍', W / 2, 190);
 
-    ctx.fillStyle = '#f59e0b';
-    ctx.fillRect(62, 314, 416, 58);
-    ctx.fillStyle = '#050816';
-    ctx.font = '900 18px system-ui, sans-serif';
-    ctx.fillText(
-      isFr ? `🗳️ SOUTENEZ ${focusName.toUpperCase()} (+100 PTS)` : `🗳️ VOTE FOR ${focusName.toUpperCase()} (+100 PTS)`,
-      W / 2,
-      350
-    );
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '900 32px system-ui, sans-serif';
+      ctx.fillText(focusName.toUpperCase(), W / 2, 240);
+
+      ctx.fillStyle = '#fde047';
+      ctx.font = '900 22px system-ui, sans-serif';
+      ctx.fillText(
+        isFr ? `🏆 RANG #${rankNum} • ${focusEntry.pts.toLocaleString()} PTS` : `🏆 RANK #${rankNum} • ${focusEntry.pts.toLocaleString()} PTS`,
+        W / 2,
+        280
+      );
+
+      ctx.fillStyle = '#f59e0b';
+      ctx.fillRect(62, 314, 416, 58);
+      ctx.fillStyle = '#050816';
+      ctx.font = '900 18px system-ui, sans-serif';
+      ctx.fillText(
+        isFr ? `🗳️ SOUTENEZ ${focusName.toUpperCase()} (+100 PTS)` : `🗳️ VOTE FOR ${focusName.toUpperCase()} (+100 PTS)`,
+        W / 2,
+        350
+      );
+    }
 
     // Top 5 Standings Box
-    ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.88)';
     ctx.fillRect(32, 416, 476, 336);
     ctx.strokeStyle = 'rgba(251, 191, 36, 0.45)';
     ctx.lineWidth = 2;
@@ -14577,7 +14759,7 @@ function renderViralPromoStudioCanvas() {
     });
 
     // Bottom VIP Gift CTA
-    ctx.fillStyle = 'rgba(2, 132, 199, 0.3)';
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
     ctx.fillRect(32, 772, 476, 152);
     ctx.strokeStyle = '#fbbf24';
     ctx.lineWidth = 2.5;
@@ -14642,11 +14824,13 @@ window.copyAndDownloadViralPromoPoster = copyAndDownloadViralPromoPoster;
 
 function renderViralPromoTemplatesList() {
   const box = document.getElementById('viralPromoTemplatesBox');
+  const catBar = document.getElementById('viralPromoCatFilterBar');
   if (!box) return;
   const lang = REMO_I18N.getLang();
   const isFr = lang === 'fr';
   const sorted = getSortedCitiesLeaderboard();
   const selCityId = document.getElementById('promoStudioCitySelect')?.value || 'montreal';
+  const destMode = document.getElementById('promoStudioDestSelect')?.value || 'home';
   const focusIdx = Math.max(0, sorted.findIndex((x) => x.city.id === selCityId));
   const focusEntry = sorted[focusIdx] || sorted[0];
   const rivalEntry = sorted[focusIdx === 0 ? 1 : focusIdx - 1] || sorted[0];
@@ -14654,66 +14838,259 @@ function renderViralPromoTemplatesList() {
   const cName = getCityName(focusEntry.city, lang);
   const rName = getCityName(rivalEntry.city, lang);
   const rank = focusIdx + 1;
+  const diffPts = Math.max(10, Math.abs(rivalEntry.pts - focusEntry.pts));
   const u = REMO_STORE.getCurrentUser();
   const inviteCode = (u && u.referralCode) ? u.referralCode : 'REMO2026';
-  const vipUrl = `https://remoworld.com/?ref=${encodeURIComponent(inviteCode)}&city=${encodeURIComponent(focusEntry.city.id)}&promo=vip150`;
-  const rankUrl = `https://remoworld.com/${isFr ? 'fr/' : ''}world-ranking.html?ref=${encodeURIComponent(inviteCode)}&city=${encodeURIComponent(focusEntry.city.id)}`;
+
+  const prefix = isFr ? 'fr/' : '';
+  const queryTail = `?ref=${encodeURIComponent(inviteCode)}&city=${encodeURIComponent(focusEntry.city.id)}&promo=vip150`;
+  const urlMap = {
+    home: `https://remoworld.com/${queryTail}`,
+    ranking: `https://remoworld.com/${prefix}world-ranking.html${queryTail}`,
+    guess: `https://remoworld.com/${prefix}guess-the-city.html${queryTail}`,
+    radio: `https://remoworld.com/${prefix}world-radio.html${queryTail}`,
+    versus: `https://remoworld.com/${prefix}city-versus.html${queryTail}`
+  };
+  const targetUrl = urlMap[destMode] || urlMap.home;
+
+  const categories = isFr ? [
+    { id: 'all', label: '✨ Tous (16)' },
+    { id: 'city', label: '🏙️ Villes & Diaspora (3)' },
+    { id: 'duel', label: '⚔️ Duels de Villes (3)' },
+    { id: 'guess', label: '🕵️ Quiz Photo (3)' },
+    { id: 'radio', label: '📻 38 Radios Live (3)' },
+    { id: 'gold', label: '🎟️ Ticket d’Or & Cartes (2)' },
+    { id: 'short', label: '📲 TikTok / WhatsApp (2)' }
+  ] : [
+    { id: 'all', label: '✨ All (16)' },
+    { id: 'city', label: '🏙️ City & Diaspora (3)' },
+    { id: 'duel', label: '⚔️ City Duels (3)' },
+    { id: 'guess', label: '🕵️ Photo Quiz (3)' },
+    { id: 'radio', label: '📻 38 Live Radios (3)' },
+    { id: 'gold', label: '🎟️ Gold & 4D Cards (2)' },
+    { id: 'short', label: '📲 TikTok / WhatsApp (2)' }
+  ];
+
+  if (catBar) {
+    catBar.innerHTML = categories.map((cat) => {
+      const active = _viralPromoActiveCategory === cat.id;
+      return `<button type="button" class="${active ? 'btn-cyber' : 'btn-ghost'}" style="padding:5px 10px;font-size:0.72rem;white-space:nowrap;font-weight:900;" onclick="setViralPromoCategory('${cat.id}')">${escapeHtmlStr(cat.label)}</button>`;
+    }).join('');
+  }
 
   _viralPromoTemplatesCache = isFr ? [
+    // 1. CITY & DIASPORA (3)
     {
-      badge: '📘 1. Groupes Facebook (Ville / Expatriés / Diaspora)',
-      text: `🔥 ALERTE FIERTÉ LOCALE : ${focusEntry.city.flag} ${cName} est actuellement #${rank} mondial dans le Classement Live des Villes 2026 (${focusEntry.pts.toLocaleString()} PTS) juste face à ${rivalEntry.city.flag} ${rName} ! 🌍\n🎁 Cliquez ici pour voter pour ${cName} en 5 secondes et recevoir un Pack VIP gratuit de +150 🪙 : ${vipUrl}`,
-      url: vipUrl
+      cat: 'city',
+      badge: '🏙️ 1. Groupes Facebook de Ville & Fierté Locale',
+      text: `🔥 ALERTE FIERTÉ LOCALE : ${focusEntry.city.flag} ${cName} est actuellement #${rank} mondial dans le Classement Live des Villes 2026 (${focusEntry.pts.toLocaleString()} PTS) juste face à ${rivalEntry.city.flag} ${rName} ! 🌍\n🎁 Cliquez ici pour voter pour ${cName} en 5 secondes et recevoir un Coffre VIP gratuit de +150 🪙 : ${targetUrl}`,
+      url: targetUrl
     },
     {
-      badge: '⚔️ 2. Duel de Villes (Provocation Amicale Virale)',
-      text: `⚔️ DUEL EN DIRECT : ${focusEntry.city.flag} ${cName} vs ${rivalEntry.city.flag} ${rName} ! Qui a la meilleure communauté en 2026 ? 🏆\nVotez gratuitement (+100 PTS pour notre ville + 1 Carte 4D offerte) : ${rankUrl}`,
-      url: rankUrl
+      cat: 'city',
+      badge: '🏙️ 2. Groupes Expatriés & Diaspora (Appel à la Communauté)',
+      text: `🌍 Combien de personnes de ${focusEntry.city.flag} ${cName} sont dans ce groupe ? Il nous manque seulement ${diffPts} PTS pour dépasser ${rivalEntry.city.flag} ${rName} dans la Coupe Mondiale des Villes 2026 !\n👉 Donnez +100 PTS gratuits à ${cName} et réclamez votre Passeport Citoyen (+150 🪙 offerts) : ${targetUrl}`,
+      url: targetUrl
     },
     {
-      badge: '📻 3. Groupes Radio, Musique & Découverte Web (Reddit / FB)',
-      text: `📻 Découvrez REMO World — 38 Radios des Villes du Monde en direct (Montréal, Paris, Chișinău, Bucarest, Tokyo, New York), Quiz Photo "Devine la Ville" & Cartes 4D gratuites ! 🌐✨\n🎁 +150 🪙 offerts avec le lien VIP : ${vipUrl}`,
-      url: vipUrl
+      cat: 'city',
+      badge: '🏙️ 3. Découverte du Hub Officiel 4D de la Ville',
+      text: `✨ On a créé le Hub 4D interactif pour les amoureux de ${focusEntry.city.flag} ${cName} : météo & heure en direct, radio locale, cartes 4D de collection et tchat entre citoyens !\n🎁 Entrez avec le code VIP ${inviteCode} pour recevoir +150 🪙 d'Or gratuits : ${targetUrl}`,
+      url: targetUrl
+    },
+    // 2. CITY DUELS (3)
+    {
+      cat: 'duel',
+      badge: '⚔️ 4. Duel Explosif entre 2 Villes (Provocation Amicale)',
+      text: `⚔️ DUEL EN DIRECT : ${focusEntry.city.flag} ${cName} vs ${rivalEntry.city.flag} ${rName} ! Quelle ville a la meilleure communauté en 2026 ? 🏆\nVotez gratuitement en 5 secondes (+100 PTS pour notre ville + +150 🪙 offerts) : ${targetUrl}`,
+      url: targetUrl
     },
     {
-      badge: '📲 4. Légende Courte pour TikTok / Story Instagram & Facebook',
-      text: `${focusEntry.city.flag} ${cName} est #${rank} mondial aujourd'hui sur REMO World ! 🏆 Rejoins notre ville et réclame +150 🪙 + 1 Carte 4D gratuite (Code : ${inviteCode}) 👉 ${vipUrl}`,
-      url: vipUrl
+      cat: 'duel',
+      badge: '⚔️ 5. Alerte Urgence Classement (Mobilisation Éclair)',
+      text: `🚨 ALERTE ${cName.toUpperCase()} : ${rivalEntry.city.flag} ${rName} est à seulement ${diffPts} PTS de nous au classement mondial ! On ne peut pas les laisser gagner aujourd'hui 💪\n🗳️ Cliquez ici pour ajouter +100 PTS à ${focusEntry.city.flag} ${cName} (+150 🪙 en cadeau) : ${targetUrl}`,
+      url: targetUrl
     },
     {
-      badge: '🟢 5. Invitation Directe WhatsApp / Telegram (Coffre VIP +150 🪙)',
-      text: `🎁 Salut ! Je t'envoie un Coffre VIP de +150 🪙 Pièces d'Or + 1 Carte de Ville 4D gratuite sur REMO World pour soutenir ${focusEntry.city.flag} ${cName} ! Ouvre ton cadeau en 5 secondes ici : ${vipUrl}`,
-      url: vipUrl
+      cat: 'duel',
+      badge: '⚔️ 6. Comparateur Coût de la Vie, Sécurité & Vibe',
+      text: `📊 Vous hésitez entre ${focusEntry.city.flag} ${cName} et ${rivalEntry.city.flag} ${rName} ? Comparez le coût de la vie, la sécurité, la gastronomie et votez dans le Duel Mondial 2026 !\n🎁 Bonus VIP de +150 🪙 inclus sur le lien : ${targetUrl}`,
+      url: targetUrl
+    },
+    // 3. GUESS THE CITY PHOTO QUIZ (3)
+    {
+      cat: 'guess',
+      badge: '🕵️ 7. Défi Viral "90% Échouent" (Très Fort Taux de Clic !)',
+      text: `🕵️ DÉFI GÉOGRAPHIE : 90% des gens n'arrivent pas à deviner la 3e ville de ce quiz photo gratuit ! Combien de villes du monde pouvez-vous reconnaître d'un seul coup d'œil ? 🌍📸\n🎮 Jouez gratuitement dans le navigateur (+150 🪙 offerts) : ${targetUrl}`,
+      url: targetUrl
+    },
+    {
+      cat: 'guess',
+      badge: '🕵️ 8. Quiz Voyageurs & Passionnés de Géographie (Reddit / FB)',
+      text: `🌍 Vous pensez connaître les grandes capitales du monde ? Testez le jeu gratuit "Devine la Ville" sur REMO World — aucune inscription obligatoire et +150 🪙 de récompense VIP pour votre ville : ${targetUrl}`,
+      url: targetUrl
+    },
+    {
+      cat: 'guess',
+      badge: '🕵️ 9. Défi Photo Mystère de Votre Ville',
+      text: `📸 Un citoyen vient de publier une photo mystère de ${focusEntry.city.flag} ${cName} ! Les vrais habitants la reconnaissent en 3 secondes. Venez tester et gagner +150 🪙 : ${targetUrl}`,
+      url: targetUrl
+    },
+    // 4. 38 LIVE RADIOS (3)
+    {
+      cat: 'radio',
+      badge: '📻 10. 38 Radios du Monde en Direct (Pour Travailler / Conduire)',
+      text: `📻 Écoutez gratuitement 38 Radios des Villes du Monde en direct (Montréal, Paris, Chișinău, Bucarest, Tokyo, New York, Londres) dans une console 4D sans publicité ! 🎶🌍\n🎁 +150 🪙 offerts en entrant par ce lien VIP : ${targetUrl}`,
+      url: targetUrl
+    },
+    {
+      cat: 'radio',
+      badge: '📻 11. Voyage Sonore Nocturne & Lo-Fi Urbain',
+      text: `🌙 Envie de voyager depuis votre salon ? Changez de ville en 1 clic et écoutez la radio live de ${focusEntry.city.flag} ${cName}, Paris ou Tokyo tout en explorant la carte 4D :\n👉 ${targetUrl}`,
+      url: targetUrl
+    },
+    {
+      cat: 'radio',
+      badge: '🎤 12. Concours Musical REMO (60s) pour Artistes & DJ',
+      text: `🎤 Artistes, DJ et créateurs de ${focusEntry.city.flag} ${cName} : représentez votre ville dans le Concours Musical Mondial REMO (extraits de 60s) ! Chaque vote rapporte +100 PTS à votre ville :\n🏆 Participez ou votez ici (+150 🪙 offerts) : ${targetUrl}`,
+      url: targetUrl
+    },
+    // 5. GOLD SCRATCH & 4D CARDS (2)
+    {
+      cat: 'gold',
+      badge: '🎟️ 13. Ticket à Gratter d’Or 24K Gratuit du Jour',
+      text: `🎟️ Grattez gratuitement votre Ticket d'Or 24K du jour sur REMO World et gagnez entre +35 et +500 🪙 Pièces d'Or pour ${focusEntry.city.flag} ${cName} ! ✨\n🎁 +150 🪙 supplémentaires offerts avec ce lien d'invitation VIP : ${targetUrl}`,
+      url: targetUrl
+    },
+    {
+      cat: 'gold',
+      badge: '🎴 14. Collection de Cartes Holographiques 4D & Diplôme d’Ambassadeur',
+      text: `🏅 Devenez Ambassadeur Officiel de ${focusEntry.city.flag} ${cName}, téléchargez votre Diplôme 9:16 avec votre photo et ouvrez votre pack quotidien de Cartes 4D !\n🎁 Réclamez votre Coffre VIP (+150 🪙) : ${targetUrl}`,
+      url: targetUrl
+    },
+    // 6. SHORT TIKTOK / WHATSAPP / TELEGRAM (2)
+    {
+      cat: 'short',
+      badge: '📲 15. Légende Courte Punchy pour TikTok / Reels / Stories',
+      text: `${focusEntry.city.flag} ${cName} est #${rank} mondial aujourd'hui sur REMO World ! 🏆 Rejoins notre ville et réclame +150 🪙 + 1 Carte 4D gratuite (Code : ${inviteCode}) 👉 ${targetUrl}`,
+      url: targetUrl
+    },
+    {
+      cat: 'short',
+      badge: '🟢 16. Message Direct WhatsApp / Telegram / Messenger',
+      text: `🎁 Salut ! Je t'envoie un Coffre VIP de +150 🪙 Pièces d'Or + 1 Carte de Ville 4D gratuite sur REMO World pour soutenir ${focusEntry.city.flag} ${cName} ! Ouvre ton cadeau en 5 secondes ici : ${targetUrl}`,
+      url: targetUrl
     }
   ] : [
+    // 1. CITY & DIASPORA (3)
     {
-      badge: '📘 1. Facebook City, Expat & Community Groups',
-      text: `🔥 LIVE CITY RANKING ALERT: ${focusEntry.city.flag} ${cName} is currently #${rank} in the 2026 World Cities Live Standings (${focusEntry.pts.toLocaleString()} PTS) battling ${rivalEntry.city.flag} ${rName}! 🌍\n🎁 Tap here to vote for ${cName} in 5 seconds & claim a free +150 🪙 VIP Welcome Pack: ${vipUrl}`,
-      url: vipUrl
+      cat: 'city',
+      badge: '🏙️ 1. Facebook City & Local Pride Groups',
+      text: `🔥 LIVE CITY RANKING ALERT: ${focusEntry.city.flag} ${cName} is currently #${rank} in the 2026 World Cities Live Standings (${focusEntry.pts.toLocaleString()} PTS) battling ${rivalEntry.city.flag} ${rName}! 🌍\n🎁 Tap here to vote for ${cName} in 5 seconds & claim a free +150 🪙 VIP Welcome Chest: ${targetUrl}`,
+      url: targetUrl
     },
     {
-      badge: '⚔️ 2. City vs City Friendly Duel Challenge',
-      text: `⚔️ LIVE CITY DUEL: ${focusEntry.city.flag} ${cName} vs ${rivalEntry.city.flag} ${rName}! Which city has the strongest community in 2026? 🏆\nCast your free +100 PTS city vote & claim a 4D City Card here: ${rankUrl}`,
-      url: rankUrl
+      cat: 'city',
+      badge: '🏙️ 2. Expat & Diaspora Community Rally Post',
+      text: `🌍 How many people from ${focusEntry.city.flag} ${cName} are in this group? We only need ${diffPts} more PTS to overtake ${rivalEntry.city.flag} ${rName} in the 2026 World City Cup!\n👉 Cast a free +100 PTS vote for ${cName} & claim your Citizen Passport (+150 🪙 free gift): ${targetUrl}`,
+      url: targetUrl
     },
     {
-      badge: '📻 3. Reddit / Web Games / Radio & Travel Communities',
-      text: `📻 Just found REMO World — stream 38 Live World City Radios (Montréal, Paris, Chișinău, Bucharest, Tokyo, NYC), play Guess The City photo trivia, and collect 4D City Cards for free! 🌐✨\n🎁 Claim +150 🪙 free VIP bonus here: ${vipUrl}`,
-      url: vipUrl
+      cat: 'city',
+      badge: '🏙️ 3. Official 4D City Hub & Live Community Showcase',
+      text: `✨ We built a live 4D interactive hub for everyone who loves ${focusEntry.city.flag} ${cName}: live city radio, real-time weather, 4D collectible city cards & citizen chat!\n🎁 Enter with VIP code ${inviteCode} to claim +150 🪙 free Gold Coins: ${targetUrl}`,
+      url: targetUrl
+    },
+    // 2. CITY DUELS (3)
+    {
+      cat: 'duel',
+      badge: '⚔️ 4. City vs City Friendly Duel Provocation',
+      text: `⚔️ LIVE CITY DUEL: ${focusEntry.city.flag} ${cName} vs ${rivalEntry.city.flag} ${rName}! Which city has the strongest community in 2026? 🏆\nVote for free in 5 seconds (+100 PTS for our city + +150 🪙 welcome gift): ${targetUrl}`,
+      url: targetUrl
     },
     {
-      badge: '📲 4. Short Punchy Caption for TikTok / Insta & FB Stories',
-      text: `${focusEntry.city.flag} ${cName} is #${rank} in the world today on REMO World! 🏆 Represent our city & claim +150 🪙 + 1 Free 4D City Card (Code: ${inviteCode}) 👉 ${vipUrl}`,
-      url: vipUrl
+      cat: 'duel',
+      badge: '⚔️ 5. Urgent Leaderboard Overtake Alert',
+      text: `🚨 URGENT FOR ${cName.toUpperCase()}: ${rivalEntry.city.flag} ${rName} is only ${diffPts} PTS away from us on the live world leaderboard! Let's push ${cName} to #1 today 💪\n🗳️ Tap here to add +100 PTS for ${focusEntry.city.flag} ${cName} (+150 🪙 gift included): ${targetUrl}`,
+      url: targetUrl
     },
     {
-      badge: '🟢 5. WhatsApp / Telegram Direct Friend VIP Chest Invite',
-      text: `🎁 Hey! I sent you a +150 🪙 Golden Welcome Chest + 1 Free 4D City Card on REMO World to help boost ${focusEntry.city.flag} ${cName}! Open your gift in 5 seconds here: ${vipUrl}`,
-      url: vipUrl
+      cat: 'duel',
+      badge: '⚔️ 6. Cost of Living, Safety & Culture Comparator',
+      text: `📊 ${focusEntry.city.flag} ${cName} vs ${rivalEntry.city.flag} ${rName}: compare cost of living, safety, food scene & nightlife side-by-side and vote in the 2026 World City Cup!\n🎁 Free +150 🪙 VIP bonus included: ${targetUrl}`,
+      url: targetUrl
+    },
+    // 3. GUESS THE CITY PHOTO QUIZ (3)
+    {
+      cat: 'guess',
+      badge: '🕵️ 7. Viral "90% Fail" Geography Photo Challenge (High CTR!)',
+      text: `🕵️ GEOGRAPHY CHALLENGE: 90% of people fail to guess the 3rd city in this free photo game! How many world cities can you recognize from a single photo? 🌍📸\n🎮 Play free in your browser (+150 🪙 VIP bonus): ${targetUrl}`,
+      url: targetUrl
+    },
+    {
+      cat: 'guess',
+      badge: '🕵️ 8. Reddit / GeoGuessr / Travel Trivia Lovers Post',
+      text: `🌍 Think you know the world's iconic skylines? Try the free "Guess The City" photo trivia on REMO World — instant browser play, no signup required, plus +150 🪙 free welcome gift: ${targetUrl}`,
+      url: targetUrl
+    },
+    {
+      cat: 'guess',
+      badge: '🕵️ 9. Local Spotter Mystery Photo Challenge',
+      text: `📸 Someone just posted a mystery street photo from ${focusEntry.city.flag} ${cName}! True locals recognize it in 3 seconds. Test your eye & claim +150 🪙 free: ${targetUrl}`,
+      url: targetUrl
+    },
+    // 4. 38 LIVE RADIOS (3)
+    {
+      cat: 'radio',
+      badge: '📻 10. 38 Live World City Radios (Work / Study / Drive)',
+      text: `📻 Stream 38 Live World City Radios for free (Montréal, Paris, Chișinău, Bucharest, Tokyo, NYC, London) inside a sleek ad-free 4D console! 🎶🌍\n🎁 Claim +150 🪙 free VIP coins via this link: ${targetUrl}`,
+      url: targetUrl
+    },
+    {
+      cat: 'radio',
+      badge: '📻 11. Night Drive & Global City Vibes Stream',
+      text: `🌙 Want to travel the world from your desk or car? Switch between live radio stations in ${focusEntry.city.flag} ${cName}, Paris, Tokyo and 24 world cities in 1 click:\n👉 ${targetUrl}`,
+      url: targetUrl
+    },
+    {
+      cat: 'radio',
+      badge: '🎤 12. REMO 60s World Music Contest for Artists & Fans',
+      text: `🎤 Musicians, DJs & music fans from ${focusEntry.city.flag} ${cName}: represent your city in the REMO 60-Second World Music Contest! Every citizen vote adds +100 PTS to your city:\n🏆 Listen & vote here (+150 🪙 free gift): ${targetUrl}`,
+      url: targetUrl
+    },
+    // 5. GOLD SCRATCH & 4D CARDS (2)
+    {
+      cat: 'gold',
+      badge: '🎟️ 13. Free Daily 24K Golden City Scratch-Card',
+      text: `🎟️ Scratch your free daily 24K Golden City Ticket on REMO World and win between +35 and +500 🪙 Gold Coins for ${focusEntry.city.flag} ${cName}! ✨\n🎁 Plus get an instant +150 🪙 VIP Welcome Chest here: ${targetUrl}`,
+      url: targetUrl
+    },
+    {
+      cat: 'gold',
+      badge: '🎴 14. Official City Ambassador 9:16 Diploma & 4D Cards',
+      text: `🏅 Become an Official Ambassador for ${focusEntry.city.flag} ${cName}, generate your personalized 9:16 Diploma with your photo, and open your free daily 4D City Card pack!\n🎁 Claim your +150 🪙 VIP Chest: ${targetUrl}`,
+      url: targetUrl
+    },
+    // 6. SHORT TIKTOK / WHATSAPP / TELEGRAM (2)
+    {
+      cat: 'short',
+      badge: '📲 15. Short Punchy Caption for TikTok / Insta & FB Stories',
+      text: `${focusEntry.city.flag} ${cName} is #${rank} in the world today on REMO World! 🏆 Represent our city & claim +150 🪙 + 1 Free 4D City Card (Code: ${inviteCode}) 👉 ${targetUrl}`,
+      url: targetUrl
+    },
+    {
+      cat: 'short',
+      badge: '🟢 16. WhatsApp / Telegram / Messenger Direct VIP Gift Invite',
+      text: `🎁 Hey! I sent you a +150 🪙 Golden Welcome Chest + 1 Free 4D City Card on REMO World to help boost ${focusEntry.city.flag} ${cName}! Open your gift in 5 seconds here: ${targetUrl}`,
+      url: targetUrl
     }
   ];
 
-  box.innerHTML = _viralPromoTemplatesCache.map((tpl, idx) => `
+  const visibleTemplates = _viralPromoTemplatesCache
+    .map((tpl, idx) => ({ tpl, idx }))
+    .filter((item) => _viralPromoActiveCategory === 'all' || item.tpl.cat === _viralPromoActiveCategory);
+
+  box.innerHTML = visibleTemplates.map(({ tpl, idx }) => `
     <div style="background:rgba(15,23,42,0.9);border:1px solid rgba(56,189,248,0.28);border-radius:12px;padding:10px;">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px;">
         <b style="font-size:0.76rem;color:#fde047;">${escapeHtmlStr(tpl.badge)}</b>

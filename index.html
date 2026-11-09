@@ -115,7 +115,7 @@
   <noscript><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"></noscript>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
 
-  <link rel="stylesheet" href="css/remo-core.css?v=99">
+  <link rel="stylesheet" href="css/remo-core.css?v=100">
 </head>
 <body>
 
@@ -263,9 +263,6 @@
           <button class="nav-btn" onclick="openGoldenScratchModal()" style="border-color:rgba(251,191,36,0.5);background:linear-gradient(135deg,rgba(251,191,36,0.16),rgba(236,72,153,0.1));">
             <span class="nav-ic">🎟️</span> <span style="color:#fde047;font-weight:900;" data-i18n="nav_scratch_card">Golden Scratch-Card</span>
           </button>
-          <button class="nav-btn" onclick="openViralPromoStudioModal()" style="border-color:rgba(56,189,248,0.55);background:linear-gradient(135deg,rgba(2,132,199,0.22),rgba(236,72,153,0.14));">
-            <span class="nav-ic">📣</span> <span style="color:#7dd3fc;font-weight:900;" data-i18n="nav_promo_studio">📣 Viral Promo Studio</span>
-          </button>
           <button class="nav-btn" data-nav-view="passport" onclick="switchRemoView('passport')">
             <span class="nav-ic">👤</span> <span data-i18n="nav_passport">Profil Citoyen &amp; ID</span>
           </button>
@@ -317,6 +314,7 @@
 
       <div class="glass-box" id="sidebarAdminBox" style="display:none;border-color:rgba(251,191,36,0.35);">
         <div style="font-weight:800;font-size:0.84rem;color:#fbbf24;margin-bottom:8px;">🛡️ Executive Control</div>
+        <button type="button" class="btn-cyber" style="width:100%;justify-content:center;margin-bottom:8px;background:linear-gradient(135deg,#0284c7,#6366f1);" onclick="openViralPromoStudioModal()" data-i18n="nav_promo_studio">📣 Viral Promo Studio</button>
         <a href="admin.html" class="btn-cyber btn-gold" style="width:100%;justify-content:center;" data-i18n="btn_admin_office">🛡️ Admin Office</a>
       </div>
     </aside>
@@ -354,7 +352,7 @@
           <div class="filter-row" id="feedModeChips">
             <button class="fchip active" onclick="setFeedMode('all', this)" data-i18n="filter_all">🌍 All World</button>
             <button class="fchip" onclick="openStoriesHubModal()" style="border-color:rgba(236,72,153,0.65);color:#f472b6;font-weight:900;" data-i18n="hdr_story_btn">📸 Story</button>
-            <button class="fchip" onclick="openViralPromoStudioModal()" style="border-color:rgba(56,189,248,0.65);color:#7dd3fc;font-weight:900;" data-i18n="promo_studio_chip">📣 Promo Studio</button>
+            <button class="fchip" id="feedChipAdminPromoBtn" onclick="openViralPromoStudioModal()" style="display:none;border-color:rgba(56,189,248,0.65);color:#7dd3fc;font-weight:900;">👑 <span data-i18n="promo_studio_chip">📣 Promo Studio</span></button>
             <button class="fchip" onclick="switchRemoView('contests')" style="border-color:rgba(251,191,36,0.55);color:#fde047;font-weight:900;" data-i18n="nav_contests">🏆 REMO Contests</button>
             <button class="fchip" onclick="setFeedMode('following', this)" data-i18n="filter_following">👥 Following</button>
             <button class="fchip" onclick="setFeedMode('mystery', this)" data-i18n="filter_mystery">🕵️ Guess City</button>
@@ -808,7 +806,6 @@
         <button class="btn-cyber btn-gold" onclick="document.getElementById('mobileHubModal').classList.remove('open');exportPassportStory();" style="grid-column:1/-1;justify-content:center;background:linear-gradient(135deg,#f59e0b,#ec4899);border-color:#fbbf24;color:#fff;font-weight:900;padding:10px;font-size:0.85rem;">📲 <span data-i18n="passport_share_story">Story 9:16 (TikTok &amp; Insta)</span></button>
         <button class="btn-cyber btn-gold" onclick="document.getElementById('mobileHubModal').classList.remove('open');openCityAmbassadorModal();" style="grid-column:1/-1;justify-content:center;padding:10px;font-size:0.84rem;" data-i18n="amb_diploma_btn">🏅 Official City Ambassador Diploma (+25 🪙)</button>
         <button class="btn-cyber btn-gold" onclick="document.getElementById('mobileHubModal').classList.remove('open');openGoldenScratchModal();" style="grid-column:1/-1;justify-content:center;padding:10px;font-size:0.84rem;background:linear-gradient(135deg,#f59e0b,#fbbf24);color:#090d16;font-weight:900;" data-i18n="scratch_right_btn">🎟️ Scratch &amp; Win Gold (+500 🪙)</button>
-        <button class="btn-cyber" onclick="document.getElementById('mobileHubModal').classList.remove('open');openViralPromoStudioModal();" style="grid-column:1/-1;justify-content:center;padding:10px;font-size:0.84rem;background:linear-gradient(135deg,#0284c7,#6366f1);color:#fff;font-weight:900;" data-i18n="nav_promo_studio">📣 Viral Promo Studio</button>
         <button class="btn-ghost" onclick="switchRemoView('shop')" style="border-color:#f472b6;color:#fbcfe8;">🛍️ <span data-i18n="nav_shop">VIP Boutique</span></button>
         <button class="btn-ghost" onclick="switchRemoView('passport')" style="border-color:#38bdf8;color:#bae6fd;">👤 <span data-i18n="nav_passport">Profil Citoyen &amp; ID</span></button>
         <button class="btn-ghost" onclick="document.getElementById('mobileHubModal').classList.remove('open');openAddUserCityModal();" style="border-color:#10b981;color:#6ee7b7;grid-column:1/-1;">🌍 <span data-i18n="add_city_btn">+ Add Missing City (+75 🪙)</span></button>
@@ -823,6 +820,7 @@
         <button class="btn-ghost" onclick="switchRemoView('bottles')" style="border-color:#38bdf8;color:#7dd3fc;">🍾 <span data-i18n="nav_bottles">City Bottle</span></button>
         <button class="btn-ghost" onclick="switchRemoView('wheel')">🎡 <span data-i18n="nav_wheel">Lucky Spin</span></button>
         <button class="btn-ghost" onclick="document.getElementById('mobileHubModal').classList.remove('open');openRemoRadioModal();" style="border-color:#10b981;color:#6ee7b7;"><span id="mbRadioBtnTxt">📻 Radio du Monde</span></button>
+        <button class="btn-cyber" id="mbHubPromoStudioBtn" style="display:none;grid-column:1/-1;justify-content:center;background:linear-gradient(135deg,#0284c7,#6366f1);color:#fff;font-weight:900;" onclick="document.getElementById('mobileHubModal').classList.remove('open');openViralPromoStudioModal();">👑 <span data-i18n="nav_promo_studio">📣 Viral Promo Studio</span></button>
         <button class="btn-ghost" id="mbHubAdminGodBtn" style="display:none;" onclick="document.getElementById('mobileHubModal').classList.remove('open');openAdminQuickModal();">👑 Admin Studio</button>
         <a href="admin.html" id="mbHubAdminOfficeBtn" class="btn-cyber btn-gold" style="display:none;justify-content:center;">🛡️ Admin Office</a>
         <button class="btn-ghost" onclick="document.getElementById('mobileHubModal').classList.remove('open');userSignOutAction();" style="border-color:#f43f5e;color:#fda4af;grid-column:1/-1;">🚪 Déconnexion / Sign Out</button>
@@ -1845,6 +1843,10 @@
 
       <!-- Unlocked Admin Superpowers -->
       <div id="admQuickControlsBox" style="display:none;flex-direction:column;gap:14px;">
+        <button type="button" class="btn-cyber" style="width:100%;justify-content:center;padding:12px;font-size:0.88rem;font-weight:900;background:linear-gradient(135deg,#0284c7,#6366f1);box-shadow:0 6px 20px rgba(2,132,199,0.4);" onclick="document.getElementById('adminQuickModal').classList.remove('open');openViralPromoStudioModal();">
+          👑 <span data-i18n="promo_studio_title">📣 1-Click Viral Promo Studio (FB / TikTok / Reddit / X)</span>
+        </button>
+
         <!-- 1. Direct Custom Coin Transfer to ANY Citizen -->
         <div style="background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.4);border-radius:16px;padding:14px;">
           <div style="font-weight:900;font-size:0.86rem;color:#fbbf24;margin-bottom:10px;" data-i18n="adm_transfer_hdr">🪙 Send / Set REMO Coins to Any Citizen</div>
@@ -2368,19 +2370,19 @@
     </div>
   </div>
 
-  <!-- 📣 2. 1-Click Viral Promo Studio Modal (Facebook Group 16:9 / Story 9:16 + 5 Ready-to-Post Viral Templates) -->
+  <!-- 📣 2. ADMIN-ONLY 1-Click Viral Promo Studio Modal (Custom Photo + 16:9 / 9:16 + 16 Viral Templates) -->
   <div class="remo-modal-backdrop" id="viralPromoStudioModal" onclick="if(event.target===this)this.classList.remove('open')">
-    <div class="remo-modal" style="max-width:640px;border-color:#38bdf8;">
+    <div class="remo-modal" style="max-width:680px;border-color:#38bdf8;">
       <div class="modal-hdr">
-        <b style="font-family:'Orbitron',sans-serif;color:#38bdf8;font-size:0.95rem;" data-i18n="promo_studio_title">📣 1-Click Viral Promo Studio (FB / TikTok / Reddit / X)</b>
+        <b style="font-family:'Orbitron',sans-serif;color:#38bdf8;font-size:0.95rem;">👑 <span data-i18n="promo_studio_title">📣 1-Click Viral Promo Studio (FB / TikTok / Reddit / X)</span></b>
         <button class="modal-close" onclick="document.getElementById('viralPromoStudioModal').classList.remove('open')">✕</button>
       </div>
       <p style="font-size:0.78rem;color:#cbd5e1;margin-bottom:10px;line-height:1.4;" data-i18n="promo_studio_sub">
-        Generate live city ranking banners (16:9 for Facebook Groups or 9:16 for Stories) and copy 5 ready-to-post viral texts in 1 click!
+        Generate live city ranking banners (16:9 for Facebook Groups or 9:16 for Stories), upload a custom photo onto the card/poster, and copy 16 ready-to-post viral texts!
       </p>
 
       <!-- Format + City + Theme Controls -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
         <button type="button" id="promoFmtBtn169" class="btn-cyber" style="justify-content:center;padding:8px 10px;font-size:0.76rem;font-weight:900;" onclick="setViralPromoStudioFormat('16:9')" data-i18n="promo_fmt_169">
           🖼️ 16:9 Facebook Group / Reddit Banner
         </button>
@@ -2389,7 +2391,7 @@
         </button>
       </div>
 
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
         <div>
           <select id="promoStudioCitySelect" class="remo-input" style="padding:8px 10px;font-size:0.8rem;font-weight:800;" onchange="renderViralPromoStudioAll()"></select>
         </div>
@@ -2398,8 +2400,34 @@
             <option value="ranking">🏆 Live World Ranking Alert</option>
             <option value="duel">⚔️ City vs City Pride Duel</option>
             <option value="radio">📻 38 Live Radios &amp; +150 🪙 Gift</option>
+            <option value="guess">🕵️ Guess The City Photo Challenge</option>
           </select>
         </div>
+      </div>
+
+      <!-- Custom Photo Upload on Card/Poster + Photo Layout Mode + Reset -->
+      <div style="display:grid;grid-template-columns:1.2fr 1fr auto;gap:8px;margin-bottom:8px;align-items:center;">
+        <input type="file" id="promoStudioPhotoInput" accept="image/*" style="display:none;" onchange="handlePromoStudioPhotoUpload(event)">
+        <button type="button" class="btn-ghost" style="justify-content:center;border-color:#fbbf24;color:#fde68a;font-size:0.76rem;font-weight:900;padding:8px 10px;" onclick="document.getElementById('promoStudioPhotoInput').click()" id="promoStudioUploadBtn">
+          📷 Upload Photo to Card / Poster
+        </button>
+        <select id="promoStudioPhotoModeSelect" class="remo-input" style="padding:7px 9px;font-size:0.76rem;font-weight:800;" onchange="renderViralPromoStudioCanvas()">
+          <option value="card">🎴 Photo Inside 4D Gold Card</option>
+          <option value="bg">🌆 Full-Screen Background Photo</option>
+        </select>
+        <button type="button" class="btn-ghost" id="promoStudioResetPhotoBtn" style="display:none;border-color:#f43f5e;color:#fda4af;padding:7px 10px;font-size:0.76rem;" onclick="resetPromoStudioPhoto()" title="Remove Photo">🗑️</button>
+      </div>
+
+      <!-- Optional Custom Headline on Poster + Destination Page Selector -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+        <input type="text" id="promoStudioCustomTitleInp" class="remo-input" style="padding:7px 10px;font-size:0.78rem;" placeholder="✍️ Optional custom title on poster..." oninput="renderViralPromoStudioCanvas()">
+        <select id="promoStudioDestSelect" class="remo-input" style="padding:7px 10px;font-size:0.76rem;font-weight:800;border-color:rgba(56,189,248,0.45);color:#7dd3fc;" onchange="renderViralPromoTemplatesList()">
+          <option value="home">🎯 Link: 🏠 Home + VIP Chest (+150 🪙)</option>
+          <option value="ranking">🎯 Link: 🏆 Top 24 Cities Live Ranking</option>
+          <option value="guess">🎯 Link: 🕵️ Guess The City Photo Game</option>
+          <option value="radio">🎯 Link: 📻 38 Live World Cities Radio</option>
+          <option value="versus">🎯 Link: ⚔️ City Duels Comparator</option>
+        </select>
       </div>
 
       <!-- Live Poster Canvas Preview -->
@@ -2407,7 +2435,7 @@
         <canvas id="viralPromoStudioCanvas" width="960" height="540" style="max-width:100%;max-height:270px;width:auto;height:auto;border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,0.75);"></canvas>
       </div>
 
-      <div style="display:grid;grid-template-columns:2fr 1fr;gap:8px;margin-bottom:14px;">
+      <div style="display:grid;grid-template-columns:2fr 1fr;gap:8px;margin-bottom:10px;">
         <button type="button" class="btn-cyber btn-gold" style="justify-content:center;padding:10px;font-size:0.8rem;font-weight:900;" onclick="copyAndDownloadViralPromoPoster()" data-i18n="promo_copy_img_btn">
           📋 Copy Poster Image (Ctrl+V on Facebook) &amp; Download PNG (+25 🪙)
         </button>
@@ -2416,8 +2444,11 @@
         </button>
       </div>
 
-      <!-- 5 Ready-to-Post Viral Templates -->
-      <div id="viralPromoTemplatesBox" style="display:flex;flex-direction:column;gap:8px;max-height:250px;overflow-y:auto;padding-right:4px;"></div>
+      <!-- Category Filter Tabs for 16 Viral Templates -->
+      <div id="viralPromoCatFilterBar" style="display:flex;gap:5px;overflow-x:auto;padding-bottom:6px;margin-bottom:8px;"></div>
+
+      <!-- 16 Ready-to-Post Viral Templates -->
+      <div id="viralPromoTemplatesBox" style="display:flex;flex-direction:column;gap:8px;max-height:255px;overflow-y:auto;padding-right:4px;"></div>
     </div>
   </div>
 
@@ -2431,13 +2462,13 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 
   <!-- REMO Modular Engines -->
-  <script src="js/remo-i18n.js?v=99"></script>
-  <script src="js/remo-cities-data.js?v=99"></script>
-  <script src="js/remo-store.js?v=99"></script>
-  <script src="js/remo-card-engine.js?v=99"></script>
-  <script src="js/remo-radar-arena.js?v=99"></script>
-  <script src="js/remo-social-comms.js?v=99"></script>
-  <script src="js/remo-radio-engine.js?v=99"></script>
+  <script src="js/remo-i18n.js?v=100"></script>
+  <script src="js/remo-cities-data.js?v=100"></script>
+  <script src="js/remo-store.js?v=100"></script>
+  <script src="js/remo-card-engine.js?v=100"></script>
+  <script src="js/remo-radar-arena.js?v=100"></script>
+  <script src="js/remo-social-comms.js?v=100"></script>
+  <script src="js/remo-radio-engine.js?v=100"></script>
 
   <noscript>
     <nav aria-label="REMO World Static Directory" style="padding:20px;background:#050816;color:#f8fafc;">
