@@ -572,19 +572,35 @@ function claimPostFeedBounty(postId) {
   }
 }
 
-function handleVersusMediaSelect(side, ev) {
+async function handleVersusMediaSelect(side, ev) {
   const file = ev.target.files && ev.target.files[0];
   if (!file) return;
-  const reader = new FileReader();
-  reader.onload = (e) => {
-    pendingVersusMedia[side] = e.target.result;
-    const prev = document.getElementById(side === 'left' ? 'versusLeftPreview' : 'versusRightPreview');
+  const prev = document.getElementById(side === 'left' ? 'versusLeftPreview' : 'versusRightPreview');
+  if (prev) {
+    prev.style.display = 'block';
+    prev.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;font-size:0.75rem;color:#38bdf8;">⏳ Optimizing...</div>`;
+  }
+  try {
+    let compressedUrl = '';
+    if (typeof window.compressImageFileToDataUrl === 'function') {
+      compressedUrl = await window.compressImageFileToDataUrl(file, 960, 0.78);
+    }
+    if (!compressedUrl) {
+      compressedUrl = await new Promise((res) => {
+        const rd = new FileReader();
+        rd.onload = (e) => res(e.target.result);
+        rd.onerror = () => res('');
+        rd.readAsDataURL(file);
+      });
+    }
+    pendingVersusMedia[side] = compressedUrl;
     if (prev) {
       prev.style.display = 'block';
-      prev.innerHTML = `<img src="${e.target.result}" style="width:100%;height:100%;object-fit:cover;">`;
+      prev.innerHTML = `<img src="${compressedUrl}" style="width:100%;height:100%;object-fit:cover;">`;
     }
-  };
-  reader.readAsDataURL(file);
+  } catch (err) {
+    console.warn('handleVersusMediaSelect error:', err);
+  }
 }
 
 function toggleCustomCapsuleMinutesInp(val) {
@@ -3320,6 +3336,15 @@ function openCreatePostModal(prefillTag = '') {
   pendingPostVoiceBlob = null;
   pendingPostVoiceDataUrl = '';
   pendingPostGpsVerified = false;
+  pendingVersusMedia = { left: '', right: '' };
+  const vLPrev = document.getElementById('versusLeftPreview');
+  if (vLPrev) { vLPrev.style.display = 'none'; vLPrev.innerHTML = ''; }
+  const vRPrev = document.getElementById('versusRightPreview');
+  if (vRPrev) { vRPrev.style.display = 'none'; vRPrev.innerHTML = ''; }
+  const fLInp = document.getElementById('createVersusLeftFile');
+  if (fLInp) fLInp.value = '';
+  const fRInp = document.getElementById('createVersusRightFile');
+  if (fRInp) fRInp.value = '';
 
   const sel = document.getElementById('createCitySelect');
   const lang = REMO_I18N.getLang();
@@ -4079,11 +4104,17 @@ async function publishNewRemoPost() {
     const durationHours = Math.max(1, Number(document.getElementById('createVersusDuration')?.value || 24));
     const cat = document.getElementById('createVersusCategory')?.value || 'general';
     const now = Date.now();
+    let leftImg = pendingVersusMedia.left || generateCityPostVisualDataUrl(lC, getCityName(getCityById(lC), 'en'));
+    let rightImg = pendingVersusMedia.right || generateCityPostVisualDataUrl(rC, getCityName(getCityById(rC), 'en'));
+    if (typeof compressImageFileToDataUrl === 'function') {
+      if (leftImg && leftImg.length > 180000) leftImg = await compressImageFileToDataUrl(leftImg, 960, 0.76);
+      if (rightImg && rightImg.length > 180000) rightImg = await compressImageFileToDataUrl(rightImg, 960, 0.76);
+    }
     newPost.versus = {
       leftCityId: lC,
       rightCityId: rC,
-      leftMedia: pendingVersusMedia.left || generateCityPostVisualDataUrl(lC, getCityName(getCityById(lC), 'en')),
-      rightMedia: pendingVersusMedia.right || generateCityPostVisualDataUrl(rC, getCityName(getCityById(rC), 'en')),
+      leftMedia: leftImg,
+      rightMedia: rightImg,
       leftVotes: 0,
       rightVotes: 0,
       durationHours,

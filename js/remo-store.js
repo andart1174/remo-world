@@ -648,11 +648,8 @@ const RemoMediaDB = {
 async function compressImageFileToDataUrl(fileOrBlob, maxDim = 1080, quality = 0.76) {
   return new Promise((resolve) => {
     if (!fileOrBlob) return resolve('');
-    if (typeof fileOrBlob === 'string' && fileOrBlob.startsWith('data:image')) {
-      return resolve(fileOrBlob);
-    }
-    const reader = new FileReader();
-    reader.onload = (ev) => {
+
+    const doCompressImg = (srcUrl) => {
       const img = new Image();
       img.onload = () => {
         let w = img.width;
@@ -674,9 +671,17 @@ async function compressImageFileToDataUrl(fileOrBlob, maxDim = 1080, quality = 0
         const dataUrl = canvas.toDataURL('image/jpeg', quality);
         resolve(dataUrl);
       };
-      img.onerror = () => resolve(ev.target.result || '');
-      img.src = ev.target.result;
+      img.onerror = () => resolve(srcUrl || '');
+      img.src = srcUrl;
     };
+
+    if (typeof fileOrBlob === 'string' && fileOrBlob.startsWith('data:image')) {
+      if (fileOrBlob.length < 180000) return resolve(fileOrBlob);
+      return doCompressImg(fileOrBlob);
+    }
+
+    const reader = new FileReader();
+    reader.onload = (ev) => doCompressImg(ev.target.result);
     reader.onerror = () => resolve('');
     reader.readAsDataURL(fileOrBlob);
   });
