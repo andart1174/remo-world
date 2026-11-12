@@ -1593,7 +1593,20 @@ function triggerCityPackOpening(isPaid = false) {
 }
 
 function inspectCardById(cardId) {
-  const c = REMO_STORE.state.droppedCardsPool.find((x) => x.id === cardId);
+  if (!cardId) return;
+  const pool = Array.isArray(REMO_STORE.state.droppedCardsPool) ? REMO_STORE.state.droppedCardsPool : [];
+  let c = pool.find((x) => x && x.id === cardId);
+  if (!c) {
+    const u = REMO_STORE.getCurrentUser();
+    if (u) {
+      const userCards = REMO_STORE.getUserCards(u.uid);
+      c = userCards.find((x) => x && x.id === cardId);
+    }
+  }
+  if (!c) {
+    const auc = (REMO_STORE.state.auctions || []).find((a) => a && a.cardSpec && (a.cardSpec.id === cardId || a.id === cardId));
+    if (auc && auc.cardSpec) c = auc.cardSpec;
+  }
   if (c) inspectCardModal(c);
 }
 
@@ -1628,12 +1641,25 @@ function inspectCardModal(cardSpec) {
   if (!ov || !fCv || !bCv) return;
 
   const isOwner = isCurrentUserOwnerOfCard(cardSpec);
+  const inAuc = isCardAlreadyInAuction(cardSpec);
+  const lang = REMO_I18N.getLang();
   const expBtn = document.getElementById('btnInspectCardExportStory');
   const qrBtn = document.getElementById('btnInspectCardTradeQR');
   const aucBtn = document.getElementById('btnInspectCardAuction');
   if (expBtn) expBtn.style.display = isOwner ? '' : 'none';
   if (qrBtn) qrBtn.style.display = isOwner ? '' : 'none';
-  if (aucBtn) aucBtn.style.display = isOwner ? '' : 'none';
+  if (aucBtn) {
+    aucBtn.style.display = isOwner ? '' : 'none';
+    if (inAuc) {
+      aucBtn.disabled = true;
+      aucBtn.style.opacity = '0.55';
+      aucBtn.textContent = lang === 'fr' ? '🔨 Déjà en Enchère' : '🔨 Already in Auction';
+    } else {
+      aucBtn.disabled = false;
+      aucBtn.style.opacity = '1';
+      aucBtn.textContent = lang === 'fr' ? '🔨 Mettre aux Enchères' : '🔨 List in Auction';
+    }
+  }
 
   if (flipper) flipper.classList.remove('flipped');
   renderCityCardFront(fCv, cardSpec);
@@ -1672,7 +1698,7 @@ function showInspectedCardTradeQR() {
   );
 }
 
-function listInspectedCardInAuction() {
+async function listInspectedCardInAuction() {
   if (!activeInspectedCard) return;
   const lang = REMO_I18N.getLang();
   const u = REMO_STORE.getCurrentUser();
@@ -1730,12 +1756,21 @@ function listInspectedCardInAuction() {
     delete cleanSpec._loadingPhoto;
     delete cleanSpec._photoFailed;
     delete cleanSpec._photoTainted;
+
+    // Compress custom photo if base64 data URL so payload easily fits in LocalStorage & Firestore
+    if (cleanSpec.customPhotoDataUrl && cleanSpec.customPhotoDataUrl.startsWith('data:image') && cleanSpec.customPhotoDataUrl.length > 50000) {
+      if (typeof window.compressImageFileToDataUrl === 'function') {
+        try {
+          cleanSpec.customPhotoDataUrl = await window.compressImageFileToDataUrl(cleanSpec.customPhotoDataUrl, 320, 0.75);
+        } catch (e) {}
+      }
+    }
   }
 
   const now = Date.now();
   const endsAt = now + durHours * 3600 * 1000;
 
-  REMO_STORE.state.auctions.unshift({
+  const newAuctionItem = {
     id: 'auc_' + now,
     cardSpec: cleanSpec,
     sellerUid: u.uid,
@@ -1746,7 +1781,12 @@ function listInspectedCardInAuction() {
     createdAt: now,
     endsAt: endsAt,
     durationHours: durHours
-  });
+  };
+
+  REMO_STORE.state.auctions.unshift(newAuctionItem);
+  if (typeof REMO_STORE.backupAuctionsToStorage === 'function') {
+    REMO_STORE.backupAuctionsToStorage();
+  }
   REMO_STORE.save(true, 'auction_new');
   if (typeof REMO_STORE.syncToFirestore === 'function') {
     REMO_STORE.syncToFirestore('auction_new', true);
@@ -1872,7 +1912,7 @@ function drawOfficialCitizenIdCard(cv, u, lang) {
   ctx.fillStyle = '#38bdf8';
   ctx.fillText(`ID #${u.passportNum || '0001'}`, 1020, 80);
 
-  // Left Avatar Emblem
+  // Left Avatar Emblem (Initial letter fallback + HD Custom Photo)
   ctx.save();
   ctx.beginPath();
   ctx.arc(138, 235, 68, 0, Math.PI * 2);
@@ -1887,6 +1927,52 @@ function drawOfficialCitizenIdCard(cv, u, lang) {
   ctx.textBaseline = 'middle';
   ctx.fillText(String((u.name || 'R')[0]).toUpperCase(), 138, 238);
   ctx.restore();
+
+  const citizenAvatarSrc = (u && u.avatarUrl) ||
+    (u && u.uid && typeof REMO_STORE !== 'undefined' && REMO_STORE.getUserAvatar ? REMO_STORE.getUserAvatar(u.uid) : '') ||
+    (u && u.name && typeof REMO_STORE !== 'undefined' && REMO_STORE.getUserAvatar ? REMO_STORE.getUserAvatar(u.name) : '') ||
+    (u && u.uid ? localStorage.getItem('remo_avatar_' + u.uid) : '') || '';
+
+  if (citizenAvatarSrc) {
+    const paintAvatarOnIdCanvas = (img) => {
+      try {
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(138, 235, 68, 0, Math.PI * 2);
+        ctx.closePath();
+        ctx.clip();
+        ctx.drawImage(img, 70, 167, 136, 136);
+        ctx.restore();
+
+        // Crisp Gold Ring Border with glow over the clipped photo
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(138, 235, 68, 0, Math.PI * 2);
+        ctx.lineWidth = 6;
+        ctx.strokeStyle = '#fbbf24';
+        ctx.shadowColor = 'rgba(251,191,36,0.6)';
+        ctx.shadowBlur = 10;
+        ctx.stroke();
+        ctx.restore();
+      } catch (e) {}
+    };
+
+    if (window._cachedCitizenAvatarImg && window._cachedCitizenAvatarImg.src === citizenAvatarSrc && window._cachedCitizenAvatarImg.complete && window._cachedCitizenAvatarImg.naturalWidth > 0) {
+      paintAvatarOnIdCanvas(window._cachedCitizenAvatarImg);
+    } else {
+      const aImg = new Image();
+      aImg.crossOrigin = 'anonymous';
+      aImg.onload = () => {
+        window._cachedCitizenAvatarImg = aImg;
+        paintAvatarOnIdCanvas(aImg);
+      };
+      aImg.src = citizenAvatarSrc;
+      if (aImg.complete && aImg.naturalWidth > 0) {
+        window._cachedCitizenAvatarImg = aImg;
+        paintAvatarOnIdCanvas(aImg);
+      }
+    }
+  }
 
   // Citizen Identity Info
   ctx.textAlign = 'left';
@@ -2146,9 +2232,11 @@ function saveUserProfile(event) {
   // Apply new avatar photo or removal
   if (window._pendingProfileAvatar === null) {
     delete u.avatarUrl;
+    window._cachedCitizenAvatarImg = null;
     try { localStorage.removeItem('remo_avatar_' + u.uid); } catch (e) {}
   } else if (typeof window._pendingProfileAvatar === 'string' && window._pendingProfileAvatar) {
     u.avatarUrl = window._pendingProfileAvatar;
+    window._cachedCitizenAvatarImg = null;
     try { localStorage.setItem('remo_avatar_' + u.uid, u.avatarUrl); } catch (e) {}
   }
   window._pendingProfileAvatar = undefined;
@@ -2347,8 +2435,8 @@ function renderPassportView() {
         <div class="prof-stat-badge">
           💬 <b>${partnerList.length}</b> Discussions
         </div>
-        <div class="prof-stat-badge">
-          🎴 <b>${(u.cards || []).length}</b> ${lang === 'fr' ? 'Cartes 4D' : '4D Cards'}
+        <div class="prof-stat-badge" style="cursor:pointer;" onclick="setPassportTab('inventory')" title="${lang === 'fr' ? 'Voir ma collection de cartes 4D' : 'View 4D Cards collection'}">
+          🎴 <b>${REMO_STORE.getUserCards(u.uid).length}</b> ${lang === 'fr' ? 'Cartes 4D' : '4D Cards'}
         </div>
         <div class="prof-stat-badge">
           🛂 <b>${(u.visas || []).length} / ${allCities.length}</b> ${lang === 'fr' ? 'Visas GPS' : 'Visas'}
@@ -2597,7 +2685,7 @@ function renderPassportView() {
     // Inventory: Frames & Titles & 4D Cards
     const ownedIds = Array.isArray(u.ownedShopItems) ? u.ownedShopItems : [];
     const ownedItems = allShopItems.filter((it) => ownedIds.includes(it.id));
-    const userCards = Array.isArray(u.cards) ? u.cards : [];
+    const userCards = REMO_STORE.getUserCards(u.uid);
 
     html += `
       <div class="glass-box" style="margin-bottom:16px;">
@@ -2652,13 +2740,15 @@ function renderPassportView() {
           </div>
         ` : `
           <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;">
-            ${userCards.slice(0, 12).map((c) => {
+            ${userCards.slice(0, 36).map((c) => {
               const cCity = getCityById(c.cityId);
+              const inAuc = isCardAlreadyInAuction(c);
               return `
-                <div style="padding:10px;border-radius:12px;background:rgba(255,255,255,0.03);border:1px solid var(--border);text-align:center;cursor:pointer;" onclick="inspectCardById('${c.id}')">
+                <div style="padding:10px;border-radius:12px;background:rgba(255,255,255,0.03);border:1px solid ${inAuc ? 'rgba(251,191,36,0.6)' : 'var(--border)'};text-align:center;cursor:pointer;position:relative;" onclick="inspectCardById('${c.id}')">
                   <div style="font-size:1.6rem;">${cCity.flag}</div>
                   <b style="font-size:0.78rem;color:#fff;">${getCityName(cCity, lang)}</b>
                   <div style="font-size:0.68rem;color:#fbbf24;font-weight:900;margin-top:2px;">#${c.serial} · ${c.rarity}</div>
+                  ${inAuc ? `<div style="font-size:0.65rem;color:#fbbf24;font-weight:900;margin-top:4px;background:rgba(251,191,36,0.14);border:1px solid rgba(251,191,36,0.4);border-radius:6px;padding:2px 4px;">🔨 ${lang === 'fr' ? 'En Enchère' : 'In Auction'}</div>` : ''}
                 </div>
               `;
             }).join('')}

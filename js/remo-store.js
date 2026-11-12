@@ -2488,6 +2488,29 @@ const REMO_STORE = {
     if (Array.isArray(this.state.auctions) && this.deletedAuctionIds && this.deletedAuctionIds.size > 0) {
       this.state.auctions = this.state.auctions.filter((a) => a && a.id && !this.deletedAuctionIds.has(a.id));
     }
+    // Ensure active card auctions are preserved from dedicated local backup across refresh
+    try {
+      const rawAucBackup = localStorage.getItem('remo_local_auctions_backup');
+      if (rawAucBackup) {
+        const backupAuctions = JSON.parse(rawAucBackup);
+        if (Array.isArray(backupAuctions) && backupAuctions.length > 0) {
+          if (!Array.isArray(this.state.auctions) || this.state.auctions.length === 0) {
+            this.state.auctions = backupAuctions.filter((a) => a && a.id && (!this.deletedAuctionIds || !this.deletedAuctionIds.has(a.id)));
+          } else {
+            backupAuctions.forEach((ba) => {
+              if (ba && ba.id && (!this.deletedAuctionIds || !this.deletedAuctionIds.has(ba.id))) {
+                const idx = this.state.auctions.findIndex((a) => a && a.id === ba.id);
+                if (idx === -1) {
+                  this.state.auctions.push(ba);
+                } else if (Number(ba.currentBid || 0) > Number(this.state.auctions[idx].currentBid || 0)) {
+                  this.state.auctions[idx] = ba;
+                }
+              }
+            });
+          }
+        }
+      }
+    } catch (e) {}
     // Strip out deleted stories, legacy demo stories (st_1..st_4), and stories older than 24 hours (86400000 ms)
     const nowInitTs = Date.now();
     if (Array.isArray(this.state.stories)) {
@@ -2703,6 +2726,15 @@ const REMO_STORE = {
           if (Array.isArray(diskState.auctions) && this.deletedAuctionIds && this.deletedAuctionIds.size > 0) {
             diskState.auctions = diskState.auctions.filter((a) => a && a.id && !this.deletedAuctionIds.has(a.id));
           }
+          // Never discard newer in-memory auctions when reloading from disk
+          const memAuctions = this.state.auctions || [];
+          if (Array.isArray(diskState.auctions)) {
+            memAuctions.forEach((ma) => {
+              if (ma && ma.id && !diskState.auctions.some((da) => da.id === ma.id) && (!this.deletedAuctionIds || !this.deletedAuctionIds.has(ma.id))) {
+                diskState.auctions.unshift(ma);
+              }
+            });
+          }
           // Never discard newer in-memory posts when reloading from disk
           const memPosts = this.state.posts || [];
           if (Array.isArray(diskState.posts)) {
@@ -2761,8 +2793,14 @@ const REMO_STORE = {
           // Keep top 20 posts in localStorage; full posts live safely in Firestore remo_posts
           pruned.posts = pruned.posts.slice(0, 20);
         }
+        if (Array.isArray(pruned.auctions)) {
+          pruned.auctions = pruned.auctions.map((a) => this.sanitizeAuctionItem(a)).filter(Boolean);
+        }
         localStorage.setItem(this.KEY, JSON.stringify(pruned));
       } catch (e2) {}
+    }
+    if (reason && (reason.startsWith('auction') || reason === 'update')) {
+      this.backupAuctionsToStorage();
     }
     if (this.fbDb && reason !== 'cloud_sync' && reason !== 'cloud_live_update') {
       this.syncToFirestore(reason);
@@ -3565,7 +3603,26 @@ const REMO_STORE = {
 
   getUserCards(uid) {
     if (!uid) return [];
-    return this.state.droppedCardsPool.filter((c) => c.ownerUid === uid);
+    const pool = Array.isArray(this.state.droppedCardsPool) ? this.state.droppedCardsPool : [];
+    const u = (this.state.users || []).find((x) => x && x.uid === uid) || (this.getCurrentUser()?.uid === uid ? this.getCurrentUser() : null);
+    const uName = u ? (u.name || '').trim().toLowerCase() : '';
+    const poolCards = pool.filter((c) => {
+      if (!c) return false;
+      if (c.ownerUid && c.ownerUid === uid) return true;
+      if (uName && c.owner && String(c.owner).trim().toLowerCase() === uName) return true;
+      if (uName && c.ownerName && String(c.ownerName).trim().toLowerCase() === uName) return true;
+      if (uName && c.subtitle && String(c.subtitle).toLowerCase().includes('moment by ' + uName)) return true;
+      return false;
+    });
+    const directCards = (u && Array.isArray(u.cards)) ? u.cards : [];
+    const map = new Map();
+    poolCards.concat(directCards).forEach((c) => {
+      if (c && (c.id || c.serial)) {
+        const key = c.id || (c.cityId + '_' + c.serial);
+        map.set(key, c);
+      }
+    });
+    return Array.from(map.values());
   },
 
   /* ── Detect Social In-App Browser (TikTok, Instagram, FB) ── */
@@ -6471,6 +6528,18 @@ const REMO_STORE = {
     return { ok: true, totalPaid, holdersCount, creatorName: stock.creatorName };
   },
 
+  backupAuctionsToStorage() {
+    try {
+      if (Array.isArray(this.state.auctions)) {
+        const clean = this.state.auctions
+          .filter((a) => a && a.id && (!this.deletedAuctionIds || !this.deletedAuctionIds.has(a.id)))
+          .map((a) => this.sanitizeAuctionItem(a))
+          .filter(Boolean);
+        localStorage.setItem('remo_local_auctions_backup', JSON.stringify(clean));
+      }
+    } catch (e) {}
+  },
+
   sanitizeAuctionItem(a) {
     if (!a || !a.cardSpec) return null;
     const cs = a.cardSpec;
@@ -6489,8 +6558,10 @@ const REMO_STORE = {
       sellerName: a.sellerName || cs.ownerName || 'Citizen',
       currentBid: Number(a.currentBid || 250),
       highestBidder: a.highestBidder || '—',
+      highestBidderUid: a.highestBidderUid || '',
       createdAt: Number(a.createdAt || Date.now()),
       endsAt: Number(a.endsAt || (Date.now() + 24 * 3600 * 1000)),
+      durationHours: Number(a.durationHours || 24),
       cardSpec: {
         id: cs.id || ('card_' + Date.now()),
         postId: cs.postId || '',
@@ -6538,6 +6609,10 @@ const REMO_STORE = {
         if (Number(cleanLa.currentBid || 0) > Number(existing.currentBid || 0)) {
           existing.currentBid = cleanLa.currentBid;
           existing.highestBidder = cleanLa.highestBidder;
+          existing.highestBidderUid = cleanLa.highestBidderUid;
+        }
+        if (!existing.durationHours && cleanLa.durationHours) {
+          existing.durationHours = cleanLa.durationHours;
         }
         if (!existing.cardSpec.customPhotoDataUrl && cleanLa.cardSpec.customPhotoDataUrl) {
           existing.cardSpec.customPhotoDataUrl = cleanLa.cardSpec.customPhotoDataUrl;
@@ -6546,6 +6621,7 @@ const REMO_STORE = {
     });
 
     this.state.auctions = Array.from(map.values());
+    this.backupAuctionsToStorage();
     if (localUnsyncedAdded) {
       this.syncToFirestore('auction_resync', true);
     }
@@ -6559,6 +6635,7 @@ const REMO_STORE = {
       localStorage.setItem('remo_deleted_auctions', JSON.stringify([...this.deletedAuctionIds]));
     } catch (e) {}
     this.state.auctions = (this.state.auctions || []).filter((x) => x && x.id !== aucId);
+    this.backupAuctionsToStorage();
     this.save(true, 'auction_delete');
     this.syncToFirestore('auction_delete', true);
   },
