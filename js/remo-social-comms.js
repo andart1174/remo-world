@@ -799,7 +799,7 @@ function renderPostCardBack(p, city, lang, wx) {
   const royalTitle = lang === 'fr' ? (cosm.title_fr || '') : (cosm.title_en || '');
   const cityName = getCityName(city, lang);
   const authorUser = (REMO_STORE.state.users || []).find((usr) => usr && ((p.uid && usr.uid === p.uid) || (p.authorName && usr.name && usr.name.toLowerCase() === p.authorName.toLowerCase())));
-  const authorAvatarUrl = p.authorAvatar || (authorUser && authorUser.avatarUrl) || '';
+  const authorAvatarUrl = p.authorAvatar || (typeof REMO_STORE.getUserAvatar === 'function' ? REMO_STORE.getUserAvatar(p.uid || p.authorName) : '') || (authorUser && authorUser.avatarUrl) || '';
 
   // Dynamic collectible scores
   const likesCount = Array.isArray(p.likes) ? p.likes.length : (typeof p.likes === 'number' ? p.likes : 0);
@@ -1539,7 +1539,7 @@ function renderSinglePostCardHtml(p, lang, u, isAdm) {
     const cosm = (REMO_STORE && REMO_STORE.getUserCosmetics) ? REMO_STORE.getUserCosmetics(p.uid) : { frameClass: '', title_fr: '', title_en: '' };
     const royalTitle = lang === 'fr' ? (cosm.title_fr || '') : (cosm.title_en || '');
     const authorUser = (REMO_STORE.state.users || []).find((usr) => usr && ((p.uid && usr.uid === p.uid) || (p.authorName && usr.name && usr.name.toLowerCase() === p.authorName.toLowerCase())));
-    const authorAvatarUrl = p.authorAvatar || (authorUser && authorUser.avatarUrl) || '';
+    const authorAvatarUrl = p.authorAvatar || (typeof REMO_STORE.getUserAvatar === 'function' ? REMO_STORE.getUserAvatar(p.uid || p.authorName) : '') || (authorUser && authorUser.avatarUrl) || '';
     const dualPair = hiddenByCapsule
       ? { en: `🔒 ${p.capsuleTeaser_en || teaserTxt}`, fr: `🔒 ${p.capsuleTeaser_fr || teaserTxt}` }
       : buildPostBilingualPair(p);
@@ -6710,7 +6710,7 @@ function openPostActionsSheet(postId) {
   const dualPair = buildPostBilingualPair(p);
   const rawCap = String((lang === 'fr' ? (p.caption_fr || p.caption_en) : (p.caption_en || p.caption_fr)) || '').replace(/^(?:🇬🇧|🇫🇷)\s+/u, '');
   const authorUser = (REMO_STORE.state.users || []).find((usr) => usr && ((p.uid && usr.uid === p.uid) || (p.authorName && usr.name && usr.name.toLowerCase() === p.authorName.toLowerCase())));
-  const authorAvatarUrl = p.authorAvatar || (authorUser && authorUser.avatarUrl) || '';
+  const authorAvatarUrl = p.authorAvatar || (typeof REMO_STORE.getUserAvatar === 'function' ? REMO_STORE.getUserAvatar(p.uid || p.authorName) : '') || (authorUser && authorUser.avatarUrl) || '';
 
   content.innerHTML = `
     <div class="modal-hdr">
@@ -10128,10 +10128,12 @@ function openCitizenProfileModal(uidOrName, fallbackName = '', silentIfMissing =
     shareHdrBtn.onclick = () => shareCitizenProfileLink(target.name || target.uid);
   }
 
+  const targetAvatarUrl = target.avatarUrl || (typeof REMO_STORE.getUserAvatar === 'function' ? REMO_STORE.getUserAvatar(target.uid || target.name) : '') || localStorage.getItem('remo_avatar_' + target.uid) || '';
+
   body.innerHTML = `
     <div class="public-profile-hero">
       <div class="pp-avatar-lg ${cosm.frameClass || ''}" style="overflow:hidden;padding:0;position:relative;">
-        ${target.avatarUrl ? `<img src="${target.avatarUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block;" alt="${escapeHtmlStr(target.name)}">` : escapeHtmlStr((target.name || 'R')[0].toUpperCase())}
+        ${targetAvatarUrl ? `<img src="${targetAvatarUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block;" alt="${escapeHtmlStr(target.name)}">` : escapeHtmlStr((target.name || 'R')[0].toUpperCase())}
         ${onlineNow ? '<span class="online-pulse-dot" style="position:absolute;bottom:2px;right:2px;border:2px solid #070b18;"></span>' : ''}
       </div>
       <div style="flex:1;min-width:180px;">

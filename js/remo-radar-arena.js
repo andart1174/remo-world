@@ -2146,10 +2146,16 @@ function saveUserProfile(event) {
   // Apply new avatar photo or removal
   if (window._pendingProfileAvatar === null) {
     delete u.avatarUrl;
+    try { localStorage.removeItem('remo_avatar_' + u.uid); } catch (e) {}
   } else if (typeof window._pendingProfileAvatar === 'string' && window._pendingProfileAvatar) {
     u.avatarUrl = window._pendingProfileAvatar;
+    try { localStorage.setItem('remo_avatar_' + u.uid, u.avatarUrl); } catch (e) {}
   }
   window._pendingProfileAvatar = undefined;
+
+  if (u.bio) {
+    try { localStorage.setItem('remo_bio_' + u.uid, u.bio); } catch (e) {}
+  }
 
   // Sync user object in state.users
   if (Array.isArray(REMO_STORE.state.users)) {
@@ -2176,6 +2182,9 @@ function saveUserProfile(event) {
         p.authorName = newName;
         if (u.avatarUrl) p.authorAvatar = u.avatarUrl;
         else delete p.authorAvatar;
+        if (typeof REMO_STORE.syncPostToCloud === 'function') {
+          REMO_STORE.syncPostToCloud(p);
+        }
       }
       if (Array.isArray(p.comments)) {
         p.comments.forEach((c) => {
@@ -2201,6 +2210,9 @@ function saveUserProfile(event) {
   });
 
   REMO_STORE.save(true, 'profile_updated');
+  if (typeof REMO_STORE.syncUserToCloud === 'function') {
+    REMO_STORE.syncUserToCloud(u);
+  }
   if (typeof REMO_STORE.syncToFirestore === 'function') {
     REMO_STORE.syncToFirestore('profile_updated', true);
   }
@@ -2223,6 +2235,7 @@ function renderPassportView() {
   if (!box) return;
   const lang = REMO_I18N.getLang();
   const u = REMO_STORE.getCurrentUser() || REMO_STORE.ensureGuestOrCitizen('REMO Pioneer', '', 'montreal');
+  const userAvatar = u.avatarUrl || (typeof REMO_STORE.getUserAvatar === 'function' ? REMO_STORE.getUserAvatar(u.uid) : '') || localStorage.getItem('remo_avatar_' + u.uid) || '';
   const home = getCityById(u.homeCity || 'montreal');
   const allCities = getRemoCities();
   const refCode = u.referralCode || `REMO-${u.passportNum}`;
@@ -2284,7 +2297,7 @@ function renderPassportView() {
       <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px;">
         <div style="display:flex;align-items:center;gap:16px;min-width:0;">
           <div class="avatar-circle ${frameClass}" style="width:68px;height:68px;font-size:1.75rem;flex-shrink:0;overflow:hidden;padding:0;position:relative;">
-            ${u.avatarUrl ? `<img src="${u.avatarUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block;" alt="${escapeHtmlStr(u.name)}">` : escapeHtmlStr((u.name || 'R')[0].toUpperCase())}
+            ${userAvatar ? `<img src="${userAvatar}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block;" alt="${escapeHtmlStr(u.name)}">` : escapeHtmlStr((u.name || 'R')[0].toUpperCase())}
           </div>
           <div style="min-width:0;">
             <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">

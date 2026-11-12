@@ -2523,6 +2523,19 @@ const REMO_STORE = {
         !(u.email && /^citizen\d+@remo\.world$/i.test(u.email) && u.role !== 'admin') &&
         !(u.name && u.name.startsWith('REMO Pioneer #'))
       );
+      // Restore any cached avatars or bios from dedicated local storage
+      this.state.users.forEach((u) => {
+        if (u && u.uid) {
+          if (!u.avatarUrl) {
+            const cachedAvatar = localStorage.getItem('remo_avatar_' + u.uid);
+            if (cachedAvatar) u.avatarUrl = cachedAvatar;
+          }
+          if (!u.bio) {
+            const cachedBio = localStorage.getItem('remo_bio_' + u.uid);
+            if (cachedBio) u.bio = cachedBio;
+          }
+        }
+      });
     }
     upgradeEcosystemState(this.state);
     if (this.state && this.state.settings && this.state.settings.adminPin) {
@@ -2771,7 +2784,38 @@ const REMO_STORE = {
   getCurrentUser() {
     const uid = localStorage.getItem(this.USER_KEY);
     if (!uid) return null;
-    return this.state.users.find((u) => u.uid === uid) || null;
+    const u = this.state.users.find((x) => x.uid === uid) || null;
+    if (u && !u.avatarUrl) {
+      const cachedAvatar = localStorage.getItem('remo_avatar_' + u.uid);
+      if (cachedAvatar) u.avatarUrl = cachedAvatar;
+    }
+    return u;
+  },
+
+  getUserAvatar(uidOrName) {
+    if (!uidOrName) return '';
+    const clean = String(uidOrName).trim().toLowerCase();
+    const u = (this.state.users || []).find((x) =>
+      x && ((x.uid && x.uid.toLowerCase() === clean) || (x.name && x.name.toLowerCase() === clean))
+    );
+    if (u && u.avatarUrl) return u.avatarUrl;
+    if (u && u.uid) {
+      const cached = localStorage.getItem('remo_avatar_' + u.uid);
+      if (cached) {
+        u.avatarUrl = cached;
+        return cached;
+      }
+    }
+    const curU = this.getCurrentUser();
+    if (curU && (curU.uid.toLowerCase() === clean || (curU.name && curU.name.toLowerCase() === clean))) {
+      if (curU.avatarUrl) return curU.avatarUrl;
+      const cached = localStorage.getItem('remo_avatar_' + curU.uid);
+      if (cached) {
+        curU.avatarUrl = cached;
+        return cached;
+      }
+    }
+    return '';
   },
 
   getUserCosmetics(uid) {
@@ -2950,6 +2994,8 @@ const REMO_STORE = {
       const cleanUser = {
         uid: user.uid,
         name: user.name || 'Citizen',
+        avatarUrl: user.avatarUrl || localStorage.getItem('remo_avatar_' + user.uid) || '',
+        bio: user.bio || localStorage.getItem('remo_bio_' + user.uid) || '',
         email: user.email || '',
         role: user.role || 'citizen',
         verified: Boolean(user.verified),
@@ -3968,6 +4014,19 @@ const REMO_STORE = {
             this.fbDb.collection('remo_users').doc(uData.uid).delete().catch(() => {});
             return;
           }
+          // Preserve avatarUrl and bio from local cache/memory if Firestore document doesn't have them yet
+          const existingLocal = (this.state.users || []).find((x) => x && x.uid === uData.uid);
+          const cachedAvatar = (existingLocal && existingLocal.avatarUrl) || localStorage.getItem('remo_avatar_' + uData.uid) || '';
+          if (!uData.avatarUrl && cachedAvatar) {
+            uData.avatarUrl = cachedAvatar;
+            this.fbDb.collection('remo_users').doc(uData.uid).set({ avatarUrl: cachedAvatar }, { merge: true }).catch(() => {});
+          } else if (uData.avatarUrl) {
+            try { localStorage.setItem('remo_avatar_' + uData.uid, uData.avatarUrl); } catch (e) {}
+          }
+          if (!uData.bio && existingLocal && existingLocal.bio) {
+            uData.bio = existingLocal.bio;
+          }
+
           cloudUsers.push(uData);
           cloudUserIds.add(uData.uid);
         });
@@ -3975,9 +4034,16 @@ const REMO_STORE = {
         // Current active user
         const curU = this.getCurrentUser();
         const activeUsers = [...cloudUsers];
-        if (curU && !cloudUserIds.has(curU.uid) && !this.deletedUserIds?.has(curU.uid)) {
-          if (!/^citizen\d+@remo\.world$/i.test(curU.email || '')) {
-            activeUsers.push(curU);
+        if (curU) {
+          if (!cloudUserIds.has(curU.uid) && !this.deletedUserIds?.has(curU.uid)) {
+            if (!/^citizen\d+@remo\.world$/i.test(curU.email || '')) {
+              activeUsers.push(curU);
+            }
+          } else {
+            const matchInCloud = activeUsers.find((x) => x && x.uid === curU.uid);
+            if (matchInCloud && !matchInCloud.avatarUrl && curU.avatarUrl) {
+              matchInCloud.avatarUrl = curU.avatarUrl;
+            }
           }
         }
         this.state.users = activeUsers;
@@ -3985,6 +4051,8 @@ const REMO_STORE = {
         window.dispatchEvent(new CustomEvent('remo:stateupdate', { detail: { reason: 'cloud_users' } }));
         if (typeof refreshAllAdminPanels === 'function') refreshAllAdminPanels();
         if (typeof syncHeaderAndSidebars === 'function') syncHeaderAndSidebars();
+        if (typeof renderPassportView === 'function') renderPassportView();
+        if (typeof renderSocialFeed === 'function') renderSocialFeed();
         if (typeof renderDirectMessagesView === 'function' && typeof currentRemoView !== 'undefined' && currentRemoView === 'messages') {
           renderDirectMessagesView();
         }
