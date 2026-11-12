@@ -1713,6 +1713,15 @@ function listInspectedCardInAuction() {
     return;
   }
 
+  const durPrompt = lang === 'fr'
+    ? '⏱️ Durée de l’enchère en heures (ex: 6, 12, 24 ou 48 heures) :'
+    : '⏱️ Auction duration in hours (e.g. 6, 12, 24, or 48 hours):';
+  const rawDur = prompt(durPrompt, '24');
+  if (rawDur === null) return;
+  let durHours = Math.round(Number(rawDur)) || 24;
+  if (durHours < 1) durHours = 1;
+  if (durHours > 168) durHours = 168;
+
   const cleanSpec = typeof window.sanitizeCardSpecForCloud === 'function'
     ? window.sanitizeCardSpecForCloud(activeInspectedCard)
     : Object.assign({}, activeInspectedCard);
@@ -1723,15 +1732,20 @@ function listInspectedCardInAuction() {
     delete cleanSpec._photoTainted;
   }
 
+  const now = Date.now();
+  const endsAt = now + durHours * 3600 * 1000;
+
   REMO_STORE.state.auctions.unshift({
-    id: 'auc_' + Date.now(),
+    id: 'auc_' + now,
     cardSpec: cleanSpec,
     sellerUid: u.uid,
     sellerName: u.name || 'Citizen',
     currentBid: startBid,
     highestBidder: '—',
-    createdAt: Date.now(),
-    endsAt: Date.now() + 24 * 3600 * 1000
+    highestBidderUid: '',
+    createdAt: now,
+    endsAt: endsAt,
+    durationHours: durHours
   });
   REMO_STORE.save(true, 'auction_new');
   if (typeof REMO_STORE.syncToFirestore === 'function') {
@@ -1960,14 +1974,145 @@ function openEditProfileModal() {
   const bioInp = document.getElementById('editProfBioInp');
   const citySel = document.getElementById('editProfCitySel');
   const lang = REMO_I18N.getLang();
+  const isFr = (lang === 'fr');
 
-  if (nameInp) nameInp.value = u.name || '';
-  if (bioInp) bioInp.value = u.bio || '';
+  // Dynamic Bilingual Localization (Strictly EN / FR)
+  const titleHdr = document.getElementById('editProfTitleHdr');
+  const uploadBtnText = document.getElementById('editProfUploadBtnText');
+  const removeBtnText = document.getElementById('editProfRemoveBtnText');
+  const nameLbl = document.getElementById('editProfNameLbl');
+  const bioLbl = document.getElementById('editProfBioLbl');
+  const cityLbl = document.getElementById('editProfCityLbl');
+  const cancelBtn = document.getElementById('editProfCancelBtn');
+  const saveBtn = document.getElementById('editProfSaveBtn');
+
+  if (titleHdr) titleHdr.textContent = isFr ? '✏️ Modifier Mon Profil Citoyen' : '✏️ Edit Citizen Profile';
+  if (uploadBtnText) uploadBtnText.textContent = isFr ? '📷 Changer Photo' : '📷 Change Photo';
+  if (removeBtnText) removeBtnText.textContent = isFr ? 'Supprimer' : 'Remove';
+  if (nameLbl) nameLbl.textContent = isFr ? 'Nom d’affichage (Pseudo) :' : 'Display Name (Nickname):';
+  if (bioLbl) bioLbl.textContent = isFr ? 'Bio / Statut Citoyen (max 80 car.) :' : 'Bio / Citizen Status (max 80 chars):';
+  if (cityLbl) cityLbl.textContent = isFr ? 'Ville de Résidence (Home City) :' : 'Home City of Residence:';
+  if (cancelBtn) cancelBtn.textContent = isFr ? 'Annuler' : 'Cancel';
+  if (saveBtn) saveBtn.textContent = isFr ? '✓ Enregistrer' : '✓ Save Changes';
+
+  if (nameInp) {
+    nameInp.value = u.name || '';
+    nameInp.placeholder = isFr ? 'Votre pseudo REMO' : 'Your REMO username';
+  }
+  if (bioInp) {
+    bioInp.value = u.bio || '';
+    bioInp.placeholder = isFr ? "Ex: Explorateur nocturne • Passionné d'art 🌃" : "Ex: Night explorer • Art lover 🌃";
+  }
   if (citySel) {
     citySel.innerHTML = getRemoCities().map((c) => `<option value="${c.id}" ${c.id === u.homeCity ? 'selected' : ''}>${c.flag} ${getCityName(c, lang)}</option>`).join('');
   }
+
+  // Set avatar photo preview
+  window._pendingProfileAvatar = undefined;
+  const imgEl = document.getElementById('editProfAvatarImg');
+  const phEl = document.getElementById('editProfAvatarPlaceholder');
+  const rmBtn = document.getElementById('editProfRemovePhotoBtn');
+  const fileInp = document.getElementById('editProfAvatarFileInput');
+  if (fileInp) fileInp.value = '';
+
+  if (u.avatarUrl) {
+    if (imgEl) {
+      imgEl.src = u.avatarUrl;
+      imgEl.style.display = 'block';
+    }
+    if (phEl) phEl.style.display = 'none';
+    if (rmBtn) rmBtn.style.display = 'inline-flex';
+  } else {
+    if (imgEl) {
+      imgEl.src = '';
+      imgEl.style.display = 'none';
+    }
+    if (phEl) {
+      phEl.textContent = (u.name || 'R')[0].toUpperCase();
+      phEl.style.display = 'block';
+    }
+    if (rmBtn) rmBtn.style.display = 'none';
+  }
+
   modal.classList.add('open');
 }
+
+async function handleProfileAvatarSelect(event) {
+  const file = event && event.target && event.target.files && event.target.files[0];
+  if (!file) return;
+  const lang = REMO_I18N.getLang();
+  const isFr = (lang === 'fr');
+
+  if (!file.type || !file.type.startsWith('image/')) {
+    remoToast(isFr ? '⚠️ Veuillez sélectionner une image valide (JPG, PNG, WebP).' : '⚠️ Please select a valid image file (JPG, PNG, WebP).');
+    return;
+  }
+
+  try {
+    let compressedUrl = '';
+    if (typeof window.compressImageFileToDataUrl === 'function') {
+      compressedUrl = await window.compressImageFileToDataUrl(file, 256, 0.82);
+    } else {
+      compressedUrl = await new Promise((res) => {
+        const reader = new FileReader();
+        reader.onload = () => res(reader.result);
+        reader.onerror = () => res('');
+        reader.readAsDataURL(file);
+      });
+    }
+
+    if (!compressedUrl) {
+      remoToast(isFr ? '⚠️ Impossible de traiter l’image sélectionnée.' : '⚠️ Could not process selected image.');
+      return;
+    }
+
+    window._pendingProfileAvatar = compressedUrl;
+    const imgEl = document.getElementById('editProfAvatarImg');
+    const phEl = document.getElementById('editProfAvatarPlaceholder');
+    const rmBtn = document.getElementById('editProfRemovePhotoBtn');
+
+    if (imgEl) {
+      imgEl.src = compressedUrl;
+      imgEl.style.display = 'block';
+    }
+    if (phEl) phEl.style.display = 'none';
+    if (rmBtn) rmBtn.style.display = 'inline-flex';
+
+    if (typeof RemoAudio !== 'undefined' && RemoAudio.play) RemoAudio.play('click');
+    remoToast(isFr ? '📷 Photo sélectionnée ! Cliquez sur Enregistrer pour confirmer.' : '📷 Photo selected! Click Save Changes to confirm.', 'coin');
+  } catch (e) {
+    console.error('Avatar upload error:', e);
+    remoToast(isFr ? '⚠️ Erreur lors du chargement de la photo.' : '⚠️ Error loading photo.');
+  }
+}
+window.handleProfileAvatarSelect = handleProfileAvatarSelect;
+
+function removeProfileAvatarPhoto() {
+  const lang = REMO_I18N.getLang();
+  const isFr = (lang === 'fr');
+  window._pendingProfileAvatar = null;
+  const imgEl = document.getElementById('editProfAvatarImg');
+  const phEl = document.getElementById('editProfAvatarPlaceholder');
+  const rmBtn = document.getElementById('editProfRemovePhotoBtn');
+  const fileInp = document.getElementById('editProfAvatarFileInput');
+  const nameInp = document.getElementById('editProfNameInp');
+
+  if (fileInp) fileInp.value = '';
+  if (imgEl) {
+    imgEl.src = '';
+    imgEl.style.display = 'none';
+  }
+  if (phEl) {
+    const pseudo = (nameInp ? nameInp.value.trim() : '') || 'R';
+    phEl.textContent = pseudo[0].toUpperCase();
+    phEl.style.display = 'block';
+  }
+  if (rmBtn) rmBtn.style.display = 'none';
+
+  if (typeof RemoAudio !== 'undefined' && RemoAudio.play) RemoAudio.play('click');
+  remoToast(isFr ? 'Photo retirée (cliquez sur Enregistrer pour valider).' : 'Photo removed (click Save Changes to confirm).');
+}
+window.removeProfileAvatarPhoto = removeProfileAvatarPhoto;
 
 function closeEditProfileModal() {
   const modal = document.getElementById('editProfileModal');
@@ -1998,19 +2143,47 @@ function saveUserProfile(event) {
   u.bio = newBio;
   u.homeCity = newCity;
 
+  // Apply new avatar photo or removal
+  if (window._pendingProfileAvatar === null) {
+    delete u.avatarUrl;
+  } else if (typeof window._pendingProfileAvatar === 'string' && window._pendingProfileAvatar) {
+    u.avatarUrl = window._pendingProfileAvatar;
+  }
+  window._pendingProfileAvatar = undefined;
+
+  // Sync user object in state.users
+  if (Array.isArray(REMO_STORE.state.users)) {
+    const targetU = REMO_STORE.state.users.find((x) => x && x.uid === u.uid);
+    if (targetU) {
+      targetU.name = u.name;
+      targetU.bio = u.bio;
+      targetU.homeCity = u.homeCity;
+      if (u.avatarUrl) targetU.avatarUrl = u.avatarUrl;
+      else delete targetU.avatarUrl;
+    }
+  }
+
   // Add home city to visas if not present
   u.visas = Array.isArray(u.visas) ? u.visas : [];
   if (!u.visas.includes(newCity)) {
     u.visas.push(newCity);
   }
 
-  // Update authorName on user's own posts, comments, bottles & DMs
+  // Update authorName & authorAvatar on user's own posts, comments, bottles & DMs
   (REMO_STORE.state.posts || []).forEach((p) => {
     if (p) {
-      if (p.uid === u.uid || p.authorName === oldName) p.authorName = newName;
+      if (p.uid === u.uid || p.authorName === oldName) {
+        p.authorName = newName;
+        if (u.avatarUrl) p.authorAvatar = u.avatarUrl;
+        else delete p.authorAvatar;
+      }
       if (Array.isArray(p.comments)) {
         p.comments.forEach((c) => {
-          if (c && (c.uid === u.uid || c.author === oldName)) c.author = newName;
+          if (c && (c.uid === u.uid || c.author === oldName)) {
+            c.author = newName;
+            if (u.avatarUrl) c.authorAvatar = u.avatarUrl;
+            else delete c.authorAvatar;
+          }
         });
       }
     }
@@ -2028,6 +2201,9 @@ function saveUserProfile(event) {
   });
 
   REMO_STORE.save(true, 'profile_updated');
+  if (typeof REMO_STORE.syncToFirestore === 'function') {
+    REMO_STORE.syncToFirestore('profile_updated', true);
+  }
 
   closeEditProfileModal();
   syncHeaderAndSidebars();
@@ -2107,8 +2283,8 @@ function renderPassportView() {
     <div class="profile-hero-card">
       <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px;">
         <div style="display:flex;align-items:center;gap:16px;min-width:0;">
-          <div class="avatar-circle ${frameClass}" style="width:68px;height:68px;font-size:1.75rem;flex-shrink:0;">
-            ${escapeHtmlStr((u.name || 'R')[0].toUpperCase())}
+          <div class="avatar-circle ${frameClass}" style="width:68px;height:68px;font-size:1.75rem;flex-shrink:0;overflow:hidden;padding:0;position:relative;">
+            ${u.avatarUrl ? `<img src="${u.avatarUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block;" alt="${escapeHtmlStr(u.name)}">` : escapeHtmlStr((u.name || 'R')[0].toUpperCase())}
           </div>
           <div style="min-width:0;">
             <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
@@ -2302,8 +2478,8 @@ function renderPassportView() {
             return `
               <div class="my-dm-thread-card" onclick="openDirectChatWithUser('${pUser.uid}')">
                 <div style="display:flex;align-items:center;gap:12px;min-width:0;flex:1;">
-                  <div class="avatar-circle" style="width:44px;height:44px;font-size:1.15rem;flex-shrink:0;">
-                    ${escapeHtmlStr((pUser.name || 'C')[0].toUpperCase())}
+                  <div class="avatar-circle" style="width:44px;height:44px;font-size:1.15rem;flex-shrink:0;overflow:hidden;padding:0;">
+                    ${pUser.avatarUrl ? `<img src="${pUser.avatarUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block;" alt="${escapeHtmlStr(pUser.name)}">` : escapeHtmlStr((pUser.name || 'C')[0].toUpperCase())}
                   </div>
                   <div style="min-width:0;flex:1;">
                     <div style="font-weight:900;font-size:0.92rem;color:#fff;display:flex;align-items:center;gap:6px;">
@@ -3893,6 +4069,8 @@ function renderAuctionsView() {
   const box = document.getElementById('auctionsListGrid');
   if (!box) return;
   const lang = REMO_I18N.getLang();
+  const isFr = (lang === 'fr');
+  const u = REMO_STORE.getCurrentUser();
   const deletedSet = REMO_STORE.deletedAuctionIds || new Set();
   const list = (REMO_STORE.state.auctions || []).filter((a) => a && a.id && a.cardSpec && !deletedSet.has(a.id));
 
@@ -3900,28 +4078,112 @@ function renderAuctionsView() {
     box.innerHTML = `
       <div style="grid-column: 1 / -1; text-align: center; padding: 48px 20px; color: var(--muted); background: rgba(255,255,255,0.02); border-radius: 16px; border: 1px dashed var(--border);">
         <div style="font-size: 2.4rem; margin-bottom: 8px;">🔨</div>
-        <div>${lang === 'fr' ? 'Aucune enchère en cours pour le moment.' : 'No active card auctions currently.'}</div>
+        <div>${isFr ? 'Aucune enchère en cours pour le moment.' : 'No active card auctions currently.'}</div>
       </div>
     `;
     return;
   }
 
+  const now = Date.now();
+
   box.innerHTML = list.map((a, idx) => {
+    // Ensure endsAt exists (fallback for older records)
+    if (!a.endsAt) {
+      a.endsAt = (a.createdAt || now) + 24 * 3600 * 1000;
+    }
+    const remMs = a.endsAt - now;
+    const isConcluded = remMs <= 0;
     const city = getCityById(a.cardSpec.cityId);
     const canDelete = canCurrentUserDeleteAuction(a);
-    return `
-      <div class="glass-box" style="display:flex;flex-direction:column;align-items:center;gap:10px;position:relative;">
-        ${canDelete ? `<button type="button" class="adm-pbtn danger" style="position:absolute;top:8px;right:8px;z-index:5;" onclick="adminDeleteAuction('${a.id}')" title="${lang === 'fr' ? 'Supprimer des enchères' : 'Remove from Auction'}">🗑️</button>` : ''}
-        <canvas id="aucCv_${idx}" style="width:100%;max-width:210px;height:auto;border-radius:14px;cursor:pointer;" onclick="inspectAuctionCard('${a.id}')"></canvas>
-        <div style="font-weight:900;font-size:0.92rem;">${city.flag} ${getCityName(city, lang)} #${a.cardSpec.serial}</div>
-        <div style="font-size:0.78rem;color:var(--muted);">${lang === 'fr' ? 'Vendeur' : 'Seller'}: ${typeof escapeHtmlStr === 'function' ? escapeHtmlStr(a.sellerName) : a.sellerName}</div>
-        <div style="font-size:0.9rem;color:#fbbf24;font-weight:900;">${t('auction_min_bid')} 🪙 ${a.currentBid} (${typeof escapeHtmlStr === 'function' ? escapeHtmlStr(a.highestBidder) : a.highestBidder})</div>
+    const hasWinner = Boolean(a.highestBidderUid && a.highestBidder && a.highestBidder !== '—');
+    const isWinner = Boolean(u && hasWinner && u.uid === a.highestBidderUid);
+    const isSeller = Boolean(u && (u.uid === a.sellerUid || (u.name && a.sellerName && u.name.toLowerCase() === a.sellerName.toLowerCase())));
+
+    // Countdown / status pill
+    let timerPillHtml = '';
+    if (!isConcluded) {
+      const sec = Math.floor((remMs / 1000) % 60);
+      const min = Math.floor((remMs / (1000 * 60)) % 60);
+      const hrs = Math.floor(remMs / (1000 * 60 * 60));
+      const isUrgent = remMs <= 1800000; // < 30 mins
+      const timeStr = `${hrs > 0 ? hrs + 'h ' : ''}${min < 10 ? '0' + min : min}m ${sec < 10 ? '0' + sec : sec}s`;
+      timerPillHtml = `
+        <div class="auc-countdown-pill ${isUrgent ? 'urgent' : ''}" style="display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:99px;font-size:0.76rem;font-weight:900;letter-spacing:0.3px;${isUrgent ? 'background:rgba(239,68,68,0.18);border:1px solid #ef4444;color:#fca5a5;' : 'background:rgba(56,189,248,0.14);border:1px solid rgba(56,189,248,0.4);color:#7dd3fc;'}">
+          <span>${isUrgent ? '🔥' : '⏳'}</span>
+          <span>${isFr ? 'Fin dans :' : 'Ends in:'}</span>
+          <span class="auc-timer-text" data-auc-ends="${a.endsAt}">${timeStr}</span>
+        </div>
+      `;
+    } else {
+      timerPillHtml = `
+        <div style="display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:99px;font-size:0.76rem;font-weight:900;background:rgba(251,191,36,0.16);border:1px solid #fbbf24;color:#fde047;">
+          <span>🏆</span>
+          <span>${isFr ? 'Enchère Terminée' : 'Auction Concluded'}</span>
+        </div>
+      `;
+    }
+
+    // Action button
+    let actionBtnHtml = '';
+    if (!isConcluded) {
+      actionBtnHtml = `
         <button class="btn-cyber btn-gold" style="width:100%;justify-content:center;" onclick="placeAuctionBid('${a.id}')">
           🔨 ${t('auction_bid_btn')} (+50 🪙)
         </button>
-        ${canDelete ? `
+      `;
+    } else {
+      if (isWinner) {
+        actionBtnHtml = `
+          <button class="btn-cyber btn-gold" style="width:100%;justify-content:center;background:linear-gradient(135deg,#10b981,#059669);border-color:#34d399;font-weight:900;" onclick="claimConcludedAuction('${a.id}')">
+            🎉 ${isFr ? 'Réclamer Ma Carte 4D !' : 'Claim My 4D Card!'}
+          </button>
+        `;
+      } else if (isSeller) {
+        if (hasWinner) {
+          actionBtnHtml = `
+            <button class="btn-cyber btn-gold" style="width:100%;justify-content:center;" onclick="claimConcludedAuction('${a.id}')">
+              💰 ${isFr ? `Finaliser & Encaisser (${a.currentBid} 🪙)` : `Finalize & Collect (${a.currentBid} 🪙)`}
+            </button>
+          `;
+        } else {
+          actionBtnHtml = `
+            <button class="btn-cyber" style="width:100%;justify-content:center;background:rgba(255,255,255,0.08);border-color:#38bdf8;color:#7dd3fc;" onclick="claimConcludedAuction('${a.id}')">
+              📦 ${isFr ? 'Récupérer dans mon Coffre' : 'Return Card to Vault'}
+            </button>
+          `;
+        }
+      } else {
+        if (hasWinner) {
+          actionBtnHtml = `
+            <div style="font-size:0.8rem;color:#34d399;font-weight:800;padding:6px;text-align:center;">
+              🏆 ${isFr ? `Remporté par @${escapeHtmlStr(a.highestBidder)} (${a.currentBid} 🪙)` : `Won by @${escapeHtmlStr(a.highestBidder)} (${a.currentBid} 🪙)`}
+            </div>
+          `;
+        } else {
+          actionBtnHtml = `
+            <div style="font-size:0.8rem;color:var(--muted);padding:6px;text-align:center;">
+              ⏳ ${isFr ? 'Terminé sans enchérisseur' : 'Ended with no bids'}
+            </div>
+          `;
+        }
+      }
+    }
+
+    return `
+      <div class="glass-box" style="display:flex;flex-direction:column;align-items:center;gap:10px;position:relative;">
+        ${canDelete ? `<button type="button" class="adm-pbtn danger" style="position:absolute;top:8px;right:8px;z-index:5;" onclick="adminDeleteAuction('${a.id}')" title="${isFr ? 'Supprimer des enchères' : 'Remove from Auction'}">🗑️</button>` : ''}
+        <canvas id="aucCv_${idx}" style="width:100%;max-width:210px;height:auto;border-radius:14px;cursor:pointer;" onclick="inspectAuctionCard('${a.id}')"></canvas>
+        <div style="font-weight:900;font-size:0.92rem;">${city.flag} ${getCityName(city, lang)} #${a.cardSpec.serial}</div>
+        
+        <!-- Live Countdown / Status Ticker -->
+        ${timerPillHtml}
+
+        <div style="font-size:0.78rem;color:var(--muted);">${isFr ? 'Vendeur' : 'Seller'}: ${typeof escapeHtmlStr === 'function' ? escapeHtmlStr(a.sellerName) : a.sellerName}</div>
+        <div style="font-size:0.9rem;color:#fbbf24;font-weight:900;">${t('auction_min_bid')} 🪙 ${a.currentBid} (${typeof escapeHtmlStr === 'function' ? escapeHtmlStr(a.highestBidder) : a.highestBidder})</div>
+        ${actionBtnHtml}
+        ${canDelete && !isConcluded ? `
         <button type="button" class="btn-ghost" style="width:100%;justify-content:center;border-color:rgba(244,63,94,0.45);color:#fda4af;background:rgba(244,63,94,0.12);font-size:0.78rem;padding:7px 10px;" onclick="adminDeleteAuction('${a.id}')">
-          🗑️ ${lang === 'fr' ? 'Retirer des Enchères' : 'Remove from Auction'}
+          🗑️ ${isFr ? 'Retirer des Enchères' : 'Remove from Auction'}
         </button>
         ` : ''}
       </div>
@@ -3958,20 +4220,181 @@ function adminDeleteAuction(aucId) {
 
 function placeAuctionBid(aucId) {
   const lang = REMO_I18N.getLang();
+  const isFr = (lang === 'fr');
   const u = REMO_STORE.getCurrentUser();
   if (!u) { openAuthModal(); return; }
-  const a = REMO_STORE.state.auctions.find((x) => x.id === aucId);
+  const a = (REMO_STORE.state.auctions || []).find((x) => x.id === aucId);
   if (!a) return;
-  const nextBid = a.currentBid + 50;
-  if (!REMO_STORE.addCoins(u.uid, -50, 10)) {
-    remoToast(lang === 'fr' ? 'Solde insuffisant en Pièces REMO !' : 'Not enough REMO Coins!');
+
+  // Check if auction is expired
+  if (a.endsAt && a.endsAt <= Date.now()) {
+    remoToast(isFr ? '⚠️ Cette enchère est déjà terminée !' : '⚠️ This auction has already ended!');
+    renderAuctionsView();
     return;
   }
+
+  // Prevent seller from bidding on their own card
+  if (a.sellerUid && u.uid === a.sellerUid) {
+    remoToast(isFr ? '⚠️ Vous ne pouvez pas surenchérir sur votre propre carte !' : '⚠️ You cannot bid on your own card!');
+    return;
+  }
+
+  // Prevent bidding if already highest bidder
+  if (a.highestBidderUid && u.uid === a.highestBidderUid) {
+    remoToast(isFr ? 'ℹ️ Vous êtes déjà le meilleur enchérisseur sur cette carte !' : 'ℹ️ You are already the highest bidder on this card!');
+    return;
+  }
+
+  const nextBid = a.currentBid + 50;
+  if (!REMO_STORE.addCoins(u.uid, -50, 10)) {
+    remoToast(isFr ? 'Solde insuffisant en Pièces REMO !' : 'Not enough REMO Coins!');
+    return;
+  }
+
   a.currentBid = nextBid;
   a.highestBidder = u.name;
+  a.highestBidderUid = u.uid;
+
+  // Anti-Snipe Mechanic: If bid is placed with less than 2 minutes left, add +3 minutes!
+  const remMs = (a.endsAt || 0) - Date.now();
+  let snipeExtended = false;
+  if (remMs > 0 && remMs < 120000) {
+    a.endsAt = Date.now() + 180000;
+    snipeExtended = true;
+  }
+
   REMO_STORE.save(true, 'auction_bid');
+  if (typeof REMO_STORE.syncToFirestore === 'function') {
+    REMO_STORE.syncToFirestore('auction_bid', true);
+  }
   renderAuctionsView();
-  remoToast(lang === 'fr' ? `🔨 Enchère placée : ${nextBid} 🪙 !` : `🔨 Bid placed: ${nextBid} 🪙!`, 'coin');
+
+  if (snipeExtended) {
+    remoToast(isFr ? `🔨 Enchère placée : ${nextBid} 🪙 ! ⏱️ +3 min ajoutées (Règle Anti-Snipe)` : `🔨 Bid placed: ${nextBid} 🪙! ⏱️ +3 mins added (Anti-Snipe Rule)`, 'coin');
+  } else {
+    remoToast(isFr ? `🔨 Enchère placée : ${nextBid} 🪙 !` : `🔨 Bid placed: ${nextBid} 🪙!`, 'coin');
+  }
+}
+
+function claimConcludedAuction(aucId) {
+  const lang = REMO_I18N.getLang();
+  const isFr = (lang === 'fr');
+  const u = REMO_STORE.getCurrentUser();
+  if (!u) { openAuthModal(); return; }
+  const a = (REMO_STORE.state.auctions || []).find((x) => x && x.id === aucId);
+  if (!a) return;
+
+  const hasWinner = Boolean(a.highestBidderUid && a.highestBidder && a.highestBidder !== '—');
+  const isWinner = hasWinner && u.uid === a.highestBidderUid;
+  const isSeller = u.uid === a.sellerUid || (u.name && a.sellerName && u.name.toLowerCase() === a.sellerName.toLowerCase());
+  const isAdm = REMO_STORE.isAdminUnlocked();
+
+  if (!isWinner && !isSeller && !isAdm) {
+    remoToast(isFr ? '🔒 Seul l’acheteur ou le vendeur peut finaliser cette enchère.' : '🔒 Only the buyer or seller can finalize this auction.');
+    return;
+  }
+
+  if (hasWinner) {
+    // Remove card from seller's collection if still present
+    if (Array.isArray(REMO_STORE.state.droppedCardsPool)) {
+      REMO_STORE.state.droppedCardsPool = REMO_STORE.state.droppedCardsPool.filter((c) => {
+        if (!c) return false;
+        if (a.cardSpec.id && c.id === a.cardSpec.id) return false;
+        if (a.cardSpec.serial && c.serial === a.cardSpec.serial && c.cityId === a.cardSpec.cityId && c.ownerUid === a.sellerUid) return false;
+        return true;
+      });
+    }
+
+    // Transfer card to winner's vault
+    const wonCard = Object.assign({}, a.cardSpec);
+    wonCard.ownerUid = a.highestBidderUid;
+    wonCard.owner = a.highestBidder;
+    wonCard.obtainedAt = Date.now();
+
+    if (!Array.isArray(REMO_STORE.state.droppedCardsPool)) {
+      REMO_STORE.state.droppedCardsPool = [];
+    }
+    REMO_STORE.state.droppedCardsPool.push(wonCard);
+
+    // Pay seller
+    if (a.sellerUid) {
+      REMO_STORE.addCoins(a.sellerUid, a.currentBid);
+    }
+
+    // Remove auction
+    REMO_STORE.state.auctions = (REMO_STORE.state.auctions || []).filter((x) => x.id !== aucId);
+    REMO_STORE.save(true, 'auction_claim_win');
+    if (typeof REMO_STORE.deleteAuctionFromCloud === 'function') {
+      REMO_STORE.deleteAuctionFromCloud(aucId);
+    }
+    if (typeof REMO_STORE.syncToFirestore === 'function') {
+      REMO_STORE.syncToFirestore('card_claimed', true);
+    }
+
+    renderAuctionsView();
+    if (typeof RemoAudio !== 'undefined' && RemoAudio.play) RemoAudio.play('badge');
+
+    if (isWinner) {
+      remoToast(isFr ? `🎉 Félicitations ! La Carte 4D #${wonCard.serial} est maintenant dans votre coffre !` : `🎉 Congratulations! 4D Card #${wonCard.serial} is now in your vault!`, 'coin');
+    } else {
+      remoToast(isFr ? `💰 Enchère finalisée ! +${a.currentBid} 🪙 versés au vendeur.` : `💰 Auction finalized! +${a.currentBid} 🪙 paid to seller.`, 'coin');
+    }
+  } else {
+    // Return card to seller's vault
+    const retCard = Object.assign({}, a.cardSpec);
+    retCard.ownerUid = a.sellerUid;
+    retCard.owner = a.sellerName;
+    if (!Array.isArray(REMO_STORE.state.droppedCardsPool)) {
+      REMO_STORE.state.droppedCardsPool = [];
+    }
+    REMO_STORE.state.droppedCardsPool.push(retCard);
+
+    REMO_STORE.state.auctions = (REMO_STORE.state.auctions || []).filter((x) => x.id !== aucId);
+    REMO_STORE.save(true, 'auction_return');
+    if (typeof REMO_STORE.deleteAuctionFromCloud === 'function') {
+      REMO_STORE.deleteAuctionFromCloud(aucId);
+    }
+    if (typeof REMO_STORE.syncToFirestore === 'function') {
+      REMO_STORE.syncToFirestore('card_returned', true);
+    }
+
+    renderAuctionsView();
+    if (typeof RemoAudio !== 'undefined' && RemoAudio.play) RemoAudio.play('click');
+    remoToast(isFr ? '📦 Carte retournée dans votre coffre avec succès.' : '📦 Card returned to your vault successfully.');
+  }
+}
+window.claimConcludedAuction = claimConcludedAuction;
+
+function updateLiveAuctionCountdowns() {
+  const elements = document.querySelectorAll('.auc-timer-text');
+  if (!elements || elements.length === 0) return;
+  const now = Date.now();
+  let needsReRender = false;
+
+  elements.forEach((el) => {
+    const endsAt = Number(el.getAttribute('data-auc-ends'));
+    if (!endsAt) return;
+    const remMs = endsAt - now;
+    if (remMs <= 0) {
+      if (el.getAttribute('data-expired') !== 'true') {
+        el.setAttribute('data-expired', 'true');
+        needsReRender = true;
+      }
+    } else {
+      const sec = Math.floor((remMs / 1000) % 60);
+      const min = Math.floor((remMs / (1000 * 60)) % 60);
+      const hrs = Math.floor(remMs / (1000 * 60 * 60));
+      el.textContent = `${hrs > 0 ? hrs + 'h ' : ''}${min < 10 ? '0' + min : min}m ${sec < 10 ? '0' + sec : sec}s`;
+    }
+  });
+
+  if (needsReRender) {
+    renderAuctionsView();
+  }
+}
+if (!window._aucTickerInit) {
+  window._aucTickerInit = true;
+  setInterval(updateLiveAuctionCountdowns, 1000);
 }
 
 /* ── 5B. AAA 4D CASINO HOLOGRAPHIC LUCKY WHEEL (8 SLICES + REAL PHYSICS + SOUND) ── */

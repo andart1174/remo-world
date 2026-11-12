@@ -798,6 +798,8 @@ function renderPostCardBack(p, city, lang, wx) {
   const cosm = (REMO_STORE && REMO_STORE.getUserCosmetics) ? REMO_STORE.getUserCosmetics(p.uid) : { frameClass: '', title_fr: '', title_en: '' };
   const royalTitle = lang === 'fr' ? (cosm.title_fr || '') : (cosm.title_en || '');
   const cityName = getCityName(city, lang);
+  const authorUser = (REMO_STORE.state.users || []).find((usr) => usr && ((p.uid && usr.uid === p.uid) || (p.authorName && usr.name && usr.name.toLowerCase() === p.authorName.toLowerCase())));
+  const authorAvatarUrl = p.authorAvatar || (authorUser && authorUser.avatarUrl) || '';
 
   // Dynamic collectible scores
   const likesCount = Array.isArray(p.likes) ? p.likes.length : (typeof p.likes === 'number' ? p.likes : 0);
@@ -827,7 +829,9 @@ function renderPostCardBack(p, city, lang, wx) {
     <div class="holo-citizen-header-card">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;">
         <div style="display:flex;align-items:center;gap:7px;">
-          <div class="avatar-circle ${cosm.frameClass}" style="width:28px;height:28px;font-size:0.75rem;">${escapeHtmlStr((p.authorName || 'R')[0].toUpperCase())}</div>
+          <div class="avatar-circle ${cosm.frameClass}" style="width:28px;height:28px;font-size:0.75rem;overflow:hidden;padding:0;">
+            ${authorAvatarUrl ? `<img src="${authorAvatarUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block;" alt="${escapeHtmlStr(p.authorName)}">` : escapeHtmlStr((p.authorName || 'R')[0].toUpperCase())}
+          </div>
           <div>
             <b style="color:#fbbf24;font-size:0.82rem;">@${escapeHtmlStr(p.authorName)}</b>
             ${royalTitle ? `<span class="royal-title-pill" style="font-size:0.6rem;margin-left:4px;">${escapeHtmlStr(royalTitle)}</span>` : ''}
@@ -1534,6 +1538,8 @@ function renderSinglePostCardHtml(p, lang, u, isAdm) {
     const isMayor = cityMayor && cityMayor.uid === p.uid;
     const cosm = (REMO_STORE && REMO_STORE.getUserCosmetics) ? REMO_STORE.getUserCosmetics(p.uid) : { frameClass: '', title_fr: '', title_en: '' };
     const royalTitle = lang === 'fr' ? (cosm.title_fr || '') : (cosm.title_en || '');
+    const authorUser = (REMO_STORE.state.users || []).find((usr) => usr && ((p.uid && usr.uid === p.uid) || (p.authorName && usr.name && usr.name.toLowerCase() === p.authorName.toLowerCase())));
+    const authorAvatarUrl = p.authorAvatar || (authorUser && authorUser.avatarUrl) || '';
     const dualPair = hiddenByCapsule
       ? { en: `🔒 ${p.capsuleTeaser_en || teaserTxt}`, fr: `🔒 ${p.capsuleTeaser_fr || teaserTxt}` }
       : buildPostBilingualPair(p);
@@ -1554,7 +1560,9 @@ function renderSinglePostCardHtml(p, lang, u, isAdm) {
         <div class="post-head">
           <div style="display:flex;align-items:center;gap:6px;min-width:0;">
             <div class="post-author" style="cursor:pointer;" onclick="openCitizenProfileModal('${p.uid || ''}', '${escapeHtmlStr(p.authorName || '')}')" title="🪪 @${escapeHtmlStr(p.authorName)}">
-              <div class="avatar-circle ${cosm.frameClass}">${escapeHtmlStr((p.authorName || 'R')[0].toUpperCase())}</div>
+              <div class="avatar-circle ${cosm.frameClass}" style="overflow:hidden;padding:0;">
+                ${authorAvatarUrl ? `<img src="${authorAvatarUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block;" alt="${escapeHtmlStr(p.authorName)}">` : escapeHtmlStr((p.authorName || 'R')[0].toUpperCase())}
+              </div>
               <div>
                 <div style="font-weight:800;font-size:0.88rem;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
                   <span>${escapeHtmlStr(p.authorName)}</span>
@@ -1678,7 +1686,9 @@ function renderSinglePostCardHtml(p, lang, u, isAdm) {
         <!-- Mobile TikTok Right Floating Rail -->
         <div class="tiktok-rail">
           <div class="tk-avatar-wrap" onclick="openCitizenProfileModal('${p.uid || ''}', '${escapeHtmlStr(p.authorName || '')}')" title="@${escapeHtmlStr(p.authorName)}">
-            <div class="avatar-circle ${cosm.frameClass}" style="width:42px;height:42px;font-size:0.95rem;border:2px solid #fff;">${escapeHtmlStr((p.authorName || 'R')[0].toUpperCase())}</div>
+            <div class="avatar-circle ${cosm.frameClass}" style="width:42px;height:42px;font-size:0.95rem;border:2px solid #fff;overflow:hidden;padding:0;">
+              ${authorAvatarUrl ? `<img src="${authorAvatarUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block;" alt="${escapeHtmlStr(p.authorName)}">` : escapeHtmlStr((p.authorName || 'R')[0].toUpperCase())}
+            </div>
             <span class="tk-avatar-plus">+</span>
           </div>
           <button type="button" class="tk-btn ${liked ? 'liked' : ''}" onclick="toggleLikePost('${p.id}')">
@@ -2249,10 +2259,15 @@ function openCommentsModal(postId) {
       const flexCity = c.flexCardCityId ? getCityById(c.flexCardCityId) : null;
       const dual = c.text ? REMO_TRANSLATOR.makeBilingualPair(c.text) : null;
       const altTxt = dual ? (lang === 'fr' ? dual.fr : dual.en) : '';
+      const cUser = (REMO_STORE.state.users || []).find((usr) => usr && ((c.uid && usr.uid === c.uid) || (c.author && usr.name && usr.name.toLowerCase() === c.author.toLowerCase())));
+      const cAvatarUrl = c.authorAvatar || (cUser && cUser.avatarUrl) || '';
       return `
         <div class="${tip > 0 ? 'super-comment-card' : ''}" style="padding:10px 12px;border-radius:12px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);margin-bottom:8px;display:flex;justify-content:space-between;align-items:start;gap:8px;">
           <div style="flex:1;">
-            <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+            <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;">
+              <div class="avatar-circle" style="width:24px;height:24px;font-size:0.7rem;flex-shrink:0;overflow:hidden;padding:0;">
+                ${cAvatarUrl ? `<img src="${cAvatarUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block;" alt="${escapeHtmlStr(c.author)}">` : escapeHtmlStr((c.author || 'R')[0].toUpperCase())}
+              </div>
               <b style="color:#38bdf8;font-size:0.83rem;cursor:pointer;" onclick="document.getElementById('commentsModal').classList.remove('open');openDirectChatWithUser('${c.uid || ''}')">@${escapeHtmlStr(c.author)} 💌</b>
               ${tip > 0 ? `<span class="surge-mini-pill">💎 +${tip} 🪙 ${t('cmt_super_badge')}</span>` : ''}
             </div>
@@ -2348,6 +2363,7 @@ function submitPostComment() {
     id: 'c_' + Date.now(),
     uid: u.uid,
     author: u.name,
+    authorAvatar: u.avatarUrl || '',
     cityId: u.homeCity,
     text: txt,
     voiceUrl: pendingCommentVoiceKey || '',
@@ -4042,6 +4058,7 @@ async function publishNewRemoPost() {
     uid: u.uid,
     authorUid: u.uid,
     authorName: u.name,
+    authorAvatar: u.avatarUrl || '',
     authorEmail: u.email || '',
     authorVerified: true,
     authorPassport: u.passportNum,
@@ -6692,12 +6709,14 @@ function openPostActionsSheet(postId) {
   const rxMap = p.reactions || {};
   const dualPair = buildPostBilingualPair(p);
   const rawCap = String((lang === 'fr' ? (p.caption_fr || p.caption_en) : (p.caption_en || p.caption_fr)) || '').replace(/^(?:🇬🇧|🇫🇷)\s+/u, '');
+  const authorUser = (REMO_STORE.state.users || []).find((usr) => usr && ((p.uid && usr.uid === p.uid) || (p.authorName && usr.name && usr.name.toLowerCase() === p.authorName.toLowerCase())));
+  const authorAvatarUrl = p.authorAvatar || (authorUser && authorUser.avatarUrl) || '';
 
   content.innerHTML = `
     <div class="modal-hdr">
       <div style="display:flex;align-items:center;gap:10px;min-width:0;cursor:pointer;" onclick="closePostActionsModal();openCitizenProfileModal('${p.uid || ''}', '${escapeHtmlStr(p.authorName || '')}');">
-        <div class="avatar-circle" style="width:36px;height:36px;font-size:0.95rem;flex-shrink:0;">
-          ${escapeHtmlStr((p.authorName || 'R')[0].toUpperCase())}
+        <div class="avatar-circle" style="width:36px;height:36px;font-size:0.95rem;flex-shrink:0;overflow:hidden;padding:0;">
+          ${authorAvatarUrl ? `<img src="${authorAvatarUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block;" alt="${escapeHtmlStr(p.authorName)}">` : escapeHtmlStr((p.authorName || 'R')[0].toUpperCase())}
         </div>
         <div style="min-width:0;">
           <div style="font-weight:900;font-size:0.92rem;color:#fff;">@${escapeHtmlStr(p.authorName)}</div>
@@ -10111,8 +10130,8 @@ function openCitizenProfileModal(uidOrName, fallbackName = '', silentIfMissing =
 
   body.innerHTML = `
     <div class="public-profile-hero">
-      <div class="pp-avatar-lg ${cosm.frameClass || ''}">
-        ${escapeHtmlStr((target.name || 'R')[0].toUpperCase())}
+      <div class="pp-avatar-lg ${cosm.frameClass || ''}" style="overflow:hidden;padding:0;position:relative;">
+        ${target.avatarUrl ? `<img src="${target.avatarUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block;" alt="${escapeHtmlStr(target.name)}">` : escapeHtmlStr((target.name || 'R')[0].toUpperCase())}
         ${onlineNow ? '<span class="online-pulse-dot" style="position:absolute;bottom:2px;right:2px;border:2px solid #070b18;"></span>' : ''}
       </div>
       <div style="flex:1;min-width:180px;">

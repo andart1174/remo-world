@@ -932,25 +932,43 @@
   <div class="remo-modal-backdrop" id="editProfileModal" onclick="if(event.target===this)closeEditProfileModal()">
     <div class="remo-modal" style="max-width:440px;">
       <div class="modal-hdr">
-        <b style="font-family:'Orbitron',sans-serif;color:#fbbf24;">✏️ Modifier Mon Profil Citoyen</b>
+        <b style="font-family:'Orbitron',sans-serif;color:#fbbf24;" id="editProfTitleHdr">✏️ Modifier Mon Profil Citoyen</b>
         <button class="modal-close" onclick="closeEditProfileModal()">✕</button>
       </div>
       <form onsubmit="saveUserProfile(event)">
+        <!-- 📸 Avatar Photo Picker -->
+        <div style="display:flex;flex-direction:column;align-items:center;margin-bottom:14px;gap:8px;">
+          <div id="editProfAvatarWrap" class="avatar-circle av-frame-gold_fire" style="width:76px;height:76px;font-size:1.85rem;cursor:pointer;position:relative;overflow:hidden;padding:0;box-shadow:0 0 18px rgba(251,191,36,0.35);" onclick="document.getElementById('editProfAvatarFileInput').click()" title="Click to upload profile photo">
+            <span id="editProfAvatarPlaceholder">A</span>
+            <img id="editProfAvatarImg" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:none;">
+            <div style="position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,0.68);font-size:0.62rem;text-align:center;color:#fbbf24;padding:2px 0;">📷 Photo</div>
+          </div>
+          <input type="file" id="editProfAvatarFileInput" accept="image/*" style="display:none;" onchange="handleProfileAvatarSelect(event)">
+          <div style="display:flex;gap:8px;">
+            <button type="button" class="btn-ghost" style="padding:4px 10px;font-size:0.75rem;" onclick="document.getElementById('editProfAvatarFileInput').click()">
+              <span id="editProfUploadBtnText">📷 Photo</span>
+            </button>
+            <button type="button" class="btn-ghost" id="editProfRemovePhotoBtn" style="padding:4px 10px;font-size:0.75rem;color:#fda4af;border-color:rgba(244,63,94,0.4);display:none;" onclick="removeProfileAvatarPhoto()">
+              ✕ <span id="editProfRemoveBtnText">Remove</span>
+            </button>
+          </div>
+        </div>
+
         <div class="form-field">
-          <label>Nom d’affichage (Pseudo) :</label>
+          <label id="editProfNameLbl">Nom d’affichage (Pseudo) :</label>
           <input type="text" id="editProfNameInp" class="remo-input" maxlength="24" required placeholder="Votre pseudo REMO">
         </div>
         <div class="form-field">
-          <label>Bio / Statut Citoyen (max 80 car.) :</label>
+          <label id="editProfBioLbl">Bio / Statut Citoyen (max 80 car.) :</label>
           <input type="text" id="editProfBioInp" class="remo-input" maxlength="80" placeholder="Ex: Explorateur nocturne • Passionné d'art 🌃">
         </div>
         <div class="form-field">
-          <label>Ville de Résidence (Home City) :</label>
+          <label id="editProfCityLbl">Ville de Résidence (Home City) :</label>
           <select id="editProfCitySel" class="remo-input"></select>
         </div>
         <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">
-          <button type="button" class="btn-ghost" onclick="closeEditProfileModal()">Annuler</button>
-          <button type="submit" class="btn-cyber btn-gold">✓ Enregistrer</button>
+          <button type="button" class="btn-ghost" onclick="closeEditProfileModal()" id="editProfCancelBtn">Annuler</button>
+          <button type="submit" class="btn-cyber btn-gold" id="editProfSaveBtn">✓ Enregistrer</button>
         </div>
       </form>
     </div>
