@@ -6,7 +6,12 @@
 /radio                  /world-radio.html          301
 /fr/radio               /fr/world-radio.html       301
 /tv                     /?tv=montreal              301
-/focus-tv               /?tv=montreal              301
+/focus-tv               /focus-tv.html             301
+/fr/focus-tv            /fr/focus-tv.html          301
+/study                  /study-room.html           301
+/fr/study               /fr/study-room.html        301
+/blitz                  /world-blitz.html          301
+/fr/blitz               /fr/world-blitz.html       301
 /fr/tv                  /?tv=montreal&lang=fr      301
 /ranking                /world-ranking.html        301
 /fr/ranking             /fr/world-ranking.html     301

@@ -187,14 +187,33 @@ const INLINE_RADIO_PLAYER_JS = `
 </script>
 `;
 
+function renderSocialMeta(title, desc, url) {
+  const img = `${DOMAIN}/img/remo_og_cover.jpg`;
+  return `<meta property="og:type" content="website">
+  <meta property="og:site_name" content="REMO World">
+  <meta property="og:url" content="${url}">
+  <meta property="og:title" content="${esc(title)}">
+  <meta property="og:description" content="${esc(desc)}">
+  <meta property="og:image" content="${img}">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="${esc(title)}">
+  <meta name="twitter:description" content="${esc(desc)}">
+  <meta name="twitter:image" content="${img}">`;
+}
+
 function renderTopbar(lang, prefix, altUrl) {
   const isFr = lang === 'fr';
-  const dirHref = isFr ? `${prefix}fr/cities/index.html` : `${prefix}cities/index.html`;
-  const radioHref = isFr ? `${prefix}fr/world-radio.html` : `${prefix}world-radio.html`;
-  const guessHref = isFr ? `${prefix}fr/guess-the-city.html` : `${prefix}guess-the-city.html`;
-  const passHref = isFr ? `${prefix}fr/boarding-pass.html` : `${prefix}boarding-pass.html`;
-  const appHref = isFr ? `${prefix}?lang=fr&from=seo` : `${prefix}?from=seo`;
-  const homeHref = isFr ? `${prefix}fr/` : (prefix || './');
+  const base = prefix || './';
+  const langDir = isFr ? `${prefix}fr/` : prefix;
+  const dirHref = `${langDir}cities/index.html`;
+  const focusHref = `${langDir}focus-tv.html`;
+  const studyHref = `${langDir}study-room.html`;
+  const radioHref = `${langDir}world-radio.html`;
+  const blitzHref = `${langDir}world-blitz.html`;
+  const appHref = isFr ? `${base}?lang=fr&from=seo` : `${base}?from=seo`;
+  const homeHref = isFr ? `${prefix}fr/` : base;
   return `
   <header class="topbar">
     <a class="brand" href="${homeHref}">
@@ -203,9 +222,10 @@ function renderTopbar(lang, prefix, altUrl) {
     </a>
     <nav class="top-links" aria-label="${isFr ? 'Navigation Principale' : 'Primary Navigation'}">
       <a class="pill" href="${dirHref}">🌍 ${isFr ? '24 Villes' : '24 Cities'}</a>
+      <a class="pill" href="${focusHref}">📺 ${isFr ? 'Focus TV' : 'Focus TV'}</a>
+      <a class="pill" href="${studyHref}">👥 ${isFr ? 'Study Room' : 'Study Room'}</a>
       <a class="pill" href="${radioHref}">📻 ${isFr ? 'Radio Monde' : 'World Radio'}</a>
-      <a class="pill" href="${guessHref}">🕵️ ${isFr ? 'Deviner la Ville' : 'Guess City'}</a>
-      <a class="pill" href="${passHref}">🎫 ${isFr ? 'Billet 4D' : 'Boarding Pass'}</a>
+      <a class="pill" href="${blitzHref}">⚡ ${isFr ? 'World Blitz' : 'World Blitz'}</a>
       <a class="pill" href="${altUrl}" hreflang="${isFr ? 'en' : 'fr'}">${isFr ? '🇬🇧 EN' : '🇫🇷 FR'}</a>
       <a class="pill gold" href="${appHref}">🚀 ${isFr ? 'Ouvrir l’App' : 'Launch App'}</a>
     </nav>
@@ -214,15 +234,23 @@ function renderTopbar(lang, prefix, altUrl) {
 
 function renderFooter(lang, prefix, stationCount = 56) {
   const isFr = lang === 'fr';
-  const homeHref = isFr ? `${prefix}fr/` : (prefix || './');
+  const base = prefix || './';
+  const langDir = isFr ? `${prefix}fr/` : prefix;
+  const homeHref = isFr ? `${prefix}fr/` : base;
   return `
   <footer>
     <div>© 2026 <strong>REMO World</strong> — ${isFr ? 'Réseau Social Urbain 4D, Focus TV & Radio Mondiale.' : 'The 4D City Social Network, Focus TV & Live World Radio.'}</div>
     <div style="display:flex;gap:14px;flex-wrap:wrap;">
       <a href="${homeHref}">${isFr ? 'Accueil REMO' : 'REMO Home'}</a>
-      <a href="${isFr ? prefix + 'fr/cities/index.html' : prefix + 'cities/index.html'}">${isFr ? 'Annuaire des Villes' : 'World Cities Directory'}</a>
-      <a href="${isFr ? prefix + 'fr/world-radio.html' : prefix + 'world-radio.html'}">${isFr ? `${stationCount} Radios en Direct` : `${stationCount} Live Radio Stations`}</a>
-      <a href="${isFr ? prefix + 'fr/world-ranking.html' : prefix + 'world-ranking.html'}">${isFr ? 'Classement 2026' : 'World Ranking 2026'}</a>
+      <a href="${langDir}focus-tv.html">${isFr ? 'Focus TV 4D' : '4D Focus TV'}</a>
+      <a href="${langDir}study-room.html">${isFr ? 'Salles d’Étude' : 'Study Rooms'}</a>
+      <a href="${langDir}world-blitz.html">${isFr ? 'World Blitz 60s' : 'World Blitz 60s'}</a>
+      <a href="${langDir}cities/index.html">${isFr ? 'Annuaire des Villes' : '24 Cities Directory'}</a>
+      <a href="${langDir}world-radio.html">${isFr ? `${stationCount} Radios en Direct` : `${stationCount} Live Radios`}</a>
+      <a href="${langDir}guess-the-city.html">${isFr ? 'Deviner la Ville' : 'Guess City'}</a>
+      <a href="${langDir}boarding-pass.html">${isFr ? 'Billet 4D' : 'Boarding Pass'}</a>
+      <a href="${langDir}world-ranking.html">${isFr ? 'Classement 2026' : 'World Ranking 2026'}</a>
+      <a href="${langDir}city-versus.html">${isFr ? 'Duels Villes' : 'City Duels'}</a>
       <a href="${prefix}llms.txt">AI / LLMs</a>
       <a href="${prefix}sitemap.xml">Sitemap</a>
     </div>
@@ -347,16 +375,7 @@ function buildCityPage(city, lang, cities, elements, stations) {
   <link rel="alternate" hreflang="en" href="${enUrl}">
   <link rel="alternate" hreflang="fr" href="${frUrl}">
   <link rel="alternate" hreflang="x-default" href="${enUrl}">
-  <meta property="og:type" content="website">
-  <meta property="og:site_name" content="REMO World">
-  <meta property="og:url" content="${canonical}">
-  <meta property="og:title" content="${esc(title)}">
-  <meta property="og:description" content="${esc(metaDesc)}">
-  <meta property="og:image" content="${DOMAIN}/img/remo_brand_coin.png">
-  <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="${esc(title)}">
-  <meta name="twitter:description" content="${esc(metaDesc)}">
-  <meta name="twitter:image" content="${DOMAIN}/img/remo_brand_coin.png">
+  ${renderSocialMeta(title, metaDesc, canonical)}
   <link rel="icon" type="image/png" sizes="32x32" href="${prefix}img/favicon-32x32.png">
   <script type="application/ld+json">${JSON.stringify(jsonLd)}</script>
   <style>${SHARED_CSS}</style>
@@ -393,6 +412,9 @@ function buildCityPage(city, lang, cities, elements, stations) {
         <div class="cta-row">
           <a class="btn-primary" href="${prefix}?tv=${city.id}&lang=${lang}&from=seo">
             📺 ${isFr ? `Ouvrir Focus TV 4D · ${esc(cName)}` : `Launch 4D Focus TV · ${esc(cName)}`}
+          </a>
+          <a class="btn-sec" href="${prefix}?tv=${city.id}&fx=rain&lang=${lang}&from=seo">
+            🌧️ ${isFr ? `Ambiance Pluie Lofi · ${esc(cName)}` : `Rain Lofi Window · ${esc(cName)}`}
           </a>
           <a class="btn-sec" href="${prefix}?city=${city.id}&lang=${lang}&from=seo">
             🚀 ${isFr ? `Hub Live de ${esc(cName)} (+25 🪙)` : `Enter Live ${esc(cName)} Hub (+25 🪙)`}
@@ -566,11 +588,7 @@ function buildDirectoryPage(lang, cities, stationCount = 56) {
   <link rel="alternate" hreflang="en" href="${enUrl}">
   <link rel="alternate" hreflang="fr" href="${frUrl}">
   <link rel="alternate" hreflang="x-default" href="${enUrl}">
-  <meta property="og:type" content="website">
-  <meta property="og:title" content="${esc(title)}">
-  <meta property="og:description" content="${esc(desc)}">
-  <meta property="og:url" content="${canonical}">
-  <meta property="og:image" content="${DOMAIN}/img/remo_brand_coin.png">
+  ${renderSocialMeta(title, desc, canonical)}
   <link rel="icon" type="image/png" sizes="32x32" href="${prefix}img/favicon-32x32.png">
   <script type="application/ld+json">${JSON.stringify(jsonLd)}</script>
   <style>${SHARED_CSS}</style>
@@ -587,6 +605,8 @@ function buildDirectoryPage(lang, cities, stationCount = 56) {
           <a class="btn-primary" href="${prefix}?tv=montreal&lang=${lang}&from=seo">📺 ${isFr ? 'Ouvrir Focus TV 4D (Direct)' : 'Open 4D Focus TV (Live)'}</a>
           <a class="btn-sec" href="${prefix}?lang=${lang}&from=seo">🚀 ${isFr ? 'Flux Social (+25 🪙)' : 'Live World Feed (+25 🪙)'}</a>
           <a class="btn-sec" href="../world-radio.html">📻 ${isFr ? `${stationCount} Radios en Direct` : `Stream ${stationCount} World Radios`}</a>
+          <a class="btn-sec" href="../focus-tv.html">🌆 ${isFr ? 'Guide Focus TV 4D' : 'Focus TV Guide'}</a>
+          <a class="btn-sec" href="../world-blitz.html">⚡ ${isFr ? 'World Blitz 60s' : 'World Blitz 60s'}</a>
           <a class="btn-sec" href="../guess-the-city.html">🕵️ ${isFr ? 'Deviner la Ville' : 'Play Guess The City'}</a>
         </div>
       </section>
@@ -677,11 +697,7 @@ function buildWorldRadioHubPage(lang, stations, cities) {
   <link rel="alternate" hreflang="en" href="${enUrl}">
   <link rel="alternate" hreflang="fr" href="${frUrl}">
   <link rel="alternate" hreflang="x-default" href="${enUrl}">
-  <meta property="og:type" content="website">
-  <meta property="og:title" content="${esc(title)}">
-  <meta property="og:description" content="${esc(desc)}">
-  <meta property="og:url" content="${canonical}">
-  <meta property="og:image" content="${DOMAIN}/img/remo_brand_coin.png">
+  ${renderSocialMeta(title, desc, canonical)}
   <link rel="icon" type="image/png" sizes="32x32" href="${prefix}img/favicon-32x32.png">
   <script type="application/ld+json">${JSON.stringify(jsonLd)}</script>
   <style>${SHARED_CSS}</style>
@@ -695,7 +711,7 @@ function buildWorldRadioHubPage(lang, stations, cities) {
         <h1>${isFr ? `Radio Mondiale en Direct — ${stCount} Stations Urbaines & Lofi` : `Free Live World Cities Radio — ${stCount} Curated Global Stations`}</h1>
         <p class="lead">${esc(desc)}</p>
         <div class="cta-row">
-          <a class="btn-primary" href="${prefix}?tv=montreal&lang=${lang}&from=seo">📺 ${isFr ? 'Ouvrir Focus TV 4D (+5 🪙 / 10 min)' : 'Launch 4D Focus TV (+5 🪙 / 10m)'}</a>
+          <a class="btn-primary" href="${prefix || './'}?tv=montreal&lang=${lang}&from=seo">📺 ${isFr ? 'Ouvrir Focus TV 4D (+5 🪙 / 10 min)' : 'Launch 4D Focus TV (+5 🪙 / 10m)'}</a>
           <input type="search" id="stSearch" placeholder="🔍 ${isFr ? 'Filtrer par ville ou style (ex: Chișinău, Paris, Lofi, Jazz)...' : 'Filter by city or genre (e.g. Chisinau, Paris, Lofi, Jazz)...'}"
             oninput="filterSt(this.value)" style="padding:12px 16px;border-radius:14px;border:1px solid rgba(56,189,248,0.45);background:rgba(2,6,23,0.85);color:#fff;min-width:270px;flex:1;">
         </div>
@@ -783,11 +799,7 @@ function buildGuessCityHubPage(lang, cities) {
   <link rel="alternate" hreflang="en" href="${enUrl}">
   <link rel="alternate" hreflang="fr" href="${frUrl}">
   <link rel="alternate" hreflang="x-default" href="${enUrl}">
-  <meta property="og:type" content="website">
-  <meta property="og:title" content="${esc(title)}">
-  <meta property="og:description" content="${esc(desc)}">
-  <meta property="og:url" content="${canonical}">
-  <meta property="og:image" content="${DOMAIN}/img/remo_brand_coin.png">
+  ${renderSocialMeta(title, desc, canonical)}
   <link rel="icon" type="image/png" sizes="32x32" href="${prefix}img/favicon-32x32.png">
   <script type="application/ld+json">${JSON.stringify(jsonLd)}</script>
   <style>${SHARED_CSS}</style>
@@ -907,11 +919,7 @@ function buildBeatMakerHubPage(lang) {
   <link rel="alternate" hreflang="en" href="${enUrl}">
   <link rel="alternate" hreflang="fr" href="${frUrl}">
   <link rel="alternate" hreflang="x-default" href="${enUrl}">
-  <meta property="og:type" content="website">
-  <meta property="og:title" content="${esc(title)}">
-  <meta property="og:description" content="${esc(desc)}">
-  <meta property="og:url" content="${canonical}">
-  <meta property="og:image" content="${DOMAIN}/img/remo_brand_coin.png">
+  ${renderSocialMeta(title, desc, canonical)}
   <link rel="icon" type="image/png" sizes="32x32" href="${prefix}img/favicon-32x32.png">
   <script type="application/ld+json">${JSON.stringify(jsonLd)}</script>
   <style>${SHARED_CSS}
@@ -1032,11 +1040,7 @@ function buildBoardingPassHubPage(lang, cities) {
   <link rel="alternate" hreflang="en" href="${enUrl}">
   <link rel="alternate" hreflang="fr" href="${frUrl}">
   <link rel="alternate" hreflang="x-default" href="${enUrl}">
-  <meta property="og:type" content="website">
-  <meta property="og:title" content="${esc(title)}">
-  <meta property="og:description" content="${esc(desc)}">
-  <meta property="og:url" content="${canonical}">
-  <meta property="og:image" content="${DOMAIN}/img/remo_brand_coin.png">
+  ${renderSocialMeta(title, desc, canonical)}
   <link rel="icon" type="image/png" sizes="32x32" href="${prefix}img/favicon-32x32.png">
   <script type="application/ld+json">${JSON.stringify(jsonLd)}</script>
   <style>${SHARED_CSS}</style>
@@ -1070,12 +1074,455 @@ function buildBoardingPassHubPage(lang, cities) {
         <h2>🌍 ${isFr ? 'Choisir Votre Ville de Destination' : 'Pick Your Destination City'}</h2>
         <div class="grid-3">
           ${cities.map((c) => `
-          <a class="city-link" href="${isFr ? 'cities/' : 'cities/'}${c.id}.html">${c.flag} ${esc(isFr ? c.name_fr : c.name_en)} (${c.code})</a>`).join('')}
+          <a class="city-link" href="cities/${c.id}.html">${c.flag} ${esc(isFr ? c.name_fr : c.name_en)} (${c.code})</a>`).join('')}
         </div>
       </section>
     </main>
     ${renderFooter(lang, prefix)}
   </div>
+</body>
+</html>`;
+}
+
+function buildFocusTvHubPage(lang, cities, stations) {
+  const isFr = lang === 'fr';
+  const enUrl = `${DOMAIN}/focus-tv.html`;
+  const frUrl = `${DOMAIN}/fr/focus-tv.html`;
+  const canonical = isFr ? frUrl : enUrl;
+  const altUrl = isFr ? '../focus-tv.html' : 'fr/focus-tv.html';
+  const prefix = isFr ? '../' : '';
+  const baseApp = prefix || './';
+
+  const title = isFr
+    ? '📺 Focus TV 4D — Fenêtre Ambiante Villes du Monde, Radio Lofi & Horloge Zen | REMO World'
+    : '📺 4D Focus TV — Live Ambient World City Windows, Lofi Radio & Zen Clock | REMO World';
+  const desc = isFr
+    ? `Ouvrez une fenêtre 4D animée sur ${cities.length} villes du monde avec pluie, neige, météo en direct, ${stations.length} radios Cyber-LoFi et mode Horloge Bureau Zen. 100% gratuit, sans inscription.`
+    : `Open a living 4D ambient window across ${cities.length} world cities with rain/snow FX, live weather, ${stations.length} ad-free Lofi & city radio streams, and fullscreen Zen Desk Clock. Free, zero sign-up.`;
+
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'WebApplication',
+        'name': isFr ? 'REMO 4D Focus TV — Fenêtre Ambiante & Horloge Zen' : 'REMO 4D Focus TV — Ambient City Window & Zen Clock',
+        'url': canonical,
+        'applicationCategory': 'LifestyleApplication',
+        'operatingSystem': 'All',
+        'offers': { '@type': 'Offer', 'price': '0', 'priceCurrency': 'USD' },
+        'description': desc
+      },
+      {
+        '@type': 'FAQPage',
+        'mainEntity': [
+          {
+            '@type': 'Question',
+            'name': isFr ? 'Qu’est-ce que REMO 4D Focus TV ?' : 'What is REMO 4D Focus TV?',
+            'acceptedAnswer': {
+              '@type': 'Answer',
+              'text': isFr
+                ? 'Focus TV 4D est un écran d’ambiance gratuit combinant silhouettes 4D de 24 villes, heure locale en direct, météo réelle, effets visuels (pluie, neige, feu, néon), 56 radios Lofi/mondiales et un mode Horloge Bureau Zen.'
+                : 'REMO 4D Focus TV is a free ambient city window combining 4D architectural skylines for 24 cities, live local clocks, real-time weather, ambient FX (rain, snow, neon, fireplace), 56 radio streams, and a fullscreen Zen Desk Clock mode.'
+            }
+          },
+          {
+            '@type': 'Question',
+            'name': isFr ? 'Comment partager mon lien d’ambiance personnalisé (Custom Vibe Link) ?' : 'How do Custom Vibe Links and Fly Random work?',
+            'acceptedAnswer': {
+              '@type': 'Answer',
+              'text': isFr
+                ? 'Chaque combinaison de ville, effets et station radio génère un lien URL direct (ex. ?tv=tokyo&fx=rain). Cliquez aussi sur Fly Random ou filtrez les villes où il pleut ou fait nuit en ce moment.'
+                : 'Every city, effect, and station choice updates your shareable Custom Vibe Link (e.g. ?tv=tokyo&fx=rain). You can also teleport with Fly Random or filter cities where it is currently raining or nighttime live.'
+            }
+          }
+        ]
+      }
+    ]
+  };
+
+  return `<!DOCTYPE html>
+<html lang="${lang}">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${esc(title)}</title>
+  <meta name="description" content="${esc(desc)}">
+  <meta name="robots" content="index, follow, max-image-preview:large">
+  <link rel="canonical" href="${canonical}">
+  <link rel="alternate" hreflang="en" href="${enUrl}">
+  <link rel="alternate" hreflang="fr" href="${frUrl}">
+  <link rel="alternate" hreflang="x-default" href="${enUrl}">
+  ${renderSocialMeta(title, desc, canonical)}
+  <link rel="icon" type="image/png" sizes="32x32" href="${prefix}img/favicon-32x32.png">
+  <script type="application/ld+json">${JSON.stringify(jsonLd)}</script>
+  <style>${SHARED_CSS}</style>
+</head>
+<body>
+  <div class="wrap">
+    ${renderTopbar(lang, prefix, altUrl)}
+    <main>
+      <section class="hero">
+        <div class="eyebrow">📺 4D AMBIENT WINDOW • ${cities.length} CITIES • ${stations.length} LIVE RADIOS • ZEN CLOCK</div>
+        <h1>${isFr ? '📺 Focus TV 4D — Fenêtre Ambiante, Horloge Zen & Radio Lofi' : '📺 4D Focus TV — Living City Windows, Zen Desk Clock & Lofi Radio'}</h1>
+        <p class="lead">${esc(desc)}</p>
+        <div class="cta-row">
+          <a class="btn-primary" href="${baseApp}?tv=tokyo&fx=rain&lang=${lang}&from=seo">🏯 ${isFr ? 'Tokyo Sous la Pluie (Live)' : 'Tokyo Rain Window (Live)'}</a>
+          <a class="btn-sec" href="${baseApp}?tv=paris&lang=${lang}&from=seo">🗼 ${isFr ? 'Paris Direct' : 'Paris Live'}</a>
+          <a class="btn-sec" href="${baseApp}?tv=montreal&fx=snow&lang=${lang}&from=seo">⚜️ ${isFr ? 'Neige à Montréal' : 'Montréal Snow'}</a>
+          <a class="btn-sec" href="study-room.html">👥 ${isFr ? 'Salles Study Together' : 'Study Together Rooms'}</a>
+        </div>
+      </section>
+
+      <section class="card" style="margin-bottom:22px;border-color:rgba(56,189,248,0.45);">
+        <h2>🔗 ${isFr ? 'Créateur de Lien Ambiance (Custom Vibe Link)' : 'Instant Custom Vibe Link Builder'}</h2>
+        <p style="font-size:0.86rem;color:var(--muted);margin-bottom:12px;">
+          ${isFr ? 'Choisissez une ville et des effets 4D pour ouvrir ou partager votre fenêtre exacte :' : 'Pick a world city and ambient FX below to generate your shareable 4D window URL:'}
+        </p>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px;">
+          <select id="ftvCitySel" onchange="updateVibe()" style="padding:10px 14px;border-radius:12px;background:#090d1f;color:#fff;border:1px solid rgba(255,255,255,0.2);font-weight:700;">
+            ${cities.map((c) => `<option value="${c.id}">${c.flag} ${esc(isFr ? c.name_fr : c.name_en)} (${c.code})</option>`).join('')}
+          </select>
+          <label class="pill" style="cursor:pointer;"><input type="checkbox" value="rain" class="ftvFxChk" onchange="updateVibe()" checked> 🌧️ ${isFr ? 'Pluie' : 'Rain'}</label>
+          <label class="pill" style="cursor:pointer;"><input type="checkbox" value="snow" class="ftvFxChk" onchange="updateVibe()"> ❄️ ${isFr ? 'Neige' : 'Snow'}</label>
+          <label class="pill" style="cursor:pointer;"><input type="checkbox" value="neon" class="ftvFxChk" onchange="updateVibe()"> 💜 ${isFr ? 'Néon' : 'Neon'}</label>
+          <label class="pill" style="cursor:pointer;"><input type="checkbox" value="fire" class="ftvFxChk" onchange="updateVibe()"> 🔥 ${isFr ? 'Cheminée' : 'Fireplace'}</label>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+          <a id="ftvLaunchLink" class="btn-primary" href="${baseApp}?tv=montreal&fx=rain&lang=${lang}&from=seo">🚀 ${isFr ? 'Ouvrir cette Fenêtre 4D' : 'Open This 4D Window'}</a>
+          <button type="button" class="btn-sec" id="ftvCopyBtn" onclick="copyVibe()">📋 ${isFr ? 'Copier le Vibe Link' : 'Copy Vibe Link'}</button>
+          <span id="ftvUrlPreview" style="font-family:monospace;font-size:0.8rem;color:#7dd3fc;"></span>
+        </div>
+      </section>
+
+      <section class="card" style="margin-bottom:22px;">
+        <h2>✨ ${isFr ? 'Fonctionnalités Incluses Sans Compte' : 'Built Into Every 4D Focus TV Window'}</h2>
+        <div class="grid-3">
+          <div>
+            <strong style="color:var(--gold);">🕰️ ${isFr ? 'Mode Horloge Bureau Zen' : 'Minimal Zen Desk Clock'}</strong>
+            <p style="font-size:0.85rem;color:#cbd5e1;margin-top:4px;">${isFr ? 'Masquez les menus en 1 clic pour transformer votre écran secondaire ou TV en horloge futuriste avec musique.' : 'Hide UI panels in 1 click to turn a second monitor or TV into a living ambient screensaver with clock and audio.'}</p>
+          </div>
+          <div>
+            <strong style="color:var(--gold);">✈️ ${isFr ? 'Fly Random & Filtres Live' : 'Fly Random & Live Weather Filters'}</strong>
+            <p style="font-size:0.85rem;color:#cbd5e1;margin-top:4px;">${isFr ? 'Téléportez-vous vers une ville aléatoire ou filtrez les métropoles où il pleut ou fait nuit en ce moment.' : 'Teleport instantly anywhere on Earth or filter for cities currently experiencing live rain or nighttime.'}</p>
+          </div>
+          <div>
+            <strong style="color:var(--gold);">📻 ${isFr ? `${stations.length} Radios & Pomodoro` : `${stations.length} Live Radios & Pomodoro`}</strong>
+            <p style="font-size:0.85rem;color:#cbd5e1;margin-top:4px;">${isFr ? 'Flux Cyber-LoFi, Jazz et radios locales avec minuterie de concentration 25/50 min.' : 'Stream Cyber-LoFi, Chillstep, Jazz, or local stations alongside an integrated 25/50m focus timer.'}</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>🌍 ${isFr ? 'Lancer Focus TV par Ville' : 'Launch 4D Focus TV by City'}</h2>
+        <div class="grid-3">
+          ${cities.map((c) => `
+          <a class="city-link" href="${baseApp}?tv=${c.id}&lang=${lang}&from=seo">${c.flag} ${esc(isFr ? c.name_fr : c.name_en)} <small style="color:var(--gold);">4D TV →</small></a>`).join('')}
+        </div>
+      </section>
+    </main>
+    ${renderFooter(lang, prefix, stations.length)}
+  </div>
+  <script>
+  (function(){
+    var baseApp = ${JSON.stringify(baseApp)};
+    var lang = ${JSON.stringify(lang)};
+    function buildRelUrl(){
+      var c = document.getElementById('ftvCitySel').value;
+      var fx = Array.prototype.slice.call(document.querySelectorAll('.ftvFxChk:checked')).map(function(i){ return i.value; }).join(',');
+      return baseApp + '?tv=' + encodeURIComponent(c) + (fx ? '&fx=' + encodeURIComponent(fx) : '') + '&lang=' + lang + '&from=seo';
+    }
+    window.updateVibe = function(){
+      var rel = buildRelUrl();
+      document.getElementById('ftvLaunchLink').setAttribute('href', rel);
+      var clean = rel.replace(/^\\.\\.\\//, '').replace(/^\\.\\//, '');
+      document.getElementById('ftvUrlPreview').textContent = 'remoworld.com/' + clean;
+    };
+    window.copyVibe = function(){
+      var rel = buildRelUrl().replace(/^\\.\\.\\//, '').replace(/^\\.\\//, '');
+      var full = 'https://remoworld.com/' + rel;
+      if(navigator.clipboard) navigator.clipboard.writeText(full);
+      document.getElementById('ftvCopyBtn').textContent = '✓ ' + (${isFr ? '"Lien Copié !"' : '"Vibe Link Copied!"'});
+    };
+    updateVibe();
+  })();
+  </script>
+</body>
+</html>`;
+}
+
+function buildStudyRoomHubPage(lang, cities, stations) {
+  const isFr = lang === 'fr';
+  const enUrl = `${DOMAIN}/study-room.html`;
+  const frUrl = `${DOMAIN}/fr/study-room.html`;
+  const canonical = isFr ? frUrl : enUrl;
+  const altUrl = isFr ? '../study-room.html' : 'fr/study-room.html';
+  const prefix = isFr ? '../' : '';
+  const baseApp = prefix || './';
+
+  const title = isFr
+    ? '👥 Salle d’Étude Lofi Synchronisée & Pomodoro Gratuit (Study Together) | REMO World'
+    : '👥 Free Synced Lofi Study Room & Online Pomodoro Co-Working | REMO World';
+  const desc = isFr
+    ? `Créez un lien de salle Focus Together (?room=...) en 1 seconde : minuterie Pomodoro synchronisée, ambiance 4D (${cities.length} villes), pluie/neige et ${stations.length} radios Lofi gratuites pour étudier entre amis.`
+    : `Create a synced Focus Together Study Room link in 1 click: shared Pomodoro timer, 4D rainy window (${cities.length} cities), and ${stations.length} Lofi radio stations for students and remote workers.`;
+
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'WebApplication',
+        'name': isFr ? 'REMO Focus Together — Salle d’Étude Pomodoro Synchronisée' : 'REMO Focus Together — Synced Study Room & Co-Working',
+        'url': canonical,
+        'applicationCategory': 'ProductivityApplication',
+        'operatingSystem': 'All',
+        'offers': { '@type': 'Offer', 'price': '0', 'priceCurrency': 'USD' },
+        'description': desc
+      },
+      {
+        '@type': 'FAQPage',
+        'mainEntity': [
+          {
+            '@type': 'Question',
+            'name': isFr ? 'Comment fonctionne une salle Focus Together sur REMO World ?' : 'How does a REMO Focus Together Study Room stay in sync?',
+            'acceptedAnswer': {
+              '@type': 'Answer',
+              'text': isFr
+                ? 'Chaque salle utilise un identifiant dans l’URL (ex. ?tv=tokyo&fx=rain&room=study42). Toute personne ouvrant ce lien rejoint instantanément la même ville 4D, la même ambiance Lofi et la même minuterie Pomodoro synchronisée.'
+                : 'Every room shares an instant link parameter (?tv=tokyo&fx=rain&room=study42). Friends who open your link join the same 4D window, ambient Lofi station, and synchronized Pomodoro session timer.'
+            }
+          }
+        ]
+      }
+    ]
+  };
+
+  return `<!DOCTYPE html>
+<html lang="${lang}">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${esc(title)}</title>
+  <meta name="description" content="${esc(desc)}">
+  <meta name="robots" content="index, follow, max-image-preview:large">
+  <link rel="canonical" href="${canonical}">
+  <link rel="alternate" hreflang="en" href="${enUrl}">
+  <link rel="alternate" hreflang="fr" href="${frUrl}">
+  <link rel="alternate" hreflang="x-default" href="${enUrl}">
+  ${renderSocialMeta(title, desc, canonical)}
+  <link rel="icon" type="image/png" sizes="32x32" href="${prefix}img/favicon-32x32.png">
+  <script type="application/ld+json">${JSON.stringify(jsonLd)}</script>
+  <style>${SHARED_CSS}</style>
+</head>
+<body>
+  <div class="wrap">
+    ${renderTopbar(lang, prefix, altUrl)}
+    <main>
+      <section class="hero">
+        <div class="eyebrow">👥 STUDY WITH ME • SYNCED POMODORO • LOFI CO-WORKING</div>
+        <h1>${isFr ? '👥 Salles d’Étude Synchronisées — Étudiez Ensemble en 4D' : '👥 Focus Together Rooms — Free Synced Lofi Study & Co-Working'}</h1>
+        <p class="lead">${esc(desc)}</p>
+        <div class="cta-row">
+          <a class="btn-primary" href="${baseApp}?tv=tokyo&fx=rain&room=study25&lang=${lang}&from=seo">🌧️ ${isFr ? 'Salle Tokyo Pluie (25 min)' : 'Join Tokyo Rain Study Room'}</a>
+          <a class="btn-sec" href="${baseApp}?tv=paris&fx=neon&room=paris-cafe&lang=${lang}&from=seo">🗼 ${isFr ? 'Café Paris Focus' : 'Paris Midnight Café'}</a>
+          <a class="btn-sec" href="${baseApp}?tv=montreal&fx=snow&room=deepwork&lang=${lang}&from=seo">⚜️ ${isFr ? 'Montréal Deep Work' : 'Montréal Snow Deep Work'}</a>
+        </div>
+      </section>
+
+      <section class="card" style="margin-bottom:22px;border-color:rgba(16,185,129,0.45);">
+        <h2>🚀 ${isFr ? 'Créer Votre Lien de Salle d’Étude Personnalisé' : 'Create Your Own Synced Study Room Link'}</h2>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:12px 0;">
+          <select id="srCity" onchange="updateRoomLink()" style="padding:10px 14px;border-radius:12px;background:#090d1f;color:#fff;border:1px solid rgba(255,255,255,0.2);font-weight:700;">
+            ${cities.map((c) => `<option value="${c.id}" ${c.id === 'tokyo' ? 'selected' : ''}>${c.flag} ${esc(isFr ? c.name_fr : c.name_en)}</option>`).join('')}
+          </select>
+          <select id="srFx" onchange="updateRoomLink()" style="padding:10px 14px;border-radius:12px;background:#090d1f;color:#fff;border:1px solid rgba(255,255,255,0.2);font-weight:700;">
+            <option value="rain">🌧️ ${isFr ? 'Pluie Lofi' : 'Lofi Rain'}</option>
+            <option value="snow">❄️ ${isFr ? 'Neige Douce' : 'Soft Snow'}</option>
+            <option value="neon">💜 ${isFr ? 'Néon Nuit' : 'Cyber Night'}</option>
+            <option value="fire">🔥 ${isFr ? 'Cheminée Cosy' : 'Cozy Fire'}</option>
+          </select>
+          <input type="text" id="srName" value="focus-crew" oninput="updateRoomLink()" maxlength="24"
+            placeholder="${isFr ? 'Nom de la salle...' : 'Room code...'}"
+            style="padding:10px 14px;border-radius:12px;background:#090d1f;color:#fff;border:1px solid rgba(56,189,248,0.45);font-weight:700;">
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+          <a id="srLaunchBtn" class="btn-primary" href="${baseApp}?tv=tokyo&fx=rain&room=focus-crew&lang=${lang}&from=seo">👥 ${isFr ? 'Lancer la Salle Synchronisée' : 'Open Synced Study Room'}</a>
+          <button type="button" id="srCopyBtn" class="btn-sec" onclick="copyRoomLink()">📋 ${isFr ? 'Copier le Lien d’Invitation' : 'Copy Invite Link'}</button>
+          <span id="srPreview" style="font-family:monospace;font-size:0.8rem;color:#a7f3d0;"></span>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>🎓 ${isFr ? 'Pourquoi utiliser REMO Study Rooms ?' : 'Ideal for Students, Remote Teams & Solo Makers'}</h2>
+        <div class="grid-3">
+          <div>
+            <strong style="color:var(--gold);">⏱️ ${isFr ? 'Pomodoro Partagé' : 'Zero-Setup Synced Timer'}</strong>
+            <p style="font-size:0.85rem;color:#cbd5e1;margin-top:4px;">${isFr ? 'Pas d’inscription ni de téléchargement : un seul lien met tout le groupe au même rythme.' : 'No accounts or downloads required—one URL aligns everyone on the same focus block and city ambiance.'}</p>
+          </div>
+          <div>
+            <strong style="color:var(--gold);">🎧 ${isFr ? '56 Flux Audio Calmes' : 'Curated Deep-Work Audio'}</strong>
+            <p style="font-size:0.85rem;color:#cbd5e1;margin-top:4px;">${isFr ? 'Lofi Beats, Piano Nocturne, Jazz et radios locales sans coupures publicitaires.' : 'Blend Chill Lofi, Night Jazz, Synthwave, or regional stations ad-free in your browser.'}</p>
+          </div>
+          <div>
+            <strong style="color:var(--gold);">🪙 ${isFr ? 'Récompenses d’Écoute' : 'Listen-to-Earn Gold Coins'}</strong>
+            <p style="font-size:0.85rem;color:#cbd5e1;margin-top:4px;">${isFr ? 'Cumulez des Pièces d’Or REMO toutes les 10 minutes tout en révisant ou en codant.' : 'Collect REMO Gold Coins automatically every 10 minutes while you study, write, or code.'}</p>
+          </div>
+        </div>
+      </section>
+    </main>
+    ${renderFooter(lang, prefix, stations.length)}
+  </div>
+  <script>
+  (function(){
+    var baseApp = ${JSON.stringify(baseApp)};
+    var lang = ${JSON.stringify(lang)};
+    function getRoomRel(){
+      var c = document.getElementById('srCity').value;
+      var fx = document.getElementById('srFx').value;
+      var rm = (document.getElementById('srName').value || 'study').toLowerCase().replace(/[^a-z0-9_-]/g, '') || 'study';
+      return baseApp + '?tv=' + encodeURIComponent(c) + '&fx=' + encodeURIComponent(fx) + '&room=' + encodeURIComponent(rm) + '&lang=' + lang + '&from=seo';
+    }
+    window.updateRoomLink = function(){
+      var rel = getRoomRel();
+      document.getElementById('srLaunchBtn').setAttribute('href', rel);
+      document.getElementById('srPreview').textContent = 'remoworld.com/' + rel.replace(/^\\.\\.\\//, '').replace(/^\\.\\//, '');
+    };
+    window.copyRoomLink = function(){
+      var rel = getRoomRel().replace(/^\\.\\.\\//, '').replace(/^\\.\\//, '');
+      if(navigator.clipboard) navigator.clipboard.writeText('https://remoworld.com/' + rel);
+      document.getElementById('srCopyBtn').textContent = '✓ ' + (${isFr ? '"Invitation Copiée !"' : '"Invite Copied!"'});
+    };
+    updateRoomLink();
+  })();
+  </script>
+</body>
+</html>`;
+}
+
+function buildWorldBlitzHubPage(lang, cities) {
+  const isFr = lang === 'fr';
+  const enUrl = `${DOMAIN}/world-blitz.html`;
+  const frUrl = `${DOMAIN}/fr/world-blitz.html`;
+  const canonical = isFr ? frUrl : enUrl;
+  const altUrl = isFr ? '../world-blitz.html' : 'fr/world-blitz.html';
+  const prefix = isFr ? '../' : '';
+  const baseApp = prefix || './';
+
+  const title = isFr
+    ? '⚡ Daily World Blitz 60s — Jeu Géographie Quotidien & Duel 1v1 en Ligne | REMO World'
+    : '⚡ Daily World Blitz 60s — Free Daily Geography Trivia & 1v1 Friend Duels | REMO World';
+  const desc = isFr
+    ? 'Devinez 5 villes mondiales en 60 secondes dans le défi quotidien REMO Daily World Blitz ! Partagez votre score style Wordle et lancez un lien de duel 1v1 à vos amis.'
+    : 'Solve the same 5 world cities as the whole planet in 60 seconds! Play Daily World Blitz free in your browser, copy your Wordle-style result card, and send a 1v1 challenge link to friends.';
+
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'VideoGame',
+        'name': 'REMO Daily World Blitz — 60s Global City Trivia & 1v1 Duels',
+        'url': canonical,
+        'gamePlatform': ['Web Browser', 'Mobile Web'],
+        'applicationCategory': 'Game',
+        'genre': ['Trivia', 'Geography', 'Daily Puzzle'],
+        'offers': { '@type': 'Offer', 'price': '0', 'priceCurrency': 'USD' },
+        'description': desc
+      },
+      {
+        '@type': 'FAQPage',
+        'mainEntity': [
+          {
+            '@type': 'Question',
+            'name': isFr ? 'Comment fonctionnent les duels 1v1 dans Daily World Blitz ?' : 'How do 1v1 Friend Duels work in Daily World Blitz?',
+            'acceptedAnswer': {
+              '@type': 'Answer',
+              'text': isFr
+                ? 'Après votre manche de 60 secondes (5 villes), générez un lien ?open=blitz&vs=... encodant votre score et votre chrono. Vos amis jouent le même tirage mondial du jour et obtiennent un verdict instantané.'
+                : 'After finishing your 5-city 60s round, generate a personal ?open=blitz&vs=... link carrying your score and time. When friends open it, they play the exact same daily seed and get a head-to-head verdict.'
+            }
+          }
+        ]
+      }
+    ]
+  };
+
+  return `<!DOCTYPE html>
+<html lang="${lang}">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${esc(title)}</title>
+  <meta name="description" content="${esc(desc)}">
+  <meta name="robots" content="index, follow, max-image-preview:large">
+  <link rel="canonical" href="${canonical}">
+  <link rel="alternate" hreflang="en" href="${enUrl}">
+  <link rel="alternate" hreflang="fr" href="${frUrl}">
+  <link rel="alternate" hreflang="x-default" href="${enUrl}">
+  ${renderSocialMeta(title, desc, canonical)}
+  <link rel="icon" type="image/png" sizes="32x32" href="${prefix}img/favicon-32x32.png">
+  <script type="application/ld+json">${JSON.stringify(jsonLd)}</script>
+  <style>${SHARED_CSS}</style>
+</head>
+<body>
+  <div class="wrap">
+    ${renderTopbar(lang, prefix, altUrl)}
+    <main>
+      <section class="hero">
+        <div class="eyebrow">⚡ DAILY GLOBAL SEED • 5 CITIES IN 60 SECONDS • 1V1 DUELS</div>
+        <h1>${isFr ? '⚡ Daily World Blitz — Le Défi Géographie 60s & Duel 1v1' : '⚡ Daily World Blitz — 60-Second Daily City Trivia & 1v1 Duels'}</h1>
+        <p class="lead">${esc(desc)}</p>
+        <div class="cta-row">
+          <a class="btn-primary" href="${baseApp}?open=blitz&lang=${lang}&from=seo">⚡ ${isFr ? 'Jouer au Blitz du Jour (Gratuit)' : 'Play Today’s World Blitz (Free)'}</a>
+          <a class="btn-sec" href="guess-the-city.html">🕵️ ${isFr ? 'Jeu Deviner la Ville (Photos)' : 'Guess The City Photo Game'}</a>
+          <a class="btn-sec" href="cities/index.html">🌍 ${isFr ? 'Réviser les 24 Villes' : 'Explore All 24 Cities'}</a>
+        </div>
+      </section>
+
+      <section class="card" style="margin-bottom:22px;border-color:rgba(251,191,36,0.45);">
+        <h2>🧠 ${isFr ? 'Échauffement Express (1 Question Blitz)' : 'Quick Blitz Practice Round'}</h2>
+        <div id="blitzPracticeBox" style="margin-top:12px;"></div>
+      </section>
+
+      <section class="card">
+        <h2>⚔️ ${isFr ? 'Comment gagner chaque duel World Blitz' : 'How the 60s Daily Challenge & 1v1 Mode Works'}</h2>
+        <div class="grid-3">
+          <div>
+            <strong style="color:var(--gold);">🌐 ${isFr ? 'Même Tirage Mondial' : 'Same 5 Cities Planet-Wide'}</strong>
+            <p style="font-size:0.85rem;color:#cbd5e1;margin-top:4px;">${isFr ? 'Tout le monde affronte les mêmes 5 villes chaque jour à partir d’indices de silhouettes, fuseaux et météo.' : 'Every player worldwide gets the exact same daily seed of 5 cities powered by skylines, flags, and clues.'}</p>
+          </div>
+          <div>
+            <strong style="color:var(--gold);">🟩 ${isFr ? 'Carte Partage & Duel 1v1' : 'Shareable Grid & 1v1 Link'}</strong>
+            <p style="font-size:0.85rem;color:#cbd5e1;margin-top:4px;">${isFr ? 'Copiez votre résultat 🟩🟩🟩🟩🟩 ou défiez un ami directement sur WhatsApp, Discord ou X.' : 'Copy your score card for Discord/WhatsApp or send a custom 1v1 Duel URL encoding your exact score & seconds.'}</p>
+          </div>
+          <div>
+            <strong style="color:var(--gold);">🪙 ${isFr ? 'Bonus Pièces d’Or REMO' : 'Win REMO Gold Coins'}</strong>
+            <p style="font-size:0.85rem;color:#cbd5e1;margin-top:4px;">${isFr ? 'Complétez votre manche quotidienne sans inscription pour remporter des récompenses urbaines.' : 'No account needed to play—beat the daily clock to earn Gold Coins and boost your Citizen standing.'}</p>
+          </div>
+        </div>
+      </section>
+    </main>
+    ${renderFooter(lang, prefix, 56)}
+  </div>
+  <script>
+  (function(){
+    var isFr = ${isFr ? 'true' : 'false'};
+    var box = document.getElementById('blitzPracticeBox');
+    var q = isFr
+      ? 'Indice Blitz #1 : Ville européenne célèbre pour ses caves souterraines de Cricova/Mileștii Mici, son Arc de Triomphe blanc et le code IATA KIV :'
+      : 'Blitz Clue #1: European capital famous for its white-stone City Gates, monumental underground wine cities, and IATA code KIV:';
+    var opts = ['Chișinău 🇲🇩', 'Lisbon 🇵🇹', 'Vienna 🇦🇹', 'Montreal ⚜️'];
+    box.innerHTML = '<div style="font-weight:800;color:#e0f2fe;margin-bottom:10px;">' + q + '</div>' +
+      '<div style="display:flex;gap:8px;flex-wrap:wrap;">' +
+      opts.map(function(o, i){
+        return '<button type="button" class="pill" style="cursor:pointer;" onclick="chkBlitz(' + i + ',this)">' + o + '</button>';
+      }).join('') + '</div>';
+    window.chkBlitz = function(i, btn){
+      var ok = i === 0;
+      btn.style.background = ok ? '#10b981' : '#ef4444';
+      btn.style.color = '#fff';
+      btn.textContent += ok ? (isFr ? ' ✓ Exact !' : ' ✓ Correct!') : ' ✕';
+    };
+  })();
+  </script>
 </body>
 </html>`;
 }
@@ -1219,11 +1666,7 @@ function buildFrenchHomePage(cities, stations) {
   <link rel="alternate" hreflang="en" href="${DOMAIN}/">
   <link rel="alternate" hreflang="fr" href="${canonical}">
   <link rel="alternate" hreflang="x-default" href="${DOMAIN}/">
-  <meta property="og:type" content="website">
-  <meta property="og:title" content="${esc(title)}">
-  <meta property="og:description" content="${esc(desc)}">
-  <meta property="og:url" content="${canonical}">
-  <meta property="og:image" content="${DOMAIN}/img/remo_brand_coin.png">
+  ${renderSocialMeta(title, desc, canonical)}
   <link rel="icon" type="image/png" sizes="32x32" href="../img/favicon-32x32.png">
   <script type="application/ld+json">${JSON.stringify(jsonLd)}</script>
   <style>${SHARED_CSS}</style>
@@ -1247,6 +1690,9 @@ function buildFrenchHomePage(cities, stations) {
         <section class="card">
           <h2>🛠️ Outils &amp; Expériences REMO World</h2>
           <div style="display:flex;flex-direction:column;gap:10px;">
+            <a class="city-link" href="focus-tv.html">📺 Focus TV 4D — Fenêtre Ambiante &amp; Horloge Zen</a>
+            <a class="city-link" href="study-room.html">👥 Salles d’Étude Lofi Synchronisées (Pomodoro)</a>
+            <a class="city-link" href="world-blitz.html">⚡ Daily World Blitz 60s — Quiz Villes &amp; Duel 1v1</a>
             <a class="city-link" href="world-radio.html">📻 Radio Mondiale Gratuite — ${stations.length} Stations (${cities.length}/${cities.length} Villes)</a>
             <a class="city-link" href="world-ranking.html">🏆 Classement Mondial des 24 Villes 2026</a>
             <a class="city-link" href="city-versus.html">⚔️ Comparateur &amp; Duels de Villes (Montréal vs Paris…)</a>
@@ -1277,6 +1723,9 @@ function buildFrenchHomePage(cities, stations) {
 function buildSitemapXml(cities) {
   const pairs = [
     { en: `${DOMAIN}/`, fr: `${DOMAIN}/fr/`, prio: '1.0', freq: 'daily' },
+    { en: `${DOMAIN}/focus-tv.html`, fr: `${DOMAIN}/fr/focus-tv.html`, prio: '0.96', freq: 'daily' },
+    { en: `${DOMAIN}/study-room.html`, fr: `${DOMAIN}/fr/study-room.html`, prio: '0.94', freq: 'daily' },
+    { en: `${DOMAIN}/world-blitz.html`, fr: `${DOMAIN}/fr/world-blitz.html`, prio: '0.94', freq: 'daily' },
     { en: `${DOMAIN}/world-ranking.html`, fr: `${DOMAIN}/fr/world-ranking.html`, prio: '0.95', freq: 'daily' },
     { en: `${DOMAIN}/city-versus.html`, fr: `${DOMAIN}/fr/city-versus.html`, prio: '0.95', freq: 'daily' },
     { en: `${DOMAIN}/cities/index.html`, fr: `${DOMAIN}/fr/cities/index.html`, prio: '0.95', freq: 'daily' },
@@ -1367,13 +1816,17 @@ Sitemap: ${DOMAIN}/sitemap.xml
 function buildLlmsFiles(cities, stations) {
   const llmsShort = `# REMO World (${DOMAIN})
 
-> REMO World is a free bilingual (English & French) 4D Focus TV City Window, 4D City Social Network, Live World Radio Player (${stations.length} ad-free global & Lofi stations across 24/24 cities), Browser Geography Game ("Guess My City!"), and 9:16 Virtual Boarding Pass Generator connecting 24 world cities in real time.
+> REMO World is a free bilingual (English & French) 4D Focus TV City Window, Synced Lofi Study Room platform, 4D City Social Network, Live World Radio Player (${stations.length} ad-free global & Lofi stations across 24/24 cities), Daily World Blitz 60s Geography Trivia with 1v1 Friend Duels, Guess My City photo game, and 9:16 Virtual Boarding Pass Generator connecting 24 world cities in real time.
 
 ## Key Free Features (Zero Sign-Up Required to Explore)
-- [REMO World Live Social App & 4D Focus TV](${DOMAIN}/): Fullscreen 4D Focus TV ambient city window with 9 visual/audio FX, real-time cross-city social feed, live City Wars, Citizen Passports, and collectible 4D City Cards.
+- [REMO World Live Social App](${DOMAIN}/): Real-time cross-city social feed, live City Wars, Citizen Passports, and collectible 4D City Cards.
+- [4D Focus TV — Ambient City Windows & Zen Clock](${DOMAIN}/focus-tv.html): Fullscreen 4D Focus TV window with rain/snow/neon/fireplace FX, Fly Random teleportation, Live Rain/Night city filters, Custom Vibe Links (\`?tv=city&fx=rain\`), and Minimal Zen Desk Clock mode.
+- [Synced Study Together Rooms](${DOMAIN}/study-room.html): Shareable Focus Together Room URLs (\`?tv=tokyo&fx=rain&room=study42\`) with synchronized Pomodoro sessions and ad-free Lofi radio.
+- [Daily World Blitz 60s & 1v1 Duels](${DOMAIN}/world-blitz.html): 5 daily world cities solved in 60 seconds with shareable Wordle-style result cards and URL-encoded 1v1 challenge links (\`?open=blitz&vs=...\`).
 - [Free Live World Cities Radio (${stations.length} Stations)](${DOMAIN}/world-radio.html): Stream live radio from Paris, Montréal, Chișinău (8 live stations), Bucharest, New York, London, Tokyo, Seoul, Berlin, Dubai, Lisbon, Amsterdam, Sydney, Rio, Singapore & Cairo + Lofi, Jazz & Synthwave.
 - [Guess The City Photo Game](${DOMAIN}/guess-the-city.html): Free browser geography & skyline photo guessing game created by real citizens worldwide.
 - [4D Holographic Boarding Pass Generator](${DOMAIN}/boarding-pass.html): Create & download 9:16 Story Boarding Passes between any two world cities for TikTok, Instagram & WhatsApp.
+- [Top 24 World Cities Live Ranking & Duels](${DOMAIN}/world-ranking.html): Real-time city standings and interactive city-vs-city comparison tool ([City Versus](${DOMAIN}/city-versus.html)).
 - [All 24 Connected World Cities Directory](${DOMAIN}/cities/index.html): Live local time, weather, radio streams & urban stats for every Edition-1 metropolis.
 
 ## Edition-1 Connected Cities (EN & FR)
@@ -1427,14 +1880,20 @@ function main() {
   fs.writeFileSync(path.join(ROOT, 'fr', 'cities', 'index.html'), buildDirectoryPage('fr', cities, stations.length), 'utf8');
   generatedCount += 2;
 
-  // 6 High-Intent Feature Hub Pages
+  // 12 High-Intent Feature Hub Pages (6 EN + 6 FR)
+  fs.writeFileSync(path.join(ROOT, 'focus-tv.html'), buildFocusTvHubPage('en', cities, stations), 'utf8');
+  fs.writeFileSync(path.join(ROOT, 'fr', 'focus-tv.html'), buildFocusTvHubPage('fr', cities, stations), 'utf8');
+  fs.writeFileSync(path.join(ROOT, 'study-room.html'), buildStudyRoomHubPage('en', cities, stations), 'utf8');
+  fs.writeFileSync(path.join(ROOT, 'fr', 'study-room.html'), buildStudyRoomHubPage('fr', cities, stations), 'utf8');
+  fs.writeFileSync(path.join(ROOT, 'world-blitz.html'), buildWorldBlitzHubPage('en', cities), 'utf8');
+  fs.writeFileSync(path.join(ROOT, 'fr', 'world-blitz.html'), buildWorldBlitzHubPage('fr', cities), 'utf8');
   fs.writeFileSync(path.join(ROOT, 'world-radio.html'), buildWorldRadioHubPage('en', stations, cities), 'utf8');
   fs.writeFileSync(path.join(ROOT, 'fr', 'world-radio.html'), buildWorldRadioHubPage('fr', stations, cities), 'utf8');
   fs.writeFileSync(path.join(ROOT, 'guess-the-city.html'), buildGuessCityHubPage('en', cities), 'utf8');
   fs.writeFileSync(path.join(ROOT, 'fr', 'guess-the-city.html'), buildGuessCityHubPage('fr', cities), 'utf8');
   fs.writeFileSync(path.join(ROOT, 'boarding-pass.html'), buildBoardingPassHubPage('en', cities), 'utf8');
   fs.writeFileSync(path.join(ROOT, 'fr', 'boarding-pass.html'), buildBoardingPassHubPage('fr', cities), 'utf8');
-  generatedCount += 6;
+  generatedCount += 12;
 
   // Clean up deprecated beat-maker static pages if present
   [path.join(ROOT, 'beat-maker.html'), path.join(ROOT, 'fr', 'beat-maker.html')].forEach((p) => {

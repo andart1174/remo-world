@@ -1,12 +1,16 @@
 # REMO World (https://remoworld.com)
 
-> REMO World is a free bilingual (English & French) 4D Focus TV City Window, 4D City Social Network, Live World Radio Player (56 ad-free global & Lofi stations across 24/24 cities), Browser Geography Game ("Guess My City!"), and 9:16 Virtual Boarding Pass Generator connecting 24 world cities in real time.
+> REMO World is a free bilingual (English & French) 4D Focus TV City Window, Synced Lofi Study Room platform, 4D City Social Network, Live World Radio Player (56 ad-free global & Lofi stations across 24/24 cities), Daily World Blitz 60s Geography Trivia with 1v1 Friend Duels, Guess My City photo game, and 9:16 Virtual Boarding Pass Generator connecting 24 world cities in real time.
 
 ## Key Free Features (Zero Sign-Up Required to Explore)
-- [REMO World Live Social App & 4D Focus TV](https://remoworld.com/): Fullscreen 4D Focus TV ambient city window with 9 visual/audio FX, real-time cross-city social feed, live City Wars, Citizen Passports, and collectible 4D City Cards.
+- [REMO World Live Social App](https://remoworld.com/): Real-time cross-city social feed, live City Wars, Citizen Passports, and collectible 4D City Cards.
+- [4D Focus TV — Ambient City Windows & Zen Clock](https://remoworld.com/focus-tv.html): Fullscreen 4D Focus TV window with rain/snow/neon/fireplace FX, Fly Random teleportation, Live Rain/Night city filters, Custom Vibe Links (`?tv=city&fx=rain`), and Minimal Zen Desk Clock mode.
+- [Synced Study Together Rooms](https://remoworld.com/study-room.html): Shareable Focus Together Room URLs (`?tv=tokyo&fx=rain&room=study42`) with synchronized Pomodoro sessions and ad-free Lofi radio.
+- [Daily World Blitz 60s & 1v1 Duels](https://remoworld.com/world-blitz.html): 5 daily world cities solved in 60 seconds with shareable Wordle-style result cards and URL-encoded 1v1 challenge links (`?open=blitz&vs=...`).
 - [Free Live World Cities Radio (56 Stations)](https://remoworld.com/world-radio.html): Stream live radio from Paris, Montréal, Chișinău (8 live stations), Bucharest, New York, London, Tokyo, Seoul, Berlin, Dubai, Lisbon, Amsterdam, Sydney, Rio, Singapore & Cairo + Lofi, Jazz & Synthwave.
 - [Guess The City Photo Game](https://remoworld.com/guess-the-city.html): Free browser geography & skyline photo guessing game created by real citizens worldwide.
 - [4D Holographic Boarding Pass Generator](https://remoworld.com/boarding-pass.html): Create & download 9:16 Story Boarding Passes between any two world cities for TikTok, Instagram & WhatsApp.
+- [Top 24 World Cities Live Ranking & Duels](https://remoworld.com/world-ranking.html): Real-time city standings and interactive city-vs-city comparison tool ([City Versus](https://remoworld.com/city-versus.html)).
 - [All 24 Connected World Cities Directory](https://remoworld.com/cities/index.html): Live local time, weather, radio streams & urban stats for every Edition-1 metropolis.
 
 ## Edition-1 Connected Cities (EN & FR)

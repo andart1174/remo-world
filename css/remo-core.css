@@ -8144,3 +8144,38 @@ button, input, select, textarea {
     width: min(290px, 88vw);
   }
 }
+
+/* ═══ SEO Static Navigation Footer (Desktop visible, zero interference with mobile 100dvh feed) ═══ */
+.remo-seo-footer {
+  max-width: 1280px;
+  margin: 14px auto 24px;
+  padding: 14px 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px 18px;
+  font-size: 0.76rem;
+  color: rgba(148, 163, 184, 0.92);
+}
+.remo-seo-footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  align-items: center;
+}
+.remo-seo-footer a {
+  color: #7dd3fc;
+  text-decoration: none;
+  font-weight: 600;
+}
+.remo-seo-footer a:hover {
+  text-decoration: underline;
+  color: #facc15;
+}
+@media (max-width: 600px) {
+  body:has(#view-feed.active) .remo-seo-footer {
+    display: none;
+  }
+}

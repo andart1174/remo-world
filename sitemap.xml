@@ -20,6 +20,60 @@
     <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/"/>
   </url>
   <url>
+    <loc>https://remoworld.com/focus-tv.html</loc>
+    <lastmod>2026-11-12</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.96</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/focus-tv.html"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/focus-tv.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/focus-tv.html"/>
+  </url>
+  <url>
+    <loc>https://remoworld.com/fr/focus-tv.html</loc>
+    <lastmod>2026-11-12</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.96</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/focus-tv.html"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/focus-tv.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/focus-tv.html"/>
+  </url>
+  <url>
+    <loc>https://remoworld.com/study-room.html</loc>
+    <lastmod>2026-11-12</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.94</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/study-room.html"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/study-room.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/study-room.html"/>
+  </url>
+  <url>
+    <loc>https://remoworld.com/fr/study-room.html</loc>
+    <lastmod>2026-11-12</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.94</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/study-room.html"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/study-room.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/study-room.html"/>
+  </url>
+  <url>
+    <loc>https://remoworld.com/world-blitz.html</loc>
+    <lastmod>2026-11-12</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.94</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/world-blitz.html"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/world-blitz.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/world-blitz.html"/>
+  </url>
+  <url>
+    <loc>https://remoworld.com/fr/world-blitz.html</loc>
+    <lastmod>2026-11-12</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.94</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/world-blitz.html"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/world-blitz.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/world-blitz.html"/>
+  </url>
+  <url>
     <loc>https://remoworld.com/world-ranking.html</loc>
     <lastmod>2026-11-12</lastmod>
     <changefreq>daily</changefreq>
