@@ -9,6 +9,19 @@
 
   const STAR_CITY_IDS = ['montreal', 'paris', 'newyork', 'tokyo'];
 
+  const AMBIENT_EFFECT_KEYS = ['rain', 'storm', 'snow', 'ocean', 'fire', 'petals', 'cyber', 'cafe', 'vinyl'];
+  const AMBIENT_BTN_MAP = {
+    rain: 'ftvAmbRainBtn',
+    storm: 'ftvAmbStormBtn',
+    snow: 'ftvAmbSnowBtn',
+    ocean: 'ftvAmbOceanBtn',
+    fire: 'ftvAmbFireBtn',
+    petals: 'ftvAmbPetalsBtn',
+    cyber: 'ftvAmbCyberBtn',
+    cafe: 'ftvAmbCafeBtn',
+    vinyl: 'ftvAmbVinylBtn'
+  };
+
   const state = {
     isOpen: false,
     cityId: 'montreal',
@@ -16,8 +29,23 @@
     particles: [],
     stars: [],
     phase: 0,
-    ambient: { rain: false, cafe: false, vinyl: false },
+    ambient: {
+      rain: false,
+      storm: false,
+      snow: false,
+      ocean: false,
+      fire: false,
+      petals: false,
+      cyber: false,
+      cafe: false,
+      vinyl: false
+    },
     audioCtx: null,
+    fxGain: null,
+    fxVolume: 0.75,
+    fxPopoverOpen: false,
+    lightningAlpha: 0,
+    lightningCooldown: 0,
     ambientNodes: {},
     pomodoroActive: false,
     pomodoroRemainingSec: 25 * 60,
@@ -139,6 +167,7 @@
                 <div class="ftv-st-desc" id="ftvStationDesc">Downtempo &amp; Lo-Fi 24/7</div>
               </div>
               <select id="ftvStationSelect" class="ftv-station-select" aria-label="Radio Station" onchange="focusTvSelectStation(this.value)"></select>
+              <button type="button" class="ftv-local-fm-btn" id="ftvLocalFmBtn" onclick="focusTvCycleLocalStation()" style="display:none;">🔀 1/2</button>
             </div>
 
             <div class="ftv-transport">
@@ -151,16 +180,39 @@
               </div>
             </div>
 
-            <div class="ftv-ambient-group">
+            <div class="ftv-ambient-group" id="ftvAmbientGroup">
               <button type="button" class="ftv-amb-btn" id="ftvAmbRainBtn" onclick="toggleFocusTvAmbient('rain')" data-i18n="ftv_amb_rain">🌧️ Rain</button>
-              <button type="button" class="ftv-amb-btn" id="ftvAmbCafeBtn" onclick="toggleFocusTvAmbient('cafe')" data-i18n="ftv_amb_cafe">☕ Café</button>
-              <button type="button" class="ftv-amb-btn" id="ftvAmbVinylBtn" onclick="toggleFocusTvAmbient('vinyl')" data-i18n="ftv_amb_vinyl">📼 Vinyl</button>
+              <button type="button" class="ftv-amb-btn" id="ftvAmbSnowBtn" onclick="toggleFocusTvAmbient('snow')" data-i18n="ftv_amb_snow">❄️ Snow</button>
+              <button type="button" class="ftv-amb-btn" id="ftvAmbFireBtn" onclick="toggleFocusTvAmbient('fire')" data-i18n="ftv_amb_fire">🔥 Fire</button>
+              <button type="button" class="ftv-amb-btn ftv-fx-more-btn" id="ftvMoreFxBtn" onclick="toggleFocusTvFxPopover()" data-i18n="ftv_more_fx">✨ More FX ▾</button>
               <button type="button" class="ftv-amb-btn ftv-console-btn" onclick="openRadioConsoleFromFocusTv()" data-i18n="ftv_all_stations">🎛️ Radio Console</button>
+
+              <div class="ftv-fx-popover" id="ftvFxPopover" aria-hidden="true">
+                <div class="ftv-fx-grid">
+                  <button type="button" class="ftv-amb-btn" id="ftvAmbStormBtn" onclick="toggleFocusTvAmbient('storm')" data-i18n="ftv_amb_storm">⛈️ Storm</button>
+                  <button type="button" class="ftv-amb-btn" id="ftvAmbOceanBtn" onclick="toggleFocusTvAmbient('ocean')" data-i18n="ftv_amb_ocean">🌊 Ocean</button>
+                  <button type="button" class="ftv-amb-btn" id="ftvAmbPetalsBtn" onclick="toggleFocusTvAmbient('petals')" data-i18n="ftv_amb_petals">🌸 Petals</button>
+                  <button type="button" class="ftv-amb-btn" id="ftvAmbCyberBtn" onclick="toggleFocusTvAmbient('cyber')" data-i18n="ftv_amb_cyber">💾 Cyber</button>
+                  <button type="button" class="ftv-amb-btn" id="ftvAmbCafeBtn" onclick="toggleFocusTvAmbient('cafe')" data-i18n="ftv_amb_cafe">☕ Café</button>
+                  <button type="button" class="ftv-amb-btn" id="ftvAmbVinylBtn" onclick="toggleFocusTvAmbient('vinyl')" data-i18n="ftv_amb_vinyl">📼 Vinyl</button>
+                </div>
+                <div class="ftv-fx-vol-row">
+                  <span data-i18n="ftv_fx_vol">🎚️ FX Mix</span>
+                  <input type="range" id="ftvFxVolSlider" min="0" max="100" value="75" oninput="setFocusTvFxVolume(this.value)" />
+                </div>
+              </div>
             </div>
           </div>
         </div>
       </div>
     `;
+
+    wrap.addEventListener('click', (e) => {
+      if (state.fxPopoverOpen && e.target && !e.target.closest('#ftvAmbientGroup')) {
+        state.fxPopoverOpen = false;
+        _syncAmbientButtons();
+      }
+    });
 
     document.body.appendChild(wrap);
   }
@@ -197,40 +249,122 @@
     return buf;
   }
 
+  function _ensureFxBus(ctx) {
+    if (!state.fxGain) {
+      state.fxGain = ctx.createGain();
+      state.fxGain.gain.value = state.fxVolume;
+      state.fxGain.connect(ctx.destination);
+    }
+    return state.fxGain;
+  }
+
+  function _spawnFilteredNoise(ctx, bus, sec, filterType, freq, q, gainVal) {
+    const src = ctx.createBufferSource();
+    src.buffer = _createPinkNoiseBuffer(ctx, sec);
+    src.loop = true;
+    const filter = ctx.createBiquadFilter();
+    filter.type = filterType;
+    filter.frequency.value = freq;
+    if (typeof q === 'number') filter.Q.value = q;
+    const gain = ctx.createGain();
+    gain.gain.value = gainVal;
+    src.connect(filter);
+    filter.connect(gain);
+    gain.connect(bus);
+    src.start();
+    return { src, filter, gain };
+  }
+
   function _startAmbientChannel(kind) {
     const ctx = _ensureAudioCtx();
     if (!ctx) return;
     _stopAmbientChannel(kind);
+    const bus = _ensureFxBus(ctx);
 
     if (kind === 'rain') {
-      const src = ctx.createBufferSource();
-      src.buffer = _createPinkNoiseBuffer(ctx, 3);
-      src.loop = true;
-      const filter = ctx.createBiquadFilter();
-      filter.type = 'bandpass';
-      filter.frequency.value = 1150;
-      filter.Q.value = 0.6;
-      const gain = ctx.createGain();
-      gain.gain.value = 0.22;
-      src.connect(filter);
-      filter.connect(gain);
-      gain.connect(ctx.destination);
-      src.start();
-      state.ambientNodes.rain = { src, gain };
+      const ch = _spawnFilteredNoise(ctx, bus, 3, 'bandpass', 1150, 0.6, 0.24);
+      state.ambientNodes.rain = { sources: [ch.src], nodes: [ch.filter, ch.gain] };
+    } else if (kind === 'storm') {
+      const heavy = _spawnFilteredNoise(ctx, bus, 3.5, 'bandpass', 680, 0.55, 0.26);
+      const rumble = _spawnFilteredNoise(ctx, bus, 4, 'lowpass', 145, null, 0.28);
+      state.ambientNodes.storm = {
+        sources: [heavy.src, rumble.src],
+        nodes: [heavy.filter, heavy.gain, rumble.filter, rumble.gain],
+        rumbleGain: rumble.gain
+      };
+    } else if (kind === 'snow') {
+      const breeze = _spawnFilteredNoise(ctx, bus, 3.5, 'bandpass', 2400, 1.2, 0.08);
+      const osc = ctx.createOscillator();
+      osc.type = 'sine';
+      osc.frequency.value = 587.33;
+      const shimmerGain = ctx.createGain();
+      shimmerGain.gain.value = 0.012;
+      osc.connect(shimmerGain);
+      shimmerGain.connect(bus);
+      osc.start();
+      state.ambientNodes.snow = { sources: [breeze.src, osc], nodes: [breeze.filter, breeze.gain, shimmerGain] };
+    } else if (kind === 'ocean') {
+      const surf = _spawnFilteredNoise(ctx, bus, 4, 'lowpass', 520, null, 0.19);
+      const lfo = ctx.createOscillator();
+      lfo.type = 'sine';
+      lfo.frequency.value = 0.14;
+      const lfoDepth = ctx.createGain();
+      lfoDepth.gain.value = 0.15;
+      lfo.connect(lfoDepth);
+      lfoDepth.connect(surf.gain.gain);
+      lfo.start();
+      state.ambientNodes.ocean = { sources: [surf.src, lfo], nodes: [surf.filter, surf.gain, lfoDepth] };
+    } else if (kind === 'fire') {
+      const warmth = _spawnFilteredNoise(ctx, bus, 3.5, 'lowpass', 310, null, 0.20);
+      const len = Math.floor(ctx.sampleRate * 2.5);
+      const cBuf = ctx.createBuffer(1, len, ctx.sampleRate);
+      const cData = cBuf.getChannelData(0);
+      for (let i = 0; i < len; i++) {
+        cData[i] = Math.random() < 0.0038 ? (Math.random() * 2 - 1) * 0.68 : (Math.random() * 2 - 1) * 0.008;
+      }
+      const cSrc = ctx.createBufferSource();
+      cSrc.buffer = cBuf;
+      cSrc.loop = true;
+      const cFilter = ctx.createBiquadFilter();
+      cFilter.type = 'bandpass';
+      cFilter.frequency.value = 2100;
+      cFilter.Q.value = 0.9;
+      const cGain = ctx.createGain();
+      cGain.gain.value = 0.14;
+      cSrc.connect(cFilter);
+      cFilter.connect(cGain);
+      cGain.connect(bus);
+      cSrc.start();
+      state.ambientNodes.fire = { sources: [warmth.src, cSrc], nodes: [warmth.filter, warmth.gain, cFilter, cGain] };
+    } else if (kind === 'petals') {
+      const wind = _spawnFilteredNoise(ctx, bus, 4, 'bandpass', 820, 1.0, 0.075);
+      const osc1 = ctx.createOscillator();
+      osc1.type = 'sine';
+      osc1.frequency.value = 528;
+      const padGain = ctx.createGain();
+      padGain.gain.value = 0.011;
+      osc1.connect(padGain);
+      padGain.connect(bus);
+      osc1.start();
+      state.ambientNodes.petals = { sources: [wind.src, osc1], nodes: [wind.filter, wind.gain, padGain] };
+    } else if (kind === 'cyber') {
+      const hum = ctx.createOscillator();
+      hum.type = 'triangle';
+      hum.frequency.value = 55;
+      const humFilter = ctx.createBiquadFilter();
+      humFilter.type = 'lowpass';
+      humFilter.frequency.value = 180;
+      const humGain = ctx.createGain();
+      humGain.gain.value = 0.04;
+      hum.connect(humFilter);
+      humFilter.connect(humGain);
+      humGain.connect(bus);
+      hum.start();
+      const dataAir = _spawnFilteredNoise(ctx, bus, 3, 'bandpass', 3200, 1.6, 0.025);
+      state.ambientNodes.cyber = { sources: [hum, dataAir.src], nodes: [humFilter, humGain, dataAir.filter, dataAir.gain] };
     } else if (kind === 'cafe') {
-      const src = ctx.createBufferSource();
-      src.buffer = _createPinkNoiseBuffer(ctx, 4);
-      src.loop = true;
-      const filter = ctx.createBiquadFilter();
-      filter.type = 'lowpass';
-      filter.frequency.value = 420;
-      const gain = ctx.createGain();
-      gain.gain.value = 0.24;
-      src.connect(filter);
-      filter.connect(gain);
-      gain.connect(ctx.destination);
-      src.start();
-      state.ambientNodes.cafe = { src, gain };
+      const ch = _spawnFilteredNoise(ctx, bus, 4, 'lowpass', 420, null, 0.24);
+      state.ambientNodes.cafe = { sources: [ch.src], nodes: [ch.filter, ch.gain] };
     } else if (kind === 'vinyl') {
       const len = Math.floor(ctx.sampleRate * 2.5);
       const buf = ctx.createBuffer(1, len, ctx.sampleRate);
@@ -248,40 +382,73 @@
       gain.gain.value = 0.14;
       src.connect(filter);
       filter.connect(gain);
-      gain.connect(ctx.destination);
+      gain.connect(bus);
       src.start();
-      state.ambientNodes.vinyl = { src, gain };
+      state.ambientNodes.vinyl = { sources: [src], nodes: [filter, gain] };
     }
   }
 
   function _stopAmbientChannel(kind) {
-    const node = state.ambientNodes[kind];
-    if (node) {
-      try { node.src.stop(); } catch (e) {}
-      try { node.src.disconnect(); } catch (e) {}
-      try { node.gain.disconnect(); } catch (e) {}
+    const entry = state.ambientNodes[kind];
+    if (entry) {
+      (entry.sources || []).forEach((s) => {
+        try { s.stop(); } catch (e) {}
+        try { s.disconnect(); } catch (e) {}
+      });
+      (entry.nodes || []).forEach((n) => {
+        try { n.disconnect(); } catch (e) {}
+      });
       delete state.ambientNodes[kind];
     }
   }
 
   function _stopAllAmbient() {
-    ['rain', 'cafe', 'vinyl'].forEach((k) => {
+    AMBIENT_EFFECT_KEYS.forEach((k) => {
       state.ambient[k] = false;
       _stopAmbientChannel(k);
     });
+    state.fxPopoverOpen = false;
+    state.lightningAlpha = 0;
     _syncAmbientButtons();
   }
 
   function _syncAmbientButtons() {
-    const map = { rain: 'ftvAmbRainBtn', cafe: 'ftvAmbCafeBtn', vinyl: 'ftvAmbVinylBtn' };
-    Object.keys(map).forEach((k) => {
-      const el = document.getElementById(map[k]);
+    Object.keys(AMBIENT_BTN_MAP).forEach((k) => {
+      const el = document.getElementById(AMBIENT_BTN_MAP[k]);
       if (el) el.classList.toggle('active', Boolean(state.ambient[k]));
     });
+    const moreBtn = document.getElementById('ftvMoreFxBtn');
+    const pop = document.getElementById('ftvFxPopover');
+    const hasSubActive = ['storm', 'ocean', 'petals', 'cyber', 'cafe', 'vinyl'].some((k) => Boolean(state.ambient[k]));
+    if (moreBtn) {
+      moreBtn.classList.toggle('active', state.fxPopoverOpen || hasSubActive);
+    }
+    if (pop) {
+      pop.classList.toggle('open', Boolean(state.fxPopoverOpen));
+      pop.setAttribute('aria-hidden', state.fxPopoverOpen ? 'false' : 'true');
+    }
+    const fxSlider = document.getElementById('ftvFxVolSlider');
+    if (fxSlider) {
+      fxSlider.value = Math.round((state.fxVolume ?? 0.75) * 100);
+    }
   }
 
+  window.toggleFocusTvFxPopover = function () {
+    state.fxPopoverOpen = !state.fxPopoverOpen;
+    _syncAmbientButtons();
+  };
+
+  window.setFocusTvFxVolume = function (val) {
+    state.fxVolume = Math.max(0, Math.min(1, Number(val) / 100));
+    if (state.fxGain && state.audioCtx) {
+      try { state.fxGain.gain.setValueAtTime(state.fxVolume, state.audioCtx.currentTime); } catch (e) {
+        state.fxGain.gain.value = state.fxVolume;
+      }
+    }
+  };
+
   window.toggleFocusTvAmbient = function (kind) {
-    if (!['rain', 'cafe', 'vinyl'].includes(kind)) return;
+    if (!AMBIENT_EFFECT_KEYS.includes(kind)) return;
     state.ambient[kind] = !state.ambient[kind];
     if (state.ambient[kind]) {
       _startAmbientChannel(kind);
@@ -304,6 +471,15 @@
     state.particles = Array.from({ length: 90 }, () => ({
       x: Math.random(),
       y: Math.random(),
+      sx: Math.random(),
+      sy: Math.random(),
+      fy: Math.random(),
+      py: Math.random(),
+      cy: Math.random(),
+      px: Math.random(),
+      cx: Math.random(),
+      fx: Math.random(),
+      ang: Math.random() * Math.PI * 2,
       len: 8 + Math.random() * 14,
       vy: 0.008 + Math.random() * 0.014,
       vx: -0.001 - Math.random() * 0.0015,
@@ -450,39 +626,175 @@
         ctx.globalAlpha = 1;
       }
 
-      // Live Real-Weather Atmospheric Particles (Rain or Snow or Cyber Embers)
+      // Live Real-Weather & 4D Atmospheric Effects (Rain, Storm, Snow, Ocean, Fire, Petals, Cyber)
       const condLow = String(wx.cond_en || '').toLowerCase();
-      const isSnow = condLow.includes('snow') || Number(wx.tempC) <= 0;
-      const isRain = state.ambient.rain || Boolean(wx.naturalStorm) || condLow.includes('rain') || condLow.includes('drizzle') || condLow.includes('storm');
+      const showStorm = Boolean(state.ambient.storm || condLow.includes('thunder') || condLow.includes('storm'));
+      const showSnow = Boolean(state.ambient.snow || condLow.includes('snow') || Number(wx.tempC) <= 0);
+      const showRain = Boolean(state.ambient.rain || showStorm || wx.naturalStorm || condLow.includes('rain') || condLow.includes('drizzle'));
+      const showOcean = Boolean(state.ambient.ocean);
+      const showFire = Boolean(state.ambient.fire);
+      const showPetals = Boolean(state.ambient.petals);
+      const showCyber = Boolean(state.ambient.cyber);
+      const particleCap = w <= 860 ? Math.min(55, state.particles.length) : state.particles.length;
 
-      if (isRain || isSnow) {
+      // Aurora Borealis northern lights ribbon during Snow
+      if (showSnow) {
         ctx.save();
-        for (let i = 0; i < state.particles.length; i++) {
-          const p = state.particles[i];
-          if (isSnow) {
-            p.y += p.vy * 0.32;
-            p.x += Math.sin(state.phase + i) * 0.0007;
-          } else {
-            p.y += p.vy * 1.45;
-            p.x += p.vx;
-          }
-          if (p.y > 1) { p.y = -0.02; p.x = Math.random(); }
-          if (p.x < 0) p.x = 1;
-          if (p.x > 1) p.x = 0;
+        const aurora = ctx.createLinearGradient(0, h * 0.08, w, h * 0.34);
+        aurora.addColorStop(0, 'rgba(16, 185, 129, 0.04)');
+        aurora.addColorStop(0.5, 'rgba(56, 189, 248, 0.14)');
+        aurora.addColorStop(1, 'rgba(167, 139, 250, 0.06)');
+        ctx.fillStyle = aurora;
+        ctx.beginPath();
+        ctx.moveTo(0, h * 0.24);
+        for (let ax = 0; ax <= w; ax += Math.max(40, w / 10)) {
+          const ay = h * 0.18 + Math.sin(state.phase * 0.7 + ax * 0.006) * 28;
+          ctx.lineTo(ax, ay);
+        }
+        ctx.lineTo(w, h * 0.36);
+        ctx.lineTo(0, h * 0.36);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      }
 
-          const px = p.x * w;
-          const py = p.y * h;
-          if (isSnow) {
-            ctx.fillStyle = 'rgba(241, 245, 249, 0.72)';
+      // Ocean neon horizon water shimmer
+      if (showOcean) {
+        ctx.save();
+        const oceanGlow = ctx.createLinearGradient(0, horizonY, 0, h);
+        oceanGlow.addColorStop(0, 'rgba(6, 182, 212, 0.22)');
+        oceanGlow.addColorStop(1, 'rgba(15, 23, 42, 0.04)');
+        ctx.fillStyle = oceanGlow;
+        ctx.fillRect(0, horizonY, w, h - horizonY);
+        ctx.strokeStyle = 'rgba(103, 232, 249, 0.36)';
+        ctx.lineWidth = 1.4;
+        for (let r = 0; r < 14; r++) {
+          const ry = horizonY + 8 + (r / 14) * (h - horizonY - 12);
+          const span = 50 + r * 22;
+          const cx = w * 0.5 + Math.sin(state.phase * 1.1 + r * 0.9) * (35 + r * 4);
+          ctx.beginPath();
+          ctx.moveTo(cx - span, ry);
+          ctx.lineTo(cx + span, ry);
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+
+      // Warm fireplace floor glow
+      if (showFire) {
+        ctx.save();
+        const fGlow = ctx.createRadialGradient(w * 0.5, h * 1.02, 20, w * 0.5, h * 1.0, Math.max(w, h) * 0.55);
+        fGlow.addColorStop(0, 'rgba(251, 146, 60, 0.28)');
+        fGlow.addColorStop(0.55, 'rgba(234, 88, 12, 0.1)');
+        fGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        ctx.fillStyle = fGlow;
+        ctx.fillRect(0, h * 0.45, w, h * 0.55);
+        ctx.restore();
+      }
+
+      // Periodic lightning flash & thunder pulse during Storm
+      if (showStorm) {
+        if (state.lightningCooldown > 0) {
+          state.lightningCooldown -= 1;
+        } else if (Math.random() < 0.015) {
+          state.lightningAlpha = 0.52;
+          state.lightningCooldown = 135 + Math.floor(Math.random() * 140);
+          if (state.ambientNodes.storm && state.ambientNodes.storm.rumbleGain && state.audioCtx) {
+            const rg = state.ambientNodes.storm.rumbleGain.gain;
+            const nowT = state.audioCtx.currentTime;
+            try {
+              rg.cancelScheduledValues(nowT);
+              rg.setValueAtTime(0.45, nowT);
+              rg.exponentialRampToValueAtTime(0.24, nowT + 1.4);
+            } catch (e) {}
+          }
+        }
+        if (state.lightningAlpha > 0.01) {
+          ctx.save();
+          ctx.fillStyle = `rgba(224, 242, 254, ${state.lightningAlpha.toFixed(3)})`;
+          ctx.fillRect(0, 0, w, h * 0.65);
+          ctx.restore();
+          state.lightningAlpha *= 0.85;
+        }
+      }
+
+      if (showRain || showSnow || showFire || showPetals || showCyber) {
+        ctx.save();
+        for (let i = 0; i < particleCap; i++) {
+          const p = state.particles[i];
+
+          // Rain & Storm Rain Streaks
+          if (showRain) {
+            p.y += p.vy * (showStorm ? 2.15 : 1.45);
+            p.x += p.vx * (showStorm ? 2.2 : 1);
+            if (p.y > 1) { p.y = -0.02; p.x = Math.random(); }
+            if (p.x < 0) p.x = 1;
+            if (p.x > 1) p.x = 0;
+            const rx = p.x * w;
+            const ry = p.y * h;
+            ctx.strokeStyle = showStorm ? 'rgba(147, 197, 253, 0.56)' : 'rgba(125, 211, 252, 0.42)';
+            ctx.lineWidth = showStorm ? 1.5 : 1.2;
             ctx.beginPath();
-            ctx.arc(px, py, p.size, 0, Math.PI * 2);
+            ctx.moveTo(rx, ry);
+            ctx.lineTo(rx - (showStorm ? 5.5 : 2.5), ry + p.len * (showStorm ? 1.35 : 1));
+            ctx.stroke();
+          }
+
+          // Falling Snowflakes
+          if (showSnow) {
+            p.sy += p.vy * 0.3;
+            p.sx += Math.sin(state.phase + i) * 0.00075;
+            if (p.sy > 1) { p.sy = -0.02; p.sx = Math.random(); }
+            if (p.sx < 0) p.sx = 1;
+            if (p.sx > 1) p.sx = 0;
+            ctx.fillStyle = 'rgba(241, 245, 249, 0.76)';
+            ctx.beginPath();
+            ctx.arc(p.sx * w, p.sy * h, p.size, 0, Math.PI * 2);
             ctx.fill();
-          } else {
-            ctx.strokeStyle = 'rgba(125, 211, 252, 0.42)';
-            ctx.lineWidth = 1.25;
+          }
+
+          // Rising Fire Embers
+          if (showFire) {
+            p.fy -= p.vy * 0.42;
+            p.fx += Math.sin(state.phase * 1.8 + i) * 0.0009;
+            if (p.fy < 0.15) { p.fy = 1.02; p.fx = Math.random(); }
+            if (p.fx < 0) p.fx = 1;
+            if (p.fx > 1) p.fx = 0;
+            const alpha = Math.max(0.15, Math.min(0.9, (p.fy - 0.15) * 1.1));
+            ctx.fillStyle = i % 3 === 0 ? `rgba(253, 224, 71, ${alpha})` : `rgba(251, 146, 60, ${alpha})`;
             ctx.beginPath();
-            ctx.moveTo(px, py);
-            ctx.lineTo(px - 2.5, py + p.len);
+            ctx.arc(p.fx * w, p.fy * h, Math.max(1.2, p.size * 0.85), 0, Math.PI * 2);
+            ctx.fill();
+          }
+
+          // Floating Sakura Cherry-Blossom Petals
+          if (showPetals) {
+            p.py += p.vy * 0.36;
+            p.px += 0.0008 + Math.sin(state.phase * 1.3 + i) * 0.0011;
+            p.ang += 0.025;
+            if (p.py > 1.02) { p.py = -0.03; p.px = Math.random(); }
+            if (p.px > 1.02) p.px = -0.02;
+            ctx.save();
+            ctx.translate(p.px * w, p.py * h);
+            ctx.rotate(p.ang);
+            ctx.fillStyle = i % 2 === 0 ? 'rgba(244, 114, 182, 0.72)' : 'rgba(251, 207, 232, 0.75)';
+            ctx.beginPath();
+            ctx.ellipse(0, 0, p.size * 1.9, p.size * 0.95, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+          }
+
+          // Vertical Cyber Neon Data Laser Streaks
+          if (showCyber) {
+            p.cy += p.vy * 0.95;
+            if (p.cy > 1.05) { p.cy = -0.08; p.cx = Math.random(); }
+            const lx = p.cx * w;
+            const ly = p.cy * h;
+            ctx.strokeStyle = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.52)`;
+            ctx.lineWidth = 1.6;
+            ctx.beginPath();
+            ctx.moveTo(lx, ly);
+            ctx.lineTo(lx, ly + p.len * 1.8);
             ctx.stroke();
           }
         }
@@ -683,9 +995,33 @@
 
     if (stSel && radio && Array.isArray(radio.stations)) {
       const curId = st ? st.id : '';
-      stSel.innerHTML = radio.stations.map((s) =>
-        `<option value="${s.id}" ${s.id === curId ? 'selected' : ''}>${s.flag || s.icon || '📻'} ${_escapeHtml(s.name)}</option>`
-      ).join('');
+      const activeCity = _getCity(state.cityId);
+      const localList = typeof radio.getStationsForCity === 'function'
+        ? radio.getStationsForCity(state.cityId)
+        : radio.stations.filter((s) => s.cityId === state.cityId);
+      const otherList = radio.stations.filter((s) => s.cityId !== state.cityId);
+      const optHtml = (s) => `<option value="${s.id}" ${s.id === curId ? 'selected' : ''}>${s.flag || s.icon || '📻'} ${_escapeHtml(s.name)}</option>`;
+
+      let html = '';
+      if (localList.length) {
+        const localLbl = `${_t('ftv_local_group')} · ${_cityName(activeCity)}`;
+        html += `<optgroup label="${_escapeHtml(localLbl)}">${localList.map(optHtml).join('')}</optgroup>`;
+      }
+      html += `<optgroup label="${_escapeHtml(_t('ftv_global_group'))}">${otherList.map(optHtml).join('')}</optgroup>`;
+      stSel.innerHTML = html;
+
+      const localBtn = document.getElementById('ftvLocalFmBtn');
+      if (localBtn) {
+        if (localList.length >= 2) {
+          const curIdx = localList.findIndex((s) => s.id === curId);
+          const pos = curIdx >= 0 ? curIdx + 1 : 1;
+          localBtn.style.display = 'inline-flex';
+          localBtn.textContent = `${_t('ftv_local_fm')} ${pos}/${localList.length}`;
+          localBtn.classList.toggle('active', curIdx >= 0);
+        } else {
+          localBtn.style.display = 'none';
+        }
+      }
     }
 
     if (playBtn && radio) {
@@ -712,6 +1048,13 @@
     if (window.REMO_RADIO && typeof window.REMO_RADIO.tuneToCity === 'function') {
       const wasPlaying = Boolean(window.REMO_RADIO.isPlaying);
       window.REMO_RADIO.tuneToCity(state.cityId, wasPlaying);
+    }
+    syncFocusTvUI();
+  };
+
+  window.focusTvCycleLocalStation = function () {
+    if (window.REMO_RADIO && typeof window.REMO_RADIO.cycleCityStation === 'function') {
+      window.REMO_RADIO.cycleCityStation(state.cityId, true);
     }
     syncFocusTvUI();
   };

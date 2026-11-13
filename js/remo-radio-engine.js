@@ -430,7 +430,7 @@
       streamUrl: 'https://ice1.somafm.com/bossa-128-mp3',
       fallbackUrl: 'https://icecast.radiofrance.fr/fipworld-midfi.mp3',
       badge: 'RIO BOSSA',
-      cityId: null
+      cityId: 'rio'
     },
     {
       id: 'lagos_afrobeats',
@@ -467,6 +467,226 @@
       fallbackUrl: 'https://stream.srg-ssr.ch/m/rsj/mp3_128',
       badge: 'RIVIERA',
       cityId: 'monaco'
+    },
+
+    // === 🇲🇩 CHIȘINĂU / MOLDOVA LIVE PACK ===
+    {
+      id: 'chisinau_zum1',
+      category: 'city',
+      name: 'Radio ZUM 1 Chișinău',
+      desc_fr: 'Chișinău • Hits Urbains, Dance & Ambiance Live',
+      desc_en: 'Chișinău • Urban Hits, Dance & Live Energy',
+      icon: '🇲🇩',
+      streamUrl: 'https://streams.radiozum.md/listen/zum1/ZUM1',
+      fallbackUrl: 'https://streams.radiozum.md/listen/zum2/ZUM2',
+      badge: 'ZUM 1',
+      cityId: 'chisinau'
+    },
+    {
+      id: 'chisinau_hitfm',
+      category: 'city',
+      name: 'Hit FM Chișinău',
+      desc_fr: 'Chișinău • Hot Hits Pop & Dance Non-Stop',
+      desc_en: 'Chișinău • Hot Pop Hits & 24/7 Dance Energy',
+      icon: '🇲🇩',
+      streamUrl: 'https://radio3.dixi.md/listen/hit_fm_hot_hits/hitfm_hothits128.aac',
+      fallbackUrl: 'https://radio4.dixi.md/listen/hit_fm_dance_hits/hitfmdancehits128.aac',
+      badge: 'HIT FM MD',
+      cityId: 'chisinau'
+    },
+    {
+      id: 'chisinau_retro',
+      category: 'city',
+      name: 'Retro FM Moldova',
+      desc_fr: 'Chișinău • Classiques Rétro & Souvenirs Dorés',
+      desc_en: 'Chișinău • Golden Retro Classics & Timeless Hits',
+      icon: '🇲🇩',
+      streamUrl: 'https://efir.retrofm.md:8000/retro',
+      fallbackUrl: 'https://radio3.dixi.md/listen/hit_fm_2000s_hits/hitfm2000hit128.aac',
+      badge: 'RETRO MD',
+      cityId: 'chisinau'
+    },
+    {
+      id: 'chisinau_jurnal',
+      category: 'city',
+      name: 'Jurnal FM Chișinău',
+      desc_fr: 'Chișinău • Pop Adulte, Acoustic & Actualités Locales',
+      desc_en: 'Chișinău • Adult Pop, Acoustic & Local Pulse',
+      icon: '🇲🇩',
+      streamUrl: 'https://audio.jurnalfm.md/hq',
+      fallbackUrl: 'https://asculta.radiorfi.ro/live.mp3',
+      badge: 'JURNAL FM',
+      cityId: 'chisinau'
+    },
+    {
+      id: 'chisinau_muzfm',
+      category: 'city',
+      name: 'Muz FM & ROKS Moldova',
+      desc_fr: 'Chișinău • Électro Fresh, Pop Moderne & Rock',
+      desc_en: 'Chișinău • Fresh Electro, Modern Pop & Rock',
+      icon: '🇲🇩',
+      streamUrl: 'https://live.muzfm.md/muzfm',
+      fallbackUrl: 'https://stream.dixi.md:9443/Roks',
+      badge: 'MUZ FM',
+      cityId: 'chisinau'
+    },
+    {
+      id: 'chisinau_noroc',
+      category: 'city',
+      name: 'Radio Noroc Moldova',
+      desc_fr: 'Chișinău • Folk Authentique & Culture Moldave',
+      desc_en: 'Chișinău • Authentic Folk & Moldovan Soul',
+      icon: '🇲🇩',
+      streamUrl: 'https://stream.noroc.tv/radionoroc_aac',
+      fallbackUrl: 'https://stream.radioplai.md/live',
+      badge: 'NOROC MD',
+      cityId: 'chisinau'
+    },
+
+    // === 🌍 GLOBAL CITIES COMPLETION (24/24 COVERAGE) ===
+    {
+      id: 'toronto_cbc',
+      category: 'city',
+      name: 'CBC Music Toronto',
+      desc_fr: 'Toronto • Indie, Jazz, Folk & Scène Canadienne',
+      desc_en: 'Toronto • Indie, Jazz, Folk & Canadian Sounds',
+      icon: '🇨🇦',
+      streamUrl: 'https://27033.live.streamtheworld.com/CBLFM_CBC_SC',
+      fallbackUrl: 'https://443-1.autopo.st/107/stream/',
+      badge: 'TORONTO',
+      cityId: 'toronto'
+    },
+    {
+      id: 'losangeles_kcrw',
+      category: 'city',
+      name: 'KCRW Eclectic 24 L.A.',
+      desc_fr: 'Los Angeles • Indie, Électro & Sessions Live',
+      desc_en: 'Los Angeles • Eclectic Indie, Electronic & Live Sets',
+      icon: '🇺🇸',
+      streamUrl: 'https://streams.kcrw.com/e24_mp3',
+      fallbackUrl: 'https://streams.kcrw.com/kcrw_aac',
+      badge: 'LA KCRW',
+      cityId: 'losangeles'
+    },
+    {
+      id: 'geneva_onefm',
+      category: 'city',
+      name: 'One FM & Radio Lac Genève',
+      desc_fr: 'Genève • Pop Romande, Groove & Hits du Léman',
+      desc_en: 'Geneva • French-Swiss Pop, Groove & Lake Léman Vibes',
+      icon: '🇨🇭',
+      streamUrl: 'https://onefm.ice.infomaniak.ch/onefm-high.mp3',
+      fallbackUrl: 'https://radiolac.ice.infomaniak.ch/radiolac-high.mp3',
+      badge: 'GENEVA',
+      cityId: 'geneva'
+    },
+    {
+      id: 'amsterdam_sublime',
+      category: 'city',
+      name: 'Sublime & Intense Amsterdam',
+      desc_fr: 'Amsterdam • Nu-Jazz, Soul, Funk & Deep House',
+      desc_en: 'Amsterdam • Nu-Jazz, Soul, Funk & Canal House Beats',
+      icon: '🇳🇱',
+      streamUrl: 'https://playerservices.streamtheworld.com/api/livestream-redirect/SUBLIME.mp3',
+      fallbackUrl: 'https://secure.live-streams.nl/main',
+      badge: 'AMSTERDAM',
+      cityId: 'amsterdam'
+    },
+    {
+      id: 'lisbon_comercial',
+      category: 'city',
+      name: 'Rádio Comercial Lisboa',
+      desc_fr: 'Lisbonne • Pop Portugaise, Soleils Atlantiques & Hits',
+      desc_en: 'Lisbon • Portuguese Pop, Atlantic Sun & Top Hits',
+      icon: '🇵🇹',
+      streamUrl: 'https://stream-icy.bauermedia.pt/comercial.mp3',
+      fallbackUrl: 'https://stream-icy.bauermedia.pt/m80.mp3',
+      badge: 'LISBON',
+      cityId: 'lisbon'
+    },
+    {
+      id: 'lisbon_fado',
+      category: 'city',
+      name: 'Antena 3 & Fado Lisboa',
+      desc_fr: 'Lisbonne • Musique Alternative, Fado & Acoustique',
+      desc_en: 'Lisbon • Alternative Music, Fado & Acoustic Soul',
+      icon: '🇵🇹',
+      streamUrl: 'https://radiocast.rtp.pt/antena380a.mp3',
+      fallbackUrl: 'https://nl.digitalrm.pt:8048/stream',
+      badge: 'FADO & ALT',
+      cityId: 'lisbon'
+    },
+    {
+      id: 'istanbul_fenomen',
+      category: 'city',
+      name: 'Radyo Fenomen Istanbul',
+      desc_fr: 'Istanbul • Bosphore Beats, Pop Turque & Club Mix',
+      desc_en: 'Istanbul • Bosphorus Beats, Turkish Pop & Club Mix',
+      icon: '🇹🇷',
+      streamUrl: 'https://live.radyofenomen.com/fenomen/128/icecast.audio',
+      fallbackUrl: 'https://turkmedya.radyotvonline.net/alemfmaac',
+      badge: 'ISTANBUL',
+      cityId: 'istanbul'
+    },
+    {
+      id: 'singapore_987fm',
+      category: 'city',
+      name: 'Singapore 987FM Live',
+      desc_fr: 'Singapour • Marina Bay Pop, R&B & Hits Asie-Pacifique',
+      desc_en: 'Singapore • Marina Bay Pop, R&B & APAC Top Hits',
+      icon: '🇸🇬',
+      streamUrl: 'https://22393.live.streamtheworld.com/987FM_PREM.aac',
+      fallbackUrl: 'https://playerservices.streamtheworld.com/api/livestream-redirect/POWER98_LOVESONGS.mp3',
+      badge: 'SINGAPORE',
+      cityId: 'singapore'
+    },
+    {
+      id: 'sydney_fbi',
+      category: 'city',
+      name: 'FBi 94.5 & PopAsia Sydney',
+      desc_fr: 'Sydney • Indie Australien, Électro & Cultures du Pacifique',
+      desc_en: 'Sydney • Australian Indie, Electronic & Harbour Beats',
+      icon: '🇦🇺',
+      streamUrl: 'https://streamer.fbiradio.com/stream',
+      fallbackUrl: 'https://sbs-ice.streamguys1.com/sbs-popasia-sbs-web',
+      badge: 'SYDNEY',
+      cityId: 'sydney'
+    },
+    {
+      id: 'sydney_finemusic',
+      category: 'city',
+      name: '2MBS Fine Music Sydney',
+      desc_fr: 'Sydney • Jazz Nocturne, Classique & Musique Instrumentale',
+      desc_en: 'Sydney • Late-Night Jazz, Classical & Instrumental',
+      icon: '🇦🇺',
+      streamUrl: 'https://radio12.shoutcast.net.au:2020/stream/2MBS-ICE',
+      fallbackUrl: 'https://www.miblradio.com.au/mibl2',
+      badge: 'FINE MUSIC',
+      cityId: 'sydney'
+    },
+    {
+      id: 'cairo_hits',
+      category: 'city',
+      name: 'Radio Hits 88.2 Cairo',
+      desc_fr: 'Le Caire • Hits Arabes Modernes & Nuits du Nil',
+      desc_en: 'Cairo • Modern Arabic Hits & Nile Night Vibes',
+      icon: '🇪🇬',
+      streamUrl: 'https://radiohits882.radioca.st/;',
+      fallbackUrl: 'https://9090streaming.mobtada.com/9090FMEGYPT',
+      badge: 'CAIRO',
+      cityId: 'cairo'
+    },
+    {
+      id: 'rio_melodia',
+      category: 'city',
+      name: 'Rádio Melodia & Rio FM',
+      desc_fr: 'Rio • Groove Carioca, Soul & Douceur Tropicale',
+      desc_en: 'Rio • Carioca Groove, Soul & Tropical Breezes',
+      icon: '🇧🇷',
+      streamUrl: 'https://26573.live.streamtheworld.com/MELODIAFMAAC.aac?1771864900231',
+      fallbackUrl: 'https://server01.ouvir.radio.br:8033/stream',
+      badge: 'RIO FM',
+      cityId: 'rio'
     }
   ];
 
@@ -1010,6 +1230,21 @@
       this._applyEffectiveVolume();
       localStorage.setItem('remo_radio_volume', String(v));
       this._updateUI();
+    }
+
+    getStationsForCity(cityId) {
+      if (!cityId) return [];
+      const cid = String(cityId).toLowerCase();
+      return this.stations.filter((s) => s.cityId === cid);
+    }
+
+    cycleCityStation(cityId, forcePlay = true) {
+      const list = this.getStationsForCity(cityId);
+      if (!list.length) return null;
+      const curIdx = this.currentStation ? list.findIndex((s) => s.id === this.currentStation.id) : -1;
+      const nextStation = list[(curIdx + 1) % list.length];
+      this.selectStation(nextStation.id, forcePlay ? true : this.isPlaying);
+      return nextStation;
     }
 
     tuneToCity(cityId, forcePlay = false) {
