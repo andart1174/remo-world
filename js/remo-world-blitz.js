@@ -9,6 +9,7 @@
 
   const STORAGE_KEY = 'remo_world_blitz_v1';
   const GUEST_COINS_KEY = 'remo_guest_blitz_coins';
+  const DUEL_NICK_KEY = 'remo_blitz_duel_nick';
   const ROUNDS_COUNT = 5;
   const HINT_PENALTY_MS = 3000;
   // Launch anchor UTC midnight: 2026-11-12 = Blitz #1
@@ -50,7 +51,8 @@
     rafId: null,
     stars: [],
     pulsePhase: 0,
-    copiedRecently: false
+    copiedRecently: false,
+    challenger: null       // { n, s, t, g, d, b } decoded from ?vs=...
   };
 
   /* ── 1. DETERMINISTIC DAILY SEED & UTILS ── */
@@ -218,15 +220,134 @@
     return oneDecimal ? sec.toFixed(1) + 's' : Math.max(1, Math.round(sec)) + 's';
   }
 
-  function buildShareText(resultObj, lang = _lang()) {
+  function _toBase64Url(str) {
+    const utf8 = unescape(encodeURIComponent(str));
+    return btoa(utf8).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+
+  function _fromBase64Url(raw) {
+    const padLen = (4 - (raw.length % 4)) % 4;
+    const b64 = (raw.replace(/-/g, '+').replace(/_/g, '/')) + '='.repeat(padLen);
+    return decodeURIComponent(escape(atob(b64)));
+  }
+
+  function getDefaultDuelNick() {
+    try {
+      const saved = (localStorage.getItem(DUEL_NICK_KEY) || '').trim();
+      if (saved) return saved.slice(0, 24);
+    } catch (e) {}
+    const u = window.REMO_STORE && typeof window.REMO_STORE.getCurrentUser === 'function'
+      ? window.REMO_STORE.getCurrentUser()
+      : null;
+    if (u && u.name) return String(u.name).trim().slice(0, 24);
+    return _lang() === 'fr' ? 'Citoyen REMO' : 'REMO Citizen';
+  }
+
+  function setSavedDuelNick(name) {
+    const clean = String(name || '').trim().slice(0, 24);
+    try {
+      if (clean) localStorage.setItem(DUEL_NICK_KEY, clean);
+      else localStorage.removeItem(DUEL_NICK_KEY);
+    } catch (e) {}
+    return clean;
+  }
+
+  function encodeDuelPayload(resultObj, nickName) {
+    const res = resultObj || state.finalResult;
+    if (!res) return '';
+    const score = (res.results || []).filter((r) => r === 'G').length;
+    const gridCode = (res.results || []).map((r) => (r === 'G' ? 'G' : 'R')).join('').slice(0, ROUNDS_COUNT);
+    const payload = {
+      n: String(nickName || getDefaultDuelNick()).trim().slice(0, 24) || 'Citizen',
+      s: Math.max(0, Math.min(ROUNDS_COUNT, score)),
+      t: Number(Math.max(0.5, Number(res.timeSec || 1)).toFixed(1)),
+      g: gridCode,
+      d: String(res.date || getUtcDateKey()),
+      b: Number(res.num || 1)
+    };
+    try {
+      return _toBase64Url(JSON.stringify(payload));
+    } catch (e) {
+      return '';
+    }
+  }
+
+  function decodeDuelPayload(raw) {
+    const clean = String(raw || '').trim();
+    if (!clean || clean.length > 260) return null;
+    try {
+      const parsed = JSON.parse(_fromBase64Url(clean));
+      if (!parsed || typeof parsed !== 'object') return null;
+      const s = Number(parsed.s);
+      const t = Number(parsed.t);
+      if (!Number.isInteger(s) || s < 0 || s > ROUNDS_COUNT) return null;
+      if (!Number.isFinite(t) || t < 0.1 || t > 3600) return null;
+      const n = String(parsed.n || '').replace(/[\r\n<>]/g, '').trim().slice(0, 24) || (_lang() === 'fr' ? 'Un Ami' : 'A Friend');
+      const g = typeof parsed.g === 'string' && /^[GR]{5}$/.test(parsed.g) ? parsed.g : '';
+      const d = typeof parsed.d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(parsed.d) ? parsed.d : '';
+      const b = Number.isInteger(Number(parsed.b)) && Number(parsed.b) >= 1 ? Number(parsed.b) : 1;
+      return { n, s, t: Number(t.toFixed(1)), g, d, b };
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function buildDuelShareUrl(resultObj, nickName) {
+    const tok = encodeDuelPayload(resultObj, nickName);
+    return tok
+      ? `https://remoworld.com/?open=blitz&vs=${encodeURIComponent(tok)}`
+      : 'https://remoworld.com/?open=blitz';
+  }
+
+  function _computeDuelVerdict(res, opp, lang = _lang()) {
+    if (!res || !opp) return null;
+    const myScore = (res.results || []).filter((r) => r === 'G').length;
+    const myTenths = Math.round(Number(res.timeSec || 0) * 10);
+    const oppTenths = Math.round(Number(opp.t || 0) * 10);
+    const diffSec = (Math.abs(myTenths - oppTenths) / 10).toFixed(1);
+
+    let outcome = 'tie';
+    let subKey = 'blitz_duel_tie_title';
+    if (myScore > opp.s) {
+      outcome = 'win';
+      subKey = 'blitz_duel_score_win';
+    } else if (myScore < opp.s) {
+      outcome = 'lose';
+      subKey = 'blitz_duel_score_lose';
+    } else if (myTenths < oppTenths) {
+      outcome = 'win';
+      subKey = 'blitz_duel_margin_win';
+    } else if (myTenths > oppTenths) {
+      outcome = 'lose';
+      subKey = 'blitz_duel_margin_lose';
+    }
+
+    const titleKey = outcome === 'win'
+      ? 'blitz_duel_won_title'
+      : (outcome === 'lose' ? 'blitz_duel_lost_title' : 'blitz_duel_tie_title');
+    return {
+      outcome,
+      title: _t(titleKey, { name: opp.n }),
+      sub: outcome === 'tie' ? '' : _t(subKey, { sec: diffSec, my: myScore, opp: opp.s }),
+      myScore,
+      myTime: Number(res.timeSec || 0).toFixed(1),
+      myGrid: (res.results || []).map((r) => (r === 'G' ? '🟩' : '🟥')).join(''),
+      oppGrid: opp.g ? opp.g.split('').map((c) => (c === 'G' ? '🟩' : '🟥')).join('') : ''
+    };
+  }
+
+  function buildShareText(resultObj, lang = _lang(), customNick) {
     const res = resultObj || state.finalResult;
     if (!res) return '';
     const score = (res.results || []).filter((r) => r === 'G').length;
     const grid = (res.results || []).map((r) => (r === 'G' ? '🟩' : '🟥')).join('');
-    const roundedSec = Math.max(1, Math.round(Number(res.timeSec || 1)));
-    const beatTxt = lang === 'fr' ? 'Bats mon chrono' : 'Beat my time';
-    const url = 'https://remoworld.com/?open=blitz';
-    return `🌐 REMO World Blitz #${res.num} — ${score}/${ROUNDS_COUNT} (${roundedSec}s)\n${grid}\n⚡ ${beatTxt}: ${url}`;
+    const timeVal = Number(res.timeSec || 1).toFixed(1);
+    const nick = String(customNick || getDefaultDuelNick()).trim().slice(0, 24);
+    const duelUrl = buildDuelShareUrl(res, nick);
+    const promptLine = lang === 'fr'
+      ? `⚡ Tu peux battre ${nick} sur les mêmes 5 villes ?`
+      : `⚡ Think you can beat ${nick} on the exact same 5 cities?`;
+    return `⚔️ REMO World Blitz #${res.num} — ${score}/${ROUNDS_COUNT} (${timeVal}s)\n${grid}\n${promptLine}\n${duelUrl}`;
   }
 
   function _awardDailyCoins(rewardCoins) {
@@ -885,8 +1006,23 @@
 
     const picked = state.revealLock ? state.pickedIds[state.roundIdx] : null;
     const isWin = picked && picked === city.id;
+    const opp = state.challenger;
+    const elapsedSec = _getElapsedMs() / 1000;
+    const diff = opp ? (opp.t - elapsedSec) : 0;
+    const duelDeltaText = opp
+      ? (diff >= 0
+          ? _t('blitz_duel_ahead', { sec: Math.abs(diff).toFixed(1) })
+          : _t('blitz_duel_behind', { sec: Math.abs(diff).toFixed(1) }))
+      : '';
 
     body.innerHTML = `
+      ${opp ? `
+        <div class="blitz-duel-bar" id="blitzDuelBar">
+          <span>${_esc(_t('blitz_duel_banner', { name: opp.n, score: opp.s, time: Number(opp.t).toFixed(1) }))}</span>
+          <span class="blitz-duel-delta ${diff >= 0 ? 'ahead' : 'behind'}" id="blitzDuelDeltaPill">${_esc(duelDeltaText)}</span>
+        </div>
+      ` : ''}
+
       <div class="blitz-stage-card ${state.revealLock ? (isWin ? 'flash-win' : 'flash-lose') : ''}">
         <canvas id="blitzCanvas" class="blitz-canvas"></canvas>
         <div class="blitz-round-badge">${_esc(roundNumLabel)}</div>
@@ -981,16 +1117,37 @@
       timerEl.textContent = `⏱️ ${Number(res.timeSec).toFixed(1)}s`;
     }
 
-    const shareTxt = buildShareText(res, lang);
+    const opp = state.challenger;
+    const verdict = opp ? _computeDuelVerdict(res, opp, lang) : null;
+    const duelNick = getDefaultDuelNick();
+    const shareTxt = buildShareText(res, lang, duelNick);
     const encodedShare = encodeURIComponent(shareTxt);
+    const copyLabel = opp ? _t('blitz_duel_counter_btn') : _t('blitz_copy_share');
     const routeCities = (res.cityIds || []).map((id) => {
       return getCanonicalPool().find((c) => c.id === id) || (typeof window.getCityById === 'function' ? window.getCityById(id) : null);
     }).filter(Boolean);
 
     body.innerHTML = `
       <div class="blitz-result-card">
-        <div class="blitz-result-title">${_esc(isPerfect ? _t('blitz_perfect_title') : _t('blitz_done_title'))}</div>
-        <div class="blitz-result-grid-emojis" aria-label="Blitz Result Grid">${grid}</div>
+        <div class="blitz-result-title">${_esc(verdict ? verdict.title : (isPerfect ? _t('blitz_perfect_title') : _t('blitz_done_title')))}</div>
+        ${verdict ? `
+          <div class="blitz-duel-verdict ${verdict.outcome}">
+            ${verdict.sub ? `<div class="blitz-duel-verdict-sub">${_esc(verdict.sub)}</div>` : ''}
+            <div class="blitz-duel-vs-row">
+              <div class="blitz-duel-side">
+                <div class="blitz-duel-who">${_esc(_t('blitz_duel_you'))}</div>
+                <div class="blitz-duel-score">${verdict.myScore}/${ROUNDS_COUNT} · ${verdict.myTime}s</div>
+                <div class="blitz-duel-mini-grid">${verdict.myGrid}</div>
+              </div>
+              <div class="blitz-duel-vs-badge">VS</div>
+              <div class="blitz-duel-side">
+                <div class="blitz-duel-who">${_esc(opp.n)}</div>
+                <div class="blitz-duel-score">${opp.s}/${ROUNDS_COUNT} · ${Number(opp.t).toFixed(1)}s</div>
+                ${verdict.oppGrid ? `<div class="blitz-duel-mini-grid">${verdict.oppGrid}</div>` : ''}
+              </div>
+            </div>
+          </div>
+        ` : `<div class="blitz-result-grid-emojis" aria-label="Blitz Result Grid">${grid}</div>`}
         <p class="blitz-result-sub">${_esc(_t('blitz_already_played'))}</p>
 
         <div class="blitz-stats-row">
@@ -1025,13 +1182,18 @@
           </div>
         ` : ''}
 
+        <div class="blitz-duel-nick-row">
+          <label for="blitzDuelNickInput">${_esc(_t('blitz_duel_name_lbl'))}</label>
+          <input type="text" id="blitzDuelNickInput" class="blitz-duel-nick-input" maxlength="24" value="${_esc(duelNick)}" placeholder="${_esc(_t('blitz_duel_name_ph'))}" />
+        </div>
+
         <div class="blitz-share-actions">
           <button type="button" class="blitz-share-main-btn ${state.copiedRecently ? 'copied' : ''}" id="blitzCopyShareBtn">
-            ${_esc(state.copiedRecently ? _t('blitz_copied_btn') : _t('blitz_copy_share'))}
+            ${_esc(state.copiedRecently ? _t('blitz_copied_btn') : copyLabel)}
           </button>
           <div class="blitz-share-quick-row">
-            <a class="blitz-social-link" href="https://wa.me/?text=${encodedShare}" target="_blank" rel="noopener noreferrer">${_esc(_t('blitz_wa_share'))}</a>
-            <a class="blitz-social-link" href="https://twitter.com/intent/tweet?text=${encodedShare}" target="_blank" rel="noopener noreferrer">${_esc(_t('blitz_x_share'))}</a>
+            <a class="blitz-social-link" id="blitzWaLink" href="https://wa.me/?text=${encodedShare}" target="_blank" rel="noopener noreferrer">${_esc(_t('blitz_wa_share'))}</a>
+            <a class="blitz-social-link" id="blitzXLink" href="https://twitter.com/intent/tweet?text=${encodedShare}" target="_blank" rel="noopener noreferrer">${_esc(_t('blitz_x_share'))}</a>
           </div>
         </div>
 
@@ -1059,6 +1221,18 @@
 
     const copyBtn = document.getElementById('blitzCopyShareBtn');
     if (copyBtn) copyBtn.onclick = _copyShareResult;
+
+    const nickInput = document.getElementById('blitzDuelNickInput');
+    if (nickInput) {
+      nickInput.addEventListener('input', () => {
+        const clean = setSavedDuelNick(nickInput.value);
+        const updTxt = encodeURIComponent(buildShareText(res, _lang(), clean || getDefaultDuelNick()));
+        const wa = document.getElementById('blitzWaLink');
+        const xl = document.getElementById('blitzXLink');
+        if (wa) wa.href = `https://wa.me/?text=${updTxt}`;
+        if (xl) xl.href = `https://twitter.com/intent/tweet?text=${updTxt}`;
+      });
+    }
 
     const claimBtn = document.getElementById('blitzClaimPassportBtn');
     if (claimBtn) {
@@ -1184,7 +1358,9 @@
 
   async function _copyShareResult() {
     if (!state.finalResult) return;
-    const txt = buildShareText(state.finalResult, _lang());
+    const nickInput = document.getElementById('blitzDuelNickInput');
+    const customNick = nickInput ? setSavedDuelNick(nickInput.value) : getDefaultDuelNick();
+    const txt = buildShareText(state.finalResult, _lang(), customNick || getDefaultDuelNick());
     let ok = false;
     try {
       if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -1213,14 +1389,14 @@
       btn.textContent = _t('blitz_copied_btn');
     }
     if (typeof window.remoToast === 'function') {
-      window.remoToast(_t('blitz_copied_toast'), ok ? 'fanfare' : 'info');
+      window.remoToast(_t('blitz_duel_copied_toast'), ok ? 'fanfare' : 'info');
     }
     setTimeout(() => {
       state.copiedRecently = false;
       const b = document.getElementById('blitzCopyShareBtn');
       if (b && state.isOpen && state.phase === 'done') {
         b.classList.remove('copied');
-        b.textContent = _t('blitz_copy_share');
+        b.textContent = state.challenger ? _t('blitz_duel_counter_btn') : _t('blitz_copy_share');
       }
     }, 2600);
   }
@@ -1251,10 +1427,18 @@
     }
   }
 
-  window.openWorldBlitzModal = function () {
+  window.openWorldBlitzModal = function (opts = {}) {
     ensureBlitzDom();
     const backdrop = document.getElementById('remoBlitzBackdrop');
     if (!backdrop) return;
+
+    const rawVs = opts && typeof opts === 'object' && opts.vs ? opts.vs : '';
+    if (rawVs) {
+      state.challenger = decodeDuelPayload(rawVs);
+    } else if (!state.challenger && typeof window.location !== 'undefined' && window.location.search) {
+      const urlVs = new URLSearchParams(window.location.search).get('vs');
+      if (urlVs) state.challenger = decodeDuelPayload(urlVs);
+    }
 
     const todayKey = getUtcDateKey();
     const saved = loadSavedStore();
@@ -1297,8 +1481,20 @@
     clearInterval(state.timerIntervalId);
     state.timerIntervalId = setInterval(() => {
       if (!state.isOpen || state.phase !== 'playing') return;
+      const ms = _getElapsedMs();
       const chip = document.getElementById('blitzTimerChip');
-      if (chip) chip.textContent = `⏱️ ${_formatSeconds(_getElapsedMs())}`;
+      if (chip) chip.textContent = `⏱️ ${_formatSeconds(ms)}`;
+      if (state.challenger) {
+        const deltaPill = document.getElementById('blitzDuelDeltaPill');
+        if (deltaPill) {
+          const diff = state.challenger.t - (ms / 1000);
+          deltaPill.classList.toggle('ahead', diff >= 0);
+          deltaPill.classList.toggle('behind', diff < 0);
+          deltaPill.textContent = diff >= 0
+            ? _t('blitz_duel_ahead', { sec: Math.abs(diff).toFixed(1) })
+            : _t('blitz_duel_behind', { sec: Math.abs(diff).toFixed(1) });
+        }
+      }
     }, 100);
 
     _renderPlayingStage();
@@ -1329,6 +1525,7 @@
       window.closeWorldBlitzModal();
       return;
     }
+    if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
     if (state.phase !== 'playing' || state.revealLock) return;
     if (e.key === 'h' || e.key === 'H') {
       _triggerHint();
@@ -1359,6 +1556,9 @@
     getBlitzNumber,
     buildDailyChallenge,
     buildShareText,
+    buildDuelShareUrl,
+    encodeDuelPayload,
+    decodeDuelPayload,
     computeCoinsReward,
     syncBlitzEntryBadges,
     drawBlitzLandmark: _drawBlitzLandmark,

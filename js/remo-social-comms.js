@@ -6596,12 +6596,22 @@ document.addEventListener('DOMContentLoaded', () => {
   const tvFx = (params.get('fx') || '').trim().toLowerCase();
   const tvSt = (params.get('st') || params.get('station') || '').trim();
   const tvZen = params.get('zen') === '1';
+  const tvRoom = (params.get('room') || '').trim();
+  const tvRt = Number(params.get('rt') || 0);
+  const tvRd = Number(params.get('rd') || 0);
   const focusFlag = params.get('focus') === '1';
   const openTarget = (params.get('open') || '').trim().toLowerCase();
-  if (tvCity || tvFx || tvSt || focusFlag || openTarget === 'focustv' || openTarget === 'tv') {
+  if (tvCity || tvFx || tvSt || tvRoom || focusFlag || openTarget === 'focustv' || openTarget === 'tv') {
     setTimeout(() => {
       if (typeof window.openFocusTvModal === 'function') {
-        window.openFocusTvModal(tvCity || null, true, { fx: tvFx, stationId: tvSt, zen: tvZen });
+        window.openFocusTvModal(tvCity || null, true, {
+          fx: tvFx,
+          stationId: tvSt,
+          zen: tvZen,
+          room: tvRoom,
+          roomStartSec: tvRt,
+          roomDurMin: tvRd
+        });
       }
     }, 280);
   }
@@ -6624,7 +6634,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const mysteryBtn = document.querySelector('#feedModeChips button[onclick*="mystery"]');
         if (typeof setFeedMode === 'function') setFeedMode('mystery', mysteryBtn);
       } else if (openTarget === 'blitz' || openTarget === 'worldblitz') {
-        if (typeof window.openWorldBlitzModal === 'function') window.openWorldBlitzModal();
+        const blitzVs = (params.get('vs') || '').trim();
+        if (typeof window.openWorldBlitzModal === 'function') {
+          window.openWorldBlitzModal(blitzVs ? { vs: blitzVs } : {});
+        }
       }
     }, 280);
   }

@@ -998,7 +998,36 @@ const REMO_DICT = {
     blitz_reward_earned: '🪙 +{coins} REMO Gold credited to your account!',
     blitz_reward_guest: '🎁 +{coins} 🪙 earned! Sign in to save coins to your Citizen Passport.',
     blitz_claim_passport: '🛂 Claim +{coins} 🪙 & Passport',
-    blitz_share_beat: 'Beat my time'
+    blitz_share_beat: 'Beat my time',
+    blitz_duel_banner: '⚔️ Duel vs {name}: {score}/5 in {time}s',
+    blitz_duel_ahead: '⚡ -{sec}s ahead',
+    blitz_duel_behind: '🔥 +{sec}s behind',
+    blitz_duel_won_title: '🏆 YOU BEAT {name}!',
+    blitz_duel_lost_title: '😅 {name} TOOK THIS ROUND!',
+    blitz_duel_tie_title: '🤝 DEAD HEAT TIE WITH {name}!',
+    blitz_duel_margin_win: 'Faster by {sec}s on identical cities',
+    blitz_duel_margin_lose: 'Beat your time by {sec}s — rematch?',
+    blitz_duel_score_win: 'Higher accuracy ({my}/5 vs {opp}/5)',
+    blitz_duel_score_lose: 'Scored {opp}/5 vs your {my}/5',
+    blitz_duel_you: 'YOU',
+    blitz_duel_name_lbl: 'Duel Nickname',
+    blitz_duel_name_ph: 'Your name (e.g. Alex)',
+    blitz_duel_counter_btn: '⚔️ Copy 1v1 Duel Challenge & Share',
+    blitz_duel_copied_toast: '⚔️ 1v1 Duel link copied! Send it to challenge a friend!',
+
+    // 👥 Focus Together Room (EN)
+    ftv_invite_btn: '👥 Invite',
+    ftv_room_title: '👥 Focus Together Room',
+    ftv_room_sub: 'Share this link — friends get the same 4D city, radio & synced timer.',
+    ftv_room_code_lbl: 'Room Code',
+    ftv_room_dur_lbl: 'Synced Sprint',
+    ftv_room_copy_btn: '📋 Copy Room Invite Link',
+    ftv_room_wa_btn: '💬 WhatsApp Invite',
+    ftv_room_leave_btn: '🚪 Leave Room',
+    ftv_room_copied_toast: '👥 Focus Room invite link copied! Synced timer active!',
+    ftv_room_focusing: 'focusing',
+    ftv_room_welcome: '👥 Joined Focus Room #{room} — synced {dur}m sprint live! Share 👥 to invite.',
+    ftv_room_synced: 'Synced'
   },
 
   fr: {
@@ -1993,7 +2022,36 @@ const REMO_DICT = {
     blitz_reward_earned: '🪙 +{coins} Or REMO ajoutés à votre compte !',
     blitz_reward_guest: '🎁 +{coins} 🪙 gagnés ! Connectez-vous pour les sauvegarder sur votre Passeport.',
     blitz_claim_passport: '🛂 Réclamer +{coins} 🪙 & Passeport',
-    blitz_share_beat: 'Bats mon chrono'
+    blitz_share_beat: 'Bats mon chrono',
+    blitz_duel_banner: '⚔️ Duel vs {name} : {score}/5 en {time}s',
+    blitz_duel_ahead: '⚡ -{sec}s d’avance',
+    blitz_duel_behind: '🔥 +{sec}s de retard',
+    blitz_duel_won_title: '🏆 TU AS BATTU {name} !',
+    blitz_duel_lost_title: '😅 {name} GAGNE CETTE MANCHE !',
+    blitz_duel_tie_title: '🤝 ÉGALITÉ PARFAITE AVEC {name} !',
+    blitz_duel_margin_win: 'Plus rapide de {sec}s sur les mêmes villes',
+    blitz_duel_margin_lose: 'En avance de {sec}s — une revanche ?',
+    blitz_duel_score_win: 'Meilleure précision ({my}/5 vs {opp}/5)',
+    blitz_duel_score_lose: 'Score {opp}/5 contre ton {my}/5',
+    blitz_duel_you: 'TOI',
+    blitz_duel_name_lbl: 'Pseudo Duel',
+    blitz_duel_name_ph: 'Ton prénom (ex. Alex)',
+    blitz_duel_counter_btn: '⚔️ Copier Défi Duel 1v1 & Partager',
+    blitz_duel_copied_toast: '⚔️ Lien Duel 1v1 copié ! Envoie-le à un ami !',
+
+    // 👥 Focus Together Room (FR)
+    ftv_invite_btn: '👥 Inviter',
+    ftv_room_title: '👥 Salle Focus à Plusieurs',
+    ftv_room_sub: 'Partage ce lien — même ville 4D, radio et chrono synchronisé.',
+    ftv_room_code_lbl: 'Code Salle',
+    ftv_room_dur_lbl: 'Session Synchro',
+    ftv_room_copy_btn: '📋 Copier Lien d’Invitation',
+    ftv_room_wa_btn: '💬 Inviter WhatsApp',
+    ftv_room_leave_btn: '🚪 Quitter Salle',
+    ftv_room_copied_toast: '👥 Lien de Salle Focus copié ! Chrono synchronisé activé !',
+    ftv_room_focusing: 'en focus',
+    ftv_room_welcome: '👥 Salle #{room} rejointe — session synchro {dur}m en direct ! Partage 👥.',
+    ftv_room_synced: 'Synchro'
   }
 };
 

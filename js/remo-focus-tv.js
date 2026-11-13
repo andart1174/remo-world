@@ -44,6 +44,7 @@
     fxGain: null,
     fxVolume: 0.75,
     fxPopoverOpen: false,
+    roomPopoverOpen: false,
     zenMode: false,
     zenIntervalId: null,
     lightningAlpha: 0,
@@ -52,7 +53,21 @@
     pomodoroActive: false,
     pomodoroRemainingSec: 25 * 60,
     pomodoroTimerId: null,
-    clockIntervalId: null
+    clockIntervalId: null,
+    room: {
+      active: false,
+      id: '',
+      durMin: 25,
+      selectedDurMin: 25,
+      startEpochSec: 0,
+      lastAwardedCycle: -1,
+      peerId: 'ftvp_' + Math.random().toString(36).slice(2, 9),
+      peers: new Map(),
+      messages: [],
+      bc: null,
+      heartbeatId: null,
+      fsUnsub: null
+    }
   };
 
   function _lang() {
@@ -133,6 +148,29 @@
             <button type="button" class="ftv-hud-btn" id="ftvPomodoroBtn" onclick="toggleFocusTvPomodoro()">
               ⏱️ 25:00
             </button>
+            <div class="ftv-room-wrap" id="ftvRoomWrap">
+              <button type="button" class="ftv-hud-btn ftv-invite-btn" id="ftvInviteRoomBtn" onclick="toggleFocusTvRoomPopover()" data-i18n="ftv_invite_btn">
+                👥 Invite
+              </button>
+              <div class="ftv-room-popover" id="ftvRoomPopover" aria-hidden="true">
+                <div class="ftv-room-pop-title" data-i18n="ftv_room_title">👥 Focus Together Room</div>
+                <div class="ftv-room-pop-sub" data-i18n="ftv_room_sub">Share this link — friends get the same 4D city, radio &amp; synced timer.</div>
+                <label class="ftv-room-lbl" for="ftvRoomCodeInput" data-i18n="ftv_room_code_lbl">Room Code</label>
+                <input type="text" id="ftvRoomCodeInput" class="ftv-room-input" maxlength="24" placeholder="tokyo-7k2m" />
+                <div class="ftv-room-dur-row">
+                  <span class="ftv-room-lbl" data-i18n="ftv_room_dur_lbl">Synced Sprint</span>
+                  <div class="ftv-room-dur-pills">
+                    <button type="button" class="ftv-amb-btn active" id="ftvRoomDur25" onclick="selectFocusTvRoomDur(25)">25m</button>
+                    <button type="button" class="ftv-amb-btn" id="ftvRoomDur50" onclick="selectFocusTvRoomDur(50)">50m</button>
+                  </div>
+                </div>
+                <button type="button" class="ftv-room-copy-btn" id="ftvRoomCopyBtn" onclick="copyFocusTvRoomInvite()" data-i18n="ftv_room_copy_btn">📋 Copy Room Invite Link</button>
+                <div class="ftv-room-pop-actions">
+                  <a class="ftv-amb-btn ftv-room-wa" id="ftvRoomWaLink" href="https://wa.me/" target="_blank" rel="noopener noreferrer" data-i18n="ftv_room_wa_btn">💬 WhatsApp Invite</a>
+                  <button type="button" class="ftv-amb-btn ftv-room-leave" id="ftvRoomLeaveBtn" onclick="leaveFocusTvRoom()" style="display:none;" data-i18n="ftv_room_leave_btn">🚪 Leave Room</button>
+                </div>
+              </div>
+            </div>
             <button type="button" class="ftv-hud-btn ftv-zen-btn" id="ftvZenBtn" onclick="toggleFocusTvZenMode()" data-i18n="ftv_zen_btn">
               🕰️ Zen
             </button>
@@ -234,7 +272,16 @@
         state.fxPopoverOpen = false;
         _syncAmbientButtons();
       }
+      if (state.roomPopoverOpen && e.target && !e.target.closest('#ftvRoomWrap')) {
+        state.roomPopoverOpen = false;
+        _syncRoomPopoverUI();
+      }
     });
+
+    const roomCodeInp = wrap.querySelector('#ftvRoomCodeInput');
+    if (roomCodeInp) {
+      roomCodeInp.addEventListener('input', () => _syncRoomPopoverUI());
+    }
 
     document.body.appendChild(wrap);
   }
@@ -830,17 +877,370 @@
     state.rafId = requestAnimationFrame(renderFrame);
   }
 
-  /* ── 4. POMODORO FOCUS TIMER (+15 🪙 REWARD) ── */
+  /* ── 4. POMODORO & FOCUS TOGETHER SYNC ENGINE (+15 🪙 REWARD) ── */
+  function _sanitizeRoomCode(raw) {
+    const clean = String(raw || '').toLowerCase().replace(/[^a-z0-9_-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '').slice(0, 24);
+    return clean;
+  }
+
+  function _defaultRoomCode() {
+    const rnd = Math.floor(100 + Math.random() * 900);
+    return `${(state.cityId || 'remo').slice(0, 10)}-${rnd}`;
+  }
+
+  function _getRoomSelfMeta() {
+    const u = window.REMO_STORE && typeof window.REMO_STORE.getCurrentUser === 'function'
+      ? window.REMO_STORE.getCurrentUser()
+      : null;
+    const city = _getCity((u && u.homeCity) || state.cityId);
+    return {
+      peerId: state.room.peerId,
+      name: (u && u.name) ? String(u.name).slice(0, 20) : (_lang() === 'fr' ? 'Citoyen' : 'Citizen'),
+      cityFlag: (city && city.flag) || '🌍',
+      ts: Date.now()
+    };
+  }
+
+  function _awardPomodoroCoins() {
+    try {
+      const store = window.REMO_STORE;
+      if (store) {
+        const u = store.getCurrentUser() || store.ensureGuestOrCitizen('Focus Citizen', '', state.cityId);
+        if (u && u.uid) {
+          store.addCoins(u.uid, 15, 10);
+          store.save(true, 'focus_pomodoro');
+        }
+      }
+      if (typeof window.spawnRemoCoinsFX === 'function') window.spawnRemoCoinsFX(12);
+      if (typeof window.remoToast === 'function') window.remoToast(_t('ftv_focus_done'), 'fanfare');
+      if (typeof window.syncHeaderAndSidebars === 'function') window.syncHeaderAndSidebars();
+    } catch (e) {}
+  }
+
+  function _syncRoomTimerFromClock() {
+    if (!state.room.active || !state.room.startEpochSec) return;
+    const durSec = Math.max(60, (state.room.durMin || 25) * 60);
+    const nowSec = Math.floor(Date.now() / 1000);
+    const elapsed = Math.max(0, nowSec - state.room.startEpochSec);
+    const cycleIdx = Math.floor(elapsed / durSec);
+    state.pomodoroRemainingSec = durSec - (elapsed % durSec);
+    if (state.room.lastAwardedCycle >= 0 && cycleIdx > state.room.lastAwardedCycle) {
+      state.room.lastAwardedCycle = cycleIdx;
+      _awardPomodoroCoins();
+    } else if (state.room.lastAwardedCycle < 0) {
+      state.room.lastAwardedCycle = cycleIdx;
+    }
+  }
+
+  function _broadcastRoomEvent(type, extra = {}) {
+    if (!state.room.bc || !state.room.active) return;
+    try {
+      state.room.bc.postMessage({
+        type,
+        roomId: state.room.id,
+        peer: _getRoomSelfMeta(),
+        startEpochSec: state.room.startEpochSec,
+        durMin: state.room.durMin,
+        ...extra
+      });
+    } catch (e) {}
+  }
+
+  function _syncRoomFirestorePeer(isLeaving = false) {
+    const db = window.REMO_STORE && window.REMO_STORE.fbDb;
+    if (!db || !state.room.id) return;
+    try {
+      const selfMeta = _getRoomSelfMeta();
+      const docRef = db.collection('remo_focus_rooms').doc(state.room.id);
+      if (isLeaving) {
+        docRef.set({
+          peers: { [state.room.peerId]: null },
+          lastActiveAt: Date.now()
+        }, { merge: true }).catch(() => {});
+        return;
+      }
+      docRef.set({
+        id: state.room.id,
+        cityId: state.cityId,
+        startEpochSec: state.room.startEpochSec,
+        durMin: state.room.durMin,
+        peers: { [state.room.peerId]: selfMeta },
+        lastActiveAt: Date.now()
+      }, { merge: true }).catch(() => {});
+    } catch (e) {}
+  }
+
+  function _pruneStalePeers() {
+    const cutoff = Date.now() - 95000;
+    for (const [pid, meta] of state.room.peers.entries()) {
+      if (pid === state.room.peerId) continue;
+      if (!meta || Number(meta.ts || 0) < cutoff) state.room.peers.delete(pid);
+    }
+  }
+
+  function _syncRoomPopoverUI() {
+    const pop = document.getElementById('ftvRoomPopover');
+    const btn = document.getElementById('ftvInviteRoomBtn');
+    const codeInp = document.getElementById('ftvRoomCodeInput');
+    const leaveBtn = document.getElementById('ftvRoomLeaveBtn');
+    const waLink = document.getElementById('ftvRoomWaLink');
+    const d25 = document.getElementById('ftvRoomDur25');
+    const d50 = document.getElementById('ftvRoomDur50');
+
+    if (pop) {
+      pop.classList.toggle('open', state.roomPopoverOpen);
+      pop.setAttribute('aria-hidden', state.roomPopoverOpen ? 'false' : 'true');
+    }
+    if (btn) {
+      btn.classList.toggle('active', state.room.active || state.roomPopoverOpen);
+      if (state.room.active) {
+        btn.removeAttribute('data-i18n');
+        btn.textContent = `👥 #${state.room.id}`;
+      } else {
+        btn.setAttribute('data-i18n', 'ftv_invite_btn');
+        btn.textContent = _t('ftv_invite_btn');
+      }
+    }
+    if (codeInp && !codeInp.value) {
+      codeInp.value = state.room.id || _defaultRoomCode();
+    }
+    const selDur = state.room.active ? state.room.durMin : state.room.selectedDurMin;
+    if (d25) d25.classList.toggle('active', Number(selDur) === 25);
+    if (d50) d50.classList.toggle('active', Number(selDur) === 50);
+    if (leaveBtn) leaveBtn.style.display = state.room.active ? 'inline-flex' : 'none';
+    if (waLink) {
+      const previewUrl = _buildRoomShareUrl(
+        _sanitizeRoomCode(codeInp ? codeInp.value : '') || state.room.id || _defaultRoomCode(),
+        state.room.active ? state.room.startEpochSec : Math.floor(Date.now() / 1000),
+        selDur
+      );
+      const city = _getCity(state.cityId);
+      const msg = _lang() === 'fr'
+        ? `Rejoins ma salle Focus 4D (${selDur}m synchro) à ${city.flag} ${_cityName(city)} sur REMO :\n${previewUrl}`
+        : `Join my synced ${selDur}m 4D Focus Room in ${city.flag} ${_cityName(city)} on REMO:\n${previewUrl}`;
+      waLink.href = `https://wa.me/?text=${encodeURIComponent(msg)}`;
+    }
+  }
+
+  function _leaveFocusRoom(clearUrlState = true) {
+    if (state.room.active) {
+      _broadcastRoomEvent('LEAVE');
+      _syncRoomFirestorePeer(true);
+    }
+    clearInterval(state.room.heartbeatId);
+    state.room.heartbeatId = null;
+    if (typeof state.room.fsUnsub === 'function') {
+      try { state.room.fsUnsub(); } catch (e) {}
+      state.room.fsUnsub = null;
+    }
+    if (state.room.bc) {
+      try { state.room.bc.close(); } catch (e) {}
+      state.room.bc = null;
+    }
+    state.room.active = false;
+    state.room.id = '';
+    state.room.startEpochSec = 0;
+    state.room.lastAwardedCycle = -1;
+    state.room.peers.clear();
+    state.room.messages = [];
+    if (clearUrlState) {
+      state.pomodoroActive = false;
+      clearInterval(state.pomodoroTimerId);
+      state.pomodoroTimerId = null;
+      state.pomodoroRemainingSec = 25 * 60;
+      _renderPomodoroBtn();
+      _renderChatStrip();
+      _syncRoomPopoverUI();
+      _updateZenClockDisplay();
+    }
+  }
+
+  function _joinFocusRoom(roomSlug, explicitStartSec = 0, explicitDurMin = 25) {
+    const cleanId = _sanitizeRoomCode(roomSlug) || _defaultRoomCode();
+    _leaveFocusRoom(false);
+
+    const durMin = Number(explicitDurMin) === 50 ? 50 : 25;
+    const durSec = durMin * 60;
+    const nowSec = Math.floor(Date.now() / 1000);
+    const hasExplicitStart = Number(explicitStartSec) > 1600000000;
+    const startSec = hasExplicitStart ? Math.floor(Number(explicitStartSec)) : (nowSec - (nowSec % durSec));
+
+    state.room.active = true;
+    state.room.id = cleanId;
+    state.room.durMin = durMin;
+    state.room.selectedDurMin = durMin;
+    state.room.startEpochSec = startSec;
+    state.room.lastAwardedCycle = -1;
+    state.room.peers.set(state.room.peerId, _getRoomSelfMeta());
+
+    // Local cross-tab realtime sync
+    if (typeof BroadcastChannel !== 'undefined') {
+      try {
+        const bc = new BroadcastChannel('remo_focus_rooms_v1');
+        bc.onmessage = (ev) => {
+          const msg = ev && ev.data;
+          if (!msg || msg.roomId !== state.room.id || !state.room.active) return;
+          if (msg.peer && msg.peer.peerId && msg.peer.peerId !== state.room.peerId) {
+            if (msg.type === 'LEAVE') {
+              state.room.peers.delete(msg.peer.peerId);
+            } else {
+              state.room.peers.set(msg.peer.peerId, { ...msg.peer, ts: Date.now() });
+            }
+          }
+          if (msg.type === 'PING' && !hasExplicitStart && msg.startEpochSec) {
+            state.room.startEpochSec = msg.startEpochSec;
+            state.room.durMin = Number(msg.durMin) === 50 ? 50 : 25;
+          }
+          if (msg.type === 'CHAT' && msg.chatItem && !state.room.messages.some((m) => m.id === msg.chatItem.id)) {
+            state.room.messages.push(msg.chatItem);
+            if (state.room.messages.length > 20) state.room.messages = state.room.messages.slice(-20);
+          }
+          _renderChatStrip();
+        };
+        state.room.bc = bc;
+        _broadcastRoomEvent('PING');
+      } catch (e) {}
+    }
+
+    // Best-effort Firestore cross-device sync
+    const db = window.REMO_STORE && window.REMO_STORE.fbDb;
+    if (db) {
+      try {
+        state.room.fsUnsub = db.collection('remo_focus_rooms').doc(cleanId).onSnapshot((docSnap) => {
+          if (!state.room.active || !docSnap || !docSnap.exists) return;
+          const data = docSnap.data() || {};
+          if (!hasExplicitStart && data.startEpochSec && Number(data.startEpochSec) > 1600000000) {
+            state.room.startEpochSec = Number(data.startEpochSec);
+            state.room.durMin = Number(data.durMin) === 50 ? 50 : 25;
+            _syncRoomTimerFromClock();
+            _renderPomodoroBtn();
+          }
+          if (data.peers && typeof data.peers === 'object') {
+            Object.entries(data.peers).forEach(([pid, pMeta]) => {
+              if (pMeta && pid !== state.room.peerId) {
+                state.room.peers.set(pid, pMeta);
+              } else if (!pMeta) {
+                state.room.peers.delete(pid);
+              }
+            });
+            _pruneStalePeers();
+          }
+          if (Array.isArray(data.messages)) {
+            data.messages.forEach((m) => {
+              if (m && m.id && !state.room.messages.some((x) => x.id === m.id)) {
+                state.room.messages.push(m);
+              }
+            });
+            state.room.messages.sort((a, b) => Number(a.ts || 0) - Number(b.ts || 0));
+            if (state.room.messages.length > 20) state.room.messages = state.room.messages.slice(-20);
+          }
+          _renderChatStrip();
+        }, () => {});
+        _syncRoomFirestorePeer(false);
+      } catch (e) {}
+    }
+
+    state.room.heartbeatId = setInterval(() => {
+      if (!state.room.active || !state.isOpen) return;
+      state.room.peers.set(state.room.peerId, _getRoomSelfMeta());
+      _pruneStalePeers();
+      _broadcastRoomEvent('PING');
+      _syncRoomFirestorePeer(false);
+      _renderChatStrip();
+    }, 20000);
+
+    // Start synchronized countdown automatically
+    _syncRoomTimerFromClock();
+    state.pomodoroActive = true;
+    clearInterval(state.pomodoroTimerId);
+    state.pomodoroTimerId = setInterval(() => {
+      if (!state.pomodoroActive) return;
+      _syncRoomTimerFromClock();
+      _renderPomodoroBtn();
+      _updateZenClockDisplay();
+    }, 1000);
+
+    const codeInp = document.getElementById('ftvRoomCodeInput');
+    if (codeInp) codeInp.value = cleanId;
+    _renderPomodoroBtn();
+    _renderChatStrip();
+    _syncRoomPopoverUI();
+    _updateZenClockDisplay();
+  }
+
+  window.toggleFocusTvRoomPopover = function () {
+    state.roomPopoverOpen = !state.roomPopoverOpen;
+    if (state.roomPopoverOpen) state.fxPopoverOpen = false;
+    _syncAmbientButtons();
+    _syncRoomPopoverUI();
+  };
+
+  window.selectFocusTvRoomDur = function (min) {
+    state.room.selectedDurMin = Number(min) === 50 ? 50 : 25;
+    if (state.room.active) {
+      state.room.durMin = state.room.selectedDurMin;
+      state.room.startEpochSec = Math.floor(Date.now() / 1000);
+      state.room.lastAwardedCycle = 0;
+      _syncRoomTimerFromClock();
+      _broadcastRoomEvent('PING');
+      _syncRoomFirestorePeer(false);
+      _renderPomodoroBtn();
+    }
+    _syncRoomPopoverUI();
+  };
+
+  window.leaveFocusTvRoom = function () {
+    state.roomPopoverOpen = false;
+    _leaveFocusRoom(true);
+  };
+
+  window.copyFocusTvRoomInvite = async function () {
+    const codeInp = document.getElementById('ftvRoomCodeInput');
+    const desiredSlug = _sanitizeRoomCode(codeInp ? codeInp.value : '') || state.room.id || _defaultRoomCode();
+    const dur = state.room.selectedDurMin || 25;
+    if (!state.room.active || state.room.id !== desiredSlug) {
+      _joinFocusRoom(desiredSlug, Math.floor(Date.now() / 1000), dur);
+    }
+    const url = _buildRoomShareUrl(state.room.id, state.room.startEpochSec, state.room.durMin);
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(url);
+      } else {
+        const ta = document.createElement('textarea');
+        ta.value = url;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
+    } catch (e) {}
+    state.roomPopoverOpen = false;
+    _syncRoomPopoverUI();
+    if (typeof window.remoToast === 'function') {
+      window.remoToast(_t('ftv_room_copied_toast'), 'fanfare');
+    }
+  };
+
   function _renderPomodoroBtn() {
     const btn = document.getElementById('ftvPomodoroBtn');
     if (!btn) return;
     const mins = String(Math.floor(state.pomodoroRemainingSec / 60)).padStart(2, '0');
     const secs = String(state.pomodoroRemainingSec % 60).padStart(2, '0');
     btn.classList.toggle('active', state.pomodoroActive);
-    btn.textContent = state.pomodoroActive ? `⏸️ ${mins}:${secs}` : `⏱️ ${mins}:${secs}`;
+    if (state.room.active) {
+      btn.textContent = `⏱️ ${mins}:${secs} · 🔗`;
+    } else {
+      btn.textContent = state.pomodoroActive ? `⏸️ ${mins}:${secs}` : `⏱️ ${mins}:${secs}`;
+    }
   }
 
   window.toggleFocusTvPomodoro = function () {
+    if (state.room.active) {
+      window.toggleFocusTvRoomPopover();
+      return;
+    }
     if (state.pomodoroActive) {
       state.pomodoroActive = false;
       clearInterval(state.pomodoroTimerId);
@@ -856,26 +1256,19 @@
     clearInterval(state.pomodoroTimerId);
     state.pomodoroTimerId = setInterval(() => {
       if (!state.pomodoroActive) return;
+      if (state.room.active) {
+        _syncRoomTimerFromClock();
+        _renderPomodoroBtn();
+        _updateZenClockDisplay();
+        return;
+      }
       state.pomodoroRemainingSec -= 1;
       if (state.pomodoroRemainingSec <= 0) {
         state.pomodoroActive = false;
         clearInterval(state.pomodoroTimerId);
         state.pomodoroTimerId = null;
         state.pomodoroRemainingSec = 25 * 60;
-
-        try {
-          const store = window.REMO_STORE;
-          if (store) {
-            const u = store.getCurrentUser() || store.ensureGuestOrCitizen('Focus Citizen', '', state.cityId);
-            if (u && u.uid) {
-              store.addCoins(u.uid, 15, 10);
-              store.save(true, 'focus_pomodoro');
-            }
-          }
-          if (typeof window.spawnRemoCoinsFX === 'function') window.spawnRemoCoinsFX(12);
-          if (typeof window.remoToast === 'function') window.remoToast(_t('ftv_focus_done'), 'fanfare');
-          if (typeof window.syncHeaderAndSidebars === 'function') window.syncHeaderAndSidebars();
-        } catch (e) {}
+        _awardPomodoroCoins();
       }
       _renderPomodoroBtn();
     }, 1000);
@@ -890,11 +1283,19 @@
     const city = _getCity(state.cityId);
 
     const store = window.REMO_STORE;
-    const onlineCount = (store && typeof store.getOnlineCitizensList === 'function')
-      ? Math.max(12, store.getOnlineCitizensList().length + 11)
-      : 18;
     if (listenersEl) {
-      listenersEl.textContent = `🎧 ${onlineCount} ${_t('ftv_listeners_lbl')}`;
+      if (state.room.active) {
+        _pruneStalePeers();
+        const peerCount = Math.max(1, state.room.peers.size);
+        listenersEl.textContent = `👥 ${peerCount} ${_t('ftv_room_focusing')} · #${state.room.id}`;
+        listenersEl.classList.add('in-room');
+      } else {
+        const onlineCount = (store && typeof store.getOnlineCitizensList === 'function')
+          ? Math.max(12, store.getOnlineCitizensList().length + 11)
+          : 18;
+        listenersEl.textContent = `🎧 ${onlineCount} ${_t('ftv_listeners_lbl')}`;
+        listenersEl.classList.remove('in-room');
+      }
     }
 
     if (l2eEl && window.REMO_RADIO && typeof window.REMO_RADIO._loadL2EState === 'function') {
@@ -904,6 +1305,22 @@
     }
 
     if (!feed) return;
+    if (state.room.active) {
+      const recentRoomMsgs = state.room.messages.slice(-3);
+      if (!recentRoomMsgs.length) {
+        const roomWelcome = _t('ftv_room_welcome', { room: state.room.id, dur: state.room.durMin });
+        feed.innerHTML = `<div class="ftv-chat-line ftv-chat-welcome">${_escapeHtml(roomWelcome)}</div>`;
+        return;
+      }
+      feed.innerHTML = recentRoomMsgs.map((m) => `
+        <div class="ftv-chat-line">
+          <span class="ftv-chat-author">${_escapeHtml(m.cityFlag || city.flag || '🌍')} @${_escapeHtml(m.author || 'Citizen')}:</span>
+          <span class="ftv-chat-text">${_escapeHtml(m.text || '')}</span>
+        </div>
+      `).join('');
+      return;
+    }
+
     const allRooms = (store && store.state && store.state.chatMessages) || {};
     const cityMsgs = Array.isArray(allRooms[state.cityId]) ? allRooms[state.cityId] : [];
     const globalMsgs = Array.isArray(allRooms.global) ? allRooms.global : [];
@@ -933,19 +1350,41 @@
     if (!txt) return;
 
     const store = window.REMO_STORE;
+    const u = store && store.getCurrentUser
+      ? (store.getCurrentUser() || store.ensureGuestOrCitizen('Focus Citizen', '', state.cityId))
+      : null;
+    const myCity = _getCity((u && u.homeCity) || state.cityId);
+    const msgObj = {
+      id: 'ftv_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+      uid: (u && u.uid) || state.room.peerId,
+      author: (u && u.name) || (_lang() === 'fr' ? 'Citoyen' : 'Citizen'),
+      cityFlag: myCity.flag || '🌍',
+      text: txt,
+      ts: Date.now()
+    };
+
+    if (state.room.active) {
+      state.room.messages.push(msgObj);
+      if (state.room.messages.length > 20) state.room.messages = state.room.messages.slice(-20);
+      _broadcastRoomEvent('CHAT', { chatItem: msgObj });
+      const db = store && store.fbDb;
+      if (db && state.room.id) {
+        try {
+          db.collection('remo_focus_rooms').doc(state.room.id).set({
+            messages: state.room.messages.slice(-15),
+            lastActiveAt: Date.now()
+          }, { merge: true }).catch(() => {});
+        } catch (e) {}
+      }
+      inp.value = '';
+      _renderChatStrip();
+      return;
+    }
+
     if (store && store.state) {
-      const u = store.getCurrentUser() || store.ensureGuestOrCitizen('Focus Citizen', '', state.cityId);
-      const myCity = _getCity(u.homeCity || state.cityId);
       store.state.chatMessages = store.state.chatMessages || {};
       store.state.chatMessages[state.cityId] = store.state.chatMessages[state.cityId] || [];
-      store.state.chatMessages[state.cityId].push({
-        id: 'ftv_' + Date.now(),
-        uid: u.uid,
-        author: u.name,
-        cityFlag: myCity.flag || '🌍',
-        text: txt,
-        ts: Date.now()
-      });
+      store.state.chatMessages[state.cityId].push(msgObj);
       store.save(true, 'focus_tv_chat');
     }
     inp.value = '';
@@ -1006,7 +1445,13 @@
     if (metaEl) {
       const st = window.REMO_RADIO && window.REMO_RADIO.currentStation;
       const stName = st ? `${st.flag || st.icon || '📻'} ${st.name}` : '📻 REMO Cyber-LoFi';
-      metaEl.textContent = `${wx.icon || '🌤️'} ${wx.tempC ?? 20}°C  ·  ${stName}`;
+      let extraRoom = '';
+      if (state.room && state.room.active) {
+        const rm = String(Math.floor(state.pomodoroRemainingSec / 60)).padStart(2, '0');
+        const rs = String(state.pomodoroRemainingSec % 60).padStart(2, '0');
+        extraRoom = `  ·  👥 #${state.room.id} · ⏱️ ${rm}:${rs}`;
+      }
+      metaEl.textContent = `${wx.icon || '🌤️'} ${wx.tempC ?? 20}°C  ·  ${stName}${extraRoom}`;
     }
   }
 
@@ -1133,6 +1578,7 @@
     _updateCityHeroAndWeather();
     _renderChatStrip();
     _syncAmbientButtons();
+    _syncRoomPopoverUI();
   }
   window.syncFocusTvUI = syncFocusTvUI;
 
@@ -1196,10 +1642,30 @@
     let shareUrl = `${window.location.origin}${window.location.pathname}?tv=${encodeURIComponent(city.id)}`;
     if (activeFx.length) shareUrl += `&fx=${encodeURIComponent(activeFx.join(','))}`;
     if (st && st.id) shareUrl += `&st=${encodeURIComponent(st.id)}`;
+    if (state.room && state.room.active && state.room.id) {
+      shareUrl += `&room=${encodeURIComponent(state.room.id)}`;
+      if (state.room.startEpochSec) shareUrl += `&rt=${Math.floor(state.room.startEpochSec)}`;
+      shareUrl += `&rd=${state.room.durMin === 50 ? 50 : 25}`;
+    }
     return shareUrl;
   }
 
+  function _buildRoomShareUrl(roomId, startEpochSec, durMin) {
+    const city = _getCity(state.cityId);
+    const activeFx = AMBIENT_EFFECT_KEYS.filter((k) => Boolean(state.ambient[k]));
+    const st = window.REMO_RADIO && window.REMO_RADIO.currentStation;
+    let url = `${window.location.origin}${window.location.pathname}?tv=${encodeURIComponent(city.id)}`;
+    if (activeFx.length) url += `&fx=${encodeURIComponent(activeFx.join(','))}`;
+    if (st && st.id) url += `&st=${encodeURIComponent(st.id)}`;
+    const slug = _sanitizeRoomCode(roomId) || state.room.id || _defaultRoomCode();
+    const rt = Math.floor(Number(startEpochSec) || Math.floor(Date.now() / 1000));
+    const rd = Number(durMin) === 50 ? 50 : 25;
+    url += `&room=${encodeURIComponent(slug)}&rt=${rt}&rd=${rd}`;
+    return url;
+  }
+
   window.getFocusTvVibeUrl = _buildVibeShareUrl;
+  window.getFocusTvRoomUrl = _buildRoomShareUrl;
 
   window.shareFocusTvVibe = async function () {
     const city = _getCity(state.cityId);
@@ -1309,8 +1775,15 @@
       });
     }
 
+    state.roomPopoverOpen = false;
+    state.fxPopoverOpen = false;
     window.toggleFocusTvZenMode(Boolean(opts.zen));
     _renderCitySelectors();
+    if (opts.room) {
+      _joinFocusRoom(opts.room, opts.roomStartSec, opts.roomDurMin);
+    } else if (state.room.active) {
+      _leaveFocusRoom(false);
+    }
     syncFocusTvUI();
     _renderPomodoroBtn();
     _startCanvasLoop();
@@ -1326,9 +1799,14 @@
   window.closeFocusTvModal = function () {
     const overlay = document.getElementById('remoFocusTvOverlay');
     state.isOpen = false;
+    state.roomPopoverOpen = false;
+    state.fxPopoverOpen = false;
     window.toggleFocusTvZenMode(false);
     if (overlay) overlay.classList.remove('open');
     document.body.classList.remove('ftv-active');
+
+    _leaveFocusRoom(true);
+    _syncAmbientButtons();
 
     if (state.rafId) {
       cancelAnimationFrame(state.rafId);
@@ -1349,5 +1827,16 @@
         window.closeFocusTvModal();
       }
     }
+  });
+
+  window.addEventListener('remo:langchange', () => {
+    if (!document.getElementById('remoFocusTvOverlay')) return;
+    _renderCitySelectors();
+    syncFocusTvUI();
+    _updateZenClockDisplay();
+  });
+
+  window.addEventListener('beforeunload', () => {
+    if (state.room && state.room.active) _leaveFocusRoom(false);
   });
 })();
