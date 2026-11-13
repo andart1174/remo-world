@@ -1,10 +1,10 @@
 # REMO World (https://remoworld.com)
 
-> REMO World is a free bilingual (English & French) 4D City Social Network, Live World Radio Player (38 ad-free global & Lofi stations), Browser Geography Game ("Guess My City!"), and 9:16 Virtual Boarding Pass Generator connecting 24 world cities in real time.
+> REMO World is a free bilingual (English & French) 4D Focus TV City Window, 4D City Social Network, Live World Radio Player (56 ad-free global & Lofi stations across 24/24 cities), Browser Geography Game ("Guess My City!"), and 9:16 Virtual Boarding Pass Generator connecting 24 world cities in real time.
 
 ## Key Free Features (Zero Sign-Up Required to Explore)
-- [REMO World Live Social App](https://remoworld.com/): Real-time cross-city social feed, 1-click cross-city Waves with km distance, live City Clicker Cup wars, Citizen Passports, and collectible 4D City Cards.
-- [Free Live World Cities Radio (38 Stations)](https://remoworld.com/world-radio.html): Stream live radio from Paris, Montréal, Chișinău, Bucharest, New York, London, Tokyo, Seoul, Berlin, Dubai + Lofi, Jazz & Synthwave with Listen-to-Earn coin rewards.
+- [REMO World Live Social App & 4D Focus TV](https://remoworld.com/): Fullscreen 4D Focus TV ambient city window with 9 visual/audio FX, real-time cross-city social feed, live City Wars, Citizen Passports, and collectible 4D City Cards.
+- [Free Live World Cities Radio (56 Stations)](https://remoworld.com/world-radio.html): Stream live radio from Paris, Montréal, Chișinău (8 live stations), Bucharest, New York, London, Tokyo, Seoul, Berlin, Dubai, Lisbon, Amsterdam, Sydney, Rio, Singapore & Cairo + Lofi, Jazz & Synthwave.
 - [Guess The City Photo Game](https://remoworld.com/guess-the-city.html): Free browser geography & skyline photo guessing game created by real citizens worldwide.
 - [4D Holographic Boarding Pass Generator](https://remoworld.com/boarding-pass.html): Create & download 9:16 Story Boarding Passes between any two world cities for TikTok, Instagram & WhatsApp.
 - [All 24 Connected World Cities Directory](https://remoworld.com/cities/index.html): Live local time, weather, radio streams & urban stats for every Edition-1 metropolis.
@@ -37,11 +37,11 @@
 
 ## Languages
 - English: https://remoworld.com/
-- Français: https://remoworld.com/fr/cities/index.html
+- Français: https://remoworld.com/fr/
 - Full AI Reference: https://remoworld.com/llms-full.txt
 
 
-## Complete Radio Directory (38 Live Streams)
+## Complete Radio Directory (56 Live Streams)
 - **Capital Chill UK** (LOFI & CHILL): Downtempo, Chillhop & Chilled Beats 24/7 / Downtempo, Chillhop & Lofi Beats 24/7
 - **SomaFM Groove Salad** (AMBIENT CHILL): Ambient, Downtempo & Chilled Electronica / Ambient, Downtempo & Chillout Électronique
 - **Lush Lofi & Focus** (STUDY LOFI): Mellow beats, dreamy vocals & study flow / Beats doux, voix aériennes & concentration
@@ -80,6 +80,24 @@
 - **Afrobeats & Amapiano Pulse** (AFROBEATS): Lagos & World • Afrobeats, Amapiano & Warm Groove / Lagos & Monde • Afrobeats, Amapiano & Groove
 - **Dubai Desert Lounge & Club** (DUBAI): Dubai • Oriental Deep House & Marina Lounge / Dubaï • Oriental Deep House & Rooftop Lounge
 - **Monaco & Geneva Riviera Pop** (RIVIERA): Monaco & Geneva • Riviera Pop & Chic Classics / Monaco & Genève • Pop Chic & Doux Classiques
+- **Radio ZUM 1 Chișinău** (ZUM 1): Chișinău • Urban Hits, Dance & Live Energy / Chișinău • Hits Urbains, Dance & Ambiance Live
+- **Hit FM Chișinău** (HIT FM MD): Chișinău • Hot Pop Hits & 24/7 Dance Energy / Chișinău • Hot Hits Pop & Dance Non-Stop
+- **Retro FM Moldova** (RETRO MD): Chișinău • Golden Retro Classics & Timeless Hits / Chișinău • Classiques Rétro & Souvenirs Dorés
+- **Jurnal FM Chișinău** (JURNAL FM): Chișinău • Adult Pop, Acoustic & Local Pulse / Chișinău • Pop Adulte, Acoustic & Actualités Locales
+- **Muz FM & ROKS Moldova** (MUZ FM): Chișinău • Fresh Electro, Modern Pop & Rock / Chișinău • Électro Fresh, Pop Moderne & Rock
+- **Radio Noroc Moldova** (NOROC MD): Chișinău • Authentic Folk & Moldovan Soul / Chișinău • Folk Authentique & Culture Moldave
+- **CBC Music Toronto** (TORONTO): Toronto • Indie, Jazz, Folk & Canadian Sounds / Toronto • Indie, Jazz, Folk & Scène Canadienne
+- **KCRW Eclectic 24 L.A.** (LA KCRW): Los Angeles • Eclectic Indie, Electronic & Live Sets / Los Angeles • Indie, Électro & Sessions Live
+- **One FM & Radio Lac Genève** (GENEVA): Geneva • French-Swiss Pop, Groove & Lake Léman Vibes / Genève • Pop Romande, Groove & Hits du Léman
+- **Sublime & Intense Amsterdam** (AMSTERDAM): Amsterdam • Nu-Jazz, Soul, Funk & Canal House Beats / Amsterdam • Nu-Jazz, Soul, Funk & Deep House
+- **Rádio Comercial Lisboa** (LISBON): Lisbon • Portuguese Pop, Atlantic Sun & Top Hits / Lisbonne • Pop Portugaise, Soleils Atlantiques & Hits
+- **Antena 3 & Fado Lisboa** (FADO & ALT): Lisbon • Alternative Music, Fado & Acoustic Soul / Lisbonne • Musique Alternative, Fado & Acoustique
+- **Radyo Fenomen Istanbul** (ISTANBUL): Istanbul • Bosphorus Beats, Turkish Pop & Club Mix / Istanbul • Bosphore Beats, Pop Turque & Club Mix
+- **Singapore 987FM Live** (SINGAPORE): Singapore • Marina Bay Pop, R&B & APAC Top Hits / Singapour • Marina Bay Pop, R&B & Hits Asie-Pacifique
+- **FBi 94.5 & PopAsia Sydney** (SYDNEY): Sydney • Australian Indie, Electronic & Harbour Beats / Sydney • Indie Australien, Électro & Cultures du Pacifique
+- **2MBS Fine Music Sydney** (FINE MUSIC): Sydney • Late-Night Jazz, Classical & Instrumental / Sydney • Jazz Nocturne, Classique & Musique Instrumentale
+- **Radio Hits 88.2 Cairo** (CAIRO): Cairo • Modern Arabic Hits & Nile Night Vibes / Le Caire • Hits Arabes Modernes & Nuits du Nil
+- **Rádio Melodia & Rio FM** (RIO FM): Rio • Carioca Groove, Soul & Tropical Breezes / Rio • Groove Carioca, Soul & Douceur Tropicale
 
 ## Detailed City Profiles (24 Cities)
 ### ⚜️ Montréal / Montréal (MTL) — Canada

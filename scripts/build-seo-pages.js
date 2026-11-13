@@ -11,7 +11,7 @@ const vm = require('vm');
 
 const ROOT = path.resolve(__dirname, '..');
 const DOMAIN = 'https://remoworld.com';
-const TODAY = '2026-11-02';
+const TODAY = '2026-11-12';
 const INDEXNOW_KEY = 'remoindexnow2026key8f4a2b9c1d7e3a5f';
 
 /* ── 1. Load Canonical Cities & Radio Stations Directly from Source ── */
@@ -193,10 +193,11 @@ function renderTopbar(lang, prefix, altUrl) {
   const radioHref = isFr ? `${prefix}fr/world-radio.html` : `${prefix}world-radio.html`;
   const guessHref = isFr ? `${prefix}fr/guess-the-city.html` : `${prefix}guess-the-city.html`;
   const passHref = isFr ? `${prefix}fr/boarding-pass.html` : `${prefix}boarding-pass.html`;
-  const appHref = `${prefix}index.html?lang=${lang}&from=seo`;
+  const appHref = isFr ? `${prefix}?lang=fr&from=seo` : `${prefix}?from=seo`;
+  const homeHref = isFr ? `${prefix}fr/` : (prefix || './');
   return `
   <header class="topbar">
-    <a class="brand" href="${appHref}">
+    <a class="brand" href="${homeHref}">
       <img src="${prefix}img/remo_brand_coin.png" alt="REMO World Coin Logo" width="34" height="34">
       <span>REMO World 🌐</span>
     </a>
@@ -211,15 +212,17 @@ function renderTopbar(lang, prefix, altUrl) {
   </header>`;
 }
 
-function renderFooter(lang, prefix) {
+function renderFooter(lang, prefix, stationCount = 56) {
   const isFr = lang === 'fr';
+  const homeHref = isFr ? `${prefix}fr/` : (prefix || './');
   return `
   <footer>
-    <div>© 2026 <strong>REMO World</strong> — ${isFr ? 'Réseau Social Urbain 4D, Radio Mondiale & Jeux de Villes.' : 'The 4D City Social Network, Live World Radio & Interactive City Games.'}</div>
+    <div>© 2026 <strong>REMO World</strong> — ${isFr ? 'Réseau Social Urbain 4D, Focus TV & Radio Mondiale.' : 'The 4D City Social Network, Focus TV & Live World Radio.'}</div>
     <div style="display:flex;gap:14px;flex-wrap:wrap;">
-      <a href="${prefix}index.html?lang=${lang}">${isFr ? 'Accueil REMO' : 'REMO Home'}</a>
+      <a href="${homeHref}">${isFr ? 'Accueil REMO' : 'REMO Home'}</a>
       <a href="${isFr ? prefix + 'fr/cities/index.html' : prefix + 'cities/index.html'}">${isFr ? 'Annuaire des Villes' : 'World Cities Directory'}</a>
-      <a href="${isFr ? prefix + 'fr/world-radio.html' : prefix + 'world-radio.html'}">${isFr ? '38 Radios en Direct' : '38 Live Radio Stations'}</a>
+      <a href="${isFr ? prefix + 'fr/world-radio.html' : prefix + 'world-radio.html'}">${isFr ? `${stationCount} Radios en Direct` : `${stationCount} Live Radio Stations`}</a>
+      <a href="${isFr ? prefix + 'fr/world-ranking.html' : prefix + 'world-ranking.html'}">${isFr ? 'Classement 2026' : 'World Ranking 2026'}</a>
       <a href="${prefix}llms.txt">AI / LLMs</a>
       <a href="${prefix}sitemap.xml">Sitemap</a>
     </div>
@@ -388,14 +391,14 @@ function buildCityPage(city, lang, cities, elements, stations) {
         </div>
 
         <div class="cta-row">
-          <a class="btn-primary" href="${prefix}index.html?city=${city.id}&lang=${lang}&from=seo">
-            🚀 ${isFr ? `Entrer dans le Hub Live de ${esc(cName)} (+25 🪙)` : `Enter Live ${esc(cName)} Hub (+25 🪙 Bonus)`}
+          <a class="btn-primary" href="${prefix}?tv=${city.id}&lang=${lang}&from=seo">
+            📺 ${isFr ? `Ouvrir Focus TV 4D · ${esc(cName)}` : `Launch 4D Focus TV · ${esc(cName)}`}
           </a>
-          <a class="btn-sec" href="${prefix}index.html?open=boardingpass&city=${city.id}&lang=${lang}&from=seo">
-            🎫 ${isFr ? `Billet d’Embarquement 4D vers ${esc(city.code)}` : `Generate 4D Boarding Pass to ${esc(city.code)}`}
+          <a class="btn-sec" href="${prefix}?city=${city.id}&lang=${lang}&from=seo">
+            🚀 ${isFr ? `Hub Live de ${esc(cName)} (+25 🪙)` : `Enter Live ${esc(cName)} Hub (+25 🪙)`}
           </a>
-          <a class="btn-sec" href="${prefix}index.html?view=radar&city=${city.id}&lang=${lang}&from=seo">
-            🗺️ ${isFr ? 'Voir sur le Radar 3D' : 'Open on Live Radar Map'}
+          <a class="btn-sec" href="${prefix}?open=boardingpass&city=${city.id}&lang=${lang}&from=seo">
+            🎫 ${isFr ? `Billet 4D vers ${esc(city.code)}` : `4D Boarding Pass to ${esc(city.code)}`}
           </a>
         </div>
       </section>
@@ -422,8 +425,8 @@ function buildCityPage(city, lang, cities, elements, stations) {
             </button>
           </div>`).join('')}
           <div style="margin-top:12px;">
-            <a href="${isFr ? '../world-radio.html' : '../world-radio.html'}" style="font-size:0.84rem;font-weight:800;">
-              🎧 ${isFr ? 'Explorer les 38 Stations Radio du Monde →' : 'Explore All 38 World Radio Stations →'}
+            <a href="../world-radio.html" style="font-size:0.84rem;font-weight:800;">
+              🎧 ${isFr ? `Explorer les ${stations.length} Stations Radio du Monde →` : `Explore All ${stations.length} World Radio Stations →`}
             </a>
           </div>
         </section>
@@ -511,7 +514,7 @@ function buildCityPage(city, lang, cities, elements, stations) {
 }
 
 /* ── 4. Build World Cities Directory Index (cities/index.html & fr/cities/index.html) ── */
-function buildDirectoryPage(lang, cities) {
+function buildDirectoryPage(lang, cities, stationCount = 56) {
   const isFr = lang === 'fr';
   const enUrl = `${DOMAIN}/cities/index.html`;
   const frUrl = `${DOMAIN}/fr/cities/index.html`;
@@ -581,9 +584,10 @@ function buildDirectoryPage(lang, cities) {
         <h1>${isFr ? 'Explorez les 24 Métropoles Connectées de REMO World' : 'Explore All 24 Connected World Cities on REMO'}</h1>
         <p class="lead">${esc(desc)}</p>
         <div class="cta-row">
-          <a class="btn-primary" href="${prefix}index.html?lang=${lang}&from=seo">🚀 ${isFr ? 'Entrer dans le Flux Mondial (+25 🪙)' : 'Enter Live World Feed (+25 🪙)'}</a>
-          <a class="btn-sec" href="${isFr ? '../world-radio.html' : '../world-radio.html'}">📻 ${isFr ? '38 Radios en Direct' : 'Stream 38 World Radios'}</a>
-          <a class="btn-sec" href="${isFr ? '../guess-the-city.html' : '../guess-the-city.html'}">🕵️ ${isFr ? 'Jouer à Deviner la Ville' : 'Play Guess The City'}</a>
+          <a class="btn-primary" href="${prefix}?tv=montreal&lang=${lang}&from=seo">📺 ${isFr ? 'Ouvrir Focus TV 4D (Direct)' : 'Open 4D Focus TV (Live)'}</a>
+          <a class="btn-sec" href="${prefix}?lang=${lang}&from=seo">🚀 ${isFr ? 'Flux Social (+25 🪙)' : 'Live World Feed (+25 🪙)'}</a>
+          <a class="btn-sec" href="../world-radio.html">📻 ${isFr ? `${stationCount} Radios en Direct` : `Stream ${stationCount} World Radios`}</a>
+          <a class="btn-sec" href="../guess-the-city.html">🕵️ ${isFr ? 'Deviner la Ville' : 'Play Guess The City'}</a>
         </div>
       </section>
 
@@ -617,19 +621,20 @@ function buildWorldRadioHubPage(lang, stations, cities) {
   const altUrl = isFr ? '../world-radio.html' : 'fr/world-radio.html';
   const prefix = isFr ? '../' : '';
 
+  const stCount = stations.length;
   const title = isFr
-    ? '📻 Radio du Monde en Direct Gratuit — 38 Stations Sans Pub (Paris, Montréal, Chișinău, Tokyo) | REMO World'
-    : '📻 Free Live World Cities Radio Online — 38 Ad-Free Streams (Lofi, Paris, Montréal, Chișinău, Tokyo) | REMO World';
+    ? `📻 Radio du Monde en Direct Gratuit — ${stCount} Stations Sans Pub (Paris, Montréal, Chișinău, Tokyo) | REMO World`
+    : `📻 Free Live World Cities Radio Online — ${stCount} Ad-Free Streams (Lofi, Paris, Montréal, Chișinău, Tokyo) | REMO World`;
   const desc = isFr
-    ? 'Écoutez 38 radios du monde et ambiances Lofi, Jazz, Synthwave, K-Pop et Hits urbains gratuitement dans votre navigateur. Zéro inscription requise + gagnez des pièces d’or sur REMO World.'
-    : 'Listen to 38 live world city radio stations, Lofi Beats, Night Jazz, Synthwave, French Touch, Chisinau, Montreal, NYC, Tokyo & Seoul K-Pop free online in your browser. Zero sign-up required.';
+    ? `Écoutez ${stCount} radios du monde et ambiances Lofi, Jazz, Synthwave, K-Pop et Hits urbains gratuitement dans votre navigateur. Zéro inscription requise + gagnez des pièces d’or sur REMO World.`
+    : `Listen to ${stCount} live world city radio stations, Lofi Beats, Night Jazz, Synthwave, French Touch, Chisinau, Montreal, NYC, Tokyo & Seoul K-Pop free online in your browser. Zero sign-up required.`;
 
   const jsonLd = {
     '@context': 'https://schema.org',
     '@graph': [
       {
         '@type': 'WebApplication',
-        'name': isFr ? 'REMO World Radio 2.0 (38 Stations en Direct)' : 'REMO World Radio 2.0 (38 Live Stations)',
+        'name': isFr ? `REMO World Radio 2.0 (${stCount} Stations en Direct)` : `REMO World Radio 2.0 (${stCount} Live Stations)`,
         'url': canonical,
         'applicationCategory': 'MultimediaApplication',
         'operatingSystem': 'All',
@@ -641,7 +646,7 @@ function buildWorldRadioHubPage(lang, stations, cities) {
         'mainEntity': [
           {
             '@type': 'Question',
-            'name': isFr ? 'Puis-je écouter les 38 stations radio gratuitement sans créer de compte ?' : 'Can I stream all 38 world radio stations for free without signing up?',
+            'name': isFr ? `Puis-je écouter les ${stCount} stations radio gratuitement sans créer de compte ?` : `Can I stream all ${stCount} world radio stations for free without signing up?`,
             'acceptedAnswer': {
               '@type': 'Answer',
               'text': isFr ? 'Oui ! Cliquez sur n’importe quelle station ci-dessous pour lancer le flux audio en direct instantanément sur téléphone ou ordinateur.' : 'Yes! Click Listen on any station below to stream live audio immediately on mobile or desktop with zero registration.'
@@ -686,18 +691,18 @@ function buildWorldRadioHubPage(lang, stations, cities) {
     ${renderTopbar(lang, prefix, altUrl)}
     <main>
       <section class="hero">
-        <div class="eyebrow">📻 38 LIVE STREAMS • ZERO SIGN-UP • LISTEN-TO-EARN</div>
-        <h1>${isFr ? 'Radio Mondiale en Direct — 38 Stations Urbaines & Lofi' : 'Free Live World Cities Radio — 38 Curated Global Stations'}</h1>
+        <div class="eyebrow">📻 ${stCount} LIVE STREAMS • ZERO SIGN-UP • LISTEN-TO-EARN</div>
+        <h1>${isFr ? `Radio Mondiale en Direct — ${stCount} Stations Urbaines & Lofi` : `Free Live World Cities Radio — ${stCount} Curated Global Stations`}</h1>
         <p class="lead">${esc(desc)}</p>
         <div class="cta-row">
-          <a class="btn-primary" href="${prefix}index.html?open=radio&lang=${lang}&from=seo">🎧 ${isFr ? 'Ouvrir le Lecteur Complet (+5 🪙 / 10 min)' : 'Open Full Radio & Earn Coins (+5 🪙 / 10m)'}</a>
-          <input type="search" id="stSearch" placeholder="🔍 ${isFr ? 'Filtrer par ville ou style (ex: Paris, Lofi, Jazz)...' : 'Filter by city or genre (e.g. Chisinau, Lofi, Jazz, K-Pop)...'}"
+          <a class="btn-primary" href="${prefix}?tv=montreal&lang=${lang}&from=seo">📺 ${isFr ? 'Ouvrir Focus TV 4D (+5 🪙 / 10 min)' : 'Launch 4D Focus TV (+5 🪙 / 10m)'}</a>
+          <input type="search" id="stSearch" placeholder="🔍 ${isFr ? 'Filtrer par ville ou style (ex: Chișinău, Paris, Lofi, Jazz)...' : 'Filter by city or genre (e.g. Chisinau, Paris, Lofi, Jazz)...'}"
             oninput="filterSt(this.value)" style="padding:12px 16px;border-radius:14px;border:1px solid rgba(56,189,248,0.45);background:rgba(2,6,23,0.85);color:#fff;min-width:270px;flex:1;">
         </div>
       </section>
 
       <section class="card" style="margin-bottom:22px;">
-        <h2>🌍 ${isFr ? 'Toutes les 38 Stations en Direct (1-Click Play)' : 'All 38 Live Stations — Click Any Stream to Listen Instantly'}</h2>
+        <h2>🌍 ${isFr ? `Toutes les ${stCount} Stations en Direct (1-Click Play)` : `All ${stCount} Live Stations — Click Any Stream to Listen Instantly`}</h2>
         <div id="stList">
           ${stations.map((st) => `
           <div class="radio-item" data-q="${esc((st.name + ' ' + st.badge + ' ' + st.desc_en + ' ' + st.desc_fr).toLowerCase())}">
@@ -1186,10 +1191,94 @@ function buildWidgetHtml(cities, stations) {
 </html>`;
 }
 
-/* ── 7. Build Sitemap.xml (60 Canonical Bilingual URLs + hreflang) & Robots.txt ── */
+/* ── 6B. Build French Root Hub Page (/fr/index.html) to eliminate /fr/ 404 & hreflang conflict ── */
+function buildFrenchHomePage(cities, stations) {
+  const canonical = `${DOMAIN}/fr/`;
+  const title = 'REMO World 🌐 Focus TV 4D, Réseau Social des Villes & 56 Radios Live (FR)';
+  const desc = `Ouvrez votre fenêtre 4D Focus TV sur ${cities.length} villes du monde (Montréal, Paris, New York, Tokyo, Chișinău), écoutez ${stations.length} radios sans pub, collectionnez les Cartes 4D et gagnez des Pièces d’Or.`;
+
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'WebSite',
+    '@id': `${DOMAIN}/fr/#website`,
+    'url': canonical,
+    'name': 'REMO World (FR)',
+    'inLanguage': 'fr',
+    'description': desc
+  };
+
+  return `<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${esc(title)}</title>
+  <meta name="description" content="${esc(desc)}">
+  <meta name="robots" content="index, follow, max-image-preview:large">
+  <link rel="canonical" href="${canonical}">
+  <link rel="alternate" hreflang="en" href="${DOMAIN}/">
+  <link rel="alternate" hreflang="fr" href="${canonical}">
+  <link rel="alternate" hreflang="x-default" href="${DOMAIN}/">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="${esc(title)}">
+  <meta property="og:description" content="${esc(desc)}">
+  <meta property="og:url" content="${canonical}">
+  <meta property="og:image" content="${DOMAIN}/img/remo_brand_coin.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="../img/favicon-32x32.png">
+  <script type="application/ld+json">${JSON.stringify(jsonLd)}</script>
+  <style>${SHARED_CSS}</style>
+</head>
+<body>
+  <div class="wrap">
+    ${renderTopbar('fr', '../', '../')}
+    <main>
+      <section class="hero">
+        <div class="eyebrow">🌐 ÉDITION FRANÇAISE • FOCUS TV 4D • ${stations.length} RADIOS LIVE</div>
+        <h1>Explorez 24 Villes du Monde en 4D — Radio Lofi, Météo Réelle &amp; Réseau Social</h1>
+        <p class="lead">${esc(desc)}</p>
+        <div class="cta-row">
+          <a class="btn-primary" href="../?tv=paris&lang=fr">📺 Ouvrir Focus TV 4D — Paris</a>
+          <a class="btn-sec" href="../?tv=montreal&lang=fr">⚜️ Focus TV — Montréal</a>
+          <a class="btn-sec" href="../?lang=fr">🚀 Lancer l’App Complète (FR)</a>
+        </div>
+      </section>
+
+      <div class="grid-2">
+        <section class="card">
+          <h2>🛠️ Outils &amp; Expériences REMO World</h2>
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            <a class="city-link" href="world-radio.html">📻 Radio Mondiale Gratuite — ${stations.length} Stations (${cities.length}/${cities.length} Villes)</a>
+            <a class="city-link" href="world-ranking.html">🏆 Classement Mondial des 24 Villes 2026</a>
+            <a class="city-link" href="city-versus.html">⚔️ Comparateur &amp; Duels de Villes (Montréal vs Paris…)</a>
+            <a class="city-link" href="guess-the-city.html">🕵️ Jeu Photo : Deviner la Ville en Direct</a>
+            <a class="city-link" href="boarding-pass.html">🎫 Générateur de Billet d’Embarquement 4D (Stories 9:16)</a>
+            <a class="city-link" href="cities/index.html">🌍 Annuaire Complet des 24 Métropoles Connectées</a>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>⭐ Villes Vedettes &amp; Accès Direct Focus TV</h2>
+          <div class="grid-3">
+            ${cities.slice(0, 12).map((c) => `<a class="city-link" href="cities/${c.id}.html">${c.flag} ${esc(c.name_fr)}</a>`).join('\n            ')}
+          </div>
+          <div style="margin-top:12px;">
+            <a href="cities/index.html" style="font-size:0.86rem;font-weight:800;">Voir toutes les 24 villes en français →</a>
+          </div>
+        </section>
+      </div>
+    </main>
+    ${renderFooter('fr', '../', stations.length)}
+  </div>
+</body>
+</html>`;
+}
+
+/* ── 7. Build Sitemap.xml (All Canonical Bilingual URLs + hreflang) & Robots.txt ── */
 function buildSitemapXml(cities) {
   const pairs = [
-    { en: `${DOMAIN}/`, fr: `${DOMAIN}/?lang=fr`, prio: '1.0', freq: 'daily' },
+    { en: `${DOMAIN}/`, fr: `${DOMAIN}/fr/`, prio: '1.0', freq: 'daily' },
+    { en: `${DOMAIN}/world-ranking.html`, fr: `${DOMAIN}/fr/world-ranking.html`, prio: '0.95', freq: 'daily' },
+    { en: `${DOMAIN}/city-versus.html`, fr: `${DOMAIN}/fr/city-versus.html`, prio: '0.95', freq: 'daily' },
     { en: `${DOMAIN}/cities/index.html`, fr: `${DOMAIN}/fr/cities/index.html`, prio: '0.95', freq: 'daily' },
     { en: `${DOMAIN}/world-radio.html`, fr: `${DOMAIN}/fr/world-radio.html`, prio: '0.95', freq: 'daily' },
     { en: `${DOMAIN}/guess-the-city.html`, fr: `${DOMAIN}/fr/guess-the-city.html`, prio: '0.90', freq: 'weekly' },
@@ -1205,9 +1294,13 @@ function buildSitemapXml(cities) {
     });
   });
 
+  pairs.push(
+    { en: `${DOMAIN}/privacy.html`, fr: `${DOMAIN}/fr/privacy.html`, prio: '0.60', freq: 'monthly' },
+    { en: `${DOMAIN}/terms.html`, fr: `${DOMAIN}/fr/terms.html`, prio: '0.60', freq: 'monthly' }
+  );
+
   const urlNodes = [];
   pairs.forEach((p) => {
-    // Emit EN entry
     urlNodes.push(`  <url>
     <loc>${p.en}</loc>
     <lastmod>${TODAY}</lastmod>
@@ -1217,8 +1310,7 @@ function buildSitemapXml(cities) {
     <xhtml:link rel="alternate" hreflang="fr" href="${p.fr}"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="${p.en}"/>
   </url>`);
-    // Emit FR entry if distinct static page
-    if (p.fr.endsWith('.html')) {
+    if (p.fr !== p.en) {
       urlNodes.push(`  <url>
     <loc>${p.fr}</loc>
     <lastmod>${TODAY}</lastmod>
@@ -1275,11 +1367,11 @@ Sitemap: ${DOMAIN}/sitemap.xml
 function buildLlmsFiles(cities, stations) {
   const llmsShort = `# REMO World (${DOMAIN})
 
-> REMO World is a free bilingual (English & French) 4D City Social Network, Live World Radio Player (38 ad-free global & Lofi stations), Browser Geography Game ("Guess My City!"), and 9:16 Virtual Boarding Pass Generator connecting 24 world cities in real time.
+> REMO World is a free bilingual (English & French) 4D Focus TV City Window, 4D City Social Network, Live World Radio Player (${stations.length} ad-free global & Lofi stations across 24/24 cities), Browser Geography Game ("Guess My City!"), and 9:16 Virtual Boarding Pass Generator connecting 24 world cities in real time.
 
 ## Key Free Features (Zero Sign-Up Required to Explore)
-- [REMO World Live Social App](${DOMAIN}/): Real-time cross-city social feed, 1-click cross-city Waves with km distance, live City Clicker Cup wars, Citizen Passports, and collectible 4D City Cards.
-- [Free Live World Cities Radio (38 Stations)](${DOMAIN}/world-radio.html): Stream live radio from Paris, Montréal, Chișinău, Bucharest, New York, London, Tokyo, Seoul, Berlin, Dubai + Lofi, Jazz & Synthwave with Listen-to-Earn coin rewards.
+- [REMO World Live Social App & 4D Focus TV](${DOMAIN}/): Fullscreen 4D Focus TV ambient city window with 9 visual/audio FX, real-time cross-city social feed, live City Wars, Citizen Passports, and collectible 4D City Cards.
+- [Free Live World Cities Radio (${stations.length} Stations)](${DOMAIN}/world-radio.html): Stream live radio from Paris, Montréal, Chișinău (8 live stations), Bucharest, New York, London, Tokyo, Seoul, Berlin, Dubai, Lisbon, Amsterdam, Sydney, Rio, Singapore & Cairo + Lofi, Jazz & Synthwave.
 - [Guess The City Photo Game](${DOMAIN}/guess-the-city.html): Free browser geography & skyline photo guessing game created by real citizens worldwide.
 - [4D Holographic Boarding Pass Generator](${DOMAIN}/boarding-pass.html): Create & download 9:16 Story Boarding Passes between any two world cities for TikTok, Instagram & WhatsApp.
 - [All 24 Connected World Cities Directory](${DOMAIN}/cities/index.html): Live local time, weather, radio streams & urban stats for every Edition-1 metropolis.
@@ -1289,7 +1381,7 @@ ${cities.map((c) => `- [${c.flag} ${c.name_en} (${c.country_en})](${DOMAIN}/citi
 
 ## Languages
 - English: ${DOMAIN}/
-- Français: ${DOMAIN}/fr/cities/index.html
+- Français: ${DOMAIN}/fr/
 - Full AI Reference: ${DOMAIN}/llms-full.txt
 `;
 
@@ -1326,9 +1418,13 @@ function main() {
     generatedCount += 2;
   });
 
+  // French Root Landing Hub (/fr/index.html)
+  fs.writeFileSync(path.join(ROOT, 'fr', 'index.html'), buildFrenchHomePage(cities, stations), 'utf8');
+  generatedCount += 1;
+
   // 2 Directory Index Pages
-  fs.writeFileSync(path.join(ROOT, 'cities', 'index.html'), buildDirectoryPage('en', cities), 'utf8');
-  fs.writeFileSync(path.join(ROOT, 'fr', 'cities', 'index.html'), buildDirectoryPage('fr', cities), 'utf8');
+  fs.writeFileSync(path.join(ROOT, 'cities', 'index.html'), buildDirectoryPage('en', cities, stations.length), 'utf8');
+  fs.writeFileSync(path.join(ROOT, 'fr', 'cities', 'index.html'), buildDirectoryPage('fr', cities, stations.length), 'utf8');
   generatedCount += 2;
 
   // 6 High-Intent Feature Hub Pages

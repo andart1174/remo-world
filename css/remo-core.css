@@ -6945,7 +6945,7 @@ button, input, select, textarea {
   padding: 6px 10px;
   font-size: 0.75rem;
   font-weight: 700;
-  max-width: 175px;
+  max-width: 245px;
 }
 .ftv-top-actions {
   display: flex;
@@ -7271,6 +7271,79 @@ button, input, select, textarea {
 .ftv-console-btn {
   border-color: rgba(251, 191, 36, 0.42);
   color: #fde047;
+}
+.ftv-fly-btn {
+  border-color: rgba(56, 189, 248, 0.45);
+  background: rgba(56, 189, 248, 0.14);
+  color: #bae6fd;
+}
+.ftv-zen-btn.active {
+  border-color: #a855f7;
+  background: rgba(168, 85, 247, 0.25);
+  color: #f3e8ff;
+}
+.ftv-zen-clock-wrap {
+  display: none;
+  margin-top: 14px;
+}
+.ftv-zen-time {
+  font-family: 'Orbitron', monospace;
+  font-size: clamp(2.8rem, 8.5vw, 5.6rem);
+  font-weight: 900;
+  letter-spacing: 5px;
+  color: #ffffff;
+  text-shadow: 0 0 38px rgba(56, 189, 248, 0.55), 0 6px 24px rgba(0, 0, 0, 0.7);
+}
+.ftv-zen-meta {
+  margin-top: 6px;
+  font-size: clamp(0.86rem, 2vw, 1.08rem);
+  font-weight: 700;
+  color: #fde047;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.75);
+}
+.ftv-zen-exit-pill {
+  display: none;
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 50;
+  background: rgba(15, 23, 42, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #e2e8f0;
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-size: 0.76rem;
+  font-weight: 800;
+  cursor: pointer;
+  opacity: 0.45;
+  backdrop-filter: blur(10px);
+  transition: opacity 0.2s ease, border-color 0.2s ease;
+}
+.ftv-zen-exit-pill:hover {
+  opacity: 1;
+  border-color: #38bdf8;
+}
+.ftv-topbar,
+.ftv-bottom-dock {
+  transition: opacity 0.28s ease, transform 0.28s ease;
+}
+.ftv-overlay.ftv-zen-mode .ftv-topbar {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-16px);
+}
+.ftv-overlay.ftv-zen-mode .ftv-bottom-dock {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(20px);
+}
+.ftv-overlay.ftv-zen-mode .ftv-zen-clock-wrap {
+  display: block;
+}
+.ftv-overlay.ftv-zen-mode .ftv-zen-exit-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 @media (max-width: 860px) {

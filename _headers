@@ -8,7 +8,20 @@
 /admin.html
   X-Robots-Tag: noindex, nofollow
 
+/admin
+  X-Robots-Tag: noindex, nofollow
+
+/404.html
+  X-Robots-Tag: noindex, follow
+
 /widget.html
+  X-Robots-Tag: noindex, follow
+  Access-Control-Allow-Origin: *
+  Content-Security-Policy: frame-ancestors *
+  Cache-Control: public, max-age=300
+
+/widget
+  X-Robots-Tag: noindex, follow
   Access-Control-Allow-Origin: *
   Content-Security-Policy: frame-ancestors *
   Cache-Control: public, max-age=300

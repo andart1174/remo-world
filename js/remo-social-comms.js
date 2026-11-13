@@ -6593,12 +6593,15 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   syncWelcomeHeroVisibility();
   const tvCity = (params.get('tv') || '').trim().toLowerCase();
+  const tvFx = (params.get('fx') || '').trim().toLowerCase();
+  const tvSt = (params.get('st') || params.get('station') || '').trim();
+  const tvZen = params.get('zen') === '1';
   const focusFlag = params.get('focus') === '1';
   const openTarget = (params.get('open') || '').trim().toLowerCase();
-  if (tvCity || focusFlag || openTarget === 'focustv' || openTarget === 'tv') {
+  if (tvCity || tvFx || tvSt || focusFlag || openTarget === 'focustv' || openTarget === 'tv') {
     setTimeout(() => {
       if (typeof window.openFocusTvModal === 'function') {
-        window.openFocusTvModal(tvCity || null, true);
+        window.openFocusTvModal(tvCity || null, true, { fx: tvFx, stationId: tvSt, zen: tvZen });
       }
     }, 280);
   }

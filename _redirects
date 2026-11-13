@@ -1,0 +1,14 @@
+# REMO World — Clean 301 Redirects for Legacy & Convenience Routes (Netlify)
+/beat-maker.html        /world-radio.html          301
+/beat-maker             /world-radio.html          301
+/fr/beat-maker.html     /fr/world-radio.html       301
+/fr/beat-maker          /fr/world-radio.html       301
+/radio                  /world-radio.html          301
+/fr/radio               /fr/world-radio.html       301
+/tv                     /?tv=montreal              301
+/focus-tv               /?tv=montreal              301
+/fr/tv                  /?tv=montreal&lang=fr      301
+/ranking                /world-ranking.html        301
+/fr/ranking             /fr/world-ranking.html     301
+/versus                 /city-versus.html          301
+/fr/versus              /fr/city-versus.html       301

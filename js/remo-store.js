@@ -6726,7 +6726,7 @@ function getRemoIndexNowUrls() {
     'monaco', 'losangeles', 'seoul', 'geneva', 'singapore', 'sydney',
     'rio', 'istanbul', 'berlin', 'amsterdam', 'lisbon', 'cairo'
   ];
-  const urls = ['https://remoworld.com/'];
+  const urls = ['https://remoworld.com/', 'https://remoworld.com/fr/'];
   coreSlugs.forEach((s) => {
     urls.push(`https://remoworld.com/${s}`);
     urls.push(`https://remoworld.com/fr/${s}`);

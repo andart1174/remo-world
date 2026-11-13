@@ -44,6 +44,8 @@
     fxGain: null,
     fxVolume: 0.75,
     fxPopoverOpen: false,
+    zenMode: false,
+    zenIntervalId: null,
     lightningAlpha: 0,
     lightningCooldown: 0,
     ambientNodes: {},
@@ -121,12 +123,18 @@
             </span>
             <div class="ftv-star-cities" id="ftvStarCitiesBar"></div>
             <select id="ftvCitySelect" class="ftv-city-select" aria-label="Select City" onchange="focusTvSwitchCity(this.value)"></select>
+            <button type="button" class="ftv-hud-btn ftv-fly-btn" id="ftvFlyRandomBtn" onclick="focusTvFlyRandom()" data-i18n="ftv_fly_random">
+              ✈️ Fly Random
+            </button>
           </div>
 
           <div class="ftv-top-actions">
             <div class="ftv-weather-pill" id="ftvWeatherPill">🕒 --:-- · 🌤️ --°C</div>
             <button type="button" class="ftv-hud-btn" id="ftvPomodoroBtn" onclick="toggleFocusTvPomodoro()">
               ⏱️ 25:00
+            </button>
+            <button type="button" class="ftv-hud-btn ftv-zen-btn" id="ftvZenBtn" onclick="toggleFocusTvZenMode()" data-i18n="ftv_zen_btn">
+              🕰️ Zen
             </button>
             <button type="button" class="ftv-hud-btn ftv-share-btn" onclick="shareFocusTvVibe()" data-i18n="ftv_share_vibe">
               📲 Share Vibe
@@ -137,11 +145,18 @@
           </div>
         </div>
 
-        <!-- CENTER FLOATING CITY HERO CALLOUT -->
+        <!-- CENTER FLOATING CITY HERO CALLOUT & ZEN SCREENSAVER CLOCK -->
         <div class="ftv-center-title">
           <div class="ftv-center-flag" id="ftvHeroCityName">⚜️ MONTRÉAL</div>
           <div class="ftv-center-sub" id="ftvHeroCitySub">Cyber-Creative Capital</div>
+          <div class="ftv-zen-clock-wrap" id="ftvZenClockWrap">
+            <div class="ftv-zen-time" id="ftvZenTime">--:--:--</div>
+            <div class="ftv-zen-meta" id="ftvZenMeta">📻 REMO Cyber-LoFi</div>
+          </div>
         </div>
+        <button type="button" class="ftv-zen-exit-pill" id="ftvZenExitPill" onclick="toggleFocusTvZenMode(false)" data-i18n="ftv_zen_exit">
+          ✨ Show Controls (Esc)
+        </button>
 
         <!-- BOTTOM CONTROL DECK & DISCREET CHAT -->
         <div class="ftv-bottom-dock">
@@ -208,6 +223,13 @@
     `;
 
     wrap.addEventListener('click', (e) => {
+      if (state.audioCtx && state.audioCtx.state === 'suspended') {
+        state.audioCtx.resume().catch(() => {});
+      }
+      if (state.zenMode && e.target && (e.target.id === 'ftvSceneCanvas' || e.target.classList.contains('ftv-vignette') || e.target.classList.contains('ftv-hud'))) {
+        window.toggleFocusTvZenMode(false);
+        return;
+      }
       if (state.fxPopoverOpen && e.target && !e.target.closest('#ftvAmbientGroup')) {
         state.fxPopoverOpen = false;
         _syncAmbientButtons();
@@ -946,10 +968,45 @@
     }
 
     if (sel && cities.length) {
-      sel.innerHTML = cities.map((c) => {
+      const wetGroup = [];
+      const nightGroup = [];
+      const dayGroup = [];
+
+      cities.forEach((c) => {
         const name = typeof window.getCityName === 'function' ? window.getCityName(c, lang) : c.name_en;
-        return `<option value="${c.id}" ${c.id === state.cityId ? 'selected' : ''}>${c.flag} ${_escapeHtml(name)}</option>`;
-      }).join('');
+        const wx = _getLiveWx(c);
+        const condLow = String(wx.cond_en || '').toLowerCase();
+        const isWet = Boolean(wx.naturalStorm) || condLow.includes('rain') || condLow.includes('drizzle') || condLow.includes('storm') || condLow.includes('snow') || Number(wx.tempC) <= 0;
+        const hr = typeof wx.hour === 'number' ? wx.hour : 12;
+        const isNight = Boolean(wx.isNight) || hr >= 20 || hr < 6;
+        const label = `${c.flag} ${_escapeHtml(name)} · ${wx.timeStr || '--:--'} ${wx.icon || '🌤️'} ${wx.tempC ?? 20}°C`;
+        const opt = `<option value="${c.id}" ${c.id === state.cityId ? 'selected' : ''}>${label}</option>`;
+        if (isWet) wetGroup.push(opt);
+        else if (isNight) nightGroup.push(opt);
+        else dayGroup.push(opt);
+      });
+
+      let html = '';
+      if (wetGroup.length) html += `<optgroup label="${_escapeHtml(_t('ftv_grp_weather'))}">${wetGroup.join('')}</optgroup>`;
+      if (nightGroup.length) html += `<optgroup label="${_escapeHtml(_t('ftv_grp_night'))}">${nightGroup.join('')}</optgroup>`;
+      if (dayGroup.length) html += `<optgroup label="${_escapeHtml(_t('ftv_grp_day'))}">${dayGroup.join('')}</optgroup>`;
+      sel.innerHTML = html || cities.map((c) => `<option value="${c.id}" ${c.id === state.cityId ? 'selected' : ''}>${c.flag} ${_escapeHtml(_cityName(c))}</option>`).join('');
+    }
+  }
+
+  function _updateZenClockDisplay() {
+    const timeEl = document.getElementById('ftvZenTime');
+    const metaEl = document.getElementById('ftvZenMeta');
+    const city = _getCity(state.cityId);
+    const wx = _getLiveWx(city);
+    const secs = String(new Date().getSeconds()).padStart(2, '0');
+    if (timeEl) {
+      timeEl.textContent = `${wx.timeStr || '--:--'}:${secs}`;
+    }
+    if (metaEl) {
+      const st = window.REMO_RADIO && window.REMO_RADIO.currentStation;
+      const stName = st ? `${st.flag || st.icon || '📻'} ${st.name}` : '📻 REMO Cyber-LoFi';
+      metaEl.textContent = `${wx.icon || '🌤️'} ${wx.tempC ?? 20}°C  ·  ${stName}`;
     }
   }
 
@@ -968,7 +1025,47 @@
     const heroSub = document.getElementById('ftvHeroCitySub');
     if (heroName) heroName.textContent = `${city.flag || '🌍'} ${_cityName(city).toUpperCase()}`;
     if (heroSub) heroSub.textContent = lang === 'fr' ? (city.tagline_fr || city.tagline_en || '') : (city.tagline_en || '');
+    _updateZenClockDisplay();
   }
+
+  window.focusTvFlyRandom = function () {
+    const cities = _getCities();
+    if (!cities.length) return;
+    const candidates = cities.filter((c) => c.id !== state.cityId);
+    const pool = candidates.length ? candidates : cities;
+    const picked = pool[Math.floor(Math.random() * pool.length)];
+    if (!picked) return;
+
+    const wasPlaying = Boolean(window.REMO_RADIO && window.REMO_RADIO.isPlaying);
+    window.focusTvSwitchCity(picked.id);
+    if (!wasPlaying && window.REMO_RADIO && typeof window.REMO_RADIO.tuneToCity === 'function') {
+      window.REMO_RADIO.tuneToCity(picked.id, true);
+      syncFocusTvUI();
+    }
+    const wx = _getLiveWx(picked);
+    if (typeof window.remoToast === 'function') {
+      window.remoToast(`✈️ ${picked.flag} ${_cityName(picked)} · ${wx.icon || '🌤️'} ${wx.tempC ?? 20}°C`, 'info');
+    }
+  };
+
+  window.toggleFocusTvZenMode = function (forceVal) {
+    state.zenMode = typeof forceVal === 'boolean' ? forceVal : !state.zenMode;
+    const overlay = document.getElementById('remoFocusTvOverlay');
+    const zenBtn = document.getElementById('ftvZenBtn');
+    if (overlay) overlay.classList.toggle('ftv-zen-mode', state.zenMode);
+    if (zenBtn) zenBtn.classList.toggle('active', state.zenMode);
+
+    clearInterval(state.zenIntervalId);
+    state.zenIntervalId = null;
+    if (state.zenMode) {
+      state.fxPopoverOpen = false;
+      _syncAmbientButtons();
+      _updateZenClockDisplay();
+      state.zenIntervalId = setInterval(() => {
+        if (state.isOpen && state.zenMode) _updateZenClockDisplay();
+      }, 1000);
+    }
+  };
 
   function syncFocusTvUI() {
     if (!state.isOpen) return;
@@ -1091,12 +1188,24 @@
     }
   };
 
-  /* ── 8. SHARE 9:16 VIBE CARD SNAPSHOT ── */
+  /* ── 8. SHARE CUSTOM VIBE LINK & 9:16 CARD SNAPSHOT ── */
+  function _buildVibeShareUrl() {
+    const city = _getCity(state.cityId);
+    const activeFx = AMBIENT_EFFECT_KEYS.filter((k) => Boolean(state.ambient[k]));
+    const st = window.REMO_RADIO && window.REMO_RADIO.currentStation;
+    let shareUrl = `${window.location.origin}${window.location.pathname}?tv=${encodeURIComponent(city.id)}`;
+    if (activeFx.length) shareUrl += `&fx=${encodeURIComponent(activeFx.join(','))}`;
+    if (st && st.id) shareUrl += `&st=${encodeURIComponent(st.id)}`;
+    return shareUrl;
+  }
+
+  window.getFocusTvVibeUrl = _buildVibeShareUrl;
+
   window.shareFocusTvVibe = async function () {
     const city = _getCity(state.cityId);
     const wx = _getLiveWx(city);
     const st = (window.REMO_RADIO && window.REMO_RADIO.currentStation) || { name: 'REMO Cyber-LoFi', flag: '📻' };
-    const shareUrl = `${window.location.origin}${window.location.pathname}?tv=${encodeURIComponent(city.id)}`;
+    const shareUrl = _buildVibeShareUrl();
 
     try {
       if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -1141,8 +1250,8 @@
       ctx.fillText(`🎧 ${st.name}`, 270, 820);
 
       ctx.fillStyle = '#94a3b8';
-      ctx.font = '18px monospace';
-      ctx.fillText('remoworld.com/?tv=' + city.id, 270, 875);
+      ctx.font = '16px monospace';
+      ctx.fillText(shareUrl.replace(/^https?:\/\//, '').slice(0, 48), 270, 875);
 
       const link = document.createElement('a');
       link.download = `REMO_4D_FocusTV_${city.id}.png`;
@@ -1156,7 +1265,7 @@
   };
 
   /* ── 9. OPEN / CLOSE PUBLIC ENTRYPOINTS ── */
-  window.openFocusTvModal = function (preferredCityId, autoPlayStation = true) {
+  window.openFocusTvModal = function (preferredCityId, autoPlayStation = true, options = {}) {
     ensureFocusTvDom();
     const overlay = document.getElementById('remoFocusTvOverlay');
     if (!overlay) return;
@@ -1176,14 +1285,31 @@
       window.REMO_I18N.applyDOM(overlay);
     }
 
+    const opts = options && typeof options === 'object' ? options : {};
     if (window.REMO_RADIO) {
-      if (preferredCityId && typeof window.REMO_RADIO.tuneToCity === 'function') {
+      if (opts.stationId && typeof window.REMO_RADIO.selectStation === 'function' &&
+          Array.isArray(window.REMO_RADIO.stations) &&
+          window.REMO_RADIO.stations.some((s) => s.id === opts.stationId)) {
+        window.REMO_RADIO.selectStation(opts.stationId, autoPlayStation);
+      } else if (preferredCityId && typeof window.REMO_RADIO.tuneToCity === 'function') {
         window.REMO_RADIO.tuneToCity(state.cityId, autoPlayStation);
       } else if (autoPlayStation && !window.REMO_RADIO.isPlaying) {
         window.REMO_RADIO.play();
       }
     }
 
+    if (opts.fx) {
+      const fxList = Array.isArray(opts.fx) ? opts.fx : String(opts.fx).split(',');
+      fxList.forEach((raw) => {
+        const k = String(raw || '').trim().toLowerCase();
+        if (AMBIENT_EFFECT_KEYS.includes(k)) {
+          state.ambient[k] = true;
+          _startAmbientChannel(k);
+        }
+      });
+    }
+
+    window.toggleFocusTvZenMode(Boolean(opts.zen));
     _renderCitySelectors();
     syncFocusTvUI();
     _renderPomodoroBtn();
@@ -1200,6 +1326,7 @@
   window.closeFocusTvModal = function () {
     const overlay = document.getElementById('remoFocusTvOverlay');
     state.isOpen = false;
+    window.toggleFocusTvZenMode(false);
     if (overlay) overlay.classList.remove('open');
     document.body.classList.remove('ftv-active');
 
@@ -1209,12 +1336,18 @@
     }
     clearInterval(state.clockIntervalId);
     state.clockIntervalId = null;
+    clearInterval(state.zenIntervalId);
+    state.zenIntervalId = null;
     _stopAllAmbient();
   };
 
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && state.isOpen) {
-      window.closeFocusTvModal();
+      if (state.zenMode) {
+        window.toggleFocusTvZenMode(false);
+      } else {
+        window.closeFocusTvModal();
+      }
     }
   });
 })();
