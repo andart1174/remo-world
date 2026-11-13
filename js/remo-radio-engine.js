@@ -1053,11 +1053,11 @@
           btn.style.padding = '';
           btn.innerHTML = `<span>⏳ ${lang === 'fr' ? 'Connexion...' : 'Tuning...'}</span>`;
         } else {
-          btn.style.borderColor = '';
+          btn.style.borderColor = 'rgba(56,189,248,0.55)';
           btn.style.boxShadow = '';
-          btn.style.color = '';
+          btn.style.color = '#bae6fd';
           btn.style.padding = '';
-          btn.innerHTML = `📻 Radio`;
+          btn.innerHTML = `📺 Focus TV`;
         }
       }
 
@@ -1119,6 +1119,10 @@
           }
         }
       });
+
+      if (typeof window.syncFocusTvUI === 'function') {
+        window.syncFocusTvUI();
+      }
     }
   }
 
@@ -1217,6 +1221,10 @@
   };
 
   window.toggleHeaderRadio = function () {
+    if (typeof window.openFocusTvModal === 'function') {
+      window.openFocusTvModal();
+      return;
+    }
     window.openRemoRadioModal();
   };
 

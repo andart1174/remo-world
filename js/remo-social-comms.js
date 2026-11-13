@@ -351,7 +351,7 @@ function handleTouchDoubleTap(ev, postId, wrapEl) {
 }
 
 function flipPost3DCard(postId) {
-  const p = (REMO_STORE.state.posts || []).find((x) => x && x.id === postId);
+  const p = findFeedPostById(postId);
   if (p && typeof isMysteryCityMaskedForViewer === 'function' && isMysteryCityMaskedForViewer(p, REMO_STORE.getCurrentUser())) {
     remoToast(t('guess_card_back_locked'));
     return;
@@ -367,7 +367,7 @@ function flipPost3DCard(postId) {
 }
 
 function savePostCardToAlbum(postId) {
-  const p = (REMO_STORE.state.posts || []).find((x) => x.id === postId);
+  const p = findFeedPostById(postId);
   if (!p) return;
   const u = REMO_STORE.getCurrentUser();
   if (u) {
@@ -392,7 +392,7 @@ function savePostCardToAlbum(postId) {
 
 function voteCityVersusDuel(postId, choice, ev) {
   if (ev) ev.stopPropagation();
-  const p = (REMO_STORE.state.posts || []).find((x) => x.id === postId);
+  const p = findFeedPostById(postId);
   if (!p || !p.versus) return;
   const v = p.versus;
   const lang = REMO_I18N.getLang();
@@ -488,7 +488,7 @@ window.voteCityVersusDuel = voteCityVersusDuel;
 
 function claimVersusVictoryBonus(postId, ev) {
   if (ev) ev.stopPropagation();
-  const p = (REMO_STORE.state.posts || []).find((x) => x.id === postId);
+  const p = findFeedPostById(postId);
   if (!p || !p.versus) return;
   const v = p.versus;
   const u = REMO_STORE.getCurrentUser() || REMO_STORE.ensureGuestOrCitizen('Citizen', '', 'montreal');
@@ -1559,7 +1559,7 @@ function renderSinglePostCardHtml(p, lang, u, isAdm) {
       <article id="post_card_${p.id}" class="post-card ${isPostBoostActive(p) || p.pinned || sealed ? 'boosted' : ''} ${p.mediaType === 'html_app' ? 'is-html-app' : ''} ${p.mediaType === 'city_versus' ? 'is-city-versus' : ''}" ${interactiveNoTilt ? '' : 'onmousemove="applyHoloTilt(event, this)" onmouseleave="resetHoloTilt(this)"'}>
         <div class="post-head">
           <div style="display:flex;align-items:center;gap:6px;min-width:0;">
-            <div class="post-author" style="cursor:pointer;" onclick="openCitizenProfileModal('${p.uid || ''}', '${escapeHtmlStr(p.authorName || '')}')" title="🪪 @${escapeHtmlStr(p.authorName)}">
+            <div class="post-author" style="cursor:pointer;" onclick="${p.isShowcase ? `openFocusTvModal('${city.id}')` : `openCitizenProfileModal('${p.uid || ''}', '${escapeHtmlStr(p.authorName || '')}')`}" title="🪪 @${escapeHtmlStr(p.authorName)}">
               <div class="avatar-circle ${cosm.frameClass}" style="overflow:hidden;padding:0;">
                 ${authorAvatarUrl ? `<img src="${authorAvatarUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block;" alt="${escapeHtmlStr(p.authorName)}">` : escapeHtmlStr((p.authorName || 'R')[0].toUpperCase())}
               </div>
@@ -1596,6 +1596,7 @@ function renderSinglePostCardHtml(p, lang, u, isAdm) {
                   ${sealed ? `<span class="pbadge capsule">${t('capsule_locked_badge')}${xray ? ' · 👁️ X-RAY' : ''}</span>` : (p.wasTimeCapsule ? `<span class="pbadge unsealed">${t('capsule_unsealed_badge')}</span>` : '')}
                   ${p.duetOf ? `<span class="pbadge duet">${t('post_duet_badge')}</span>` : ''}
                   ${p.isWorldWindow || (p.duetOf && p.duetOf.isWorldWindow) ? `<span class="window-live-badge">${t('win_badge_live')}</span>` : ''}
+                  ${p.isShowcase ? `<span class="pbadge showcase-guide">${t('showcase_badge')}</span>` : ''}
                   ${p.pinned ? `<span class="pbadge pinned">${t('post_pinned_badge')}</span>` : ''}
                   ${p.founderAward ? `<span class="pbadge founder">${t('post_founder_award_badge')}</span>` : ''}
                   ${getPostBoostBadgeHtml(p, lang)}
@@ -1724,10 +1725,203 @@ function renderSinglePostCardHtml(p, lang, u, isAdm) {
   }
 }
 
+/* ── EDITORIAL SHOWCASE FEED MOMENTS & CLEAN UI HELPERS ── */
+function getEditorialShowcasePosts() {
+  if (Array.isArray(window._REMO_SHOWCASE_POSTS) && window._REMO_SHOWCASE_POSTS.length) {
+    return window._REMO_SHOWCASE_POSTS;
+  }
+  const now = Date.now();
+  const neonGameHtml = `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>*{box-sizing:border-box;margin:0;padding:0;font-family:system-ui,sans-serif;}body{height:100vh;background:radial-gradient(circle at 50% 25%,#1e1b4b,#050816);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;overflow:hidden;user-select:none;}#orb{width:96px;height:96px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#38bdf8,#ec4899);box-shadow:0 0 36px rgba(236,72,153,0.75);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:2rem;transition:transform .09s ease;}#orb:active{transform:scale(0.9);}.hud{font-size:0.85rem;color:#bae6fd;letter-spacing:1px;font-weight:800;}#sc{font-size:2.1rem;font-weight:900;color:#fde047;text-shadow:0 0 14px rgba(253,224,71,0.5);}</style></head><body><div class="hud">TOKYO NEON PULSE · TAP ORB</div><div id="sc">0</div><div id="orb" onclick="hit()">⚡</div><div class="hud" id="sub">Catch Cyber Voltage</div><script>let n=0;function hit(){n+=10;document.getElementById('sc').textContent=n;const o=document.getElementById('orb');o.style.transform='scale(1.12)';setTimeout(()=>o.style.transform='',90);document.getElementById('sub').textContent='Voltage '+n+' ⚡';}</script></body></html>`;
+
+  window._REMO_SHOWCASE_POSTS = [
+    {
+      id: 'showcase_mtl_guide',
+      isShowcase: true,
+      uid: '',
+      authorName: 'REMO City Guide',
+      authorVerified: true,
+      cityId: 'montreal',
+      vibe: 'culture',
+      mediaType: 'image',
+      visualHeadline: 'MONTRÉAL SKYLINE',
+      visualSub: 'Mount Royal · Cyber-Creative Capital',
+      caption_en: '⚜️ Welcome to Montréal — home of the 4D World Feed, late-night cafés & live Cyber-LoFi Focus TV. Tap 📺 Focus TV above to tune in!',
+      caption_fr: '⚜️ Bienvenue à Montréal — berceau du Flux Mondial 4D, cafés nocturnes et Focus TV Cyber-LoFi en direct. Touchez 📺 Focus TV ci-dessus !',
+      createdAt: now - 3600000,
+      likes: [],
+      comments: [],
+      reactions: { '🔥': 3, '💎': 2 }
+    },
+    {
+      id: 'showcase_duel_mtl_par',
+      isShowcase: true,
+      uid: '',
+      authorName: 'REMO City Duel',
+      authorVerified: true,
+      cityId: 'paris',
+      vibe: 'energy',
+      mediaType: 'city_versus',
+      versus: {
+        leftCityId: 'montreal',
+        rightCityId: 'paris',
+        category: 'nightlife',
+        durationHours: 72,
+        endsAt: now + 72 * 3600000,
+        leftVotes: 0,
+        rightVotes: 0,
+        voters: [],
+        voterSides: {}
+      },
+      caption_en: '⚔️ Classic Transatlantic Duel: ⚜️ Montréal Nightlife vs 🗼 Paris Golden Hour! Tap a city photo to cast your vote (+10 🪙)!',
+      caption_fr: '⚔️ Duel Transatlantique : ⚜️ Nuits de Montréal vs 🗼 Heure Dorée à Paris ! Touchez une photo pour voter (+10 🪙) !',
+      createdAt: now - 7200000,
+      likes: [],
+      comments: [],
+      reactions: { '⚡': 4 }
+    },
+    {
+      id: 'showcase_ny_guess',
+      isShowcase: true,
+      uid: '',
+      authorName: 'REMO Mystery Lens',
+      authorVerified: true,
+      cityId: 'newyork',
+      vibe: 'chill',
+      mediaType: 'image',
+      mysteryCity: true,
+      visualHeadline: 'NEON CANYON 02:15',
+      visualSub: 'Guess This Sleepless Metropolis!',
+      caption_en: '🕵️ Guess The City Challenge: Which metropolis never sleeps beneath holographic skyscrapers? Pick your answer below (+10 🪙)!',
+      caption_fr: '🕵️ Défi Devine la Ville : Quelle métropole ne dort jamais sous les gratte-ciels néon ? Choisissez votre réponse ci-dessous (+10 🪙) !',
+      createdAt: now - 10800000,
+      likes: [],
+      comments: [],
+      reactions: { '🤯': 2 }
+    },
+    {
+      id: 'showcase_tyo_arcade',
+      isShowcase: true,
+      uid: '',
+      authorName: 'REMO Cyber Arcade',
+      authorVerified: true,
+      cityId: 'tokyo',
+      vibe: 'energy',
+      mediaType: 'html_app',
+      htmlCode: neonGameHtml,
+      caption_en: '💻 Playable 4D Mini-App directly in the feed: Tokyo Neon Pulse ⚡ Tap the cyber orb right inside this card!',
+      caption_fr: '💻 Mini-App 4D jouable directement dans le flux : Tokyo Neon Pulse ⚡ Touchez l’orbe cyber dans cette carte !',
+      createdAt: now - 14400000,
+      likes: [],
+      comments: [],
+      reactions: { '👑': 2 }
+    },
+    {
+      id: 'showcase_par_lofi',
+      isShowcase: true,
+      uid: '',
+      authorName: 'REMO City Guide',
+      authorVerified: true,
+      cityId: 'paris',
+      vibe: 'chill',
+      mediaType: 'image',
+      visualHeadline: 'PARIS · LA SEINE',
+      visualSub: 'Golden Hour & Velvet Nightfall',
+      caption_en: '🗼 Midnight walks along the Seine, rainy brasseries, and French-touch chill beats inside 4D Focus TV.',
+      caption_fr: '🗼 Balades nocturnes sur la Seine, brasseries sous la pluie et beats chill dans Focus TV 4D.',
+      createdAt: now - 18000000,
+      likes: [],
+      comments: [],
+      reactions: { '🔥': 2 }
+    },
+    {
+      id: 'showcase_tyo_night',
+      isShowcase: true,
+      uid: '',
+      authorName: 'REMO City Guide',
+      authorVerified: true,
+      cityId: 'tokyo',
+      vibe: 'culture',
+      mediaType: 'image',
+      visualHeadline: 'TOKYO SHIBUYA',
+      visualSub: 'Rain Reflections & Holographic Neon',
+      caption_en: '🏯 Tokyo Shibuya 24/7 — sync live weather & neon Lo-Fi radio inside your own 4D City Window.',
+      caption_fr: '🏯 Tokyo Shibuya 24/7 — synchronisez la météo réelle et la radio Lo-Fi dans votre Fenêtre Ville 4D.',
+      createdAt: now - 21600000,
+      likes: [],
+      comments: [],
+      reactions: { '💎': 3 }
+    }
+  ];
+  return window._REMO_SHOWCASE_POSTS;
+}
+
+function findFeedPostById(postId) {
+  if (!postId) return null;
+  const target = String(postId);
+  const realMatch = (REMO_STORE.state.posts || []).find((x) => x && String(x.id) === target);
+  if (realMatch) return realMatch;
+  return getEditorialShowcasePosts().find((x) => x && String(x.id) === target) || null;
+}
+window.findFeedPostById = findFeedPostById;
+
+function openAppLauncherModal() {
+  const modal = document.getElementById('appLauncherModal');
+  if (!modal) return;
+  if (typeof REMO_I18N !== 'undefined' && REMO_I18N.applyDOM) REMO_I18N.applyDOM(modal);
+  const isAdm = REMO_STORE.isAdminUnlocked() || REMO_STORE.isCurrentUserAdmin();
+  const admTile = document.getElementById('appLauncherAdminPromoTile');
+  if (admTile) admTile.style.display = isAdm ? '' : 'none';
+  modal.classList.add('open');
+}
+window.openAppLauncherModal = openAppLauncherModal;
+
+function closeAppLauncherModal() {
+  document.getElementById('appLauncherModal')?.classList.remove('open');
+}
+window.closeAppLauncherModal = closeAppLauncherModal;
+
+function toggleMoreFeedFilters(forceState) {
+  const wrap = document.getElementById('moreFeedFiltersWrap');
+  const btn = document.getElementById('btnToggleMoreFilters');
+  if (!wrap) return;
+  const nextOpen = typeof forceState === 'boolean' ? forceState : !wrap.classList.contains('open');
+  wrap.classList.toggle('open', nextOpen);
+  if (btn) {
+    btn.setAttribute('data-i18n', nextOpen ? 'filter_less_btn' : 'filter_more_btn');
+    btn.textContent = REMO_I18N.t(nextOpen ? 'filter_less_btn' : 'filter_more_btn');
+    btn.classList.toggle('active', nextOpen);
+  }
+}
+window.toggleMoreFeedFilters = toggleMoreFeedFilters;
+
+function dismissWelcomeHeroStrip() {
+  const el = document.getElementById('remoWelcomeHeroStrip');
+  if (el) el.style.display = 'none';
+  try { localStorage.setItem('remo_hero_strip_dismissed', '1'); } catch (e) {}
+}
+window.dismissWelcomeHeroStrip = dismissWelcomeHeroStrip;
+
+function syncWelcomeHeroVisibility() {
+  const el = document.getElementById('remoWelcomeHeroStrip');
+  if (!el) return;
+  let dismissed = false;
+  try { dismissed = localStorage.getItem('remo_hero_strip_dismissed') === '1'; } catch (e) {}
+  el.style.display = dismissed ? 'none' : '';
+}
+window.syncWelcomeHeroVisibility = syncWelcomeHeroVisibility;
+
+function voteCityDuelShortcut() {
+  const chip = document.querySelector('#feedModeChips button[onclick*="duets"]');
+  setFeedMode('duets', chip);
+  const duelCard = document.querySelector('#remoPostsGrid .is-city-versus') || document.getElementById('remoPostsGrid');
+  if (duelCard) duelCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+window.voteCityDuelShortcut = voteCityDuelShortcut;
+
 function rerenderSinglePostCard(postId) {
   if (!postId) return;
   const existingEl = document.getElementById('post_card_' + postId);
-  const p = (REMO_STORE.state.posts || []).find((x) => x && x.id === postId);
+  const p = findFeedPostById(postId);
   if (!existingEl || !p) {
     renderSocialFeed('', true);
     return;
@@ -1755,15 +1949,20 @@ window.rerenderSinglePostCard = rerenderSinglePostCard;
 function getFilteredSortedFeedPosts(searchQuery = '') {
   const u = REMO_STORE.getCurrentUser();
   const deepId = window._deepLinkedPostId || '';
-  let posts = (REMO_STORE.state.posts || []).filter((p) => p && p.mediaType !== 'beat_loop');
+  const realPosts = (REMO_STORE.state.posts || []).filter((p) => p && p.mediaType !== 'beat_loop');
 
   // Deep-linked shared post (?post=ID) floats #1 on arrival, then Official Pinned posts, then Boosted posts, then newest
-  posts.sort((a, b) =>
+  realPosts.sort((a, b) =>
     (deepId && b.id === deepId ? 1 : 0) - (deepId && a.id === deepId ? 1 : 0) ||
     (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) ||
     ((isPostBoostActive(b) ? 1 : 0) - (isPostBoostActive(a) ? 1 : 0)) ||
     (b.createdAt || 0) - (a.createdAt || 0)
   );
+
+  // Merge Editorial Showcase posts after real user posts only while real feed is sparse (< 6 posts)
+  let posts = realPosts.length < 6
+    ? realPosts.concat(getEditorialShowcasePosts())
+    : realPosts.slice();
 
   if (currentFeedMode === 'following') {
     const myFollowing = (u && Array.isArray(u.following)) ? u.following : [];
@@ -1925,7 +2124,7 @@ function filterFeedByCityFromMap(cityId) {
 /* ── 3. POST INTERACTIONS: LIKE, COMMENT, TIP, BOOST, SAVE & MINT-AS-CARD ── */
 function toggleLikePost(postId) {
   const u = REMO_STORE.getCurrentUser() || REMO_STORE.ensureGuestOrCitizen('Citizen', '', 'montreal');
-  const p = REMO_STORE.state.posts.find((x) => x.id === postId);
+  const p = findFeedPostById(postId);
   if (!p) return;
   p.likes = p.likes || [];
   const idx = p.likes.indexOf(u.uid);
@@ -1935,7 +2134,7 @@ function toggleLikePost(postId) {
     p.likes.push(u.uid);
     RemoAudio.play('click');
     RemoAudio.haptic(15);
-    REMO_STORE.addCityScore(p.cityId, 5);
+    if (!p.isShowcase) REMO_STORE.addCityScore(p.cityId, 5);
     if (p.uid && p.uid !== u.uid) {
       REMO_STORE.addNotification({
         toUid: p.uid,
@@ -1956,10 +2155,14 @@ function toggleLikePost(postId) {
 
 function tipPostAuthor(postId) {
   const lang = REMO_I18N.getLang();
+  const p = findFeedPostById(postId);
+  if (!p) return;
+  if (p.isShowcase) {
+    remoToast(t('showcase_tip_notice'));
+    return;
+  }
   const u = REMO_STORE.getCurrentUser();
   if (!u) { openAuthModal(); return; }
-  const p = REMO_STORE.state.posts.find((x) => x.id === postId);
-  if (!p) return;
   const amt = Number(prompt(lang === 'fr' ? 'Combien de Pièces REMO offrir ?' : 'How many REMO Coins to tip?', '25'));
   if (!amt || amt <= 0) return;
   if (!REMO_STORE.addCoins(u.uid, -amt, 10)) {
@@ -2103,7 +2306,7 @@ function hasCitizenUsedMonthlyPhotoCardQuota(u) {
 async function mintPostAsCityCard(postId) {
   const lang = REMO_I18N.getLang();
   const u = REMO_STORE.getCurrentUser();
-  const p = REMO_STORE.state.posts.find((x) => x.id === postId);
+  const p = findFeedPostById(postId);
   if (!p) return;
 
   // If this post was already minted into a 4D Card, open/inspect the existing card instead of duplicating!
@@ -2230,7 +2433,7 @@ function saveBookmarkPost(postId) {
 function openCommentsModal(postId) {
   activeCommentPostId = postId;
   pendingCommentVoiceKey = '';
-  const p = REMO_STORE.state.posts.find((x) => x.id === postId);
+  const p = findFeedPostById(postId);
   if (!p) return;
   const lang = REMO_I18N.getLang();
   const isAdm = REMO_STORE.isAdminUnlocked();
@@ -2342,10 +2545,10 @@ function submitPostComment() {
   if (!activeCommentPostId || (!txt && !pendingCommentVoiceKey && !flexRaw)) return;
 
   const u = REMO_STORE.getCurrentUser() || REMO_STORE.ensureGuestOrCitizen('Citizen', '', 'montreal');
-  const p = REMO_STORE.state.posts.find((x) => x.id === activeCommentPostId);
+  const p = findFeedPostById(activeCommentPostId);
   if (!p) return;
 
-  if (tipAmt > 0) {
+  if (tipAmt > 0 && !p.isShowcase) {
     if (!REMO_STORE.addCoins(u.uid, -tipAmt, 10)) {
       remoToast(lang === 'fr' ? `Il faut ${tipAmt} 🪙 pour ce Super-Commentaire !` : `Need ${tipAmt} 🪙 for this Super-Comment!`);
       return;
@@ -2353,8 +2556,10 @@ function submitPostComment() {
     p.tipsTotal = (p.tipsTotal || 0) + tipAmt;
     if (p.uid) REMO_STORE.adminAdjustUserCoins(p.uid, 'add', tipAmt);
     spawnRemoCoinsFX(10);
-  } else {
+  } else if (!p.isShowcase) {
     REMO_STORE.addCoins(u.uid, 5, 5);
+  } else {
+    remoToast(t('showcase_comment_notice'));
   }
 
   const [flexCardCityId, flexCardRarity] = flexRaw ? flexRaw.split('|') : ['', ''];
@@ -2408,7 +2613,7 @@ function handleMediaDoubleTap(ev, postId, wrapEl) {
   setTimeout(() => heart.remove(), 800);
 
   const u = REMO_STORE.getCurrentUser() || REMO_STORE.ensureGuestOrCitizen('Citizen', '', 'montreal');
-  const p = REMO_STORE.state.posts.find((x) => x.id === postId);
+  const p = findFeedPostById(postId);
   if (p && !(p.likes || []).includes(u.uid)) {
     toggleLikePost(postId);
   } else {
@@ -2429,7 +2634,7 @@ window._activeViralSharePostId = null;
 function getViralPostShareData(postId) {
   const lang = REMO_I18N.getLang();
   const isFr = lang === 'fr';
-  const post = (REMO_STORE.state.posts || []).find((p) => p && p.id === postId);
+  const post = findFeedPostById(postId);
   const u = REMO_STORE.getCurrentUser();
   const refCode = (u && (u.referralCode || u.passportNum)) ? String(u.referralCode || ('REMO-' + u.passportNum)) : '';
   const cleanId = encodeURIComponent(postId || '');
@@ -3072,7 +3277,7 @@ function shareFullscreenPostLink() {
 }
 
 function openHtmlFullscreenModal(postId) {
-  const p = REMO_STORE.state.posts.find((x) => x.id === postId);
+  const p = findFeedPostById(postId);
   if (!p || !p.htmlCode) return;
   currentFullscreenPostId = postId;
   const modal = document.getElementById('htmlFullscreenModal');
@@ -3205,7 +3410,7 @@ function updateBeforeAfterSlider(rangeInput) {
 function voteOnPostPoll(postId, optIdx) {
   const lang = REMO_I18N.getLang();
   const u = REMO_STORE.getCurrentUser() || REMO_STORE.ensureGuestOrCitizen('Citizen', '', 'montreal');
-  const p = REMO_STORE.state.posts.find((x) => x.id === postId);
+  const p = findFeedPostById(postId);
   if (!p || !p.poll || !p.poll.options[optIdx]) return;
   p.poll.voters = p.poll.voters || [];
   if (p.poll.voters.includes(u.uid)) {
@@ -3257,7 +3462,7 @@ function unlockSecretCapsule(postId, freeCityPass = false) {
 
 function reactEmojiToPost(postId, emoji) {
   const u = REMO_STORE.getCurrentUser() || REMO_STORE.ensureGuestOrCitizen('Citizen', '', 'montreal');
-  const p = REMO_STORE.state.posts.find((x) => x.id === postId);
+  const p = findFeedPostById(postId);
   if (!p) return;
   p.reactions = p.reactions || {};
   p.reactions[emoji] = (p.reactions[emoji] || 0) + 1;
@@ -6152,6 +6357,10 @@ function userSignOutAction() {
 }
 
 function toggleHeaderRadio() {
+  if (typeof window.openFocusTvModal === 'function') {
+    window.openFocusTvModal();
+    return;
+  }
   if (typeof window.openRemoRadioModal === 'function') {
     window.openRemoRadioModal();
     return;
@@ -6315,7 +6524,7 @@ document.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => { if (card) card.style.boxShadow = ''; }, 3500);
       }
       if (!window._deepLinkToastShown) {
-        const pObj = (REMO_STORE.state.posts || []).find((x) => x && x.id === targetPost);
+        const pObj = findFeedPostById(targetPost);
         if (pObj) {
           window._deepLinkToastShown = true;
           const isFrNow = REMO_I18N.getLang() === 'fr';
@@ -6382,7 +6591,17 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }, 850);
   }
+  syncWelcomeHeroVisibility();
+  const tvCity = (params.get('tv') || '').trim().toLowerCase();
+  const focusFlag = params.get('focus') === '1';
   const openTarget = (params.get('open') || '').trim().toLowerCase();
+  if (tvCity || focusFlag || openTarget === 'focustv' || openTarget === 'tv') {
+    setTimeout(() => {
+      if (typeof window.openFocusTvModal === 'function') {
+        window.openFocusTvModal(tvCity || null, true);
+      }
+    }, 280);
+  }
   if (openTarget) {
     setTimeout(() => {
       if (openTarget === 'radio') {
@@ -6693,7 +6912,7 @@ function openPostActionsSheet(postId) {
   const lang = REMO_I18N.getLang();
   const u = REMO_STORE.getCurrentUser();
   const isAdm = REMO_STORE.isAdminUnlocked() || REMO_STORE.isCurrentUserAdmin();
-  const p = (REMO_STORE.state.posts || []).find((x) => x.id === postId);
+  const p = findFeedPostById(postId);
   if (!p) return;
 
   const city = getCityById(p.cityId) || getCityById('montreal');
@@ -6876,7 +7095,7 @@ function userDeleteOwnPost(postId) {
   const lang = REMO_I18N.getLang();
   const u = REMO_STORE.getCurrentUser();
   const isAdm = REMO_STORE.isAdminUnlocked() || REMO_STORE.isCurrentUserAdmin();
-  const p = (REMO_STORE.state.posts || []).find((x) => x.id === postId);
+  const p = findFeedPostById(postId);
   if (!p) return;
   const isPostOwner = Boolean(u && (
     (p.uid && u.uid === p.uid) ||
@@ -8679,8 +8898,8 @@ function showWelcomeSplashScreen(force = false) {
   const params = new URLSearchParams(window.location.search);
   const hasWelcomeParam = params.has('welcome') || params.has('onboarding');
   const hasRefParam = params.has('ref');
-  const isDirectSeoEntry = params.get('from') === 'seo' || params.has('open') || params.has('post');
-  if (!force && (params.has('post') || (isDirectSeoEntry && !hasWelcomeParam && !hasRefParam))) {
+  const isDirectSeoEntry = params.get('from') === 'seo' || params.has('open') || params.has('post') || params.has('tv') || params.has('focus');
+  if (!force && (params.has('post') || params.has('tv') || params.has('focus') || (isDirectSeoEntry && !hasWelcomeParam && !hasRefParam))) {
     localStorage.setItem('remo_welcome_splash_seen', '1');
     return;
   }
@@ -8780,7 +8999,7 @@ window.dismissGenesisFomoBar = dismissGenesisFomoBar;
 let currentLightboxPostId = null;
 
 function openPostFullscreenMedia(postId) {
-  const p = (REMO_STORE.state.posts || []).find((x) => String(x.id) === String(postId));
+  const p = findFeedPostById(postId);
   if (!p) {
     console.warn('Post not found for fullscreen:', postId);
     return;
@@ -8804,7 +9023,7 @@ function openPostFullscreenMedia(postId) {
 }
 
 function openPhotoLightboxModal(postId) {
-  const p = (REMO_STORE.state.posts || []).find((x) => String(x.id) === String(postId));
+  const p = findFeedPostById(postId);
   if (!p) return;
   currentLightboxPostId = p.id;
   const modal = document.getElementById('photoLightboxModal');
@@ -8819,6 +9038,9 @@ function openPhotoLightboxModal(postId) {
     resolved = RemoMediaDB.resolveSyncOrPlaceholder(rawKey);
   } else {
     resolved = rawKey;
+  }
+  if (!resolved) {
+    resolved = p._cachedArt || (typeof generateCityPostVisualDataUrl === 'function' ? generateCityPostVisualDataUrl(city.id, p.visualHeadline, p.visualSub) : '');
   }
   if (img) img.src = resolved;
   if (title) title.textContent = `${city.flag || '📸'} @${p.authorName} — 4D VIEW`;
@@ -10854,7 +11076,7 @@ function renderMysteryCityWidget(p, city, lang, u, isPostOwner) {
 window.renderMysteryCityWidget = renderMysteryCityWidget;
 
 function submitMysteryCityGuess(postId, guessedCityId) {
-  const p = (REMO_STORE.state.posts || []).find((x) => x && x.id === postId);
+  const p = findFeedPostById(postId);
   if (!p || !p.mysteryCity) return;
   const u = REMO_STORE.getCurrentUser();
   if (getViewerMysteryGuess(p, u)) return;

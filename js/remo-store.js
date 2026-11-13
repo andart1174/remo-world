@@ -4827,7 +4827,7 @@ const REMO_STORE = {
   },
 
   syncPostToCloud(post) {
-    if (!this.fbDb || !post || !post.id) return;
+    if (!this.fbDb || !post || !post.id || post.isShowcase) return;
     try {
       // Sanitize undefined fields so Firestore doesn't reject write
       const cleanPost = JSON.parse(JSON.stringify(post));
