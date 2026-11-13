@@ -8179,3 +8179,58 @@ button, input, select, textarea {
     display: none;
   }
 }
+
+/* ══ v115: Admin Promo Studio & Auto-Demo in Daily World Blitz ══ */
+.blitz-admin-bar {
+  margin-bottom: 10px;
+  padding: 7px 9px;
+  border-radius: 12px;
+  background: linear-gradient(90deg, rgba(245, 158, 11, 0.14), rgba(14, 165, 233, 0.14));
+  border: 1px dashed rgba(251, 191, 36, 0.45);
+}
+.blitz-admin-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.blitz-admin-tag {
+  font-family: 'Orbitron', monospace;
+  font-size: 0.62rem;
+  font-weight: 900;
+  color: #fde68a;
+  letter-spacing: 0.4px;
+  margin-right: 2px;
+}
+.blitz-admin-btn {
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(15, 23, 42, 0.78);
+  color: #e2e8f0;
+  font-size: 0.69rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: transform 0.12s ease, border-color 0.15s ease, background 0.15s ease;
+}
+.blitz-admin-btn:hover {
+  transform: translateY(-1px);
+  border-color: #38bdf8;
+  color: #fff;
+}
+.blitz-admin-btn.active {
+  border-color: rgba(251, 191, 36, 0.7);
+  background: rgba(251, 191, 36, 0.2);
+  color: #fef08a;
+}
+.blitz-admin-btn.running {
+  border-color: rgba(244, 63, 94, 0.75);
+  background: rgba(244, 63, 94, 0.25);
+  color: #ffe4e6;
+}
+.blitz-opt-btn.demo-focus {
+  transform: translateY(-1px) scale(1.02);
+  border-color: #38bdf8 !important;
+  background: rgba(56, 189, 248, 0.26) !important;
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.35), 0 0 22px rgba(251, 191, 36, 0.4);
+}

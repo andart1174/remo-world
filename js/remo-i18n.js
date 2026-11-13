@@ -1014,6 +1014,14 @@ const REMO_DICT = {
     blitz_duel_name_ph: 'Your name (e.g. Alex)',
     blitz_duel_counter_btn: '⚔️ Copy 1v1 Duel Challenge & Share',
     blitz_duel_copied_toast: '⚔️ 1v1 Duel link copied! Send it to challenge a friend!',
+    blitz_admin_tag: '🛡️ ADMIN PROMO',
+    blitz_admin_replay: '🔄 Replay',
+    blitz_admin_random: '🎲 Random 5',
+    blitz_admin_duel: '⚔️ 1v1 Demo',
+    blitz_admin_autoplay: '🤖 Auto-Play',
+    blitz_admin_stop: '⏹️ Stop Auto',
+    blitz_admin_clean: '🎥 Clean Rec',
+    blitz_admin_clean_toast: '🎥 Clean Rec ON — tap #N badge or press D to restore Admin bar.',
 
     // 👥 Focus Together Room (EN)
     ftv_invite_btn: '👥 Invite',
@@ -2038,6 +2046,14 @@ const REMO_DICT = {
     blitz_duel_name_ph: 'Ton prénom (ex. Alex)',
     blitz_duel_counter_btn: '⚔️ Copier Défi Duel 1v1 & Partager',
     blitz_duel_copied_toast: '⚔️ Lien Duel 1v1 copié ! Envoie-le à un ami !',
+    blitz_admin_tag: '🛡️ PROMO ADMIN',
+    blitz_admin_replay: '🔄 Rejouer',
+    blitz_admin_random: '🎲 5 Aléatoires',
+    blitz_admin_duel: '⚔️ Démo 1v1',
+    blitz_admin_autoplay: '🤖 Auto-Démo',
+    blitz_admin_stop: '⏹️ Stop Auto',
+    blitz_admin_clean: '🎥 Capture Propre',
+    blitz_admin_clean_toast: '🎥 Mode Capture ON — clique sur #N ou appuie sur D pour réafficher.',
 
     // 👥 Focus Together Room (FR)
     ftv_invite_btn: '👥 Inviter',

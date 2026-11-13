@@ -52,7 +52,13 @@
     stars: [],
     pulsePhase: 0,
     copiedRecently: false,
-    challenger: null       // { n, s, t, g, d, b } decoded from ?vs=...
+    challenger: null,      // { n, s, t, g, d, b } decoded from ?vs=...
+    isDemoRun: false,
+    demoMode: 'daily',     // 'daily' | 'random' | 'duel'
+    demoSeed: '',
+    autoPlayActive: false,
+    autoTimers: [],
+    cleanRec: false
   };
 
   /* ── 1. DETERMINISTIC DAILY SEED & UTILS ── */
@@ -928,7 +934,207 @@
     state.rafId = requestAnimationFrame(_renderCanvasFrame);
   }
 
-  /* ── 5. LAZY MODAL DOM & RENDERING ── */
+  /* ── 5. LAZY MODAL DOM, ADMIN PROMO CONTROLS & RENDERING ── */
+  function _isAdminDemoAllowed() {
+    return Boolean(
+      window.REMO_STORE &&
+      typeof window.REMO_STORE.isAdminUnlocked === 'function' &&
+      window.REMO_STORE.isAdminUnlocked()
+    );
+  }
+
+  function _clearAutoTimers() {
+    if (Array.isArray(state.autoTimers)) {
+      state.autoTimers.forEach((id) => clearTimeout(id));
+    }
+    state.autoTimers = [];
+  }
+
+  function _stopAutoPlay(rerender = true) {
+    _clearAutoTimers();
+    state.autoPlayActive = false;
+    if (typeof document !== 'undefined') {
+      document.querySelectorAll('.blitz-opt-btn.demo-focus').forEach((el) => {
+        if (el.classList) el.classList.remove('demo-focus');
+      });
+    }
+    if (rerender && state.isOpen) _renderAdminBar();
+  }
+
+  function _renderAdminBar() {
+    const bar = document.getElementById('blitzAdminBar');
+    if (!bar) return;
+    if (!_isAdminDemoAllowed() || state.cleanRec) {
+      bar.style.display = 'none';
+      bar.innerHTML = '';
+      return;
+    }
+    bar.style.display = 'block';
+    const curMode = state.isDemoRun ? state.demoMode : '';
+    bar.innerHTML = `
+      <div class="blitz-admin-row">
+        <span class="blitz-admin-tag">${_esc(_t('blitz_admin_tag'))}</span>
+        <button type="button" class="blitz-admin-btn ${curMode === 'daily' ? 'active' : ''}" id="blitzAdminReplayBtn">${_esc(_t('blitz_admin_replay'))}</button>
+        <button type="button" class="blitz-admin-btn ${curMode === 'random' ? 'active' : ''}" id="blitzAdminRandomBtn">${_esc(_t('blitz_admin_random'))}</button>
+        <button type="button" class="blitz-admin-btn ${curMode === 'duel' ? 'active' : ''}" id="blitzAdminDuelBtn">${_esc(_t('blitz_admin_duel'))}</button>
+        <button type="button" class="blitz-admin-btn ${state.autoPlayActive ? 'running' : ''}" id="blitzAdminAutoBtn">${_esc(state.autoPlayActive ? _t('blitz_admin_stop') : _t('blitz_admin_autoplay'))}</button>
+        <button type="button" class="blitz-admin-btn" id="blitzAdminCleanBtn">${_esc(_t('blitz_admin_clean'))}</button>
+      </div>
+    `;
+    const rBtn = document.getElementById('blitzAdminReplayBtn');
+    const rndBtn = document.getElementById('blitzAdminRandomBtn');
+    const duelBtn = document.getElementById('blitzAdminDuelBtn');
+    const autoBtn = document.getElementById('blitzAdminAutoBtn');
+    const cleanBtn = document.getElementById('blitzAdminCleanBtn');
+    if (rBtn) rBtn.onclick = () => startAdminBlitzDemo({ mode: 'daily' });
+    if (rndBtn) rndBtn.onclick = () => startAdminBlitzDemo({ mode: 'random' });
+    if (duelBtn) duelBtn.onclick = () => startAdminBlitzDemo({ mode: 'duel' });
+    if (autoBtn) autoBtn.onclick = () => toggleBlitzAutoDemo();
+    if (cleanBtn) cleanBtn.onclick = () => toggleBlitzCleanRec();
+  }
+
+  function _startStopwatchLoop() {
+    clearInterval(state.timerIntervalId);
+    state.timerIntervalId = setInterval(() => {
+      if (!state.isOpen || state.phase !== 'playing') return;
+      const ms = _getElapsedMs();
+      const chip = document.getElementById('blitzTimerChip');
+      if (chip) chip.textContent = `⏱️ ${_formatSeconds(ms)}`;
+      if (state.challenger) {
+        const deltaPill = document.getElementById('blitzDuelDeltaPill');
+        if (deltaPill) {
+          const diff = state.challenger.t - (ms / 1000);
+          deltaPill.classList.toggle('ahead', diff >= 0);
+          deltaPill.classList.toggle('behind', diff < 0);
+          deltaPill.textContent = diff >= 0
+            ? _t('blitz_duel_ahead', { sec: Math.abs(diff).toFixed(1) })
+            : _t('blitz_duel_behind', { sec: Math.abs(diff).toFixed(1) });
+        }
+      }
+    }, 100);
+  }
+
+  function _scheduleAutoDemoStep() {
+    _clearAutoTimers();
+    if (!state.isOpen || !state.autoPlayActive || state.phase !== 'playing' || state.revealLock) return;
+    const round = state.challenge && state.challenge[state.roundIdx];
+    if (!round || !round.city) return;
+    const targetId = round.city.id;
+
+    const scheduleTargetTap = (delayMs) => {
+      const focusTimer = setTimeout(() => {
+        if (!state.isOpen || !state.autoPlayActive || state.phase !== 'playing' || state.revealLock) return;
+        const body = document.getElementById('blitzBody');
+        const btn = (body && typeof body.querySelector === 'function' ? body.querySelector(`.blitz-opt-btn[data-city-id="${targetId}"]`) : null) ||
+          (typeof document.querySelector === 'function' ? document.querySelector(`.blitz-opt-btn[data-city-id="${targetId}"]`) : null);
+        if (btn && btn.classList) btn.classList.add('demo-focus');
+        const pickTimer = setTimeout(() => {
+          if (!state.isOpen || !state.autoPlayActive || state.phase !== 'playing' || state.revealLock) return;
+          _submitAnswer(targetId, { fromAuto: true });
+        }, 420);
+        state.autoTimers.push(pickTimer);
+      }, delayMs);
+      state.autoTimers.push(focusTimer);
+    };
+
+    if (state.roundIdx === 1 && !state.hintUsedInRound) {
+      const hintTimer = setTimeout(() => {
+        if (!state.isOpen || !state.autoPlayActive || state.phase !== 'playing' || state.revealLock) return;
+        _triggerHint();
+        scheduleTargetTap(900);
+      }, 750);
+      state.autoTimers.push(hintTimer);
+    } else {
+      scheduleTargetTap(1050);
+    }
+  }
+
+  function startAdminBlitzDemo(opts = {}) {
+    if (!_isAdminDemoAllowed()) return false;
+    ensureBlitzDom();
+    const backdrop = document.getElementById('remoBlitzBackdrop');
+    if (backdrop) backdrop.classList.add('open');
+
+    _stopAutoPlay(false);
+    const mode = ['daily', 'random', 'duel'].includes(opts.mode) ? opts.mode : 'daily';
+    const todayKey = getUtcDateKey();
+    state.dateKey = todayKey;
+    state.blitzNumber = getBlitzNumber(todayKey);
+    state.isOpen = true;
+    state.copiedRecently = false;
+    state.isDemoRun = true;
+    state.demoMode = mode;
+    state.demoSeed = mode === 'random' ? `promo-${Date.now()}-${Math.random().toString(36).slice(2, 7)}` : '';
+
+    if (mode === 'duel') {
+      state.challenger = {
+        n: 'Alex',
+        s: 4,
+        t: 14.8,
+        g: 'GGRGG',
+        d: todayKey,
+        b: state.blitzNumber
+      };
+    } else if (!opts.preserveChallenger) {
+      state.challenger = null;
+    }
+
+    const seedKey = state.demoSeed || todayKey;
+    state.challengeDate = seedKey;
+    state.challenge = buildDailyChallenge(seedKey);
+    state.roundIdx = 0;
+    state.results = [];
+    state.pickedIds = [];
+    state.hintUsedInRound = false;
+    state.hintsCount = 0;
+    state.accumulatedMs = 0;
+    state.penaltyMs = 0;
+    state.revealLock = false;
+    state.finalResult = null;
+    state.phase = 'playing';
+    state.roundStartedAt = performance.now();
+
+    _startStopwatchLoop();
+    _renderAdminBar();
+    _renderPlayingStage();
+
+    if (opts.autoPlay) {
+      state.autoPlayActive = true;
+      _renderAdminBar();
+      _scheduleAutoDemoStep();
+    }
+    return true;
+  }
+  window.startAdminBlitzDemo = startAdminBlitzDemo;
+
+  function toggleBlitzAutoDemo() {
+    if (!_isAdminDemoAllowed()) return false;
+    if (state.autoPlayActive) {
+      _stopAutoPlay(true);
+      return false;
+    }
+    if (!state.isOpen || state.phase !== 'playing' || !state.challenge) {
+      const nextMode = state.challenger ? 'duel' : (state.isDemoRun ? state.demoMode : 'daily');
+      return startAdminBlitzDemo({ mode: nextMode, autoPlay: true, preserveChallenger: Boolean(state.challenger) });
+    }
+    state.autoPlayActive = true;
+    _renderAdminBar();
+    _scheduleAutoDemoStep();
+    return true;
+  }
+  window.toggleBlitzAutoDemo = toggleBlitzAutoDemo;
+
+  function toggleBlitzCleanRec(force) {
+    if (!_isAdminDemoAllowed()) return false;
+    state.cleanRec = typeof force === 'boolean' ? force : !state.cleanRec;
+    _renderAdminBar();
+    if (state.cleanRec && typeof window.remoToast === 'function') {
+      window.remoToast(_t('blitz_admin_clean_toast'), 'info');
+    }
+    return state.cleanRec;
+  }
+  window.toggleBlitzCleanRec = toggleBlitzCleanRec;
+
   function ensureBlitzDom() {
     if (document.getElementById('remoBlitzBackdrop')) return;
     const wrap = document.createElement('div');
@@ -952,6 +1158,7 @@
             <button type="button" class="blitz-close-btn" id="blitzCloseBtn" aria-label="Close" onclick="closeWorldBlitzModal()">✕</button>
           </div>
         </div>
+        <div class="blitz-admin-bar" id="blitzAdminBar" style="display:none;"></div>
         <div class="blitz-progress-row" id="blitzProgressRow"></div>
         <div id="blitzBody"></div>
       </div>
@@ -960,6 +1167,12 @@
       if (e.target === wrap) window.closeWorldBlitzModal();
     });
     document.body.appendChild(wrap);
+    const edPill = document.getElementById('blitzEditionPill');
+    if (edPill && typeof edPill.addEventListener === 'function') {
+      edPill.addEventListener('click', () => {
+        if (_isAdminDemoAllowed()) toggleBlitzCleanRec();
+      });
+    }
   }
 
   function _renderProgressPills() {
@@ -998,7 +1211,7 @@
     const continentText = _continentName(city.continent, lang);
     const roundNumLabel = _t('blitz_round_of', { n: state.roundIdx + 1 });
 
-    if (edEl) edEl.textContent = `#${state.blitzNumber}`;
+    if (edEl) edEl.textContent = state.isDemoRun && state.demoMode === 'random' ? `#${state.blitzNumber} · DEMO` : `#${state.blitzNumber}`;
     if (timerEl) {
       timerEl.style.display = 'inline-flex';
       timerEl.textContent = `⏱️ ${_formatSeconds(_getElapsedMs())}`;
@@ -1111,7 +1324,7 @@
       ? window.REMO_STORE.getCurrentUser()
       : null;
 
-    if (edEl) edEl.textContent = `#${res.num}`;
+    if (edEl) edEl.textContent = state.isDemoRun && state.demoMode === 'random' ? `#${res.num} · DEMO` : `#${res.num}`;
     if (timerEl) {
       timerEl.style.display = 'inline-flex';
       timerEl.textContent = `⏱️ ${Number(res.timeSec).toFixed(1)}s`;
@@ -1276,10 +1489,14 @@
     _renderPlayingStage();
   }
 
-  function _submitAnswer(cityId) {
+  function _submitAnswer(cityId, meta = {}) {
     if (state.phase !== 'playing' || state.revealLock) return;
     const round = state.challenge && state.challenge[state.roundIdx];
     if (!round) return;
+
+    if ((!meta || !meta.fromAuto) && state.autoPlayActive) {
+      _stopAutoPlay(true);
+    }
 
     // Pause stopwatch cleanly during feedback reveal so transition animation never hurts time
     if (state.roundStartedAt > 0) {
@@ -1301,6 +1518,9 @@
         state.roundIdx += 1;
         state.roundStartedAt = state.isOpen ? performance.now() : 0;
         if (state.isOpen) _renderPlayingStage();
+        if (state.autoPlayActive && state.isOpen && state.phase === 'playing') {
+          _scheduleAutoDemoStep();
+        }
       } else {
         _completeDailyBlitz();
       }
@@ -1310,6 +1530,8 @@
   function _completeDailyBlitz() {
     clearInterval(state.timerIntervalId);
     state.timerIntervalId = null;
+    _clearAutoTimers();
+    state.autoPlayActive = false;
     state.phase = 'done';
 
     const totalSec = Number(Math.max(0.5, _getElapsedMs() / 1000).toFixed(1));
@@ -1339,7 +1561,7 @@
       cityIds
     };
 
-    if (!alreadySavedToday) {
+    if (!alreadySavedToday && !state.isDemoRun) {
       saveStore({
         lastCompletedDate: state.dateKey,
         streak: newStreak,
@@ -1352,6 +1574,7 @@
 
     state.finalResult = resultObj;
     syncBlitzEntryBadges();
+    _renderAdminBar();
     window.dispatchEvent(new CustomEvent('remo:blitzdone', { detail: resultObj }));
     if (state.isOpen) _renderDoneStage();
   }
@@ -1432,6 +1655,12 @@
     const backdrop = document.getElementById('remoBlitzBackdrop');
     if (!backdrop) return;
 
+    _stopAutoPlay(false);
+    state.isDemoRun = false;
+    state.demoMode = 'daily';
+    state.demoSeed = '';
+    state.cleanRec = false;
+
     const rawVs = opts && typeof opts === 'object' && opts.vs ? opts.vs : '';
     if (rawVs) {
       state.challenger = decodeDuelPayload(rawVs);
@@ -1451,6 +1680,7 @@
     if (window.REMO_I18N && typeof window.REMO_I18N.applyDOM === 'function') {
       window.REMO_I18N.applyDOM(backdrop);
     }
+    _renderAdminBar();
 
     if (saved.lastCompletedDate === todayKey && saved.todayResult) {
       state.phase = 'done';
@@ -1478,32 +1708,22 @@
 
     if (!state.revealLock) state.roundStartedAt = performance.now();
 
-    clearInterval(state.timerIntervalId);
-    state.timerIntervalId = setInterval(() => {
-      if (!state.isOpen || state.phase !== 'playing') return;
-      const ms = _getElapsedMs();
-      const chip = document.getElementById('blitzTimerChip');
-      if (chip) chip.textContent = `⏱️ ${_formatSeconds(ms)}`;
-      if (state.challenger) {
-        const deltaPill = document.getElementById('blitzDuelDeltaPill');
-        if (deltaPill) {
-          const diff = state.challenger.t - (ms / 1000);
-          deltaPill.classList.toggle('ahead', diff >= 0);
-          deltaPill.classList.toggle('behind', diff < 0);
-          deltaPill.textContent = diff >= 0
-            ? _t('blitz_duel_ahead', { sec: Math.abs(diff).toFixed(1) })
-            : _t('blitz_duel_behind', { sec: Math.abs(diff).toFixed(1) });
-        }
-      }
-    }, 100);
-
+    _startStopwatchLoop();
     _renderPlayingStage();
   };
 
   window.closeWorldBlitzModal = function () {
+    _stopAutoPlay(false);
+    state.cleanRec = false;
     if (state.phase === 'playing' && !state.revealLock && state.roundStartedAt > 0) {
       state.accumulatedMs += Math.max(0, performance.now() - state.roundStartedAt);
       state.roundStartedAt = 0;
+    }
+    if (state.isDemoRun && state.phase === 'done') {
+      state.isDemoRun = false;
+      state.challenge = null;
+      state.challengeDate = '';
+      state.phase = 'idle';
     }
     state.isOpen = false;
     const backdrop = document.getElementById('remoBlitzBackdrop');
@@ -1526,6 +1746,11 @@
       return;
     }
     if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
+    if ((e.key === 'd' || e.key === 'D') && _isAdminDemoAllowed()) {
+      e.preventDefault();
+      toggleBlitzCleanRec();
+      return;
+    }
     if (state.phase !== 'playing' || state.revealLock) return;
     if (e.key === 'h' || e.key === 'H') {
       _triggerHint();
@@ -1545,8 +1770,15 @@
     if (backdrop && window.REMO_I18N && typeof window.REMO_I18N.applyDOM === 'function') {
       window.REMO_I18N.applyDOM(backdrop);
     }
+    _renderAdminBar();
     if (state.phase === 'playing') _renderPlayingStage();
     else if (state.phase === 'done') _renderDoneStage();
+  });
+
+  window.addEventListener('remo:stateupdate', (ev) => {
+    if (state.isOpen && (!ev || !ev.detail || ev.detail.reason === 'admin_mode')) {
+      _renderAdminBar();
+    }
   });
 
   window.addEventListener('DOMContentLoaded', syncBlitzEntryBadges);
@@ -1562,6 +1794,9 @@
     computeCoinsReward,
     syncBlitzEntryBadges,
     drawBlitzLandmark: _drawBlitzLandmark,
+    startAdminBlitzDemo,
+    toggleBlitzAutoDemo,
+    toggleBlitzCleanRec,
     CUSTOM_LANDMARK_IDS: Array.from(CUSTOM_LANDMARK_IDS)
   };
 })();
