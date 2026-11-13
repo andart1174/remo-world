@@ -115,7 +115,7 @@
   <noscript><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"></noscript>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
 
-  <link rel="stylesheet" href="css/remo-core.css?v=111">
+  <link rel="stylesheet" href="css/remo-core.css?v=112">
 </head>
 <body>
 
@@ -238,7 +238,7 @@
               <span class="nav-ic">⊞</span>
               <span data-i18n="nav_explore_apps">Explore All Apps</span>
             </span>
-            <span class="apps-count-pill">16</span>
+            <span class="apps-count-pill">17</span>
           </button>
 
           <!-- Legal & Support Footer -->
@@ -306,6 +306,7 @@
           <div class="filter-row" id="feedModeChips">
             <button class="fchip active" onclick="setFeedMode('all', this)" data-i18n="filter_all">🌍 All World</button>
             <button class="fchip" onclick="openStoriesHubModal()" style="border-color:rgba(236,72,153,0.65);color:#f472b6;font-weight:900;" data-i18n="hdr_story_btn">📸 Story</button>
+            <button type="button" class="fchip blitz-feed-pill" id="feedWorldBlitzPill" onclick="openWorldBlitzModal()"><span data-i18n="feed_blitz_pill">🧠 Daily Blitz</span><span class="blitz-pill-status" id="feedBlitzPillStatus">5/5</span></button>
             <button class="fchip" id="feedChipAdminPromoBtn" onclick="openViralPromoStudioModal()" style="display:none;border-color:rgba(56,189,248,0.65);color:#7dd3fc;font-weight:900;">👑 <span data-i18n="promo_studio_chip">📣 Promo Studio</span></button>
             <button class="fchip" onclick="setFeedMode('mystery', this)" data-i18n="filter_mystery">🕵️ Guess City</button>
             <button class="fchip" onclick="setFeedMode('duets', this)" data-i18n="filter_duets">⚔️ City Duels</button>
@@ -2480,6 +2481,11 @@
 
       <div class="apps-sec-label" data-i18n="apps_sec_play">⚔️ Games, Arena &amp; Contests</div>
       <div class="apps-grid">
+        <button type="button" class="app-tile emerald" id="appLauncherBlitzTile" onclick="closeAppLauncherModal();openWorldBlitzModal()">
+          <span class="app-tile-badge" id="appLauncherBlitzBadge" data-i18n="blitz_badge_daily">DAILY</span>
+          <span class="app-tile-ic">🧠</span>
+          <span class="app-tile-lbl" data-i18n="nav_world_blitz">World Blitz 60s</span>
+        </button>
         <button type="button" class="app-tile gold" onclick="closeAppLauncherModal();switchRemoView('contests')">
           <span class="app-tile-ic">🏆</span>
           <span class="app-tile-lbl" data-i18n="nav_contests">REMO Contests</span>
@@ -2550,14 +2556,15 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 
   <!-- REMO Modular Engines -->
-  <script src="js/remo-i18n.js?v=111"></script>
-  <script src="js/remo-cities-data.js?v=111"></script>
-  <script src="js/remo-store.js?v=111"></script>
-  <script src="js/remo-card-engine.js?v=111"></script>
-  <script src="js/remo-radar-arena.js?v=111"></script>
-  <script src="js/remo-social-comms.js?v=111"></script>
-  <script src="js/remo-radio-engine.js?v=111"></script>
-  <script src="js/remo-focus-tv.js?v=111"></script>
+  <script src="js/remo-i18n.js?v=112"></script>
+  <script src="js/remo-cities-data.js?v=112"></script>
+  <script src="js/remo-store.js?v=112"></script>
+  <script src="js/remo-card-engine.js?v=112"></script>
+  <script src="js/remo-radar-arena.js?v=112"></script>
+  <script src="js/remo-social-comms.js?v=112"></script>
+  <script src="js/remo-radio-engine.js?v=112"></script>
+  <script src="js/remo-focus-tv.js?v=112"></script>
+  <script src="js/remo-world-blitz.js?v=112"></script>
 
   <noscript>
     <nav aria-label="REMO World Static Directory" style="padding:20px;background:#050816;color:#f8fafc;">

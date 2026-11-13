@@ -6623,6 +6623,8 @@ document.addEventListener('DOMContentLoaded', () => {
       } else if (openTarget === 'guess') {
         const mysteryBtn = document.querySelector('#feedModeChips button[onclick*="mystery"]');
         if (typeof setFeedMode === 'function') setFeedMode('mystery', mysteryBtn);
+      } else if (openTarget === 'blitz' || openTarget === 'worldblitz') {
+        if (typeof window.openWorldBlitzModal === 'function') window.openWorldBlitzModal();
       }
     }, 280);
   }
@@ -11212,10 +11214,12 @@ function flushPendingGuestV59Rewards() {
   if (!u || !u.uid) return;
   const mCoins = Number(localStorage.getItem('remo_guest_mystery_coins') || 0);
   const wCoins = Number(localStorage.getItem('remo_guest_war_coins') || 0);
-  const total = mCoins + wCoins;
+  const bCoins = Number(localStorage.getItem('remo_guest_blitz_coins') || 0);
+  const total = mCoins + wCoins + bCoins;
   if (total > 0) {
     localStorage.removeItem('remo_guest_mystery_coins');
     localStorage.removeItem('remo_guest_war_coins');
+    localStorage.removeItem('remo_guest_blitz_coins');
     REMO_STORE.addCoins(u.uid, total, 10);
     spawnRemoCoinsFX(10);
     const isFr = REMO_I18N.getLang() === 'fr';
