@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Outfit:wght@600;700;800;900&family=Orbitron:wght@700;900&display=swap" media="print" onload="this.media='all'">
-  <link rel="stylesheet" href="css/remo-admin.css?v=124">
+  <link rel="stylesheet" href="css/remo-admin.css?v=125">
   <link rel="icon" type="image/png" sizes="32x32" href="img/favicon-32x32.png">
   <link rel="icon" type="image/png" sizes="64x64" href="img/favicon-64x64.png">
   <link rel="apple-touch-icon" sizes="180x180" href="img/apple-touch-icon.png">
@@ -215,13 +215,28 @@
               </div>
             </div>
 
-            <!-- Custom City Artwork Photo or Vector Landmark -->
+            <!-- Custom City Artwork Photo or Official Landmark Photo -->
             <div class="adm-field">
-              <label>Custom City Photo (Leave empty for Neon Vector Landmark)</label>
+              <label>Custom City Photo (Leave empty for Official City Photo / Landmark)</label>
               <div style="display:flex;gap:8px;">
                 <input type="file" id="stPhotoInput" accept="image/*" class="adm-inp" onchange="handleStudioPhotoUpload(event)">
                 <button type="button" class="adm-btn outline" onclick="clearStudioPhoto()">✕</button>
               </div>
+            </div>
+
+            <!-- Ideea 5: Community Photo Edition Picker -->
+            <div class="adm-field" style="background:rgba(15,23,42,0.55);border:1px solid rgba(56,189,248,0.28);border-radius:12px;padding:10px 12px;">
+              <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
+                <label style="margin:0;color:#38bdf8;font-weight:800;">📸 Community Photo Edition</label>
+                <div style="display:flex;gap:6px;">
+                  <button type="button" id="stCommFilterCityBtn" class="adm-btn emerald" style="padding:4px 9px;font-size:0.72rem;" onclick="setStudioCommunityFilter(true)">Current City</button>
+                  <button type="button" id="stCommFilterAllBtn" class="adm-btn outline" style="padding:4px 9px;font-size:0.72rem;" onclick="setStudioCommunityFilter(false)">All Cities</button>
+                </div>
+              </div>
+              <div id="stCommActiveCredit" style="font-size:0.74rem;color:#cbd5e1;margin-bottom:8px;">
+                Default: Official City Landmark Photo
+              </div>
+              <div id="admCommunityPhotoGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(122px,1fr));gap:8px;max-height:190px;overflow-y:auto;padding-right:2px;"></div>
             </div>
 
             <!-- Security & Grading Layers -->
@@ -989,10 +1004,10 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js" integrity="sha384-oFrOL1TiREYNET0lsYF3LjQuyi2gL7vhjH1X8vFr+umcmzAdPELopeSgbcrv4uRm" crossorigin="anonymous"></script>
 
   <!-- Shared REMO Core + Admin Controller -->
-  <script src="js/remo-i18n.js?v=124"></script>
-  <script src="js/remo-cities-data.js?v=124"></script>
-  <script src="js/remo-store.js?v=124"></script>
-  <script src="js/remo-card-engine.js?v=124"></script>
-  <script src="js/remo-admin.js?v=124"></script>
+  <script src="js/remo-i18n.js?v=125"></script>
+  <script src="js/remo-cities-data.js?v=125"></script>
+  <script src="js/remo-store.js?v=125"></script>
+  <script src="js/remo-card-engine.js?v=125"></script>
+  <script src="js/remo-admin.js?v=125"></script>
 </body>
 </html>

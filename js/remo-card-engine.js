@@ -538,9 +538,26 @@ async function fetchRemotePhotoAsDataUrl(srcUrl) {
 const CARD_PHOTO_MEM_CACHE = new Map();
 const CARD_PHOTO_INFLIGHT = new Set();
 
-function getCardCacheKey(spec) {
+function resolveCardPhotoUrl(spec, cityIdOverride) {
+  if (!spec) return { url: '', source: 'vector' };
+  recoverCardPhotoFromPosts(spec);
+  if (spec.customPhotoDataUrl && String(spec.customPhotoDataUrl).length > 8) {
+    return {
+      url: String(spec.customPhotoDataUrl),
+      source: spec.communityAuthorName ? 'community' : 'custom'
+    };
+  }
+  if (!spec._forceVectorFallback && typeof getDefaultCityCardImageUrl === 'function') {
+    const defUrl = getDefaultCityCardImageUrl(cityIdOverride || spec.cityId || 'montreal');
+    if (defUrl) return { url: defUrl, source: 'city_artwork' };
+  }
+  return { url: '', source: 'vector' };
+}
+
+function getCardCacheKey(spec, resolvedUrl) {
   if (!spec) return '';
-  return String(spec.id || spec.serial || spec.customPhotoDataUrl || '');
+  const url = resolvedUrl !== undefined ? resolvedUrl : resolveCardPhotoUrl(spec).url;
+  return url ? String(url) : '';
 }
 
 function recoverCardPhotoFromPosts(spec) {
@@ -589,7 +606,9 @@ function sanitizeCardSpecForCloud(spec) {
   }
   return {
     id: spec.id || ('card_' + Date.now()),
-    postId: spec.postId || '',
+    postId: spec.postId || spec.communityPostId || '',
+    communityPostId: spec.communityPostId || spec.postId || '',
+    communityAuthorName: spec.communityAuthorName || '',
     cityId: spec.cityId || 'montreal',
     title: spec.title || '',
     subtitle: spec.subtitle || '',
@@ -623,17 +642,110 @@ function loadImageElement(src, withCors = false) {
   });
 }
 
+function drawArtworkRarityEffects(ctx, artX, artY, artW, artH, rarity, rarColor, accent, city, spec = {}) {
+  const rLow = String(rarity || '').toLowerCase();
+  const isFounder = rLow.includes('founder') || rLow.includes('1-of-1');
+  const isMythic = rLow.includes('mythic');
+  const isLegend = rLow.includes('legend');
+  const isEpic = rLow.includes('epic');
+
+  ctx.save();
+  // Soft atmospheric frame gradient harmonizing photography with rarity palette
+  const topGrad = ctx.createLinearGradient(0, artY, 0, artY + artH * 0.42);
+  topGrad.addColorStop(0, rarColor + '2e');
+  topGrad.addColorStop(1, 'transparent');
+  ctx.fillStyle = topGrad;
+  ctx.fillRect(artX, artY, artW, artH * 0.42);
+
+  // Diagonal holographic foil beam for Epic / Legendary / Mythic / Founder
+  if (isFounder || isMythic || isLegend || isEpic) {
+    const beam = ctx.createLinearGradient(artX, artY, artX + artW, artY + artH);
+    beam.addColorStop(0, 'transparent');
+    beam.addColorStop(0.38, 'transparent');
+    beam.addColorStop(0.46, isMythic ? 'rgba(56, 189, 248, 0.14)' : (isFounder ? 'rgba(244, 63, 94, 0.16)' : rarColor + '1c'));
+    beam.addColorStop(0.52, isMythic ? 'rgba(251, 191, 36, 0.18)' : 'rgba(255, 255, 255, 0.10)');
+    beam.addColorStop(0.60, isMythic ? 'rgba(168, 85, 247, 0.12)' : 'transparent');
+    beam.addColorStop(1, 'transparent');
+    ctx.fillStyle = beam;
+    ctx.fillRect(artX, artY, artW, artH);
+  }
+
+  // Subtle metallic filigree corner brackets & golden dust motes for top tiers
+  if (isFounder || isMythic || isLegend) {
+    ctx.strokeStyle = isFounder ? '#fbbf24cc' : rarColor + 'bb';
+    ctx.lineWidth = 2;
+    const cl = 18;
+    const pad = 8;
+    // Bottom-left & bottom-right hairline corner accents (top corners stay clear for crest & GPS stamp)
+    [
+      [artX + pad, artY + artH - pad - cl, artX + pad, artY + artH - pad, artX + pad + cl, artY + artH - pad],
+      [artX + artW - pad - cl, artY + artH - pad, artX + artW - pad, artY + artH - pad, artX + artW - pad, artY + artH - pad - cl]
+    ].forEach(([x1, y1, x2, y2, x3, y3]) => {
+      ctx.beginPath();
+      ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.lineTo(x3, y3);
+      ctx.stroke();
+    });
+
+    // Subtle luminous particles (deterministic positions)
+    const moteCount = isMythic ? 14 : (isFounder ? 16 : 9);
+    for (let i = 0; i < moteCount; i++) {
+      const mx = artX + 70 + ((i * 89 + 31) % (artW - 140));
+      const my = artY + 24 + ((i * 53 + 17) % (artH - 90));
+      const mr = (i % 3 === 0) ? 2.2 : 1.3;
+      ctx.fillStyle = (isMythic && i % 2 === 0) ? 'rgba(253, 224, 71, 0.72)' : 'rgba(255, 255, 255, 0.55)';
+      ctx.beginPath();
+      ctx.arc(mx, my, mr, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  // Ideea 2: City Heraldic / Architectural Crest Watermark (top-left of artwork)
+  if (typeof drawCityCrestWatermark === 'function') {
+    drawCityCrestWatermark(ctx, city, artX + 34, artY + 34, 19, rarColor);
+  }
+
+  // Ideea 5: Community Photo Edition badge beside the city crest when a real citizen photo is featured
+  if (spec && spec.communityAuthorName) {
+    const rawAuthor = String(spec.communityAuthorName).replace(/^@+/, '').trim();
+    if (rawAuthor) {
+      const tagText = `📸 @${rawAuthor.toUpperCase()}`.slice(0, 22);
+      ctx.font = '800 11px "Orbitron", sans-serif';
+      const tw = Math.min(230, Math.max(115, ctx.measureText(tagText).width + 22));
+      ctx.fillStyle = 'rgba(5, 8, 22, 0.84)';
+      ctx.strokeStyle = '#38bdf8cc';
+      ctx.lineWidth = 1.4;
+      remoRoundRect(ctx, artX + 62, artY + 21, tw, 26, 13);
+      ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#e0f2fe';
+      ctx.textAlign = 'left';
+      ctx.fillText(tagText, artX + 73, artY + 38);
+    }
+  }
+  ctx.restore();
+}
+
 async function ensureSpecPhotoUntainted(spec) {
   if (!spec) return false;
-  recoverCardPhotoFromPosts(spec);
-  if (!spec.customPhotoDataUrl) return false;
-  const key = getCardCacheKey(spec);
+  const resolved = resolveCardPhotoUrl(spec, spec.cityId);
+  if (!resolved.url) return false;
+  const key = getCardCacheKey(spec, resolved.url);
   const cached = CARD_PHOTO_MEM_CACHE.get(key);
   if (cached && cached.img && cached.img.width > 0 && !cached.tainted) {
     return true;
   }
 
-  const safeDataUrl = await fetchRemotePhotoAsDataUrl(spec.customPhotoDataUrl);
+  // Same-origin local bundled city image (./img/cities/*.jpg) when served over http(s)
+  const isRelativeLocal = !/^(https?:|data:|blob:|idb:)/i.test(resolved.url);
+  if (isRelativeLocal) {
+    const directImg = await loadImageElement(resolved.url, false);
+    if (directImg && directImg.width > 0) {
+      const isHttp = typeof window !== 'undefined' && window.location && /^https?:$/i.test(window.location.protocol);
+      CARD_PHOTO_MEM_CACHE.set(key, { img: directImg, tainted: !isHttp });
+      if (isHttp) return true;
+    }
+  }
+
+  const safeDataUrl = await fetchRemotePhotoAsDataUrl(resolved.url);
   if (safeDataUrl) {
     const cleanImg = await loadImageElement(safeDataUrl, false);
     if (cleanImg && cleanImg.width > 0) {
@@ -653,12 +765,14 @@ function renderCityCardFront(canvas, spec = {}, langOverride) {
     if ('_photoFailed' in spec) delete spec._photoFailed;
     if ('_photoTainted' in spec) delete spec._photoTainted;
   }
-  recoverCardPhotoFromPosts(spec);
+  const cityObj = getCityById(spec.cityId || 'montreal');
+  const resolvedPhoto = resolveCardPhotoUrl(spec, cityObj.id);
+  const effectivePhotoUrl = resolvedPhoto.url;
 
-  const cacheKey = getCardCacheKey(spec);
+  const cacheKey = getCardCacheKey(spec, effectivePhotoUrl);
   const cachedEntry = cacheKey ? CARD_PHOTO_MEM_CACHE.get(cacheKey) : null;
 
-  if (spec.customPhotoDataUrl && !cachedEntry && cacheKey && !CARD_PHOTO_INFLIGHT.has(cacheKey)) {
+  if (effectivePhotoUrl && !cachedEntry && cacheKey && !CARD_PHOTO_INFLIGHT.has(cacheKey)) {
     CARD_PHOTO_INFLIGHT.add(cacheKey);
     (async () => {
       try {
@@ -668,11 +782,12 @@ function renderCityCardFront(canvas, spec = {}, langOverride) {
           renderCityCardFront(canvas, spec, langOverride);
           return;
         }
-        const fallbackImg = await loadImageElement(spec.customPhotoDataUrl, false);
+        const fallbackImg = await loadImageElement(effectivePhotoUrl, false);
         if (fallbackImg && fallbackImg.width > 0) {
           CARD_PHOTO_MEM_CACHE.set(cacheKey, {
             img: fallbackImg,
-            tainted: /^https?:\/\//i.test(String(spec.customPhotoDataUrl))
+            tainted: /^https?:\/\//i.test(String(effectivePhotoUrl)) ||
+              (typeof window !== 'undefined' && window.location && window.location.protocol === 'file:')
           });
         } else {
           CARD_PHOTO_MEM_CACHE.set(cacheKey, { img: null, failed: true });
@@ -839,6 +954,9 @@ function renderCityCardFront(canvas, spec = {}, langOverride) {
     }
     drawCityLandmark(ctx, city.id, accent, CARD_W / 2, artY + artH * 0.52, Math.min(artW, artH) * 0.40);
   }
+
+  // Ideea 2 + 5: Rarity atmospheric grading, foil beams, city crest watermark & community badge
+  drawArtworkRarityEffects(ctx, artX, artY, artW, artH, rarity, rarColor, accent, city, spec);
 
   // Locality Pill inside artwork bottom (Zero GPS coordinates for privacy & security)
   const locName = `${city.flag || '📍'} ${(lang === 'fr' ? (city.name_fr || city.name_en) : city.name_en).toUpperCase()} · ${(lang === 'fr' ? (city.country_fr || city.country_en) : (city.country_en || 'WORLD')).toUpperCase()}`;
@@ -1178,14 +1296,23 @@ function renderCityCardBack(canvas, spec = {}, langOverride) {
   }
 
   const sha = remoPseudoSHA256(fullSerial + rarity);
+  const hasCredit = Boolean(spec && spec.communityAuthorName && String(spec.communityAuthorName).trim());
   ctx.font = 'bold 11px monospace';
   ctx.fillStyle = '#94a3b8';
-  ctx.fillText(`SHA-256: ${sha.slice(0, 26)}...`, rx, qrPanelY + 196);
+  ctx.fillText(`SHA-256: ${sha.slice(0, 26)}...`, rx, qrPanelY + (hasCredit ? 190 : 196));
 
   if (sec.founderSig !== false) {
     ctx.font = 'italic bold 22px Georgia, serif';
     ctx.fillStyle = '#fbbf24';
-    ctx.fillText('REMO Executive Seal', rx, qrPanelY + 238);
+    ctx.fillText('REMO Executive Seal', rx, qrPanelY + (hasCredit ? 228 : 238));
+  }
+
+  if (hasCredit) {
+    const cleanCredit = String(spec.communityAuthorName).replace(/^@+/, '').trim().slice(0, 22);
+    ctx.font = '800 13px "Outfit", sans-serif';
+    ctx.fillStyle = '#38bdf8';
+    const creditLabel = lang === 'fr' ? `📸 Édition Photo : @${cleanCredit}` : `📸 Photo Edition: @${cleanCredit}`;
+    ctx.fillText(creditLabel, rx, qrPanelY + 266);
   }
   ctx.restore();
 
@@ -1245,11 +1372,11 @@ function downloadCanvasAsPNG(canvas, filename) {
 }
 
 async function getUntaintedCardCanvas(frontCanvas, spec = {}, langOverride) {
-  recoverCardPhotoFromPosts(spec);
-  if (spec && spec.customPhotoDataUrl) {
+  const resolved = resolveCardPhotoUrl(spec, spec.cityId);
+  if (resolved.url) {
     await ensureSpecPhotoUntainted(spec);
   }
-  const cacheKey = getCardCacheKey(spec);
+  const cacheKey = getCardCacheKey(spec, resolved.url);
   const cachedEntry = cacheKey ? CARD_PHOTO_MEM_CACHE.get(cacheKey) : null;
   const cleanCv = document.createElement('canvas');
   if (cachedEntry && cachedEntry.img && !cachedEntry.tainted) {
@@ -1270,7 +1397,8 @@ async function getUntaintedCardCanvas(frontCanvas, spec = {}, langOverride) {
   }
   const safeSpec = Object.assign({}, spec, {
     id: (spec.id || 'card') + '_vec',
-    customPhotoDataUrl: ''
+    customPhotoDataUrl: '',
+    _forceVectorFallback: true
   });
   renderCityCardFront(cleanCv, safeSpec, langOverride);
   return cleanCv;
@@ -1456,13 +1584,35 @@ function downloadCityCertificateA4(spec = {}, langOverride) {
   downloadCanvasAsPNG(cv, `REMO_Certificate_A4_${fullSerial}.png`);
 }
 
-function openCityPrintSuite(specsList, side = 'front', langOverride) {
+async function openCityPrintSuite(specsList, side = 'front', langOverride) {
   const lang = langOverride || (window.REMO_I18N ? window.REMO_I18N.getLang() : 'en');
+  const w = window.open('', '_blank');
+  if (!w) {
+    alert(lang === 'fr' ? 'Veuillez autoriser les pop-ups pour imprimer.' : 'Please allow pop-ups to open the print suite.');
+    return;
+  }
+
+  w.document.open();
+  w.document.write(`<!DOCTYPE html><html><body style="margin:0;background:#0b1020;color:#fbbf24;font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;"><h2>⏳ ${lang === 'fr' ? 'Préparation des cartes 300 DPI...' : 'Preparing 300 DPI City Cards...'}</h2></body></html>`);
+  w.document.close();
+
+  if (side === 'front' && Array.isArray(specsList)) {
+    await Promise.all(specsList.map((sp) => ensureSpecPhotoUntainted(sp).catch(() => false)));
+  }
+
   const tempCv = document.createElement('canvas');
-  const renderedCards = specsList.map((sp) => {
+  const renderedCards = (specsList || []).map((sp) => {
     if (side === 'front') renderCityCardFront(tempCv, sp, lang);
     else renderCityCardBack(tempCv, sp, lang);
-    return { url: tempCv.toDataURL('image/png'), code: sp.cityId };
+    let url = '';
+    try {
+      url = tempCv.toDataURL('image/png');
+    } catch (e) {
+      const safeSp = Object.assign({}, sp, { customPhotoDataUrl: '', _forceVectorFallback: true });
+      if (side === 'front') renderCityCardFront(tempCv, safeSp, lang);
+      url = tempCv.toDataURL('image/png');
+    }
+    return { url, code: sp.cityId };
   });
 
   // For Duplex Back printing, mirror each row of 3 horizontally (2, 1, 0) so Front & Back align!
@@ -1479,12 +1629,6 @@ function openCityPrintSuite(specsList, side = 'front', langOverride) {
   const pages = [];
   for (let i = 0; i < ordered.length; i += 9) pages.push(ordered.slice(i, i + 9));
 
-  const w = window.open('', '_blank');
-  if (!w) {
-    alert(lang === 'fr' ? 'Veuillez autoriser les pop-ups pour imprimer.' : 'Please allow pop-ups to open the print suite.');
-    return;
-  }
-
   const dict = lang === 'fr' ? REMO_DICT.fr : REMO_DICT.en;
   const pagesHtml = (cls) => pages.map((pg) => `
     <div class="sheet">
@@ -1494,6 +1638,7 @@ function openCityPrintSuite(specsList, side = 'front', langOverride) {
     </div>
   `).join('');
 
+  w.document.open();
   w.document.write(`<!DOCTYPE html>
   <html lang="${lang}">
   <head>
@@ -1546,6 +1691,9 @@ function openCityPrintSuite(specsList, side = 'front', langOverride) {
 
 window.REMO_CARD_THEMES = REMO_CARD_THEMES;
 window.RemoQREngine = RemoQREngine;
+window.CARD_PHOTO_MEM_CACHE = CARD_PHOTO_MEM_CACHE;
+window.resolveCardPhotoUrl = resolveCardPhotoUrl;
+window.ensureSpecPhotoUntainted = ensureSpecPhotoUntainted;
 window.renderCityCardFront = renderCityCardFront;
 window.renderCityCardBack = renderCityCardBack;
 window.downloadCanvasAsPNG = downloadCanvasAsPNG;

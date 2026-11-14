@@ -7,6 +7,8 @@
 let adminCurrentTab = 'overview';
 let studioLoadedPhotoImg = null;
 let studioPhotoDataUrl = '';
+let studioCommunityMeta = null;
+let studioCommunityFilterCityOnly = true;
 
 function admToast(msg) {
   RemoAudio.play('coin');
@@ -125,8 +127,12 @@ function switchAdminTab(tabId) {
   document.querySelectorAll('.adm-tab-btn').forEach((b) => {
     b.classList.toggle('active', b.getAttribute('data-adm-tab') === tabId);
   });
-  if (tabId === 'cards') renderAdminCardStudio();
-  else refreshAllAdminPanels();
+  if (tabId === 'cards') {
+    renderAdminCardStudio();
+    renderAdminCommunityPhotoPicker();
+  } else {
+    refreshAllAdminPanels();
+  }
 }
 
 /* ── 2. OVERVIEW KPIs & MEGAPHONE ── */
@@ -215,7 +221,7 @@ function renderAdminCardStudioSelectors() {
   }
 }
 
-function onStudioCityChange() {
+function onStudioCityChange(preservePhoto = false) {
   const cityId = document.getElementById('stCitySelect')?.value || 'montreal';
   const c = getCityById(cityId);
   const lang = REMO_I18N.getLang();
@@ -227,7 +233,15 @@ function onStudioCityChange() {
   document.getElementById('stStatNight').value = c.stats.nightlife;
   document.getElementById('stStatTech').value = c.stats.tech;
   document.getElementById('stStatGastro').value = c.stats.gastronomy;
+  if (!preservePhoto && studioCommunityMeta) {
+    studioPhotoDataUrl = '';
+    studioLoadedPhotoImg = null;
+    studioCommunityMeta = null;
+    const subInp = document.getElementById('stCardSubtitle');
+    if (subInp && String(subInp.value || '').includes('COMMUNITY EDITION')) subInp.value = '';
+  }
   renderAdminCardStudio();
+  renderAdminCommunityPhotoPicker();
 }
 
 function buildCurrentStudioSpec() {
@@ -244,7 +258,9 @@ function buildCurrentStudioSpec() {
     verifiedGps: !!document.getElementById('stChkGps')?.checked,
     customLore: document.getElementById('stCustomLore')?.value || '',
     customPhotoDataUrl: studioPhotoDataUrl,
-    _loadedPhotoImg: studioLoadedPhotoImg,
+    postId: studioCommunityMeta ? studioCommunityMeta.postId : '',
+    communityPostId: studioCommunityMeta ? studioCommunityMeta.postId : '',
+    communityAuthorName: studioCommunityMeta ? studioCommunityMeta.authorName : '',
     stats: {
       culture: Number(document.getElementById('stStatCulture')?.value || 94),
       nightlife: Number(document.getElementById('stStatNight')?.value || 90),
@@ -272,16 +288,166 @@ function renderAdminCardStudio() {
   renderCityCardBack(bCv, spec);
 }
 
+function getSafeCommunityPostMediaUrl(post) {
+  if (!post || !['image', 'carousel', 'before_after'].includes(post.mediaType)) return '';
+  const raw = post.mediaUrl || (Array.isArray(post.mediaUrls) && post.mediaUrls[0]) || '';
+  if (!raw) return '';
+  const s = String(raw).trim();
+  if (/^(https?:\/\/|data:image\/|blob:|idb:\/\/|\.\/)/i.test(s)) return s;
+  return '';
+}
+
+function setStudioCommunityFilter(cityOnly) {
+  studioCommunityFilterCityOnly = !!cityOnly;
+  renderAdminCommunityPhotoPicker();
+}
+
+function renderAdminCommunityPhotoPicker() {
+  const grid = document.getElementById('admCommunityPhotoGrid');
+  const creditEl = document.getElementById('stCommActiveCredit');
+  const btnCity = document.getElementById('stCommFilterCityBtn');
+  const btnAll = document.getElementById('stCommFilterAllBtn');
+  const lang = window.REMO_I18N ? REMO_I18N.getLang() : 'en';
+  const curCityId = document.getElementById('stCitySelect')?.value || 'chisinau';
+
+  if (btnCity && btnAll) {
+    btnCity.className = 'adm-btn ' + (studioCommunityFilterCityOnly ? 'emerald' : 'outline');
+    btnAll.className = 'adm-btn ' + (!studioCommunityFilterCityOnly ? 'emerald' : 'outline');
+  }
+
+  if (creditEl) {
+    if (studioCommunityMeta && studioCommunityMeta.authorName) {
+      creditEl.innerHTML = `<span style="color:#38bdf8;font-weight:800;">📸 ${lang === 'fr' ? 'Édition Communauté active :' : 'Active Community Edition:'} @${escapeHtmlStr(studioCommunityMeta.authorName)}</span>`;
+    } else if (studioPhotoDataUrl) {
+      creditEl.innerHTML = `<span style="color:#fbbf24;font-weight:800;">🖼️ ${lang === 'fr' ? 'Photo personnalisée chargée' : 'Custom Uploaded Photo Active'}</span>`;
+    } else {
+      const c = getCityById(curCityId);
+      creditEl.textContent = `${lang === 'fr' ? 'Par défaut :' : 'Default:'} ${c.flag} ${getCityName(c, lang)} Official Landmark Artwork`;
+    }
+  }
+
+  if (!grid) return;
+  const posts = Array.isArray(REMO_STORE.state?.posts) ? REMO_STORE.state.posts : [];
+  const filtered = posts
+    .filter((p) => {
+      const u = getSafeCommunityPostMediaUrl(p);
+      if (!u) return false;
+      if (studioCommunityFilterCityOnly && curCityId && p.cityId !== curCityId) return false;
+      return true;
+    })
+    .slice(0, 24);
+
+  if (!filtered.length) {
+    grid.innerHTML = `<div style="grid-column:1/-1;font-size:0.76rem;color:var(--muted);padding:8px 4px;">${
+      lang === 'fr'
+        ? 'Aucune photo publiée pour ce filtre. Essayez « All Cities ».'
+        : 'No citizen photos matching this filter yet. Try "All Cities".'
+    }</div>`;
+    return;
+  }
+
+  grid.innerHTML = filtered.map((p) => {
+    const mediaUrl = getSafeCommunityPostMediaUrl(p);
+    const city = getCityById(p.cityId || curCityId);
+    const author = String(p.authorName || 'Citizen');
+    const isSelected = studioCommunityMeta && String(studioCommunityMeta.postId) === String(p.id);
+    const isIdb = mediaUrl.startsWith('idb://');
+    return `
+      <button type="button" data-post-id="${escapeHtmlStr(p.id)}"
+        style="text-align:left;padding:5px;border-radius:10px;border:1.5px solid ${isSelected ? '#fbbf24' : 'rgba(148,163,184,0.28)'};background:${isSelected ? 'rgba(251,191,36,0.14)' : 'rgba(2,6,23,0.75)'};cursor:pointer;color:#f8fafc;display:flex;flex-direction:column;gap:4px;">
+        <div style="width:100%;height:68px;border-radius:7px;overflow:hidden;background:#0f172a;position:relative;">
+          ${isIdb
+            ? `<div data-idb-src="${escapeHtmlStr(mediaUrl)}" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:0.7rem;color:#38bdf8;">⏳ Media</div>`
+            : `<img src="${escapeHtmlStr(mediaUrl)}" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block;">`
+          }
+          ${p.verifiedGps ? `<span style="position:absolute;top:4px;right:4px;background:rgba(16,185,129,0.9);color:#fff;font-size:0.62rem;font-weight:900;padding:1px 5px;border-radius:99px;">📍GPS</span>` : ''}
+        </div>
+        <div style="font-size:0.72rem;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${city.flag} @${escapeHtmlStr(author)}</div>
+      </button>
+    `;
+  }).join('');
+
+  if (!grid._remoBoundClick) {
+    grid._remoBoundClick = true;
+    grid.addEventListener('click', (ev) => {
+      const btn = ev.target && ev.target.closest ? ev.target.closest('[data-post-id]') : null;
+      if (!btn) return;
+      const pid = btn.getAttribute('data-post-id');
+      if (pid) selectCommunityPhotoForStudio(pid);
+    });
+  }
+
+  // Resolve any local IndexedDB thumbnails lazily
+  if (window.RemoMediaDB && typeof window.RemoMediaDB.getObjectUrl === 'function') {
+    grid.querySelectorAll('[data-idb-src]').forEach((holder) => {
+      const idbUri = holder.getAttribute('data-idb-src');
+      window.RemoMediaDB.getObjectUrl(idbUri).then((objUrl) => {
+        if (objUrl && holder.parentNode) {
+          holder.outerHTML = `<img src="${escapeHtmlStr(objUrl)}" alt="" style="width:100%;height:100%;object-fit:cover;display:block;">`;
+        }
+      }).catch(() => {});
+    });
+  }
+}
+
+async function selectCommunityPhotoForStudio(postId) {
+  const lang = window.REMO_I18N ? REMO_I18N.getLang() : 'en';
+  const posts = Array.isArray(REMO_STORE.state?.posts) ? REMO_STORE.state.posts : [];
+  const post = posts.find((x) => x && String(x.id) === String(postId));
+  if (!post) return;
+  const mediaUrl = getSafeCommunityPostMediaUrl(post);
+  if (!mediaUrl) return;
+
+  const citySel = document.getElementById('stCitySelect');
+  if (citySel && post.cityId && citySel.value !== post.cityId && getRemoCities().some((c) => c.id === post.cityId)) {
+    citySel.value = post.cityId;
+    onStudioCityChange(true);
+  }
+
+  const cleanAuthor = String(post.authorName || 'Citizen').replace(/^@+/, '').trim();
+  studioCommunityMeta = {
+    postId: String(post.id),
+    authorName: cleanAuthor,
+    authorUid: String(post.authorUid || '')
+  };
+  studioPhotoDataUrl = mediaUrl;
+
+  const subInp = document.getElementById('stCardSubtitle');
+  if (subInp) {
+    subInp.value = `📸 COMMUNITY EDITION · @${cleanAuthor.toUpperCase()}`;
+  }
+  const gpsChk = document.getElementById('stChkGps');
+  if (gpsChk) gpsChk.checked = !!post.verifiedGps;
+
+  renderAdminCardStudio();
+  renderAdminCommunityPhotoPicker();
+
+  if (typeof ensureSpecPhotoUntainted === 'function') {
+    await ensureSpecPhotoUntainted(buildCurrentStudioSpec()).catch(() => false);
+    renderAdminCardStudio();
+  }
+  admToast(
+    lang === 'fr'
+      ? `📸 Photo de @${cleanAuthor} chargée dans le Studio !`
+      : `📸 Community photo by @${cleanAuthor} loaded into Studio!`
+  );
+}
+
 function handleStudioPhotoUpload(ev) {
   const file = ev.target.files && ev.target.files[0];
   if (!file) return;
   const rd = new FileReader();
   rd.onload = (e) => {
+    studioCommunityMeta = null;
     studioPhotoDataUrl = e.target.result;
     const img = new Image();
     img.onload = () => {
       studioLoadedPhotoImg = img;
+      if (window.CARD_PHOTO_MEM_CACHE) {
+        window.CARD_PHOTO_MEM_CACHE.set(studioPhotoDataUrl, { img, tainted: false, dataUrl: studioPhotoDataUrl });
+      }
       renderAdminCardStudio();
+      renderAdminCommunityPhotoPicker();
     };
     img.src = studioPhotoDataUrl;
   };
@@ -291,9 +457,15 @@ function handleStudioPhotoUpload(ev) {
 function clearStudioPhoto() {
   studioPhotoDataUrl = '';
   studioLoadedPhotoImg = null;
+  studioCommunityMeta = null;
+  const subInp = document.getElementById('stCardSubtitle');
+  if (subInp && String(subInp.value || '').includes('COMMUNITY EDITION')) {
+    subInp.value = '';
+  }
   const inp = document.getElementById('stPhotoInput');
   if (inp) inp.value = '';
   renderAdminCardStudio();
+  renderAdminCommunityPhotoPicker();
 }
 
 function adminDropCardLiveToNetwork() {
@@ -346,7 +518,7 @@ function adminPrintCurrentSheet(side) {
     ...spec,
     serial: String(Number(spec.serial) + i).padStart(4, '0')
   }));
-  openCityPrintSuite(nineCopies, side);
+  return openCityPrintSuite(nineCopies, side);
 }
 
 function adminPrintAllCitiesDeck(side) {
@@ -355,14 +527,18 @@ function adminPrintAllCitiesDeck(side) {
     ...baseSpec,
     cityId: c.id,
     title: '',
+    subtitle: '',
     serial: String(idx + 1).padStart(4, '0'),
     rarity: c.rarity,
     themeId: c.themeId,
     coinValue: c.baseValue,
     stats: c.stats,
-    _loadedPhotoImg: null
+    customPhotoDataUrl: '',
+    communityPostId: '',
+    communityAuthorName: '',
+    postId: ''
   }));
-  openCityPrintSuite(allSpecs, side);
+  return openCityPrintSuite(allSpecs, side);
 }
 
 /* ── 4. CITIES, SCORES & 15-MIN FLASH DROP CONTROLLER ── */
@@ -1500,6 +1676,9 @@ window.triggerGlobalCoinRainAdmin = triggerGlobalCoinRainAdmin;
 window.onStudioCityChange = onStudioCityChange;
 window.buildCurrentStudioSpec = buildCurrentStudioSpec;
 window.renderAdminCardStudio = renderAdminCardStudio;
+window.renderAdminCommunityPhotoPicker = renderAdminCommunityPhotoPicker;
+window.setStudioCommunityFilter = setStudioCommunityFilter;
+window.selectCommunityPhotoForStudio = selectCommunityPhotoForStudio;
 window.handleStudioPhotoUpload = handleStudioPhotoUpload;
 window.clearStudioPhoto = clearStudioPhoto;
 window.adminDropCardLiveToNetwork = adminDropCardLiveToNetwork;

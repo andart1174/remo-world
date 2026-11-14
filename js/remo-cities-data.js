@@ -787,8 +787,221 @@ function drawCityLandmark(ctx, cityId, themeColor, cx, cy, sz) {
   ctx.restore();
 }
 
+const REMO_BUNDLED_CITY_IMAGE_IDS = new Set([
+  'montreal', 'paris', 'chisinau', 'bucharest', 'newyork', 'tokyo',
+  'london', 'dubai', 'miami', 'barcelona', 'rome', 'toronto',
+  'monaco', 'losangeles', 'seoul', 'geneva', 'singapore', 'sydney',
+  'rio', 'istanbul', 'berlin', 'amsterdam', 'lisbon', 'cairo'
+]);
+
+function getDefaultCityCardImageUrl(cityId) {
+  const id = String(cityId || '').trim().toLowerCase();
+  if (!REMO_BUNDLED_CITY_IMAGE_IDS.has(id)) return '';
+  const prefix = (typeof location !== 'undefined' && /\/fr\//i.test(String(location.pathname || '')))
+    ? '../img/cities/'
+    : './img/cities/';
+  return prefix + id + '.jpg';
+}
+
+/* Crisp heraldic / architectural emblem watermark rendered inside the card artwork corner */
+function drawCityCrestWatermark(ctx, city, x, y, r = 19, color = '#fbbf24') {
+  if (!ctx || !city) return;
+  const cid = String(city.id || '').toLowerCase();
+  ctx.save();
+  ctx.translate(x, y);
+
+  // Translucent obsidian glass seal + rarity metallic ring
+  ctx.fillStyle = 'rgba(5, 8, 22, 0.78)';
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1.8;
+  ctx.stroke();
+
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
+  ctx.lineWidth = 0.8;
+  ctx.beginPath();
+  ctx.arc(0, 0, r - 3.2, 0, Math.PI * 2);
+  ctx.stroke();
+
+  ctx.strokeStyle = '#fef3c7';
+  ctx.fillStyle = color;
+  ctx.lineWidth = 1.5;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  const s = r * 0.52;
+  if (cid === 'montreal') {
+    // Stylized Fleur-de-lis crest
+    ctx.beginPath();
+    ctx.moveTo(0, -s * 1.05);
+    ctx.quadraticCurveTo(s * 0.42, -s * 0.25, 0, s * 0.35);
+    ctx.quadraticCurveTo(-s * 0.42, -s * 0.25, 0, -s * 1.05);
+    ctx.moveTo(0, s * 0.28);
+    ctx.quadraticCurveTo(s * 0.85, -s * 0.35, s * 0.78, s * 0.22);
+    ctx.quadraticCurveTo(s * 0.45, s * 0.42, 0, s * 0.28);
+    ctx.quadraticCurveTo(-s * 0.85, -s * 0.35, -s * 0.78, s * 0.22);
+    ctx.quadraticCurveTo(-s * 0.45, s * 0.42, 0, s * 0.28);
+    ctx.moveTo(-s * 0.52, s * 0.48);
+    ctx.lineTo(s * 0.52, s * 0.48);
+    ctx.moveTo(0, s * 0.48);
+    ctx.lineTo(0, s * 0.92);
+    ctx.stroke();
+  } else if (cid === 'paris') {
+    // Minimalist Eiffel crest
+    ctx.beginPath();
+    ctx.moveTo(0, -s);
+    ctx.lineTo(s * 0.58, s * 0.85);
+    ctx.moveTo(0, -s);
+    ctx.lineTo(-s * 0.58, s * 0.85);
+    ctx.moveTo(-s * 0.35, s * 0.15);
+    ctx.lineTo(s * 0.35, s * 0.15);
+    ctx.moveTo(-s * 0.72, s * 0.85);
+    ctx.lineTo(s * 0.72, s * 0.85);
+    ctx.stroke();
+  } else if (cid === 'chisinau' || cid === 'bucharest' || cid === 'rome' || cid === 'berlin') {
+    // Neoclassical Triumphal Arch / Colonnade crest
+    ctx.beginPath();
+    ctx.moveTo(-s * 0.85, -s * 0.35);
+    ctx.lineTo(0, -s * 0.95);
+    ctx.lineTo(s * 0.85, -s * 0.35);
+    ctx.closePath();
+    ctx.stroke();
+    [-0.55, 0, 0.55].forEach((px) => {
+      ctx.beginPath();
+      ctx.moveTo(s * px, -s * 0.32);
+      ctx.lineTo(s * px, s * 0.75);
+      ctx.stroke();
+    });
+    ctx.beginPath();
+    ctx.moveTo(-s * 0.9, s * 0.78);
+    ctx.lineTo(s * 0.9, s * 0.78);
+    ctx.stroke();
+  } else if (cid === 'london' || cid === 'monaco') {
+    // Sovereign Crown emblem
+    ctx.beginPath();
+    ctx.moveTo(-s * 0.82, s * 0.65);
+    ctx.lineTo(-s * 0.9, -s * 0.35);
+    ctx.lineTo(-s * 0.38, s * 0.1);
+    ctx.lineTo(0, -s * 0.75);
+    ctx.lineTo(s * 0.38, s * 0.1);
+    ctx.lineTo(s * 0.9, -s * 0.35);
+    ctx.lineTo(s * 0.82, s * 0.65);
+    ctx.closePath();
+    ctx.stroke();
+  } else if (cid === 'newyork' || cid === 'miami' || cid === 'losangeles') {
+    // Radiant Art Deco / Torch Crown crest
+    ctx.beginPath();
+    ctx.arc(0, s * 0.18, s * 0.45, Math.PI, 0);
+    ctx.stroke();
+    for (let i = -2; i <= 2; i++) {
+      const a = -Math.PI / 2 + i * 0.42;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(a) * s * 0.45, s * 0.18 + Math.sin(a) * s * 0.45);
+      ctx.lineTo(Math.cos(a) * s * 1.0, s * 0.18 + Math.sin(a) * s * 1.0);
+      ctx.stroke();
+    }
+    ctx.beginPath();
+    ctx.moveTo(-s * 0.7, s * 0.65);
+    ctx.lineTo(s * 0.7, s * 0.65);
+    ctx.stroke();
+  } else if (cid === 'tokyo' || cid === 'seoul' || cid === 'singapore') {
+    // Torii / Rising Sun emblem
+    ctx.beginPath();
+    ctx.moveTo(-s * 0.92, -s * 0.55);
+    ctx.quadraticCurveTo(0, -s * 0.35, s * 0.92, -s * 0.55);
+    ctx.moveTo(-s * 0.72, -s * 0.12);
+    ctx.lineTo(s * 0.72, -s * 0.12);
+    ctx.moveTo(-s * 0.45, -s * 0.45);
+    ctx.lineTo(-s * 0.52, s * 0.78);
+    ctx.moveTo(s * 0.45, -s * 0.45);
+    ctx.lineTo(s * 0.52, s * 0.78);
+    ctx.stroke();
+  } else if (cid === 'dubai' || cid === 'cairo') {
+    // Twin Pyramid / Spire crest
+    ctx.beginPath();
+    ctx.moveTo(-s * 0.9, s * 0.72);
+    ctx.lineTo(-s * 0.12, -s * 0.85);
+    ctx.lineTo(s * 0.65, s * 0.72);
+    ctx.closePath();
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(s * 0.25, s * 0.72);
+    ctx.lineTo(s * 0.62, -s * 0.25);
+    ctx.lineTo(s * 0.95, s * 0.72);
+    ctx.stroke();
+  } else if (cid === 'toronto') {
+    // Maple Leaf + Tower spire crest
+    ctx.beginPath();
+    ctx.moveTo(0, -s);
+    ctx.lineTo(s * 0.22, -s * 0.38);
+    ctx.lineTo(s * 0.85, -s * 0.48);
+    ctx.lineTo(s * 0.42, s * 0.08);
+    ctx.lineTo(s * 0.72, s * 0.42);
+    ctx.lineTo(0, s * 0.3);
+    ctx.lineTo(-s * 0.72, s * 0.42);
+    ctx.lineTo(-s * 0.42, s * 0.08);
+    ctx.lineTo(-s * 0.85, -s * 0.48);
+    ctx.lineTo(-s * 0.22, -s * 0.38);
+    ctx.closePath();
+    ctx.stroke();
+  } else if (cid === 'geneva') {
+    // Helvetic Precision Cross crest
+    ctx.fillStyle = '#fef3c7';
+    ctx.fillRect(-s * 0.18, -s * 0.72, s * 0.36, s * 1.44);
+    ctx.fillRect(-s * 0.72, -s * 0.18, s * 1.44, s * 0.36);
+  } else if (cid === 'istanbul') {
+    // Crescent & Star dome crest
+    ctx.beginPath();
+    ctx.arc(-s * 0.08, 0, s * 0.72, 0.65, Math.PI * 2 - 0.65);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(s * 0.42, 0, s * 0.14, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (cid === 'sydney' || cid === 'lisbon' || cid === 'amsterdam') {
+    // Sails / Maritime Crest
+    ctx.beginPath();
+    ctx.arc(s * 0.1, s * 0.55, s * 0.85, Math.PI * 1.05, Math.PI * 1.75);
+    ctx.closePath();
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(-s * 0.35, s * 0.55, s * 0.58, Math.PI * 1.08, Math.PI * 1.78);
+    ctx.closePath();
+    ctx.stroke();
+  } else if (cid === 'rio') {
+    // Radiant Skyline Cross / Peak
+    ctx.beginPath();
+    ctx.moveTo(0, -s * 0.92);
+    ctx.lineTo(0, s * 0.82);
+    ctx.moveTo(-s * 0.72, -s * 0.38);
+    ctx.lineTo(s * 0.72, -s * 0.38);
+    ctx.moveTo(-s * 0.85, s * 0.82);
+    ctx.lineTo(0, s * 0.2);
+    ctx.lineTo(s * 0.85, s * 0.82);
+    ctx.stroke();
+  } else {
+    // Compass Rose / Barcelona Star Emblem
+    ctx.beginPath();
+    for (let i = 0; i < 8; i++) {
+      const a = (i * Math.PI) / 4;
+      const rad = i % 2 === 0 ? s * 0.95 : s * 0.38;
+      const px = Math.cos(a) * rad, py = Math.sin(a) * rad;
+      i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
 window.REMO_DEFAULT_CITIES = REMO_DEFAULT_CITIES;
 window.REMO_ELEMENTS = REMO_ELEMENTS;
+window.REMO_BUNDLED_CITY_IMAGE_IDS = REMO_BUNDLED_CITY_IMAGE_IDS;
+window.getDefaultCityCardImageUrl = getDefaultCityCardImageUrl;
+window.drawCityCrestWatermark = drawCityCrestWatermark;
 window.getRemoCities = getRemoCities;
 window.saveRemoCities = saveRemoCities;
 window.getCityById = getCityById;

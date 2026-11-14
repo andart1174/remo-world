@@ -3726,6 +3726,9 @@ const REMO_STORE = {
       verifiedGps: !!verifiedGps,
       coinValue: customSpec.coinValue || city.baseValue || 8500,
       customPhotoDataUrl: customSpec.customPhotoDataUrl || '',
+      postId: customSpec.postId || customSpec.communityPostId || '',
+      communityPostId: customSpec.communityPostId || customSpec.postId || '',
+      communityAuthorName: customSpec.communityAuthorName || '',
       security: customSpec.security || {
         guilloche: true, microtext: true, nfcChip: true,
         psaSlab: false, goldStamp: true, founderSig: true, redLensSecret: ''
