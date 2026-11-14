@@ -6,6 +6,7 @@
 export const REMO_ORIGIN = 'https://remoworld.com';
 export const FIREBASE_PROJECT_ID = 'remo-world';
 export const FIRESTORE_COLLECTION = 'remo_posts';
+export const FIRESTORE_ROOMS_COLLECTION = 'remo_focus_rooms';
 
 export const REMO_CITIES_META = {
   montreal:   { id: 'montreal',   name_en: 'Montréal',       name_fr: 'Montréal',       flag: '⚜️', themeColor: '#8b5cf6' },
@@ -155,7 +156,168 @@ export function getTextCardFirstPage(post) {
   return String(tc.raw || '').split(/\n\s*(?:---|===)\s*\n/)[0].trim();
 }
 
-export function buildPostOgMeta(post, lang = 'en', nowMs = Date.now()) {
+export function sanitizeRecipientName(raw) {
+  return String(raw || '').replace(/[\r\n<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, 32);
+}
+
+export function isValidRoomId(roomId) {
+  return typeof roomId === 'string' && /^[a-zA-Z0-9_-]{2,48}$/.test(roomId);
+}
+
+function decodeBase64UrlUtf8(raw) {
+  const clean = String(raw || '').trim();
+  if (!clean || clean.length > 320) return '';
+  const padLen = (4 - (clean.length % 4)) % 4;
+  const b64 = clean.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat(padLen);
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) {
+    bytes[i] = bin.charCodeAt(i);
+  }
+  return new TextDecoder('utf-8').decode(bytes);
+}
+
+export function decodeBlitzVsToken(raw) {
+  const clean = String(raw || '').trim();
+  if (!clean || clean.length > 320) return null;
+  try {
+    const parsed = JSON.parse(decodeBase64UrlUtf8(clean));
+    if (!parsed || typeof parsed !== 'object') return null;
+    const s = Number(parsed.s);
+    const t = Number(parsed.t);
+    if (!Number.isInteger(s) || s < 0 || s > 5) return null;
+    if (!Number.isFinite(t) || t < 0.1 || t > 3600) return null;
+    const n = String(parsed.n || '').replace(/[\r\n<>]/g, '').trim().slice(0, 24) || 'Citizen';
+    const g = typeof parsed.g === 'string' && /^[GR]{5}$/.test(parsed.g) ? parsed.g : ('G'.repeat(s) + 'R'.repeat(5 - s));
+    const d = typeof parsed.d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(parsed.d) ? parsed.d : '';
+    const bNum = Number(parsed.b);
+    const b = Number.isInteger(bNum) && bNum >= 1 ? bNum : 1;
+    return { n, s, t: Number(t.toFixed(1)), g, d, b };
+  } catch (e) {
+    return null;
+  }
+}
+
+export async function fetchFocusRoomDoc(roomId, opts = {}) {
+  const cleanRoom = String(roomId || '').trim().replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 48);
+  if (!isValidRoomId(cleanRoom)) return null;
+  const fetchImpl = opts.fetchImpl || globalThis.fetch;
+  if (typeof fetchImpl !== 'function') return null;
+
+  const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/${FIRESTORE_ROOMS_COLLECTION}/${encodeURIComponent(cleanRoom)}`;
+  const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const timer = controller ? setTimeout(() => controller.abort(), opts.timeoutMs || 1800) : null;
+
+  try {
+    const res = await fetchImpl(url, {
+      method: 'GET',
+      headers: { Accept: 'application/json' },
+      signal: controller ? controller.signal : undefined
+    });
+    if (!res || !res.ok) return null;
+    const json = await res.json();
+    return decodeFirestoreDoc(json);
+  } catch (e) {
+    return null;
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+export function countActiveRoomPeers(roomDoc, nowMs = Date.now()) {
+  if (!roomDoc || !roomDoc.peers || typeof roomDoc.peers !== 'object') return 0;
+  let count = 0;
+  for (const val of Object.values(roomDoc.peers)) {
+    if (!val || typeof val !== 'object') continue;
+    const ts = Number(val.ts || 0);
+    if (!ts || nowMs - ts <= 180000) count++;
+  }
+  return Math.min(99, count);
+}
+
+export function buildBlitzOgMeta(vsData, vsToken = '', lang = 'en') {
+  const isFr = lang === 'fr';
+  const langParam = isFr ? '&lang=fr' : '';
+  const cleanTok = String(vsToken || '').trim();
+  const hasVs = Boolean(vsData && cleanTok);
+  const canonicalUrl = hasVs
+    ? `${REMO_ORIGIN}/?open=blitz&vs=${encodeURIComponent(cleanTok)}`
+    : `${REMO_ORIGIN}/?open=blitz`;
+  const ogImage = hasVs
+    ? `${REMO_ORIGIN}/.netlify/functions/og-image?mode=blitz&vs=${encodeURIComponent(cleanTok)}${langParam}`
+    : `${REMO_ORIGIN}/.netlify/functions/og-image?mode=blitz${langParam}`;
+
+  let title = isFr
+    ? '⚡ Daily World Blitz 60s — Duel Géographique 1v1 | REMO World'
+    : '⚡ Daily World Blitz 60s — 1v1 World Trivia Duel | REMO World';
+  let description = isFr
+    ? '5 villes du monde en 60 secondes ! Jouez gratuitement et défiez vos amis sur la même graine quotidienne.'
+    : 'Guess 5 world cities in 60 seconds! Play the daily global challenge free and duel friends 1v1.';
+
+  if (vsData) {
+    const gridEmoji = String(vsData.g || '')
+      .split('')
+      .map((c) => (c === 'G' ? '🟩' : '🟥'))
+      .join('');
+    title = isFr
+      ? `⚡ World Blitz #${vsData.b} : Bats ${vsData.s}/5 (${vsData.t}s) de ${vsData.n} ! — REMO World`
+      : `⚡ World Blitz #${vsData.b}: Beat ${vsData.n}'s ${vsData.s}/5 in ${vsData.t}s! — REMO World`;
+    description = isFr
+      ? `${gridEmoji} Score de ${vsData.n} : ${vsData.s}/5 en ${vsData.t}s. Vous pensez pouvoir le battre sur les mêmes 5 villes ?`
+      : `${gridEmoji} ${vsData.n} scored ${vsData.s}/5 in ${vsData.t}s. Think you can beat them on the exact same 5 cities?`;
+  }
+
+  return {
+    canonicalUrl,
+    ogImage,
+    imageWidth: '1200',
+    imageHeight: '630',
+    title,
+    description,
+    imageAlt: title
+  };
+}
+
+export function buildStudyRoomOgMeta(opts = {}, lang = 'en') {
+  const isFr = lang === 'fr';
+  const cleanRoom = String(opts.roomId || '').trim().replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 48);
+  const roomDoc = opts.roomDoc || null;
+  const effCityId = String((roomDoc && roomDoc.cityId) || opts.cityId || 'montreal').toLowerCase();
+  const city = getCityMeta(effCityId);
+  const cityName = getCityDisplayName(city, isFr ? 'fr' : 'en');
+  const dur = Number((roomDoc && roomDoc.durMin) || opts.durMin) === 50 ? 50 : 25;
+  const fx = String(opts.fx || '').trim().replace(/[^a-zA-Z0-9,_-]/g, '').slice(0, 48);
+  const peers = opts.peers != null ? Math.max(0, Number(opts.peers) || 0) : countActiveRoomPeers(roomDoc);
+
+  let canonicalUrl = `${REMO_ORIGIN}/?tv=${encodeURIComponent(city.id)}`;
+  if (fx) canonicalUrl += `&fx=${encodeURIComponent(fx)}`;
+  if (cleanRoom) canonicalUrl += `&room=${encodeURIComponent(cleanRoom)}&rd=${dur}`;
+
+  const langParam = isFr ? '&lang=fr' : '';
+  const ogImage = `${REMO_ORIGIN}/.netlify/functions/og-image?mode=room&room=${encodeURIComponent(cleanRoom || 'focus')}&city=${encodeURIComponent(city.id)}&rd=${dur}&peers=${peers}${fx ? '&fx=' + encodeURIComponent(fx) : ''}${langParam}`;
+
+  const peerLabel = peers > 0
+    ? (isFr ? ` • 👥 ${peers} en direct` : ` • 👥 ${peers} online`)
+    : '';
+  const title = isFr
+    ? `👥 Salle d'Étude "${cleanRoom || 'Focus'}" (${city.flag} ${cityName} · ${dur}m) — REMO World`
+    : `👥 Study Together "${cleanRoom || 'Focus'}" (${city.flag} ${cityName} · ${dur}m) — REMO World`;
+  const description = isFr
+    ? `Rejoignez la session Pomodoro synchronisée (${dur} min)${peerLabel} avec fenêtre 4D sur ${cityName} & radio LoFi live.`
+    : `Join the synced ${dur}-min Pomodoro coworking session${peerLabel} with a live 4D ${cityName} window & Lofi radio.`;
+
+  return {
+    canonicalUrl,
+    ogImage,
+    imageWidth: '1200',
+    imageHeight: '630',
+    title,
+    description,
+    imageAlt: title
+  };
+}
+
+export function buildPostOgMeta(post, lang = 'en', nowMs = Date.now(), recipientOverride = '') {
   if (!post || !post.id) return null;
   const isFr = lang === 'fr';
   const city = getCityMeta(post.cityId);
@@ -166,11 +328,15 @@ export function buildPostOgMeta(post, lang = 'en', nowMs = Date.now()) {
   const cap = isFr
     ? (post.caption_fr || post.caption_en || '')
     : (post.caption_en || post.caption_fr || '');
+  const dedicatedTo = (!locked && post.mediaType === 'text_card')
+    ? sanitizeRecipientName(recipientOverride || (post.textCard && post.textCard.dedicatedTo) || '')
+    : '';
 
   const encodedId = encodeURIComponent(post.id);
   const langParam = isFr ? '&lang=fr' : '';
-  const canonicalUrl = `${REMO_ORIGIN}/?post=${encodedId}`;
-  const dynamicImgUrl = `${REMO_ORIGIN}/.netlify/functions/og-image?post=${encodedId}${langParam}`;
+  const toParam = dedicatedTo ? `&to=${encodeURIComponent(dedicatedTo)}` : '';
+  const canonicalUrl = `${REMO_ORIGIN}/?post=${encodedId}${toParam}`;
+  const dynamicImgUrl = `${REMO_ORIGIN}/.netlify/functions/og-image?post=${encodedId}${toParam}${langParam}`;
 
   let ogImage = dynamicImgUrl;
   let imageWidth = '1200';
@@ -230,12 +396,21 @@ export function buildPostOgMeta(post, lang = 'en', nowMs = Date.now()) {
       ? (isFr ? '🕵️ Devinez la Ville' : '🕵️ Guess This City')
       : `${city.flag} ${cityName}`;
 
-    title = `${badgeTxt} · ${locTxt} (${author}) — REMO World`;
+    title = dedicatedTo
+      ? (isFr
+          ? `🎁 Pour ${dedicatedTo} · ${badgeTxt} (${author}) — REMO World`
+          : `🎁 For ${dedicatedTo} · ${badgeTxt} (${author}) — REMO World`)
+      : `${badgeTxt} · ${locTxt} (${author}) — REMO World`;
     const quoteSnippet = truncateClean(page1, 145);
     const pagesSuffix = pageCount > 1 ? ` [${pageCount} pages]` : '';
+    const toLead = dedicatedTo
+      ? (isFr ? `✨ Dédicacé à ${dedicatedTo} — ` : `✨ Dedicated to ${dedicatedTo} — `)
+      : '';
     description = quoteSnippet
-      ? `"${quoteSnippet}"${pagesSuffix}${cap ? ` — ${truncateClean(cap, 60)}` : ''}`
-      : (isFr ? 'Lisez cette carte texte sur REMO World.' : 'Read this Text Card on REMO World.');
+      ? `${toLead}"${quoteSnippet}"${pagesSuffix}${cap ? ` — ${truncateClean(cap, 60)}` : ''}`
+      : (dedicatedTo
+          ? (isFr ? `✨ Vœu personnalisé de ${author} pour ${dedicatedTo} sur REMO World.` : `✨ Personalized REMO card from ${author} for ${dedicatedTo}.`)
+          : (isFr ? 'Lisez cette carte texte sur REMO World.' : 'Read this Text Card on REMO World.'));
   } else if (mystery) {
     title = isFr
       ? `🕵️ Devinez cette Ville ! (${author}) — REMO World`

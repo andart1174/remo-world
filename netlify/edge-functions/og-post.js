@@ -1,12 +1,19 @@
 /**
- * Netlify Edge Function: Dynamic Per-Post Open Graph Meta Injection
- * Intercepts /?post=<id> requests (for WhatsApp, Facebook, Telegram, X, Discord, iMessage)
- * and injects post-specific og:title, og:description, and og:image without delaying homepage loads.
+ * Netlify Edge Function: Dynamic Open Graph Meta Injection
+ * Intercepts /?post=<id>[&to=<name>], /?open=blitz[&vs=<tok>], and /?room=<slug>
+ * requests (WhatsApp, Facebook, Telegram, X, Discord, iMessage) and injects tailored
+ * og:title, og:description, and og:image without delaying homepage loads.
  */
 import {
   isValidPostId,
+  isValidRoomId,
   fetchFirestorePost,
+  fetchFocusRoomDoc,
+  decodeBlitzVsToken,
   buildPostOgMeta,
+  buildBlitzOgMeta,
+  buildStudyRoomOgMeta,
+  sanitizeRecipientName,
   escapeHtmlAttr
 } from '../shared/og-meta.mjs';
 
@@ -70,17 +77,52 @@ export default async (request, context) => {
 
   const url = new URL(request.url);
   const postId = (url.searchParams.get('post') || '').trim();
-  if (!isValidPostId(postId)) {
+  const roomId = (url.searchParams.get('room') || '').trim();
+  const openTarget = (url.searchParams.get('open') || '').trim().toLowerCase();
+  const vsToken = (url.searchParams.get('vs') || '').trim();
+
+  const wantsPost = isValidPostId(postId);
+  const wantsRoom = !wantsPost && isValidRoomId(roomId);
+  const wantsBlitz = !wantsPost && !wantsRoom && (openTarget === 'blitz' || openTarget === 'worldblitz' || Boolean(decodeBlitzVsToken(vsToken)));
+
+  if (!wantsPost && !wantsRoom && !wantsBlitz) {
     return context.next();
   }
 
   const lang = detectRequestLang(url, request);
-  const [originRes, post] = await Promise.all([
-    context.next(),
-    fetchFirestorePost(postId, { timeoutMs: 2000 })
-  ]);
+  let meta = null;
+  let originRes = null;
 
-  if (!post || !originRes || !originRes.ok) {
+  if (wantsPost) {
+    const toName = sanitizeRecipientName(url.searchParams.get('to') || '');
+    const [res, post] = await Promise.all([
+      context.next(),
+      fetchFirestorePost(postId, { timeoutMs: 2000 })
+    ]);
+    originRes = res;
+    if (post) {
+      meta = buildPostOgMeta(post, lang, Date.now(), toName);
+    }
+  } else if (wantsRoom) {
+    const [res, roomDoc] = await Promise.all([
+      context.next(),
+      fetchFocusRoomDoc(roomId, { timeoutMs: 1600 })
+    ]);
+    originRes = res;
+    meta = buildStudyRoomOgMeta({
+      roomId,
+      cityId: (url.searchParams.get('tv') || '').trim().toLowerCase(),
+      durMin: url.searchParams.get('rd'),
+      fx: url.searchParams.get('fx') || '',
+      roomDoc
+    }, lang);
+  } else if (wantsBlitz) {
+    originRes = await context.next();
+    const vsData = decodeBlitzVsToken(vsToken);
+    meta = buildBlitzOgMeta(vsData, vsData ? vsToken : '', lang);
+  }
+
+  if (!meta || !originRes || !originRes.ok) {
     return originRes;
   }
 
@@ -88,9 +130,6 @@ export default async (request, context) => {
   if (!ctype.includes('text/html')) {
     return originRes;
   }
-
-  const meta = buildPostOgMeta(post, lang);
-  if (!meta) return originRes;
 
   const origHtml = await originRes.text();
   const nextHtml = injectPostOgIntoHtml(origHtml, meta);

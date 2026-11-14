@@ -241,13 +241,17 @@ function syncHeaderAndSidebars() {
     }
   }
 
-  // Left Sidebar Home City Card + Live Local Clock & Weather
+  // Left Sidebar Home City Card + Live Local Clock & Weather + Today's Crown
   const homeCard = document.getElementById('leftHomeCityBox');
   if (homeCard) {
     const hc = getCityById(u ? u.homeCity : 'montreal');
     const pts = st.cityScores[hc.id] || 1000;
     const wx = REMO_WEATHER.getCityLiveStatus(hc);
     const condTxt = lang === 'fr' ? wx.cond_fr : wx.cond_en;
+    const spotlight = typeof computeCityDailySpotlight === 'function' ? computeCityDailySpotlight(hc.id) : null;
+    const leaderLabel = spotlight
+      ? `${spotlight.isLive24h ? t('spotlight_24h_lbl') : t('spotlight_mayor_lbl')}: @${escapeHtmlStr(spotlight.leaderName)}${spotlight.pointsToday > 0 ? ` (${spotlight.pointsToday}p)` : ''}`
+      : '';
     homeCard.innerHTML = `
       <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
         <div>
@@ -264,12 +268,148 @@ function syncHeaderAndSidebars() {
           <button class="btn-ghost" style="border-color:rgba(251,191,36,0.55);color:#fbbf24;" title="Official City Ambassador 9:16 Diploma (+25 🪙)" onclick="openCityAmbassadorModal()">🏅</button>
         </div>
       </div>
+      ${spotlight ? `
+      <div class="home-city-spotlight-row">
+        <button type="button" class="home-spotlight-user" onclick="openCitizenProfileModal('${escapeHtmlStr(spotlight.leaderUid || '')}', '${escapeHtmlStr(spotlight.leaderName || '')}')">
+          <span>${leaderLabel}</span>
+        </button>
+        <div class="home-spotlight-mini-btns">
+          <button type="button" class="home-spotlight-mini-btn" onclick="openWorldBlitzModal()" title="Daily World Blitz">⚡</button>
+          <button type="button" class="home-spotlight-mini-btn" onclick="openWidgetEmbedModal('${hc.id}')" title="Live City Widget">🧩</button>
+        </div>
+      </div>` : ''}
     `;
   }
 
   if (typeof updateUnreadBadges === 'function') updateUnreadBadges();
+  if (typeof renderFeedCitySpotlightBar === 'function') renderFeedCitySpotlightBar();
   renderRightSidebarWidgets();
 }
+
+function computeCityDailySpotlight(cityId) {
+  const cid = String(cityId || 'montreal').toLowerCase();
+  const st = REMO_STORE.state || {};
+  const posts = Array.isArray(st.posts) ? st.posts : [];
+  const users = Array.isArray(st.users) ? st.users : [];
+  const officialMayor = (REMO_STORE.getCityMayor) ? REMO_STORE.getCityMayor(cid) : null;
+  const cutoffMs = Date.now() - 24 * 3600 * 1000;
+  const todayUtc = new Date().toISOString().slice(0, 10);
+
+  const tallyMap = new Map();
+  const addScore = (key, meta, pts) => {
+    if (!key) return;
+    const prev = tallyMap.get(key) || {
+      uid: meta.uid || '',
+      name: meta.name || 'Citizen',
+      points: 0
+    };
+    prev.points += pts;
+    if (!prev.uid && meta.uid) prev.uid = meta.uid;
+    if (meta.name && (!prev.name || prev.name === 'Citizen')) prev.name = meta.name;
+    tallyMap.set(key, prev);
+  };
+
+  for (const p of posts) {
+    if (!p || p.cityId !== cid || p.isShowcase) continue;
+    const ts = Number(p.createdAt || 0);
+    if (ts < cutoffMs) continue;
+    const likePts = Array.isArray(p.likes) ? p.likes.length * 5 : 0;
+    const cmtPts = Array.isArray(p.comments) ? p.comments.length * 8 : 0;
+    const craftPts = (p.mediaType === 'text_card' || p.verifiedGps || p.isWorldWindow) ? 10 : 0;
+    const pts = 25 + likePts + cmtPts + craftPts;
+    const key = p.uid || (p.authorName ? 'name:' + p.authorName.toLowerCase() : '');
+    addScore(key, { uid: p.uid || '', name: p.authorName || 'Citizen' }, pts);
+  }
+
+  for (const usr of users) {
+    if (!usr || usr.banned || usr.homeCity !== cid) continue;
+    if (usr.lastBlitzDate === todayUtc && Number(usr.lastBlitzScore || 0) > 0) {
+      addScore(usr.uid, { uid: usr.uid, name: usr.name || 'Citizen' }, Number(usr.lastBlitzScore) * 12);
+    }
+  }
+
+  const ranked = Array.from(tallyMap.values()).sort((a, b) => b.points - a.points);
+  if (ranked.length > 0 && ranked[0].points > 0) {
+    return {
+      cityId: cid,
+      leaderUid: ranked[0].uid,
+      leaderName: ranked[0].name,
+      pointsToday: ranked[0].points,
+      isLive24h: true,
+      officialMayor
+    };
+  }
+
+  if (officialMayor) {
+    return {
+      cityId: cid,
+      leaderUid: officialMayor.uid || '',
+      leaderName: officialMayor.name || 'REMO Citizen',
+      pointsToday: 0,
+      isLive24h: false,
+      officialMayor
+    };
+  }
+
+  return {
+    cityId: cid,
+    leaderUid: 'u_admin_founder',
+    leaderName: 'REMO Founder',
+    pointsToday: 0,
+    isLive24h: false,
+    officialMayor: null
+  };
+}
+window.computeCityDailySpotlight = computeCityDailySpotlight;
+
+function renderFeedCitySpotlightBar() {
+  const bar = document.getElementById('feedCitySpotlightBar');
+  if (!bar) return;
+  const lang = REMO_I18N.getLang();
+  const u = REMO_STORE.getCurrentUser();
+  const targetCid = (typeof currentFeedCityFilter === 'string' && currentFeedCityFilter && currentFeedCityFilter !== 'all')
+    ? currentFeedCityFilter
+    : ((u && u.homeCity) || 'montreal');
+  const city = getCityById(targetCid) || getCityById('montreal');
+  if (!city) {
+    bar.style.display = 'none';
+    return;
+  }
+  const sp = computeCityDailySpotlight(city.id);
+  const badgeTitle = sp.isLive24h ? t('spotlight_24h_lbl') : t('spotlight_mayor_lbl');
+  const scoreSub = sp.isLive24h
+    ? t('spotlight_pts_today', { pts: sp.pointsToday })
+    : t('spotlight_alltime');
+  const hasSeparateMayor = sp.officialMayor && sp.officialMayor.name &&
+    sp.officialMayor.name.toLowerCase() !== sp.leaderName.toLowerCase() && sp.isLive24h;
+
+  bar.style.display = 'flex';
+  bar.innerHTML = `
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:0;">
+      <button type="button" class="spotlight-crown-chip" onclick="openCitizenProfileModal('${escapeHtmlStr(sp.leaderUid || '')}', '${escapeHtmlStr(sp.leaderName || '')}')">
+        <span>${city.flag} ${escapeHtmlStr(getCityName(city, lang))}</span>
+        <span style="opacity:0.65;">·</span>
+        <span>${escapeHtmlStr(badgeTitle)}: @${escapeHtmlStr(sp.leaderName)}</span>
+      </button>
+      <span style="font-size:0.71rem;font-weight:800;color:#93c5fd;">⚡ ${escapeHtmlStr(scoreSub)}${hasSeparateMayor ? ` · 🏛️ @${escapeHtmlStr(sp.officialMayor.name)}` : ''}</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
+      <button type="button" class="spotlight-action-btn" onclick="openCitySpotlightComposer('${city.id}')">${escapeHtmlStr(t('spotlight_claim_btn'))}</button>
+      <button type="button" class="spotlight-action-btn" onclick="openWidgetEmbedModal('${city.id}')" title="${escapeHtmlStr(t('nav_city_widget'))}">🧩</button>
+    </div>
+  `;
+}
+window.renderFeedCitySpotlightBar = renderFeedCitySpotlightBar;
+
+function openCitySpotlightComposer(cityId = '') {
+  if (typeof openCreatePostModal === 'function') openCreatePostModal();
+  const sel = document.getElementById('createCitySelect');
+  if (sel && cityId) sel.value = cityId;
+  if (typeof updateTextCardStudioPreview === 'function' && activeCreateStudioTab === 'textcard') {
+    updateTextCardStudioPreview();
+  }
+}
+window.openCitySpotlightComposer = openCitySpotlightComposer;
 
 function renderRightSidebarWidgets() {
   const lang = REMO_I18N.getLang();
@@ -1531,6 +1671,11 @@ function computePostRenderSig(p, u, lang) {
 function renderSinglePostCardHtml(p, lang, u, isAdm) {
   try {
     if (!p || !p.id) return '';
+    const tcRecipient = (p.mediaType === 'text_card') ? getEffectiveTextCardRecipient(p) : '';
+    const showTcReplyBar = Boolean(
+      p.mediaType === 'text_card' &&
+      (tcRecipient || (window._deepLinkedPostId && window._deepLinkedPostId === p.id))
+    );
     const city = getCityById(p.cityId) || getCityById('montreal') || { id: 'montreal', name_en: 'Montreal', name_fr: 'Montréal', flag: '⚜️', code: 'MTL' };
     const wx = (typeof REMO_WEATHER !== 'undefined' && REMO_WEATHER.getCityLiveStatus)
       ? (REMO_WEATHER.getCityLiveStatus(city) || { icon: '🌤️', tempC: 20, isSurge: false, timeStr: '12:00' })
@@ -1636,6 +1781,11 @@ function renderSinglePostCardHtml(p, lang, u, isAdm) {
 
         <!-- Modern Sleek Post Body -->
         <div class="post-body">
+          ${(!hiddenByCapsule && showTcReplyBar) ? `
+            <div class="tc-dedicated-reply-bar">
+              <span class="tc-dedicated-reply-txt">${tcRecipient ? escapeHtmlStr(t('tc_dedicated_banner', { name: tcRecipient })) : `✍️ @${escapeHtmlStr(p.authorName || 'Citizen')}`}</span>
+              <button type="button" class="tc-send-back-btn" onclick="openReplyTextCardTo('${escapeHtmlStr(p.authorName || '')}', '${city.id}')">${escapeHtmlStr(t('tc_send_back_btn'))}</button>
+            </div>` : ''}
           ${mysteryMasked ? '' : getInterCityDistanceBridge(city, lang)}
           ${!hiddenByCapsule && typeof renderMysteryCityWidget === 'function' ? renderMysteryCityWidget(p, city, lang, u, isPostOwner) : ''}
           ${!hiddenByCapsule && !mysteryMasked && typeof renderWorldWindowActionsBar === 'function' ? renderWorldWindowActionsBar(p, lang) : ''}
@@ -2059,6 +2209,9 @@ function syncMobileFeedLayoutModeUI() {
 
 function renderSocialFeed(searchQuery = '', forceFull = false) {
   renderStoriesAndBanners();
+  if (typeof renderFeedCitySpotlightBar === 'function') {
+    renderFeedCitySpotlightBar();
+  }
   if (typeof renderFeedActiveContestsBanner === 'function') {
     renderFeedActiveContestsBanner();
   }
@@ -2648,6 +2801,13 @@ function toggleHtmlCodeView(postId, btnEl) {
 let currentFullscreenPostId = null;
 window._activeViralSharePostId = null;
 
+function getEffectiveTextCardRecipient(post) {
+  if (!post || post.mediaType !== 'text_card') return '';
+  const fromUrlMap = (window._deepLinkedRecipientByPost && post.id) ? window._deepLinkedRecipientByPost[post.id] : '';
+  const stored = (post.textCard && post.textCard.dedicatedTo) ? post.textCard.dedicatedTo : '';
+  return String(fromUrlMap || stored || '').replace(/[\r\n<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, 32);
+}
+
 function getViralPostShareData(postId) {
   const lang = REMO_I18N.getLang();
   const isFr = lang === 'fr';
@@ -2659,8 +2819,10 @@ function getViralPostShareData(postId) {
   if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
     baseOrigin = 'https://remoworld.com';
   }
+  const tcTo = post ? getEffectiveTextCardRecipient(post) : '';
+  const toParam = tcTo ? `&to=${encodeURIComponent(tcTo)}` : '';
   const refParam = refCode ? `&ref=${encodeURIComponent(refCode)}` : '';
-  const url = `${baseOrigin}/?post=${cleanId}${refParam}#post_${cleanId}`;
+  const url = `${baseOrigin}/?post=${cleanId}${toParam}${refParam}#post_${cleanId}`;
 
   let title = 'REMO World 🌐 4D World Cities';
   let shareText = isFr
@@ -2687,10 +2849,11 @@ function getViralPostShareData(postId) {
       : '';
     const effectiveCap = cap || tcActiveTxt;
     const shortCap = effectiveCap.length > 90 ? effectiveCap.slice(0, 87) + '...' : effectiveCap;
-    title = `${locLabel} • @${post.authorName || 'Citizen'} on REMO World`;
+    const toTag = tcTo ? (isFr ? `🎁 Pour ${tcTo} · ` : `🎁 For ${tcTo} · `) : '';
+    title = `${toTag}${locLabel} • @${post.authorName || 'Citizen'} on REMO World`;
     shareText = shortCap
-      ? `${locLabel} — "${shortCap}" 🌐 REMO World 👉`
-      : (isFr ? `${locLabel} en direct sur REMO World 👉` : `${locLabel} live on REMO World 👉`);
+      ? `${toTag}${locLabel} — "${shortCap}" 🌐 REMO World 👉`
+      : `${toTag}${isFr ? `${locLabel} en direct sur REMO World 👉` : `${locLabel} live on REMO World 👉`}`;
   }
 
   return { post, url, title, shareText, lang, isFr, u };
@@ -2959,8 +3122,12 @@ function drawViralPostStoryCanvas(postId) {
       tcCv.width = stageW * 2;
       tcCv.height = stageH * 2;
       const tcCtx = tcCv.getContext('2d');
+      const tcSpecForStory = {
+        ...post.textCard,
+        dedicatedTo: getEffectiveTextCardRecipient(post)
+      };
       drawTextCardCanvasFrame(
-        tcCtx, tcCv.width, tcCv.height, post.textCard, activePageIdx,
+        tcCtx, tcCv.width, tcCv.height, tcSpecForStory, activePageIdx,
         city, post.authorName || 'REMO Citizen', lang, mysteryMasked, 0
       );
 
@@ -3647,6 +3814,7 @@ function renderTextCardMarkup(spec, opts = {}) {
   const curText = pages[idx] || opts.emptyHint || '';
   const sizeCls = getTextCardSizeClass(curText);
   const mysteryMasked = Boolean(opts.mysteryMasked);
+  const dedicatedTo = String(opts.dedicatedTo || s.dedicatedTo || '').replace(/[\r\n<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, 32);
   const authorHandle = opts.authorName ? `@${escapeHtmlStr(opts.authorName)}` : '';
   const locText = mysteryMasked
     ? t('tc_guess_masked_loc')
@@ -3665,7 +3833,10 @@ function renderTextCardMarkup(spec, opts = {}) {
   return `
     <div class="remo-text-card-stage tc-theme-${theme} tc-font-${fontStyle} ${motion === 'glow' ? 'tc-living-glow' : ''} ${context === 'preview' ? 'is-preview' : ''}" ${themeStyle} ${touchAttr}>
       <div class="tc-top-row">
-        ${badgeLabel ? `<span class="tc-cat-pill">${escapeHtmlStr(badgeLabel)}</span>` : '<span></span>'}
+        <span style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+          ${badgeLabel ? `<span class="tc-cat-pill">${escapeHtmlStr(badgeLabel)}</span>` : ''}
+          ${dedicatedTo ? `<span class="tc-for-pill">${escapeHtmlStr(t('tc_dedicated_prefix'))} ${escapeHtmlStr(dedicatedTo)}</span>` : ''}
+        </span>
         ${len > 1 ? `<span class="tc-page-pill">📖 ${idx + 1}/${len}</span>` : ''}
       </div>
 
@@ -3704,6 +3875,7 @@ function _isTextCardMysteryMasked(p) {
 function renderPostTextCardStage(p, city, lang, opts = {}) {
   const mysteryMasked = _isTextCardMysteryMasked(p);
   const idx = _carouselState[p.id] || 0;
+  const dedicatedTo = getEffectiveTextCardRecipient(p);
   const html = renderTextCardMarkup(p.textCard, {
     context: opts.compact ? 'compact' : 'feed',
     postId: p.id,
@@ -3711,7 +3883,8 @@ function renderPostTextCardStage(p, city, lang, opts = {}) {
     authorName: p.authorName || 'Citizen',
     lang,
     pageIdx: idx,
-    mysteryMasked
+    mysteryMasked,
+    dedicatedTo
   });
   return `<div class="tc-stage-host" data-tc-post-id="${p.id}" style="width:100%;height:100%;">${html}</div>`;
 }
@@ -3862,9 +4035,17 @@ function drawTextCardCanvasFrame(ctx, w, h, spec, pageIdx, city, authorName, lan
     ctx.fillStyle = textCol;
     ctx.textAlign = 'left';
     ctx.fillText(labelTxt, px + pPadX, topY + 1);
+    return pillW;
   };
+  let nextPillX = padX;
   if (badgeKey) {
-    drawPill(t(badgeKey).toUpperCase(), padX, 'rgba(15, 23, 42, 0.56)', '#fde68a', true);
+    const bw = drawPill(t(badgeKey).toUpperCase(), padX, 'rgba(15, 23, 42, 0.56)', '#fde68a', true);
+    nextPillX = padX + bw + Math.round(w * 0.015);
+  }
+  const dedicatedTo = String(s.dedicatedTo || '').replace(/[\r\n<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, 24);
+  if (dedicatedTo) {
+    const forWord = lang === 'fr' ? 'POUR' : 'FOR';
+    drawPill(`🎁 ${forWord} ${dedicatedTo.toUpperCase()}`, nextPillX, 'rgba(251, 191, 36, 0.25)', '#fef08a', true);
   }
   if (len > 1) {
     drawPill(`📖 ${idx + 1}/${len}`, null, 'rgba(15, 23, 42, 0.58)', '#ffffff', false);
@@ -3924,8 +4105,10 @@ function drawTextCardCanvasFrame(ctx, w, h, spec, pageIdx, city, authorName, lan
 function renderTextCardToDataUrl(postOrSpec, pageIdx = 0, opts = {}) {
   try {
     const isPost = Boolean(postOrSpec && postOrSpec.textCard);
-    const spec = isPost ? postOrSpec.textCard : postOrSpec;
-    if (!spec) return '';
+    const rawSpec = isPost ? postOrSpec.textCard : postOrSpec;
+    if (!rawSpec) return '';
+    const effTo = isPost ? getEffectiveTextCardRecipient(postOrSpec) : (rawSpec.dedicatedTo || '');
+    const spec = effTo ? { ...rawSpec, dedicatedTo: effTo } : rawSpec;
     const lang = opts.lang || REMO_I18N.getLang();
     const city = getCityById((isPost ? postOrSpec.cityId : spec.cityId) || 'montreal') || getCityById('montreal');
     const authorName = (isPost ? postOrSpec.authorName : opts.authorName) || 'Citizen';
@@ -3946,6 +4129,7 @@ function _getStudioTextCardSpecFromDom() {
   const raw = (inp ? inp.value : '').trim().slice(0, REMO_TEXT_CARD_CHAR_LIMIT);
   const badgeType = document.getElementById('createTextCardBadgeSel')?.value || 'proverb';
   const fontStyle = document.getElementById('createTextCardFontSel')?.value || 'modern';
+  const dedicatedTo = (document.getElementById('createTextCardToInp')?.value || '').replace(/[\r\n<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, 32);
   return {
     raw,
     pages: splitTextCardPages(raw),
@@ -3953,7 +4137,8 @@ function _getStudioTextCardSpecFromDom() {
     fontStyle,
     badgeType,
     align: _textCardStudioState.align || 'center',
-    motion: _textCardStudioState.motion || 'glow'
+    motion: _textCardStudioState.motion || 'glow',
+    dedicatedTo
   };
 }
 
@@ -4108,6 +4293,8 @@ function toggleTextCardMotion() {
 function clearTextCardInput() {
   const inp = document.getElementById('createTextCardInp');
   if (inp) inp.value = '';
+  const toInp = document.getElementById('createTextCardToInp');
+  if (toInp) toInp.value = '';
   _textCardStudioState.previewPage = 0;
   updateTextCardStudioPreview();
 }
@@ -4119,6 +4306,8 @@ function resetTextCardStudioState() {
   _textCardStudioState.previewPage = 0;
   const inp = document.getElementById('createTextCardInp');
   if (inp) inp.value = '';
+  const toInp = document.getElementById('createTextCardToInp');
+  if (toInp) toInp.value = '';
   const bSel = document.getElementById('createTextCardBadgeSel');
   if (bSel) bSel.value = 'proverb';
   const fSel = document.getElementById('createTextCardFontSel');
@@ -4136,6 +4325,20 @@ function resetTextCardStudioState() {
   renderTextCardThemeSwatches();
   updateTextCardStudioPreview();
 }
+
+function openReplyTextCardTo(recipientName = '', cityId = '') {
+  if (typeof openCreatePostModal === 'function') openCreatePostModal();
+  if (typeof switchCreateStudioTab === 'function') switchCreateStudioTab('textcard');
+  const citySel = document.getElementById('createCitySelect');
+  if (citySel && cityId) citySel.value = cityId;
+  const toInp = document.getElementById('createTextCardToInp');
+  if (toInp) toInp.value = String(recipientName || '').replace(/[\r\n<>]/g, '').trim().slice(0, 32);
+  const bSel = document.getElementById('createTextCardBadgeSel');
+  if (bSel) bSel.value = 'wish';
+  updateTextCardStudioPreview();
+  setTimeout(() => document.getElementById('createTextCardInp')?.focus(), 60);
+}
+window.openReplyTextCardTo = openReplyTextCardTo;
 
 function downloadTextCardPng(postId, pageIdx = null) {
   const p = findFeedPostById(postId);
@@ -7348,8 +7551,13 @@ document.addEventListener('DOMContentLoaded', () => {
     REMO_I18N.setLang(urlLang);
   }
   const targetPost = params.get('post') || (window.location.hash ? window.location.hash.replace('#post_', '').replace('#', '') : null);
+  const urlToParam = (params.get('to') || '').replace(/[\r\n<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, 32);
   if (targetPost) {
     window._deepLinkedPostId = targetPost;
+    if (urlToParam) {
+      window._deepLinkedRecipientByPost = window._deepLinkedRecipientByPost || {};
+      window._deepLinkedRecipientByPost[targetPost] = urlToParam;
+    }
     currentFeedMode = 'all';
     currentFeedCityFilter = 'all';
     renderSocialFeed('', true);
@@ -7367,12 +7575,23 @@ document.addEventListener('DOMContentLoaded', () => {
         if (pObj) {
           window._deepLinkToastShown = true;
           const isFrNow = REMO_I18N.getLang() === 'fr';
-          remoToast(
-            pObj.versus
-              ? (isFrNow ? '⚔️ Duel de Villes en direct ! Touchez une ville pour voter (+10 🪙) !' : '⚔️ Live City Duel! Tap a city photo to cast your vote (+10 🪙)!')
-              : (isFrNow ? '🌐 Moment de ville partagé en direct sur REMO World !' : '🌐 Shared live City Moment on REMO World!'),
-            'coin'
-          );
+          const effTo = (pObj.mediaType === 'text_card') ? getEffectiveTextCardRecipient(pObj) : '';
+          if (effTo) {
+            if (typeof spawnRemoCoinsFX === 'function') spawnRemoCoinsFX(8);
+            remoToast(
+              isFrNow
+                ? `🎁 Vœu personnalisé pour ${effTo} de @${pObj.authorName || 'Citoyen'} !`
+                : `🎁 Personalized card for ${effTo} from @${pObj.authorName || 'Citizen'}!`,
+              'fanfare'
+            );
+          } else {
+            remoToast(
+              pObj.versus
+                ? (isFrNow ? '⚔️ Duel de Villes en direct ! Touchez une ville pour voter (+10 🪙) !' : '⚔️ Live City Duel! Tap a city photo to cast your vote (+10 🪙)!')
+                : (isFrNow ? '🌐 Moment de ville partagé en direct sur REMO World !' : '🌐 Shared live City Moment on REMO World!'),
+              'coin'
+            );
+          }
         }
       }
     };
@@ -7522,9 +7741,114 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 });
 
+/* ── FEATURE 4: LIVE CITY WIDGET EMBED STUDIO CONTROLLER ── */
+const REMO_WIDGET_CITY_IDS = [
+  'montreal', 'paris', 'chisinau', 'bucharest', 'newyork', 'tokyo',
+  'london', 'dubai', 'miami', 'barcelona', 'rome', 'toronto',
+  'monaco', 'losangeles', 'seoul', 'geneva', 'singapore', 'sydney',
+  'rio', 'istanbul', 'berlin', 'amsterdam', 'lisbon', 'cairo'
+];
+
+const _widgetEmbedState = {
+  cityId: 'montreal',
+  lang: 'en'
+};
+
+function _populateWidgetCityOptions(selectedCityId = '') {
+  const sel = document.getElementById('widgetEmbedCitySel');
+  if (!sel) return;
+  const lang = REMO_I18N.getLang();
+  const pick = REMO_WIDGET_CITY_IDS.includes(String(selectedCityId || '').toLowerCase())
+    ? String(selectedCityId).toLowerCase()
+    : _widgetEmbedState.cityId;
+  sel.innerHTML = REMO_WIDGET_CITY_IDS.map((cid) => {
+    const c = getCityById(cid);
+    const label = c ? `${c.flag} ${escapeHtmlStr(getCityName(c, lang))}` : cid;
+    return `<option value="${cid}" ${cid === pick ? 'selected' : ''}>${label}</option>`;
+  }).join('');
+  sel.value = pick;
+  _widgetEmbedState.cityId = pick;
+}
+
+function setWidgetEmbedLang(langCode) {
+  _widgetEmbedState.lang = langCode === 'fr' ? 'fr' : 'en';
+  document.getElementById('widgetLangBtnEn')?.classList.toggle('active', _widgetEmbedState.lang === 'en');
+  document.getElementById('widgetLangBtnFr')?.classList.toggle('active', _widgetEmbedState.lang === 'fr');
+  updateWidgetEmbedPreview();
+}
+window.setWidgetEmbedLang = setWidgetEmbedLang;
+
+function updateWidgetEmbedPreview() {
+  const sel = document.getElementById('widgetEmbedCitySel');
+  if (sel && REMO_WIDGET_CITY_IDS.includes(sel.value)) {
+    _widgetEmbedState.cityId = sel.value;
+  }
+  const cid = _widgetEmbedState.cityId || 'montreal';
+  const wLang = _widgetEmbedState.lang === 'fr' ? 'fr' : 'en';
+  const prodUrl = `https://remoworld.com/widget.html?city=${encodeURIComponent(cid)}&lang=${wLang}`;
+  const previewSrc = `widget.html?city=${encodeURIComponent(cid)}&lang=${wLang}`;
+  const iframeCode = `<iframe src="${prodUrl}" width="100%" height="156" style="border:0;border-radius:16px;overflow:hidden;" loading="lazy" title="REMO World Live City Widget"></iframe>`;
+
+  const urlInp = document.getElementById('widgetEmbedDirectUrlInp');
+  if (urlInp) urlInp.value = prodUrl;
+  const iframeInp = document.getElementById('widgetEmbedIframeInp');
+  if (iframeInp) iframeInp.value = iframeCode;
+
+  const frame = document.getElementById('widgetEmbedLiveFrame');
+  if (frame && frame.getAttribute('src') !== previewSrc) {
+    frame.setAttribute('src', previewSrc);
+  }
+}
+window.updateWidgetEmbedPreview = updateWidgetEmbedPreview;
+
+function openWidgetEmbedModal(preferredCityId = '') {
+  const modal = document.getElementById('widgetEmbedModal');
+  if (!modal) return;
+  const u = REMO_STORE.getCurrentUser();
+  const candidate = String(preferredCityId || (u && u.homeCity) || 'montreal').toLowerCase();
+  _widgetEmbedState.cityId = REMO_WIDGET_CITY_IDS.includes(candidate) ? candidate : 'montreal';
+  _widgetEmbedState.lang = REMO_I18N.getLang() === 'fr' ? 'fr' : 'en';
+
+  if (typeof REMO_I18N !== 'undefined' && REMO_I18N.applyDOM) REMO_I18N.applyDOM(modal);
+  _populateWidgetCityOptions(_widgetEmbedState.cityId);
+  setWidgetEmbedLang(_widgetEmbedState.lang);
+  modal.classList.add('open');
+}
+window.openWidgetEmbedModal = openWidgetEmbedModal;
+
+function closeWidgetEmbedModal() {
+  document.getElementById('widgetEmbedModal')?.classList.remove('open');
+  const frame = document.getElementById('widgetEmbedLiveFrame');
+  if (frame) frame.setAttribute('src', 'about:blank');
+}
+window.closeWidgetEmbedModal = closeWidgetEmbedModal;
+
+async function copyWidgetEmbedValue(kind) {
+  const el = document.getElementById(kind === 'iframe' ? 'widgetEmbedIframeInp' : 'widgetEmbedDirectUrlInp');
+  const text = el ? el.value : '';
+  if (!text) return;
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(text);
+    } else if (el) {
+      el.select();
+      document.execCommand('copy');
+    }
+  } catch (e) {}
+  RemoAudio.play('coin');
+  remoToast(t(kind === 'iframe' ? 'widget_copied_iframe' : 'widget_copied_link'), 'coin');
+}
+window.copyWidgetEmbedValue = copyWidgetEmbedValue;
+
 window.addEventListener('remo:langchange', () => {
   syncHeaderAndSidebars();
   switchRemoView(currentRemoView);
+  const widgetModal = document.getElementById('widgetEmbedModal');
+  if (widgetModal && widgetModal.classList.contains('open')) {
+    _populateWidgetCityOptions(_widgetEmbedState.cityId);
+    if (REMO_I18N.applyDOM) REMO_I18N.applyDOM(widgetModal);
+    updateWidgetEmbedPreview();
+  }
   const createModal = document.getElementById('createPostModal');
   if (createModal && createModal.classList.contains('open') && typeof updateTextCardStudioPreview === 'function') {
     updateTextCardStudioPreview();

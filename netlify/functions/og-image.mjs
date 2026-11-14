@@ -13,7 +13,9 @@ import {
   fetchFirestorePost,
   isPostTimeLocked,
   getTextCardFirstPage,
-  truncateClean
+  truncateClean,
+  decodeBlitzVsToken,
+  sanitizeRecipientName
 } from '../shared/og-meta.mjs';
 import { getOgFontAtlas } from './og-font-data.mjs';
 
@@ -336,9 +338,32 @@ function drawAtlasText(buf, W, H, text, x, y, fontSet, rgb, align = 'left', shad
   drawPass(0, 0, r, g, b, opacity);
 }
 
+function drawSegment(buf, W, H, x0, y0, x1, y1, radius, rgba) {
+  const minX = Math.max(0, Math.floor(Math.min(x0, x1) - radius - 2));
+  const maxX = Math.min(W - 1, Math.ceil(Math.max(x0, x1) + radius + 2));
+  const minY = Math.max(0, Math.floor(Math.min(y0, y1) - radius - 2));
+  const maxY = Math.min(H - 1, Math.ceil(Math.max(y0, y1) + radius + 2));
+  const dx = x1 - x0;
+  const dy = y1 - y0;
+  const len2 = dx * dx + dy * dy || 1;
+  const [r, g, b, a] = rgba;
+  for (let py = minY; py <= maxY; py++) {
+    for (let px = minX; px <= maxX; px++) {
+      const t = Math.max(0, Math.min(1, ((px - x0) * dx + (py - y0) * dy) / len2));
+      const projX = x0 + t * dx;
+      const projY = y0 + t * dy;
+      const dist = Math.hypot(px - projX, py - projY) - radius;
+      if (dist < 0.75) {
+        const cov = Math.max(0, Math.min(1, 0.5 - dist));
+        blendPixel(buf, (py * W + px) * 4, r, g, b, a * cov);
+      }
+    }
+  }
+}
+
 function drawPill(buf, W, H, atlasSm, label, xLeft, yCenter, fillRgba, textRgb, rightEdgeX = null) {
   const clean = sanitizeTextForAtlas(label, atlasSm);
-  if (!clean) return;
+  if (!clean) return 0;
   const tw = measureAtlasText(clean, atlasSm);
   const padX = 24;
   const pillW = tw + padX * 2;
@@ -347,6 +372,7 @@ function drawPill(buf, W, H, atlasSm, label, xLeft, yCenter, fillRgba, textRgb, 
   const py = Math.round(yCenter - pillH / 2);
   drawRoundedBox(buf, W, H, px, py, pillW, pillH, pillH / 2, fillRgba, [255, 255, 255, 0.24], 1.5);
   drawAtlasText(buf, W, H, clean, px + padX, py + 7, atlasSm, textRgb, 'left', 0.28);
+  return pillW;
 }
 
 function chooseBestFontAndLines(text, atlas, maxWidth, maxHeight) {
@@ -368,7 +394,108 @@ function chooseBestFontAndLines(text, atlas, maxWidth, maxHeight) {
   return { fontSet: atlas.md, lines: [] };
 }
 
-export function renderPostOgPngBuffer(post, lang = 'en', nowMs = Date.now()) {
+export function renderBlitzOgPngBuffer(vsData, lang = 'en') {
+  const atlas = getOgFontAtlas();
+  const buf = Buffer.allocUnsafe(OG_W * OG_H * 4);
+  const isFr = lang === 'fr';
+  const edNum = (vsData && vsData.b) || 1;
+
+  fillGradientRect(buf, OG_W, OG_H, 0, 0, OG_W, OG_H, '#050816', '#0f172a', '#1e1b4b');
+  blendRadialGlow(buf, OG_W, OG_H, 300, 150, 480, [16, 185, 129], 0.22);
+  blendRadialGlow(buf, OG_W, OG_H, 920, 460, 440, [251, 191, 36], 0.16);
+  drawRoundedBox(buf, OG_W, OG_H, 36, 30, OG_W - 72, OG_H - 60, 32, [255, 255, 255, 0.03], [56, 189, 248, 0.35], 2);
+
+  drawPill(buf, OG_W, OG_H, atlas.sm, `WORLD BLITZ #${edNum}`, 80, 84, [15, 23, 42, 0.68], [253, 224, 71]);
+  drawPill(buf, OG_W, OG_H, atlas.sm, isFr ? 'DEFI 1V1 • 60S' : '1V1 DUEL • 60S', 0, 84, [16, 185, 129, 0.24], [110, 231, 183], OG_W - 80);
+
+  if (vsData) {
+    const cleanName = sanitizeTextForAtlas(String(vsData.n || 'CITIZEN').toUpperCase(), atlas.md) || 'CITIZEN';
+    const subTitle = isFr ? `${truncateClean(cleanName, 20)} TE DEFIE !` : `${truncateClean(cleanName, 20)} CHALLENGES YOU!`;
+    drawAtlasText(buf, OG_W, OG_H, subTitle, OG_W / 2, 148, atlas.md, [125, 211, 252], 'center', 0.45);
+    drawAtlasText(buf, OG_W, OG_H, `${vsData.s} / 5   •   ${vsData.t}s`, OG_W / 2, 208, atlas.lg, [255, 255, 255], 'center', 0.55);
+
+    // 5 crisp rounded score tiles centered
+    const grid = /^[GR]{5}$/.test(vsData.g || '') ? vsData.g : ('G'.repeat(vsData.s) + 'R'.repeat(5 - vsData.s));
+    const tileSz = 84;
+    const gap = 22;
+    const totalW = tileSz * 5 + gap * 4;
+    const startX = Math.round((OG_W - totalW) / 2);
+    const tileY = 316;
+
+    for (let i = 0; i < 5; i++) {
+      const tx = startX + i * (tileSz + gap);
+      const isWin = grid[i] === 'G';
+      const fill = isWin ? [16, 185, 129, 0.94] : [244, 63, 94, 0.90];
+      const stroke = isWin ? [167, 243, 208, 0.85] : [254, 205, 211, 0.78];
+      drawRoundedBox(buf, OG_W, OG_H, tx, tileY, tileSz, tileSz, 18, fill, stroke, 2.5);
+      const cx = tx + tileSz / 2;
+      const cy = tileY + tileSz / 2;
+      if (isWin) {
+        drawSegment(buf, OG_W, OG_H, cx - 18, cy + 2, cx - 5, cy + 16, 4.5, [255, 255, 255, 0.98]);
+        drawSegment(buf, OG_W, OG_H, cx - 5, cy + 16, cx + 20, cy - 14, 4.5, [255, 255, 255, 0.98]);
+      } else {
+        drawSegment(buf, OG_W, OG_H, cx - 15, cy - 15, cx + 15, cy + 15, 4.2, [255, 255, 255, 0.95]);
+        drawSegment(buf, OG_W, OG_H, cx + 15, cy - 15, cx - 15, cy + 15, 4.2, [255, 255, 255, 0.95]);
+      }
+    }
+
+    const ctaTxt = isFr
+      ? 'PEUX-TU BATTRE CE SCORE SUR LES MEMES 5 VILLES ?'
+      : 'CAN YOU BEAT THIS SCORE ON THE SAME 5 CITIES?';
+    drawAtlasText(buf, OG_W, OG_H, ctaTxt, OG_W / 2, 444, atlas.sm, [253, 224, 71], 'center', 0.35);
+  } else {
+    drawAtlasText(buf, OG_W, OG_H, isFr ? 'QUIZ MONDIAL 60 SECONDES' : '60-SECOND GLOBAL CITY BLITZ', OG_W / 2, 212, atlas.lg, [255, 255, 255], 'center', 0.5);
+    drawAtlasText(buf, OG_W, OG_H, isFr ? '5 VILLES • MEME DEFIS MONDIAL • 1V1' : '5 WORLD CITIES • SAME DAILY SEED • 1V1', OG_W / 2, 315, atlas.md, [125, 211, 252], 'center', 0.4);
+  }
+
+  drawAtlasText(buf, OG_W, OG_H, isFr ? '24 VILLES DU MONDE' : '24 WORLD CITIES', 84, 528, atlas.sm, [203, 213, 225], 'left', 0.3);
+  drawAtlasText(buf, OG_W, OG_H, 'REMOWORLD.COM', OG_W - 84, 528, atlas.sm, [56, 189, 248], 'right', 0.3);
+  return encodeRgbaToPng(buf, OG_W, OG_H);
+}
+
+export function renderStudyRoomOgPngBuffer(opts = {}, lang = 'en') {
+  const atlas = getOgFontAtlas();
+  const buf = Buffer.allocUnsafe(OG_W * OG_H * 4);
+  const isFr = lang === 'fr';
+  const city = getCityMeta(opts.cityId || 'montreal');
+  const cityName = getCityDisplayName(city, isFr ? 'fr' : 'en').toUpperCase();
+  const cleanRoom = sanitizeTextForAtlas(String(opts.roomId || 'FOCUS').slice(0, 28).toUpperCase(), atlas.md) || 'FOCUS';
+  const durMin = Number(opts.durMin) === 50 ? 50 : 25;
+  const peers = Math.max(0, Number(opts.peers || 0) || 0);
+  const cityRgb = hexToRgb(city.themeColor || '#38bdf8', [56, 189, 248]);
+
+  fillGradientRect(buf, OG_W, OG_H, 0, 0, OG_W, OG_H, '#050816', '#0f172a', '#0c1f3f');
+  blendRadialGlow(buf, OG_W, OG_H, 280, 180, 520, cityRgb, 0.28);
+  blendRadialGlow(buf, OG_W, OG_H, 920, 440, 420, [99, 102, 241], 0.20);
+
+  // Subtle 4D Focus Window mullions & glass border
+  drawRoundedBox(buf, OG_W, OG_H, OG_W / 2 - 2, 130, 4, 340, 2, [255, 255, 255, 0.08]);
+  drawRoundedBox(buf, OG_W, OG_H, 120, 300, OG_W - 240, 4, 2, [255, 255, 255, 0.07]);
+  drawRoundedBox(buf, OG_W, OG_H, 36, 30, OG_W - 72, OG_H - 60, 32, [255, 255, 255, 0.03], [56, 189, 248, 0.34], 2);
+
+  drawPill(buf, OG_W, OG_H, atlas.sm, isFr ? "SALLE D'ETUDE LIVE" : 'LIVE STUDY ROOM', 80, 84, [15, 23, 42, 0.68], [125, 211, 252]);
+  drawPill(buf, OG_W, OG_H, atlas.sm, `POMODORO ${durMin} MIN`, 0, 84, [251, 191, 36, 0.22], [253, 224, 71], OG_W - 80);
+
+  drawAtlasText(buf, OG_W, OG_H, `#${cleanRoom}`, OG_W / 2, 174, atlas.md, [253, 224, 71], 'center', 0.42);
+  drawAtlasText(buf, OG_W, OG_H, truncateClean(cityName, 18), OG_W / 2, 244, atlas.lg, [255, 255, 255], 'center', 0.55);
+
+  const fxRaw = String(opts.fx || '').trim();
+  const subTxt = fxRaw
+    ? `${fxRaw.replace(/,/g, ' • ').toUpperCase()}  •  56 LOFI RADIOS`
+    : (isFr ? 'FENETRE 4D LIVE  •  RADIO LOFI SYNCHRONISEE' : '4D LIVE CITY WINDOW  •  SYNCED LOFI RADIO');
+  drawAtlasText(buf, OG_W, OG_H, truncateClean(subTxt, 48), OG_W / 2, 355, atlas.sm, [186, 230, 253], 'center', 0.36);
+
+  const peerBanner = peers > 0
+    ? (isFr ? `${peers} CITOYEN(S) EN LIGNE MAINTENANT` : `${peers} STUDYING TOGETHER RIGHT NOW`)
+    : (isFr ? 'REJOIGNEZ LE COMPTEUR SYNCHRONISE' : 'JOIN THE SYNCED FOCUS SESSION');
+  drawAtlasText(buf, OG_W, OG_H, peerBanner, OG_W / 2, 424, atlas.sm, [110, 231, 183], 'center', 0.35);
+
+  drawAtlasText(buf, OG_W, OG_H, isFr ? '4D FOCUS TV' : '4D FOCUS TV', 84, 528, atlas.sm, [203, 213, 225], 'left', 0.3);
+  drawAtlasText(buf, OG_W, OG_H, 'REMOWORLD.COM', OG_W - 84, 528, atlas.sm, [56, 189, 248], 'right', 0.3);
+  return encodeRgbaToPng(buf, OG_W, OG_H);
+}
+
+export function renderPostOgPngBuffer(post, lang = 'en', nowMs = Date.now(), recipientOverride = '') {
   const atlas = getOgFontAtlas();
   const buf = Buffer.allocUnsafe(OG_W * OG_H * 4);
   const isFr = lang === 'fr';
@@ -431,6 +558,9 @@ export function renderPostOgPngBuffer(post, lang = 'en', nowMs = Date.now()) {
 
   // Determine theme & card text for Text Card or Standard / Mystery / Time-Capsule post
   const isTextCard = Boolean(post && post.mediaType === 'text_card' && post.textCard && !locked);
+  const dedicatedTo = isTextCard
+    ? sanitizeRecipientName(recipientOverride || (post.textCard && post.textCard.dedicatedTo) || '')
+    : '';
   const themeId = isTextCard ? (post.textCard.theme || 'aurora') : 'aurora';
   const theme = TEXT_CARD_THEMES_OG[themeId] || TEXT_CARD_THEMES_OG.aurora;
 
@@ -490,7 +620,16 @@ export function renderPostOgPngBuffer(post, lang = 'en', nowMs = Date.now()) {
     }
   }
 
-  drawPill(buf, OG_W, OG_H, atlas.sm, badgeLabel, 82, 84, [15, 23, 42, 0.58], [253, 230, 138]);
+  const pillW1 = drawPill(buf, OG_W, OG_H, atlas.sm, badgeLabel, 82, 84, [15, 23, 42, 0.58], [253, 230, 138]);
+  if (dedicatedTo) {
+    const forClean = sanitizeTextForAtlas(
+      `${isFr ? 'POUR' : 'FOR'} ${truncateClean(dedicatedTo, 18).toUpperCase()}`,
+      atlas.sm
+    );
+    if (forClean) {
+      drawPill(buf, OG_W, OG_H, atlas.sm, forClean, 82 + pillW1 + 14, 84, [251, 191, 36, 0.24], [254, 240, 138]);
+    }
+  }
   drawPill(buf, OG_W, OG_H, atlas.sm, pagePill, 0, 84, [15, 23, 42, 0.58], [125, 211, 252], OG_W - 82);
 
   // Body Text in Safe Middle Zone (Y: 155 .. 485)
@@ -523,8 +662,46 @@ export function renderPostOgPngBuffer(post, lang = 'en', nowMs = Date.now()) {
 
 export const handler = async (event, _context, deps = {}) => {
   const params = (event && event.queryStringParameters) || {};
-  const postId = String(params.post || '').trim();
+  const mode = String(params.mode || '').toLowerCase();
   const lang = String(params.lang || '').toLowerCase() === 'fr' ? 'fr' : 'en';
+
+  if (mode === 'blitz') {
+    const vsData = decodeBlitzVsToken(params.vs || '');
+    const pngBuf = renderBlitzOgPngBuffer(vsData, lang);
+    return {
+      statusCode: 200,
+      headers: {
+        'Content-Type': 'image/png',
+        'Cache-Control': 'public, max-age=300, s-maxage=900',
+        'Access-Control-Allow-Origin': '*'
+      },
+      body: pngBuf.toString('base64'),
+      isBase64Encoded: true
+    };
+  }
+
+  if (mode === 'room') {
+    const pngBuf = renderStudyRoomOgPngBuffer({
+      roomId: params.room || 'focus',
+      cityId: params.city || 'montreal',
+      durMin: params.rd,
+      fx: params.fx || '',
+      peers: params.peers
+    }, lang);
+    return {
+      statusCode: 200,
+      headers: {
+        'Content-Type': 'image/png',
+        'Cache-Control': 'public, max-age=120, s-maxage=300',
+        'Access-Control-Allow-Origin': '*'
+      },
+      body: pngBuf.toString('base64'),
+      isBase64Encoded: true
+    };
+  }
+
+  const postId = String(params.post || '').trim();
+  const toName = sanitizeRecipientName(params.to || '');
   const fetcher = deps.fetchPost || ((id) => fetchFirestorePost(id, { timeoutMs: 2500 }));
 
   const post = postId ? await fetcher(postId) : null;
@@ -554,7 +731,7 @@ export const handler = async (event, _context, deps = {}) => {
     }
   }
 
-  const pngBuf = renderPostOgPngBuffer(post, lang);
+  const pngBuf = renderPostOgPngBuffer(post, lang, Date.now(), toName);
   return {
     statusCode: 200,
     headers: {
