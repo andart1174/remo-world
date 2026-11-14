@@ -2678,13 +2678,19 @@ function getViralPostShareData(postId) {
       : `⚔️ Live City Duel: ${cA.flag} ${nA} vs ${cB.flag} ${nB} on REMO World! Vote for our city (+10 🪙) 👉`;
   } else if (post) {
     const city = getCityById(post.cityId || 'montreal');
-    const cityName = getCityName(city, lang);
+    const mysteryMasked = _isTextCardMysteryMasked(post);
+    const locLabel = mysteryMasked ? t('tc_guess_masked_loc') : `${city.flag} ${getCityName(city, lang)}`;
     const cap = isFr ? (post.caption_fr || post.caption_en || '') : (post.caption_en || post.caption_fr || '');
-    const shortCap = cap.length > 90 ? cap.slice(0, 87) + '...' : cap;
-    title = `${city.flag} ${cityName} • @${post.authorName || 'Citizen'} on REMO World`;
+    const tcPages = (post.mediaType === 'text_card' && post.textCard) ? _getTextCardSpecPages(post.textCard) : [];
+    const tcActiveTxt = tcPages.length
+      ? (tcPages[((_carouselState[post.id] || 0) % tcPages.length + tcPages.length) % tcPages.length] || '').replace(/\s+/g, ' ').trim()
+      : '';
+    const effectiveCap = cap || tcActiveTxt;
+    const shortCap = effectiveCap.length > 90 ? effectiveCap.slice(0, 87) + '...' : effectiveCap;
+    title = `${locLabel} • @${post.authorName || 'Citizen'} on REMO World`;
     shareText = shortCap
-      ? `${city.flag} ${cityName} — "${shortCap}" 🌐 REMO World 👉`
-      : (isFr ? `${city.flag} En direct de ${cityName} sur REMO World 👉` : `${city.flag} Live from ${cityName} on REMO World 👉`);
+      ? `${locLabel} — "${shortCap}" 🌐 REMO World 👉`
+      : (isFr ? `${locLabel} en direct sur REMO World 👉` : `${locLabel} live on REMO World 👉`);
   }
 
   return { post, url, title, shareText, lang, isFr, u };
@@ -2938,6 +2944,53 @@ function drawViralPostStoryCanvas(postId) {
         W / 2,
         718
       );
+    } else if (post && post.mediaType === 'text_card' && post.textCard) {
+      // Text Card 9:16 Stage
+      const city = getCityById(post.cityId || 'montreal');
+      const mysteryMasked = _isTextCardMysteryMasked(post);
+      const stageX = 32;
+      const stageY = 115;
+      const stageW = W - 64;
+      const stageH = 490;
+      const tcPages = _getTextCardSpecPages(post.textCard);
+      const activePageIdx = (((_carouselState[post.id] || 0) % tcPages.length) + tcPages.length) % tcPages.length;
+
+      const tcCv = document.createElement('canvas');
+      tcCv.width = stageW * 2;
+      tcCv.height = stageH * 2;
+      const tcCtx = tcCv.getContext('2d');
+      drawTextCardCanvasFrame(
+        tcCtx, tcCv.width, tcCv.height, post.textCard, activePageIdx,
+        city, post.authorName || 'REMO Citizen', lang, mysteryMasked, 0
+      );
+
+      ctx.save();
+      roundRectSafe(stageX, stageY, stageW, stageH, 22);
+      ctx.clip();
+      ctx.drawImage(tcCv, stageX, stageY, stageW, stageH);
+      ctx.restore();
+
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.24)';
+      ctx.lineWidth = 2;
+      roundRectSafe(stageX, stageY, stageW, stageH, 22);
+      ctx.stroke();
+
+      const cap = isFr ? (post.caption_fr || post.caption_en || '') : (post.caption_en || post.caption_fr || '');
+      const rawPageTxt = (tcPages[activePageIdx] || '').replace(/\s+/g, ' ').trim();
+      const subRaw = cap || rawPageTxt;
+      const shortCap = subRaw.length > 56 ? subRaw.slice(0, 53) + '...' : subRaw;
+      ctx.fillStyle = '#e2e8f0';
+      ctx.font = '700 17px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(shortCap || (isFr ? 'En direct sur REMO World' : 'Live on REMO World'), W / 2, 655);
+
+      ctx.fillStyle = '#fde047';
+      ctx.font = '900 18px Orbitron, sans-serif';
+      ctx.fillText(
+        isFr ? '24 VILLES • RADIO LIVE • PASSEPORT 4D' : '24 CITIES • LIVE RADIO • 4D PASSPORT',
+        W / 2,
+        705
+      );
     } else {
       // Regular Post 9:16 Card
       const city = getCityById((post && post.cityId) || 'montreal');
@@ -3020,6 +3073,12 @@ function drawViralPostStoryCanvas(postId) {
     ctx.font = '700 12px sans-serif';
     ctx.fillText('TikTok • Instagram Stories • WhatsApp • REMO 4D World', W / 2, 922);
   };
+
+  if (post && post.mediaType === 'text_card' && post.textCard) {
+    renderFrame(null, null);
+    window._viralStoryRenderPromise = Promise.resolve();
+    return;
+  }
 
   // Check if the post card in the DOM already has a loaded image or video frame
   const domCard = postId ? document.getElementById('post_card_' + postId) : null;
@@ -3500,7 +3559,17 @@ function splitTextCardPages(rawText, maxCharsPerPage = 250, maxLinesPerPage = 6)
         const next = current + sep + word;
         if (next.length > maxCharsPerPage || next.split('\n').length > maxLinesPerPage) {
           flushChunk(current);
-          current = word.length > maxCharsPerPage ? word.slice(0, maxCharsPerPage) : word;
+          current = '';
+          const wordChars = Array.from(word);
+          if (wordChars.length > maxCharsPerPage) {
+            for (let i = 0; i < wordChars.length; i += maxCharsPerPage) {
+              const part = wordChars.slice(i, i + maxCharsPerPage).join('');
+              if (i + maxCharsPerPage < wordChars.length) flushChunk(part);
+              else current = part;
+            }
+          } else {
+            current = word;
+          }
         } else {
           current = next;
         }
@@ -3681,6 +3750,21 @@ function _refreshTextCardStageHost(postId, p) {
 
 function _wrapCanvasTextLines(ctx, text, maxWidth) {
   const out = [];
+  const pushLongWord = (word) => {
+    const chars = Array.from(word);
+    let chunk = '';
+    chars.forEach((ch) => {
+      const candidate = chunk + ch;
+      if (chunk && ctx.measureText(candidate).width > maxWidth) {
+        out.push(chunk);
+        chunk = ch;
+      } else {
+        chunk = candidate;
+      }
+    });
+    if (chunk) out.push(chunk);
+  };
+
   String(text || '').replace(/\r\n/g, '\n').split('\n').forEach((para) => {
     const trimmed = para.trim();
     if (!trimmed) { out.push(''); return; }
@@ -3691,8 +3775,15 @@ function _wrapCanvasTextLines(ctx, text, maxWidth) {
       if (ctx.measureText(test).width <= maxWidth) {
         line = test;
       } else {
-        if (line) out.push(line);
-        line = word;
+        if (line) {
+          out.push(line);
+          line = '';
+        }
+        if (ctx.measureText(word).width <= maxWidth) {
+          line = word;
+        } else {
+          pushLongWord(word);
+        }
       }
     });
     if (line) out.push(line);
@@ -3746,44 +3837,72 @@ function drawTextCardCanvasFrame(ctx, w, h, spec, pageIdx, city, authorName, lan
 
   // Top category & page pills
   const padX = Math.round(w * 0.08);
-  const topY = Math.round(h * 0.06);
+  const topY = Math.round(h * 0.075);
   const badgeKey = REMO_TEXT_CARD_BADGE_KEYS[s.badgeType];
   ctx.save();
   ctx.textBaseline = 'middle';
-  if (badgeKey) {
-    ctx.font = `900 ${Math.round(w * 0.028)}px "Outfit", sans-serif`;
-    ctx.fillStyle = '#fde68a';
+  const drawPill = (labelTxt, xLeft, fillCol, textCol, bold = true) => {
+    const pFontPx = Math.round(w * 0.026);
+    ctx.font = `${bold ? '900' : '800'} ${pFontPx}px "Outfit", sans-serif`;
+    const pPadX = Math.round(w * 0.026);
+    const pillH = Math.round(pFontPx * 1.9);
+    const pillW = Math.min(w - padX * 2, Math.round(ctx.measureText(labelTxt).width + pPadX * 2));
+    const px = xLeft != null ? xLeft : (w - padX - pillW);
+    ctx.fillStyle = fillCol;
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.24)';
+    ctx.lineWidth = Math.max(1.5, w * 0.002);
+    ctx.beginPath();
+    if (typeof ctx.roundRect === 'function') {
+      ctx.roundRect(px, topY - pillH / 2, pillW, pillH, pillH / 2);
+    } else {
+      ctx.rect(px, topY - pillH / 2, pillW, pillH);
+    }
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = textCol;
     ctx.textAlign = 'left';
-    ctx.fillText(t(badgeKey).toUpperCase(), padX, topY);
+    ctx.fillText(labelTxt, px + pPadX, topY + 1);
+  };
+  if (badgeKey) {
+    drawPill(t(badgeKey).toUpperCase(), padX, 'rgba(15, 23, 42, 0.56)', '#fde68a', true);
   }
   if (len > 1) {
-    ctx.font = `800 ${Math.round(w * 0.028)}px "Outfit", sans-serif`;
-    ctx.fillStyle = 'rgba(255,255,255,0.82)';
-    ctx.textAlign = 'right';
-    ctx.fillText(`📖 ${idx + 1}/${len}`, w - padX, topY);
+    drawPill(`📖 ${idx + 1}/${len}`, null, 'rgba(15, 23, 42, 0.58)', '#ffffff', false);
   }
 
-  // Adaptive centered or left-aligned message text
+  // Adaptive centered or left-aligned message text bounded safely between top badge & footer
   const maxTextW = w - padX * 2;
+  const safeTop = Math.round(h * 0.16);
+  const safeBottom = Math.round(h * 0.87);
+  const safeH = safeBottom - safeTop;
   const density = pageText.length;
-  const basePx = density <= 85 ? w * 0.068 : density <= 165 ? w * 0.052 : density <= 230 ? w * 0.043 : w * 0.037;
-  const fontPx = Math.round(basePx);
-  const lineH = Math.round(fontPx * 1.38);
+  let fontPx = Math.round(density <= 85 ? w * 0.068 : density <= 165 ? w * 0.052 : density <= 230 ? w * 0.043 : w * 0.037);
+  const minFontPx = Math.max(16, Math.round(w * 0.026));
+  let lineH = Math.round(fontPx * 1.36);
   ctx.font = `${fontSpec.style} ${fontSpec.weight} ${fontPx}px ${fontSpec.family}`;
-  const lines = _wrapCanvasTextLines(ctx, pageText, maxTextW);
+  let lines = _wrapCanvasTextLines(ctx, pageText, maxTextW);
+
+  while (lines.length * lineH > safeH && fontPx > minFontPx) {
+    fontPx = Math.max(minFontPx, fontPx - 2);
+    lineH = Math.round(fontPx * 1.36);
+    ctx.font = `${fontSpec.style} ${fontSpec.weight} ${fontPx}px ${fontSpec.family}`;
+    lines = _wrapCanvasTextLines(ctx, pageText, maxTextW);
+  }
+
   const totalTextH = lines.length * lineH;
   const isLeft = s.align === 'left';
 
   ctx.textAlign = isLeft ? 'left' : 'center';
+  ctx.textBaseline = 'top';
   ctx.fillStyle = theme.textColor || '#ffffff';
   ctx.shadowColor = 'rgba(0,0,0,0.45)';
   ctx.shadowBlur = 14;
-  const startY = Math.max(Math.round(h * 0.16), Math.round((h - totalTextH) / 2) + Math.round(lineH * 0.35));
+  const startY = safeTop + Math.max(0, Math.round((safeH - totalTextH) / 2));
   const textX = isLeft ? padX : Math.round(w / 2);
 
   lines.forEach((ln, i) => {
     const ly = startY + i * lineH;
-    if (ly < h * 0.85) ctx.fillText(ln, textX, ly);
+    if (ly + fontPx <= safeBottom + 4) ctx.fillText(ln, textX, ly);
   });
   ctx.restore();
 
@@ -3815,7 +3934,8 @@ function renderTextCardToDataUrl(postOrSpec, pageIdx = 0, opts = {}) {
     cv.height = opts.height || 900;
     const ctx = cv.getContext('2d');
     drawTextCardCanvasFrame(ctx, cv.width, cv.height, spec, pageIdx, city, authorName, lang, Boolean(opts.mysteryMasked), 0);
-    return cv.toDataURL('image/jpeg', 0.88);
+    const mime = opts.mime || 'image/jpeg';
+    return mime === 'image/png' ? cv.toDataURL('image/png') : cv.toDataURL(mime, opts.quality || 0.9);
   } catch (e) {
     return '';
   }
@@ -4021,11 +4141,16 @@ function downloadTextCardPng(postId, pageIdx = null) {
   const p = findFeedPostById(postId);
   if (!p || !p.textCard) return;
   const idx = pageIdx != null ? pageIdx : (_carouselState[postId] || 0);
-  const url = renderTextCardToDataUrl(p, idx, { width: 900, height: 1125, mysteryMasked: _isTextCardMysteryMasked(p) });
+  const url = renderTextCardToDataUrl(p, idx, {
+    width: 900,
+    height: 1125,
+    mime: 'image/png',
+    mysteryMasked: _isTextCardMysteryMasked(p)
+  });
   if (!url) return;
   const a = document.createElement('a');
   a.href = url;
-  a.download = `REMO_TextCard_${postId}_p${idx + 1}.jpg`;
+  a.download = `REMO_TextCard_${postId}_p${idx + 1}.png`;
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -7400,6 +7525,16 @@ document.addEventListener('DOMContentLoaded', () => {
 window.addEventListener('remo:langchange', () => {
   syncHeaderAndSidebars();
   switchRemoView(currentRemoView);
+  const createModal = document.getElementById('createPostModal');
+  if (createModal && createModal.classList.contains('open') && typeof updateTextCardStudioPreview === 'function') {
+    updateTextCardStudioPreview();
+    const alignBtn = document.getElementById('btnTcAlignToggle');
+    if (alignBtn) alignBtn.textContent = _textCardStudioState.align === 'left' ? t('tc_align_left') : t('tc_align_center');
+    const motBtn = document.getElementById('btnTcMotionToggle');
+    if (motBtn) motBtn.textContent = _textCardStudioState.motion === 'glow' ? t('tc_motion_on') : t('tc_motion_off');
+    const capEl = document.getElementById('createCaptionInp');
+    if (capEl && activeCreateStudioTab === 'textcard') capEl.placeholder = t('tc_cap_opt_hint');
+  }
 });
 
 window.addEventListener('remo:stateupdate', (ev) => {
