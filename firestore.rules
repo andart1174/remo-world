@@ -8,7 +8,14 @@ service cloud.firestore {
     }
 
     function isOwner(userId) {
-      return isAuthenticated() && (request.auth.uid == userId || request.auth.token.email == resource.data.email);
+      return isAuthenticated() && (
+        request.auth.uid == userId ||
+        userId == 'u_fb_' + request.auth.uid ||
+        (resource != null && resource.data != null && (
+          (('fbUid' in resource.data) && resource.data.fbUid == request.auth.uid) ||
+          (('email' in resource.data) && request.auth.token.email == resource.data.email)
+        ))
+      );
     }
 
     function isAdmin() {
@@ -102,7 +109,11 @@ service cloud.firestore {
       ) || (
         isNotBanned() &&
         !isOwner(userId) &&
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['coins', 'lifetimeCoins']) &&
+        ('coins' in resource.data) &&
+        ('coins' in request.resource.data) &&
+        (resource.data.coins is int || resource.data.coins is float) &&
+        (request.resource.data.coins is int || request.resource.data.coins is float) &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['coins', 'lifetimeCoins', 'updatedAt']) &&
         (request.resource.data.coins - resource.data.coins) > 0 &&
         (request.resource.data.coins - resource.data.coins) <= 5000
       );
@@ -146,6 +157,7 @@ service cloud.firestore {
       allow create: if isAdmin() || (
         isNotBanned() && (
           isUidMatch(request.resource.data.fromUid) ||
+          (request.resource.data.fromUid == 'u_system_treasury' && isUidMatch(request.resource.data.toUid)) ||
           (request.resource.data.toUid == 'u_admin_founder' && request.resource.data.fromUid == 'u_support_desk')
         )
       );

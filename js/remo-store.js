@@ -2646,7 +2646,7 @@ const REMO_STORE = {
       this.state.directMessages = this.state.directMessages || [];
       const dmObj = {
         id: 'dm_sys_' + Date.now() + '_' + Math.random().toString(36).slice(2, 5),
-        fromUid: 'u_admin_founder',
+        fromUid: 'u_system_treasury',
         fromName: '👑 REMO Treasury',
         toUid: u.uid,
         text: `🪙 [+${val} REMO Coins → @${u.name}]: ${note.trim()}`,
@@ -2657,7 +2657,16 @@ const REMO_STORE = {
     }
     try { RemoAudio.play('coin'); } catch (e) {}
     this.save(true, 'system_coin_credit', { uid: u.uid, coins: u.coins });
-    this.syncUserToCloud(u);
+    const curMe = this.getCurrentUser();
+    if (!curMe || curMe.uid === u.uid || this.isCurrentUserAdmin()) {
+      this.syncUserToCloud(u);
+    } else if (this.fbDb && typeof firebase !== 'undefined') {
+      this.fbDb.collection('remo_users').doc(u.uid).update({
+        coins: Number(u.coins || 0),
+        lifetimeCoins: Number(u.lifetimeCoins || u.coins || 0),
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      }).catch(() => {});
+    }
     return u;
   },
 
