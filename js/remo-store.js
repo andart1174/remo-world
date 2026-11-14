@@ -2616,11 +2616,39 @@ const REMO_STORE = {
     return false;
   },
 
+  _getFbEmail(fbU) {
+    if (!fbU) return '';
+    if (fbU.email) return String(fbU.email).trim();
+    if (Array.isArray(fbU.providerData)) {
+      const p = fbU.providerData.find((item) => item && item.email);
+      if (p && p.email) return String(p.email).trim();
+    }
+    return '';
+  },
+
+  _isFbUserVerified(fbU) {
+    if (!fbU) return false;
+    if (fbU.emailVerified === true) return true;
+    if (Array.isArray(fbU.providerData)) {
+      return fbU.providerData.some((p) => p && (p.providerId === 'google.com' || p.providerId === 'apple.com'));
+    }
+    return false;
+  },
+
   isCurrentUserAdmin() {
     const fbUser = this.fbAuth && this.fbAuth.currentUser;
-    if (!fbUser || !fbUser.email || fbUser.emailVerified !== true) return false;
+    const fbEmail = this._getFbEmail(fbUser);
+    if (!fbUser || !fbEmail || fbUser.emailVerified !== true) return false;
     const adminEmail = (this.state && this.state.settings && this.state.settings.adminEmail) || 'andart1174@gmail.com';
-    return fbUser.email.toLowerCase().trim() === adminEmail.toLowerCase().trim();
+    if (fbEmail.toLowerCase().trim() !== adminEmail.toLowerCase().trim()) return false;
+    // Prevent admin/guest split-brain if local session is currently pinned to a non-admin citizen or guest
+    const uid = localStorage.getItem(this.USER_KEY) || '';
+    if (uid && Array.isArray(this.state?.users)) {
+      const cur = this.state.users.find((x) => x && x.uid === uid);
+      if (cur && cur.fbUid && cur.fbUid !== fbUser.uid) return false;
+      if (cur && cur.email && cur.email.toLowerCase().trim() !== adminEmail.toLowerCase().trim() && !this.isFakeOrGuestUser(cur)) return false;
+    }
+    return true;
   },
 
   isCurrentUserBanned() {
@@ -2866,10 +2894,60 @@ const REMO_STORE = {
 
   /* ── Current Citizen, Cosmetics & Viral Referral Engine ── */
   getCurrentUser() {
-    const uid = localStorage.getItem(this.USER_KEY);
-    if (!uid) return null;
-    const u = this.state.users.find((x) => x.uid === uid) || null;
-    if (u && !u.avatarUrl) {
+    let uid = localStorage.getItem(this.USER_KEY);
+    // Recover cleanly if USER_KEY was ever stored as JSON instead of plain UID string
+    if (uid && uid.charAt(0) === '{') {
+      try {
+        const parsed = JSON.parse(uid);
+        if (parsed && parsed.uid) {
+          uid = String(parsed.uid);
+          localStorage.setItem(this.USER_KEY, uid);
+        } else {
+          uid = '';
+          localStorage.removeItem(this.USER_KEY);
+        }
+      } catch (e) {
+        uid = '';
+        localStorage.removeItem(this.USER_KEY);
+      }
+    }
+
+    let u = uid ? (this.state.users || []).find((x) => x && x.uid === uid) || null : null;
+    const fbU = this.fbAuth && this.fbAuth.currentUser;
+    const fbVerified = this._isFbUserVerified(fbU);
+
+    // Self-heal session mismatch between Firebase Auth and local USER_KEY
+    if (fbU && fbVerified) {
+      const fbEmail = this._getFbEmail(fbU).toLowerCase().trim();
+      const needsSwitch = !u || this.isFakeOrGuestUser(u) || (u.fbUid && u.fbUid !== fbU.uid) || (u.email && fbEmail && u.email.toLowerCase().trim() !== fbEmail);
+      if (needsSwitch) {
+        const match = (this.state.users || []).find((x) =>
+          x && (x.uid === ('u_fb_' + fbU.uid) || x.fbUid === fbU.uid || (fbEmail && x.email && x.email.toLowerCase().trim() === fbEmail))
+        );
+        if (match) {
+          if (fbEmail && (!match.email || /^citizen\d+@remo\.world$/i.test(match.email))) match.email = this._getFbEmail(fbU);
+          if (!match.fbUid) match.fbUid = fbU.uid;
+          match.emailVerified = true;
+          if (!match.role || match.role === 'guest') {
+            const adminEmail = (this.state?.settings?.adminEmail || 'andart1174@gmail.com').toLowerCase().trim();
+            match.role = (fbEmail === adminEmail && fbU.emailVerified === true) ? 'admin' : 'citizen';
+          }
+          localStorage.setItem(this.USER_KEY, match.uid);
+          u = match;
+        }
+      } else if (u) {
+        if (fbEmail && (!u.email || /^citizen\d+@remo\.world$/i.test(u.email))) u.email = this._getFbEmail(fbU);
+        if (!u.fbUid) u.fbUid = fbU.uid;
+        u.emailVerified = true;
+      }
+    } else if (this.fbAuth && !fbU && u && u.uid === 'u_admin_founder') {
+      // Never impersonate Founder Admin when Firebase Auth is signed out
+      localStorage.removeItem(this.USER_KEY);
+      u = null;
+    }
+
+    if (!u) return null;
+    if (!u.avatarUrl) {
       const cachedAvatar = localStorage.getItem('remo_avatar_' + u.uid);
       if (cachedAvatar) u.avatarUrl = cachedAvatar;
     }
@@ -2954,16 +3032,23 @@ const REMO_STORE = {
   },
 
   ensureGuestOrCitizen(name, email, homeCity = 'montreal', isAdmin = false, fbUid = '') {
-    // 1. If user already logged in and no specific new email/fbUid is requested, keep current user
+    // 1. If caller asks for current/guest session without specifying email/fbUid, check active Firebase user first
     if (!email && !fbUid) {
       const cur = this.getCurrentUser();
-      // If current user in storage is u_admin_founder but admin is not unlocked or verified, wipe to protect founder identity
-      if (cur) {
+      if (cur && (!this.isFakeOrGuestUser(cur) || !(this.fbAuth && this.fbAuth.currentUser && this._isFbUserVerified(this.fbAuth.currentUser)))) {
         if (cur.uid === 'u_admin_founder' && !this.isCurrentUserAdmin()) {
           localStorage.removeItem(this.USER_KEY);
         } else {
           return cur;
         }
+      }
+      // If Firebase Auth already has a verified signed-in user, hydrate them instead of creating a Guest!
+      const curFb = this.fbAuth && this.fbAuth.currentUser;
+      if (curFb && this._isFbUserVerified(curFb)) {
+        const fbEmail = this._getFbEmail(curFb);
+        const adminEmail = (this.state?.settings?.adminEmail || 'andart1174@gmail.com').toLowerCase().trim();
+        const isFbAdmin = Boolean(curFb.emailVerified === true && fbEmail.toLowerCase() === adminEmail);
+        return this.ensureGuestOrCitizen(curFb.displayName || (isFbAdmin ? 'REMO Founder' : 'Citizen'), fbEmail, homeCity, isFbAdmin, curFb.uid);
       }
       // Never fallback to this.state.users[0]! Create an isolated Guest Explorer session
       const guestUid = 'u_guest_' + Math.random().toString(36).slice(2, 9);
@@ -3001,29 +3086,42 @@ const REMO_STORE = {
       return guestUser;
     }
 
-    let u = email ? this.state.users.find((x) => x.email && x.email.toLowerCase() === email.toLowerCase()) : null;
-    if (!u && fbUid) {
-      u = this.state.users.find((x) => x.uid === ('u_fb_' + fbUid) || x.fbUid === fbUid);
+    const cleanEmail = email ? String(email).trim() : '';
+    const adminEmail = (this.state && this.state.settings && this.state.settings.adminEmail) || 'andart1174@gmail.com';
+    const curFb = this.fbAuth && this.fbAuth.currentUser;
+    const matchesVerifiedFbAdmin = Boolean(
+      curFb && curFb.emailVerified === true &&
+      this._getFbEmail(curFb).toLowerCase().trim() === adminEmail.toLowerCase().trim() &&
+      (!fbUid || curFb.uid === fbUid)
+    );
+    const isAdminTarget = Boolean(
+      cleanEmail && cleanEmail.toLowerCase() === adminEmail.toLowerCase().trim() &&
+      (isAdmin || matchesVerifiedFbAdmin)
+    );
+
+    if (!Array.isArray(this.state.users)) this.state.users = [];
+    let u = fbUid ? this.state.users.find((x) => x && (x.uid === ('u_fb_' + fbUid) || x.fbUid === fbUid)) : null;
+    if (!u && cleanEmail) {
+      u = this.state.users.find((x) => x && x.email && x.email.toLowerCase().trim() === cleanEmail.toLowerCase() && (!fbUid || !x.fbUid || x.fbUid === fbUid));
     }
 
     if (!u) {
-      // Only create if we actually have an email or fbUid (real sign-up)
-      if (!email && !fbUid) {
+      if (!cleanEmail && !fbUid) {
         return null;
       }
       const realUsersCount = (this.state.users || []).filter((x) => !this.isFakeOrGuestUser(x)).length;
       const pNum = String(realUsersCount + 1).padStart(4, '0');
       const bonus = this.state.settings?.rewards?.signupBonus || 150;
-      const finalEmail = email || (fbUid ? `user_${fbUid.slice(0, 8)}@gmail.com` : '');
+      const finalEmail = cleanEmail || (fbUid ? `user_${fbUid.slice(0, 8)}@gmail.com` : '');
 
       u = {
         uid: fbUid ? ('u_fb_' + fbUid) : ('u_' + Date.now().toString(36)),
         fbUid: fbUid || '',
-        name: name || 'Citizen #' + pNum,
+        name: (name && name !== 'REMO Pioneer') ? name : ('Citizen #' + pNum),
         email: finalEmail,
-        role: isAdmin || (email && email.toLowerCase() === this.state.settings?.adminEmail?.toLowerCase()) ? 'admin' : 'citizen',
+        role: isAdminTarget ? 'admin' : 'citizen',
         verified: true,
-        emailVerified: Boolean(fbUid || (email && !email.includes('citizen') && !email.includes('pioneer'))),
+        emailVerified: Boolean(fbUid || (finalEmail && !finalEmail.includes('citizen') && !finalEmail.includes('pioneer'))),
         termsAcceptedAt: Date.now(),
         termsVersion: '1.0',
         homeCity: homeCity || 'montreal',
@@ -3047,19 +3145,31 @@ const REMO_STORE = {
       this.state.users.push(u);
       this.mintCardForUser(u.uid, homeCity || 'montreal', 'Rare', false);
     } else {
-      if (name && (!u.name || u.name.startsWith('Citizen #') || u.name === 'REMO Pioneer')) {
+      if (name && name !== 'REMO Pioneer' && (!u.name || u.name === 'Citizen' || u.name.startsWith('Citizen #') || u.name === 'REMO Pioneer')) {
         u.name = name;
       }
+      if (cleanEmail && (!u.email || /^citizen\d+@remo\.world$/i.test(u.email))) {
+        u.email = cleanEmail;
+      }
       if (fbUid && !u.fbUid) u.fbUid = fbUid;
+      u.emailVerified = true;
+      u.verified = true;
+      if (!u.role || u.role === 'guest') {
+        u.role = isAdminTarget ? 'admin' : 'citizen';
+      }
     }
 
     // Evict any leftover temporary guest sessions once authenticated as a real citizen
     this.state.users = (this.state.users || []).filter((x) => x && (x.uid === u.uid || !this.isFakeOrGuestUser(x)));
     localStorage.setItem(this.USER_KEY, u.uid);
-    const adminEmail = (this.state && this.state.settings && this.state.settings.adminEmail) || 'andart1174@gmail.com';
-    if (u && u.email && u.email.toLowerCase().trim() === adminEmail.toLowerCase().trim()) {
+    if (u && u.email && u.email.toLowerCase().trim() === adminEmail.toLowerCase().trim() && matchesVerifiedFbAdmin) {
       u.role = 'admin';
       this.setAdminUnlocked(true);
+    } else {
+      if (u && u.role === 'admin' && (!u.email || u.email.toLowerCase().trim() !== adminEmail.toLowerCase().trim())) {
+        u.role = 'citizen';
+      }
+      this.setAdminUnlocked(false);
     }
     // Auto-apply pending URL Referral Code (?ref=...) if present!
     const pendingRef = localStorage.getItem('remo_pending_ref');
@@ -3671,17 +3781,27 @@ const REMO_STORE = {
     localStorage.removeItem(this.USER_KEY);
     localStorage.removeItem(this.ADMIN_MODE_KEY);
     sessionStorage.removeItem('remo_admin_unlocked');
+    try {
+      sessionStorage.removeItem('remo_pending_signup');
+      localStorage.removeItem('remo_pending_signup');
+      sessionStorage.removeItem('remo_pending_google');
+      localStorage.removeItem('remo_pending_google');
+    } catch (e) {}
     this.setAdminUnlocked(false);
     this.state.directMessages = [];
     this.state.notifications = [];
     this.state.supportTickets = [];
+    let p = Promise.resolve();
     if (this.fbAuth) {
-      try { this.fbAuth.signOut().catch(() => {}); } catch (e) {}
+      try {
+        p = Promise.resolve(this.fbAuth.signOut()).catch(() => {});
+      } catch (e) {}
     }
     if (typeof this.refreshPrivateCloudListeners === 'function') {
       this.refreshPrivateCloudListeners();
     }
     window.dispatchEvent(new CustomEvent('remo:stateupdate', { detail: { reason: 'auth' } }));
+    return p;
   },
 
   addCoins(uid, delta, addCityPoints = 0) {
@@ -4156,30 +4276,75 @@ const REMO_STORE = {
       }
       if (firebase.auth) {
         this.fbAuth = firebase.auth();
+        if (typeof this.fbAuth.getRedirectResult === 'function') {
+          this.fbAuth.getRedirectResult().then((res) => {
+            if (res && res.user) {
+              const fbU = res.user;
+              const fbEmail = this._getFbEmail(fbU);
+              const adminEmail = (this.state?.settings?.adminEmail || 'andart1174@gmail.com').toLowerCase().trim();
+              const isAdminEmail = Boolean(fbU.emailVerified === true && fbEmail.toLowerCase() === adminEmail);
+              let chosenCity = 'montreal';
+              try {
+                const rawG = sessionStorage.getItem('remo_pending_google') || localStorage.getItem('remo_pending_google');
+                if (rawG) {
+                  const pg = JSON.parse(rawG);
+                  if (pg && pg.cityId) chosenCity = pg.cityId;
+                }
+                sessionStorage.removeItem('remo_pending_google');
+                localStorage.removeItem('remo_pending_google');
+              } catch (e) {}
+              const u = this.ensureGuestOrCitizen(fbU.displayName || (isAdminEmail ? 'REMO Founder' : 'Citizen'), fbEmail, chosenCity, isAdminEmail, fbU.uid);
+              if (u && isAdminEmail) this.setAdminUnlocked(true);
+              if (typeof document !== 'undefined') document.getElementById('authModal')?.classList.remove('open');
+              if (typeof syncHeaderAndSidebars === 'function') syncHeaderAndSidebars();
+              if (typeof renderSocialFeed === 'function') renderSocialFeed();
+              if (typeof renderPassportView === 'function') renderPassportView();
+              if (typeof remoToast === 'function') {
+                const lang = (typeof REMO_I18N !== 'undefined' && REMO_I18N.getLang) ? REMO_I18N.getLang() : 'en';
+                remoToast(isAdminEmail ? (lang === 'fr' ? '👑 Session Fondateur Admin activée !' : '👑 Founder Admin session active!') : (lang === 'fr' ? `🎉 Bienvenue ${u ? u.name : ''} !` : `🎉 Welcome ${u ? u.name : ''}!`), 'fanfare');
+              }
+            }
+          }).catch((err) => {
+            if (err && typeof remoToast === 'function' && err.code !== 'auth/no-current-user') {
+              remoToast('Google Sign-In: ' + (err.message || err.code));
+            }
+          });
+        }
         this.fbAuth.onAuthStateChanged((fbU) => {
           if (fbU) {
-            const isGoogle = Array.isArray(fbU.providerData) && fbU.providerData.some((p) => p && p.providerId === 'google.com');
-            if (!fbU.emailVerified && !isGoogle) {
+            const isVerified = this._isFbUserVerified(fbU);
+            if (!isVerified) {
+              this.setAdminUnlocked(false);
               return;
             }
-            const adminEmail = (this.state?.settings?.adminEmail || 'andart1174@gmail.com').toLowerCase();
-            const isAdminEmail = (fbU.email || '').toLowerCase() === adminEmail && fbU.emailVerified === true;
+            const fbEmail = this._getFbEmail(fbU);
+            const adminEmail = (this.state?.settings?.adminEmail || 'andart1174@gmail.com').toLowerCase().trim();
+            const isAdminEmail = Boolean(fbU.emailVerified === true && fbEmail.toLowerCase() === adminEmail);
             let pendingName = fbU.displayName || '';
             let pendingCity = 'montreal';
             try {
               const rawPending = sessionStorage.getItem('remo_pending_signup') || localStorage.getItem('remo_pending_signup');
               if (rawPending) {
                 const parsed = JSON.parse(rawPending);
-                if (parsed && parsed.email && parsed.email.toLowerCase() === (fbU.email || '').toLowerCase()) {
-                  if (parsed.name) pendingName = parsed.name;
+                if (parsed && parsed.email && parsed.email.toLowerCase().trim() === fbEmail.toLowerCase()) {
+                  if (parsed.name && parsed.name !== 'REMO Pioneer') pendingName = parsed.name;
                   if (parsed.cityId) pendingCity = parsed.cityId;
                 }
               }
+              const rawG = sessionStorage.getItem('remo_pending_google') || localStorage.getItem('remo_pending_google');
+              if (rawG) {
+                const pg = JSON.parse(rawG);
+                if (pg && pg.cityId) pendingCity = pg.cityId;
+              }
             } catch (e) {}
-            const u = this.ensureGuestOrCitizen(pendingName || (isAdminEmail ? 'REMO Founder' : 'Citizen'), fbU.email, pendingCity, isAdminEmail, fbU.uid);
+            if (!isAdminEmail) {
+              this.setAdminUnlocked(false);
+            }
+            const u = this.ensureGuestOrCitizen(pendingName || (isAdminEmail ? 'REMO Founder' : 'Citizen'), fbEmail, pendingCity, isAdminEmail, fbU.uid);
             if (u) {
               u.emailVerified = true;
               u.fbUid = fbU.uid;
+              if (fbEmail && !u.email) u.email = fbEmail;
             }
             if (u && u.banned && !isAdminEmail) {
               this.setAdminUnlocked(false);
@@ -4191,15 +4356,28 @@ const REMO_STORE = {
             }
             if (isAdminEmail) {
               this.setAdminUnlocked(true);
+            } else {
+              this.setAdminUnlocked(false);
             }
             this.refreshPrivateCloudListeners();
             if (typeof syncHeaderAndSidebars === 'function') syncHeaderAndSidebars();
             if (typeof updateAuthHeaderUI === 'function') updateAuthHeaderUI();
+            if (typeof renderPassportView === 'function') renderPassportView();
             if (typeof refreshAllAdminPanels === 'function') refreshAllAdminPanels();
           } else {
             this.setAdminUnlocked(false);
+            // If local USER_KEY still points to a signed-in user or founder, clear it cleanly on sign-out
+            const curUid = localStorage.getItem(this.USER_KEY) || '';
+            const curLocal = (this.state?.users || []).find((x) => x && x.uid === curUid);
+            if (curUid === 'u_admin_founder' || curUid.startsWith('u_fb_') || (curLocal && !this.isFakeOrGuestUser(curLocal))) {
+              localStorage.removeItem(this.USER_KEY);
+            }
             this.refreshPrivateCloudListeners();
+            if (typeof syncHeaderAndSidebars === 'function') syncHeaderAndSidebars();
             if (typeof updateAuthHeaderUI === 'function') updateAuthHeaderUI();
+            if (typeof renderPassportView === 'function') renderPassportView();
+            if (typeof renderSocialFeed === 'function') renderSocialFeed();
+            if (typeof refreshAllAdminPanels === 'function') refreshAllAdminPanels();
           }
         });
       }
@@ -4410,7 +4588,9 @@ const REMO_STORE = {
               const u = this.getCurrentUser();
               if (u && u.uid === myUid && !u.email) {
                 u.email = pd.email;
-                try { localStorage.setItem(this.USER_KEY, JSON.stringify(u)); } catch (e) {}
+                // Keep USER_KEY strictly as UID string (never overwrite with JSON)
+                this.save(false, 'private_email_sync');
+                if (typeof syncHeaderAndSidebars === 'function') syncHeaderAndSidebars();
               }
             }
           }, () => {})
@@ -4430,6 +4610,11 @@ const REMO_STORE = {
         const curU0 = this.getCurrentUser();
         const myUid0 = curU0 ? curU0.uid : '';
         const isAdm0 = this.isCurrentUserAdmin();
+        const curFb = this.fbAuth && this.fbAuth.currentUser;
+        const curFbVerified = this._isFbUserVerified(curFb);
+        const curFbEmail = this._getFbEmail(curFb);
+        const adminEmail = (this.state?.settings?.adminEmail || 'andart1174@gmail.com').toLowerCase().trim();
+
         snap.forEach((doc) => {
           const uData = doc.data();
           if (!uData) return;
@@ -4456,9 +4641,24 @@ const REMO_STORE = {
           if (!uData.bio && existingLocal && existingLocal.bio) {
             uData.bio = existingLocal.bio;
           }
-          // Preserve owner's private email locally if already loaded
-          if (existingLocal && existingLocal.email && !uData.email && (uData.uid === myUid0 || isAdm0)) {
-            uData.email = existingLocal.email;
+          // Preserve owner's private email & auth identity fields across public profile sync
+          if (existingLocal) {
+            if (existingLocal.email && !uData.email && (uData.uid === myUid0 || isAdm0)) {
+              uData.email = existingLocal.email;
+            }
+            if (existingLocal.fbUid && !uData.fbUid) uData.fbUid = existingLocal.fbUid;
+            if (existingLocal.role && !uData.role) uData.role = existingLocal.role;
+            if (existingLocal.emailVerified && uData.emailVerified === undefined) uData.emailVerified = existingLocal.emailVerified;
+            if (existingLocal.verified && uData.verified === undefined) uData.verified = existingLocal.verified;
+          }
+          if (curFb && curFbVerified && (uData.uid === ('u_fb_' + curFb.uid) || uData.fbUid === curFb.uid || (curFbEmail && uData.email && uData.email.toLowerCase().trim() === curFbEmail.toLowerCase()) || (uData.uid === 'u_admin_founder' && curFb.emailVerified === true && curFbEmail.toLowerCase() === adminEmail))) {
+            if (curFbEmail && !uData.email) uData.email = curFbEmail;
+            if (!uData.fbUid) uData.fbUid = curFb.uid;
+            uData.emailVerified = true;
+            uData.verified = true;
+            if (!uData.role || uData.role === 'guest') {
+              uData.role = (curFb.emailVerified === true && curFbEmail.toLowerCase() === adminEmail) ? 'admin' : 'citizen';
+            }
           }
 
           cloudUsers.push(uData);
@@ -4476,10 +4676,13 @@ const REMO_STORE = {
             const matchInCloud = activeUsers.find((x) => x && x.uid === curU.uid);
             if (matchInCloud) {
               if (!matchInCloud.avatarUrl && curU.avatarUrl) matchInCloud.avatarUrl = curU.avatarUrl;
-              // Sync moderation/coin flags back into current local session cleanly
+              if (curU.email && !matchInCloud.email) matchInCloud.email = curU.email;
+              if (curU.fbUid && !matchInCloud.fbUid) matchInCloud.fbUid = curU.fbUid;
+              if (curU.role && (!matchInCloud.role || matchInCloud.role === 'guest')) matchInCloud.role = curU.role;
+              if (curU.emailVerified) matchInCloud.emailVerified = true;
+              // Sync moderation flags back cleanly (keep USER_KEY strictly as UID string!)
               if (matchInCloud.banned !== undefined && curU.uid === matchInCloud.uid) {
                 curU.banned = Boolean(matchInCloud.banned);
-                try { localStorage.setItem(this.USER_KEY, JSON.stringify(curU)); } catch (e) {}
               }
             }
           }

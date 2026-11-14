@@ -2322,7 +2322,21 @@ function renderPassportView() {
   const box = document.getElementById('passportContentBox');
   if (!box) return;
   const lang = REMO_I18N.getLang();
-  const u = REMO_STORE.getCurrentUser() || REMO_STORE.ensureGuestOrCitizen('REMO Pioneer', '', 'montreal');
+  const u = REMO_STORE.getCurrentUser() || {
+    uid: 'u_guest_preview',
+    fbUid: '',
+    name: lang === 'fr' ? 'Visiteur REMO' : 'Guest Explorer',
+    email: '',
+    role: 'guest',
+    verified: false,
+    emailVerified: false,
+    homeCity: 'montreal',
+    passportNum: '0000',
+    referralCode: 'REMO-0000',
+    coins: 100,
+    visas: [],
+    bio: lang === 'fr' ? 'Connectez-vous pour sauvegarder votre passeport & vos cartes 4D.' : 'Sign in to save your Passport & 4D City Cards.'
+  };
   const userAvatar = u.avatarUrl || (typeof REMO_STORE.getUserAvatar === 'function' ? REMO_STORE.getUserAvatar(u.uid) : '') || localStorage.getItem('remo_avatar_' + u.uid) || '';
   const home = getCityById(u.homeCity || 'montreal');
   const allCities = getRemoCities();
@@ -2379,6 +2393,8 @@ function renderPassportView() {
     return sum + (p * count);
   }, 0);
 
+  const isGuestUser = Boolean(u.role === 'guest' || (typeof REMO_STORE.isFakeOrGuestUser === 'function' && REMO_STORE.isFakeOrGuestUser(u)));
+
   // 1. Profile Hero Card
   let html = `
     <div class="profile-hero-card">
@@ -2393,9 +2409,10 @@ function renderPassportView() {
                 ${escapeHtmlStr(u.name)}
               </h2>
               ${u.verified ? '<span style="color:#38bdf8;font-size:1.1rem;" title="Vérifié">✓</span>' : ''}
-              ${u.role === 'admin' ? '<span class="adm-badge">👑 ADMIN</span>' : ''}
-              ${titleBadge ? `<span class="royal-title-pill">${escapeHtmlStr(titleBadge)}</span>` : ''}
-              <span class="${userTier.cssClass || 'genesis-tier-badge'}">${escapeHtmlStr(tierBadgeText)}</span>
+              ${isGuestUser ? `<span style="background:rgba(148,163,184,0.18);border:1px solid rgba(148,163,184,0.45);color:#cbd5e1;padding:2px 8px;border-radius:999px;font-size:0.68rem;font-weight:800;">👤 ${lang === 'fr' ? 'INVITÉ (NON CONNECTÉ)' : 'GUEST (NOT SIGNED IN)'}</span>` : ''}
+              ${(!isGuestUser && u.role === 'admin') ? '<span class="adm-badge">👑 ADMIN</span>' : ''}
+              ${(!isGuestUser && titleBadge) ? `<span class="royal-title-pill">${escapeHtmlStr(titleBadge)}</span>` : ''}
+              ${!isGuestUser ? `<span class="${userTier.cssClass || 'genesis-tier-badge'}">${escapeHtmlStr(tierBadgeText)}</span>` : ''}
             </div>
             <div style="font-size:0.84rem;color:#94a3b8;margin-top:3px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
               <span>${home.flag} <b>${escapeHtmlStr(getCityName(home, lang))}</b></span>
@@ -2409,15 +2426,21 @@ function renderPassportView() {
           </div>
         </div>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-          <button class="btn-cyber btn-gold" style="padding:8px 14px;font-size:0.82rem;font-weight:900;" onclick="openCityAmbassadorModal()">
-            🏅 ${lang === 'fr' ? 'Diplôme d’Ambassadeur (+25 🪙)' : 'Ambassador Diploma (+25 🪙)'}
-          </button>
-          <button class="btn-cyber" style="padding:8px 14px;font-size:0.82rem;" onclick="openEditProfileModal()">
-            ✏️ ${lang === 'fr' ? 'Modifier Profil' : 'Edit Profile'}
-          </button>
-          <button class="btn-ghost" style="border-color:#f43f5e;color:#fda4af;padding:8px 12px;font-size:0.82rem;" onclick="userSignOutAction()">
-            🚪 ${lang === 'fr' ? 'Déconnexion' : 'Sign Out'}
-          </button>
+          ${isGuestUser ? `
+            <button class="btn-cyber btn-gold" style="padding:9px 16px;font-size:0.85rem;font-weight:900;" onclick="openAuthModal(false)">
+              ✨ ${lang === 'fr' ? 'Se Connecter / Créer un Compte' : 'Sign In / Create Account'}
+            </button>
+          ` : `
+            <button class="btn-cyber btn-gold" style="padding:8px 14px;font-size:0.82rem;font-weight:900;" onclick="openCityAmbassadorModal()">
+              🏅 ${lang === 'fr' ? 'Diplôme d’Ambassadeur (+25 🪙)' : 'Ambassador Diploma (+25 🪙)'}
+            </button>
+            <button class="btn-cyber" style="padding:8px 14px;font-size:0.82rem;" onclick="openEditProfileModal()">
+              ✏️ ${lang === 'fr' ? 'Modifier Profil' : 'Edit Profile'}
+            </button>
+            <button class="btn-ghost" style="border-color:#f43f5e;color:#fda4af;padding:8px 12px;font-size:0.82rem;" onclick="userSignOutAction()">
+              🚪 ${lang === 'fr' ? 'Déconnexion' : 'Sign Out'}
+            </button>
+          `}
         </div>
       </div>
 

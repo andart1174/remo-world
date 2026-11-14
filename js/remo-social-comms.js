@@ -144,10 +144,11 @@ function syncHeaderAndSidebars() {
   const hhEl = document.getElementById('hdrHappyHourBadge');
   if (hhEl) hhEl.style.display = st.settings.happyHour2x ? 'inline-flex' : 'none';
 
-  // Admin God-Mode Header Pill & Navigation Links (Strictly visible ONLY when verified admin and PIN unlocked)
+  // Admin God-Mode Header Pill & Navigation Links (Strictly visible ONLY when verified admin AND non-guest session)
   const isAdmUser = REMO_STORE.isCurrentUserAdmin();
   const isAdmUnlocked = REMO_STORE.isAdminUnlocked();
-  const showAdminControls = Boolean(isAdmUser && isAdmUnlocked);
+  const isGuestSession = Boolean(!u || (typeof REMO_STORE.isFakeOrGuestUser === 'function' && REMO_STORE.isFakeOrGuestUser(u)) || u.role === 'guest');
+  const showAdminControls = Boolean(isAdmUser && isAdmUnlocked && !isGuestSession);
 
   const admBtn = document.getElementById('hdrAdminGodBtn');
   if (admBtn) {
@@ -231,7 +232,10 @@ function syncHeaderAndSidebars() {
 
   const authBtn = document.getElementById('hdrAuthBtn');
   if (authBtn) {
-    if (u && u.email && u.role !== 'guest' && u.name) {
+    const curFb = REMO_STORE.fbAuth && REMO_STORE.fbAuth.currentUser;
+    const isFbVerified = Boolean(curFb && REMO_STORE._isFbUserVerified && REMO_STORE._isFbUserVerified(curFb));
+    const hasIdentity = Boolean(u && !(typeof REMO_STORE.isFakeOrGuestUser === 'function' && REMO_STORE.isFakeOrGuestUser(u)) && u.role !== 'guest' && u.name && (u.email || u.fbUid || isFbVerified));
+    if (hasIdentity) {
       const hc = getCityById(u.homeCity) || { flag: '🌐' };
       authBtn.innerHTML = `${hc.flag} ${escapeHtmlStr(u.name)}`;
       authBtn.onclick = () => switchRemoView('passport');
@@ -8036,7 +8040,10 @@ function setAuthModalMode(isReg = true) {
   if (nameInp) nameInp.required = isRegisterMode;
   if (termsWrap) termsWrap.style.display = isRegisterMode ? 'flex' : 'none';
   if (termsChk) termsChk.required = isRegisterMode;
-  if (passInp) passInp.setAttribute('autocomplete', isRegisterMode ? 'new-password' : 'current-password');
+  if (passInp) {
+    passInp.setAttribute('autocomplete', isRegisterMode ? 'new-password' : 'current-password');
+    passInp.minLength = isRegisterMode ? 8 : 6;
+  }
   if (submitBtn) {
     submitBtn.setAttribute('data-i18n', isRegisterMode ? 'auth_submit_register' : 'auth_submit_login');
     submitBtn.textContent = t(isRegisterMode ? 'auth_submit_register' : 'auth_submit_login');
@@ -8054,6 +8061,14 @@ function openAuthModal(defaultRegister = true) {
   }
   const iabWarn = document.getElementById('authIabWarningBox');
   if (iabWarn) iabWarn.style.display = REMO_STORE.isInAppBrowser() ? 'block' : 'none';
+  const curFb = REMO_STORE.fbAuth && REMO_STORE.fbAuth.currentUser;
+  const isWaitingVerify = Boolean(curFb && !REMO_STORE._isFbUserVerified(curFb));
+  if (!isWaitingVerify) {
+    const regForm = document.getElementById('authRegisterForm');
+    const otpBox = document.getElementById('authOtpBox');
+    if (regForm) regForm.style.display = 'block';
+    if (otpBox) otpBox.style.display = 'none';
+  }
   setAuthModalMode(defaultRegister !== false);
   document.getElementById('authModal')?.classList.add('open');
 }
@@ -8110,7 +8125,8 @@ window.isDisposableEmail = isDisposableEmail;
 async function submitUniversalAuth(ev) {
   if (ev) ev.preventDefault();
   const lang = REMO_I18N.getLang();
-  const name = document.getElementById('authNameInp')?.value.trim() || 'REMO Pioneer';
+  const rawName = (document.getElementById('authNameInp')?.value || '').trim();
+  const name = isRegisterMode ? (rawName || 'Citizen') : rawName;
   const email = (document.getElementById('authEmailInp')?.value || '').trim();
   const password = document.getElementById('authPassInp')?.value || '';
   const cityId = document.getElementById('authHomeCitySelect')?.value || 'montreal';
@@ -8132,7 +8148,8 @@ async function submitUniversalAuth(ev) {
     return;
   }
 
-  if (!password || password.length < 8) {
+  const minLen = isRegisterMode ? 8 : 6;
+  if (!password || password.length < minLen) {
     remoToast(t('auth_err_password_short'));
     document.getElementById('authPassInp')?.focus();
     return;
@@ -8147,8 +8164,8 @@ async function submitUniversalAuth(ev) {
     return;
   }
 
-  const adminEmail = (REMO_STORE.ADMIN_EMAIL || 'andart1174@gmail.com').toLowerCase();
-  const isTargetingAdmin = email.toLowerCase() === adminEmail;
+  const adminEmail = (REMO_STORE.state?.settings?.adminEmail || REMO_STORE.ADMIN_EMAIL || 'andart1174@gmail.com').toLowerCase().trim();
+  const isTargetingAdmin = email.toLowerCase().trim() === adminEmail;
 
   const pendingData = {
     name,
@@ -8164,6 +8181,24 @@ async function submitUniversalAuth(ev) {
 
   let fbUser = null;
 
+  const formatAuthError = (err) => {
+    const code = err && err.code ? err.code : '';
+    if (code === 'auth/user-not-found') {
+      return lang === 'fr'
+        ? '❌ Aucun compte trouvé pour cet email. Cliquez sur « Créer mon Compte Citoyen » ou « Continuer avec Google ».'
+        : '❌ No account found for this email. Click "Create Citizen Account" or "Continue with Google".';
+    }
+    if (code === 'auth/invalid-credential' || code === 'auth/wrong-password' || code === 'auth/invalid-login-credentials') {
+      return lang === 'fr'
+        ? '❌ Mot de passe incorrect — ou ce compte Gmail utilise « Continuer avec Google ». Utilisez Google ou « Mot de passe oublié » pour définir un mot de passe.'
+        : '❌ Incorrect password — or this Gmail uses "Continue with Google". Use Google above or "Forgot or Set Password?" below.';
+    }
+    if (code === 'auth/too-many-requests') {
+      return lang === 'fr' ? '⏳ Trop de tentatives. Réessayez dans quelques minutes ou utilisez Google.' : '⏳ Too many attempts. Wait a moment or use Google.';
+    }
+    return (err && err.message) || (lang === 'fr' ? 'Email ou mot de passe incorrect.' : 'Invalid email or password.');
+  };
+
   if (isTargetingAdmin || !isRegisterMode) {
     try {
       const signInCred = await REMO_STORE.fbAuth.signInWithEmailAndPassword(email, password);
@@ -8173,10 +8208,11 @@ async function submitUniversalAuth(ev) {
         remoToast(
           lang === 'fr'
             ? '🔐 Compte Admin : connectez-vous via Google ou utilisez « Mot de passe oublié » pour définir votre mot de passe Firebase.'
-            : '🔐 Admin Account: sign in with Google or use "Forgot / Set Password" to set your Firebase password.'
+            : '🔐 Admin Account: sign in with Google or use "Forgot / Set Password" to set your Firebase password.',
+          6000
         );
       } else {
-        remoToast(signInErr?.message || (lang === 'fr' ? 'Email ou mot de passe incorrect.' : 'Invalid email or password.'));
+        remoToast(formatAuthError(signInErr), 6500);
       }
       return;
     }
@@ -8193,7 +8229,12 @@ async function submitUniversalAuth(ev) {
           const signInCred = await REMO_STORE.fbAuth.signInWithEmailAndPassword(email, password);
           fbUser = signInCred && signInCred.user;
         } catch (signInErr) {
-          remoToast(lang === 'fr' ? '⚠️ Cet email existe déjà. Passez en mode « Connexion » ou utilisez Google.' : '⚠️ Email already registered. Switch to Sign In mode or use Google.');
+          remoToast(
+            lang === 'fr'
+              ? '⚠️ Cet email existe déjà (ou utilise « Continuer avec Google »). Utilisez « Connexion », « Continuer avec Google » ou « Mot de passe oublié ».'
+              : '⚠️ Email already registered (or uses "Continue with Google"). Use Sign In with its password, Google above, or "Forgot / Set Password?".',
+            7000
+          );
           return;
         }
       } else {
@@ -8269,7 +8310,10 @@ function startEmailVerificationWatcher() {
 
 function completeVerifiedEmailLogin(fbUser, pending) {
   const lang = REMO_I18N.getLang();
-  const existing = (REMO_STORE.state.users || []).find((x) => x && (x.uid === fbUser.uid || (x.email && x.email.toLowerCase() === (fbUser.email || '').toLowerCase())));
+  const fbEmail = REMO_STORE._getFbEmail ? REMO_STORE._getFbEmail(fbUser) : (fbUser.email || '');
+  const existing = (REMO_STORE.state.users || []).find((x) =>
+    x && (x.uid === ('u_fb_' + fbUser.uid) || x.uid === fbUser.uid || x.fbUid === fbUser.uid || (x.email && fbEmail && x.email.toLowerCase().trim() === fbEmail.toLowerCase().trim()))
+  );
   if (existing && existing.banned) {
     try { REMO_STORE.fbAuth && REMO_STORE.fbAuth.signOut(); } catch (e) {}
     REMO_STORE.signOut();
@@ -8277,12 +8321,16 @@ function completeVerifiedEmailLogin(fbUser, pending) {
     return;
   }
 
-  const adminEmail = (REMO_STORE.ADMIN_EMAIL || 'andart1174@gmail.com').toLowerCase();
-  const isAdminVerified = Boolean(fbUser.emailVerified && (fbUser.email || '').toLowerCase().trim() === adminEmail);
+  const adminEmail = (REMO_STORE.state?.settings?.adminEmail || REMO_STORE.ADMIN_EMAIL || 'andart1174@gmail.com').toLowerCase().trim();
+  const isAdminVerified = Boolean(fbUser.emailVerified && fbEmail.toLowerCase().trim() === adminEmail);
+
+  const chosenName = (pending && pending.name && pending.name !== 'REMO Pioneer')
+    ? pending.name
+    : (fbUser.displayName || (isAdminVerified ? 'REMO Founder' : 'Citizen'));
 
   const u = REMO_STORE.ensureGuestOrCitizen(
-    (pending && pending.name) || fbUser.displayName || (isAdminVerified ? 'REMO Founder' : 'Citizen'),
-    (pending && pending.email) || fbUser.email,
+    chosenName,
+    (pending && pending.email) || fbEmail,
     (pending && pending.cityId) || 'montreal',
     isAdminVerified,
     fbUser.uid
@@ -8291,10 +8339,14 @@ function completeVerifiedEmailLogin(fbUser, pending) {
     u.termsAcceptedAt = Date.now();
     u.termsVersion = '1.0';
     u.emailVerified = true;
+    u.fbUid = fbUser.uid;
+    if (fbEmail && !u.email) u.email = fbEmail;
     REMO_STORE.save(true, 'user_registered_verified');
   }
   if (isAdminVerified) {
     REMO_STORE.setAdminUnlocked(true);
+  } else {
+    REMO_STORE.setAdminUnlocked(false);
   }
   if (typeof REMO_STORE.refreshPrivateCloudListeners === 'function') {
     REMO_STORE.refreshPrivateCloudListeners();
@@ -8315,12 +8367,13 @@ function completeVerifiedEmailLogin(fbUser, pending) {
   spawnRemoCoinsFX(15);
   syncHeaderAndSidebars();
   renderSocialFeed();
+  if (typeof renderPassportView === 'function') renderPassportView();
   remoToast(
     isAdminVerified
       ? (lang === 'fr' ? '👑 Session Fondateur Admin activée !' : '👑 Founder Admin session active!')
       : (lang === 'fr'
-        ? `🎉 Email réel vérifié avec succès ! Bienvenue ${u ? u.name : ''} (Passeport #${u ? u.passportNum : '0001'}) !`
-        : `🎉 Real Email Verified! Welcome ${u ? u.name : ''} (Passport #${u ? u.passportNum : '0001'})!`),
+        ? `🎉 Compte connecté avec succès ! Bienvenue ${u ? u.name : ''} (Passeport #${u ? u.passportNum : '0001'}) !`
+        : `🎉 Signed in successfully! Welcome ${u ? u.name : ''} (Passport #${u ? u.passportNum : '0001'})!`),
     'fanfare'
   );
 }
@@ -8430,11 +8483,19 @@ function quickGoogleSignInSim() {
     provider.addScope('email');
     provider.addScope('profile');
     provider.setCustomParameters({ prompt: 'select_account' });
+    const cityId = document.getElementById('authHomeCitySelect')?.value || 'montreal';
+    try {
+      sessionStorage.setItem('remo_pending_google', JSON.stringify({ cityId, ts: Date.now() }));
+      localStorage.setItem('remo_pending_google', JSON.stringify({ cityId, ts: Date.now() }));
+    } catch (e) {}
 
     REMO_STORE.fbAuth.signInWithPopup(provider).then((res) => {
       const fbU = res && res.user;
       if (!fbU) return;
-      const existing = (REMO_STORE.state.users || []).find((x) => x && (x.uid === fbU.uid || (x.email && fbU.email && x.email.toLowerCase() === fbU.email.toLowerCase())));
+      const fbEmail = REMO_STORE._getFbEmail ? REMO_STORE._getFbEmail(fbU) : (fbU.email || '');
+      const existing = (REMO_STORE.state.users || []).find((x) =>
+        x && (x.uid === ('u_fb_' + fbU.uid) || x.uid === fbU.uid || x.fbUid === fbU.uid || (x.email && fbEmail && x.email.toLowerCase().trim() === fbEmail.toLowerCase().trim()))
+      );
       if (existing && existing.banned) {
         try { REMO_STORE.fbAuth.signOut(); } catch (e) {}
         REMO_STORE.signOut();
@@ -8442,26 +8503,43 @@ function quickGoogleSignInSim() {
         return;
       }
 
-      const cityId = document.getElementById('authHomeCitySelect')?.value || 'montreal';
-      const adminEmail = (REMO_STORE.ADMIN_EMAIL || 'andart1174@gmail.com').toLowerCase();
-      const isAdminEmail = Boolean(fbU.emailVerified && (fbU.email || '').toLowerCase().trim() === adminEmail);
+      const adminEmail = (REMO_STORE.state?.settings?.adminEmail || REMO_STORE.ADMIN_EMAIL || 'andart1174@gmail.com').toLowerCase().trim();
+      const isAdminEmail = Boolean(fbU.emailVerified && fbEmail.toLowerCase().trim() === adminEmail);
+
+      try {
+        sessionStorage.removeItem('remo_pending_signup');
+        localStorage.removeItem('remo_pending_signup');
+        sessionStorage.removeItem('remo_pending_google');
+        localStorage.removeItem('remo_pending_google');
+      } catch (e) {}
+
+      if (isAdminEmail) {
+        REMO_STORE.setAdminUnlocked(true);
+      } else {
+        REMO_STORE.setAdminUnlocked(false);
+      }
 
       const u = REMO_STORE.ensureGuestOrCitizen(
         fbU.displayName || (isAdminEmail ? 'REMO Founder' : 'Citizen'),
-        fbU.email,
+        fbEmail,
         cityId,
         isAdminEmail,
         fbU.uid
       );
-      if (isAdminEmail) {
-        REMO_STORE.setAdminUnlocked(true);
+      if (u) {
+        u.emailVerified = true;
+        u.fbUid = fbU.uid;
+        if (fbEmail && !u.email) u.email = fbEmail;
+        REMO_STORE.save(true, 'auth_google');
       }
       if (typeof REMO_STORE.refreshPrivateCloudListeners === 'function') {
         REMO_STORE.refreshPrivateCloudListeners();
       }
+      cancelAuthOtpStep(true);
       document.getElementById('authModal')?.classList.remove('open');
       syncHeaderAndSidebars();
       renderSocialFeed();
+      if (typeof renderPassportView === 'function') renderPassportView();
       if (document.getElementById('adminQuickModal')?.classList.contains('open') && typeof openAdminQuickModal === 'function') {
         openAdminQuickModal();
       }
@@ -8473,11 +8551,15 @@ function quickGoogleSignInSim() {
       );
     }).catch((err) => {
       console.warn('Firebase Google Sign-In error:', err);
-      if (err.code === 'auth/popup-blocked' || err.code === 'auth/popup-closed-by-user') {
+      if (err && (err.code === 'auth/popup-blocked' || err.code === 'auth/operation-not-supported-in-this-environment')) {
         REMO_STORE.fbAuth.signInWithRedirect(provider).catch((e) => remoToast(e.message));
         return;
       }
-      remoToast('Google Sign-In: ' + (err.message || err.code));
+      if (err && err.code === 'auth/popup-closed-by-user') {
+        remoToast(lang === 'fr' ? 'Fenêtre Google fermée avant la fin. Cliquez à nouveau sur Google pour vous connecter.' : 'Google popup closed before finishing. Click Google again to sign in.');
+        return;
+      }
+      remoToast('Google Sign-In: ' + ((err && (err.message || err.code)) || 'Error'));
     });
     return;
   }
@@ -8485,20 +8567,27 @@ function quickGoogleSignInSim() {
   remoToast(lang === 'fr' ? 'Initialisation de Firebase en cours... Veuillez réessayer dans quelques secondes.' : 'Firebase initializing... Please retry in a few seconds.');
 }
 
-function userSignOutAction() {
+async function userSignOutAction(reopenAuthModal = false) {
   const lang = REMO_I18N.getLang();
-  REMO_STORE.signOut();
+  cancelAuthOtpStep(true);
+  await REMO_STORE.signOut();
   localStorage.removeItem(REMO_STORE.USER_KEY);
   localStorage.removeItem(REMO_STORE.ADMIN_MODE_KEY);
   sessionStorage.removeItem('remo_admin_unlocked');
   if (typeof firebase !== 'undefined' && firebase.auth) {
-    try { firebase.auth().signOut(); } catch (e) {}
+    try { await firebase.auth().signOut(); } catch (e) {}
   }
   syncHeaderAndSidebars();
+  if (typeof renderPassportView === 'function') renderPassportView();
   renderSocialFeed();
-  switchRemoView('feed');
-  remoToast(lang === 'fr' ? '🚪 Déconnecté avec succès. Vous pouvez maintenant vous reconnecter.' : '🚪 Signed out successfully. You can now sign in again.');
+  if (reopenAuthModal) {
+    openAuthModal(false);
+  } else {
+    switchRemoView('feed');
+    remoToast(lang === 'fr' ? '🚪 Déconnecté avec succès. Vous pouvez maintenant vous reconnecter.' : '🚪 Signed out successfully. You can now sign in again.');
+  }
 }
+window.updateAuthHeaderUI = syncHeaderAndSidebars;
 
 function toggleHeaderRadio() {
   if (typeof window.openFocusTvModal === 'function') {
