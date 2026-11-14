@@ -2554,13 +2554,13 @@ const REMO_STORE = {
         (!this.deletedPostIds || !this.deletedPostIds.has(p.id))
       );
     }
-    // Strip out legacy fake citizen00XX accounts and deleted users from local state
+    // Strip out legacy fake citizen00XX accounts, non-active guest sessions, and deleted users from local state
     if (Array.isArray(this.state.users)) {
+      const activeUid = localStorage.getItem(this.USER_KEY) || '';
       this.state.users = this.state.users.filter((u) =>
         u && u.uid &&
         !this.deletedUserIds.has(u.uid) &&
-        !(u.email && /^citizen\d+@remo\.world$/i.test(u.email) && u.role !== 'admin') &&
-        !(u.name && u.name.startsWith('REMO Pioneer #'))
+        (!this.isFakeOrGuestUser(u) || (u.uid === activeUid && u.role === 'guest' && String(u.uid).startsWith('u_guest_')))
       );
       // Restore any cached avatars or bios from dedicated local storage
       this.state.users.forEach((u) => {
@@ -2599,6 +2599,21 @@ const REMO_STORE = {
         window.dispatchEvent(new CustomEvent('remo:stateupdate', { detail: { reason: 'storage' } }));
       }
     });
+  },
+
+  isFakeOrGuestUser(u) {
+    if (!u || typeof u !== 'object') return false;
+    if (u.role === 'admin' || u.uid === 'u_admin_founder') return false;
+    const uid = String(u.uid || '');
+    const email = String(u.email || '').trim();
+    const name = String(u.name || '').trim();
+    const pNum = String(u.passportNum || '').trim();
+    const hasRealFbAuth = Boolean(u.fbUid) || uid.startsWith('u_fb_');
+    if (uid.startsWith('u_guest_') || u.role === 'guest') return true;
+    if (email && /^citizen\d+@remo\.world$/i.test(email)) return true;
+    if (name.startsWith('REMO Pioneer #')) return true;
+    if (!hasRealFbAuth && pNum === '0000') return true;
+    return false;
   },
 
   isCurrentUserAdmin() {
@@ -2710,9 +2725,9 @@ const REMO_STORE = {
       const explicit = this.state.users.find((u) => u.uid === mayorUid && !u.banned);
       if (explicit) return explicit;
     }
-    // Dynamic auto-mayor: richest citizen of that city!
+    // Dynamic auto-mayor: richest verified citizen of that city!
     const candidates = (this.state.users || [])
-      .filter((u) => u.homeCity === cityId && !u.banned)
+      .filter((u) => u && u.homeCity === cityId && !u.banned && !this.isFakeOrGuestUser(u))
       .sort((a, b) => (b.lifetimeCoins || b.coins || 0) - (a.lifetimeCoins || a.coins || 0));
     return candidates[0] || null;
   },
@@ -2781,11 +2796,11 @@ const REMO_STORE = {
             );
           }
           if (Array.isArray(diskState.users)) {
+            const activeUid = localStorage.getItem(this.USER_KEY) || '';
             diskState.users = diskState.users.filter((u) =>
               u && u.uid &&
               (!this.deletedUserIds || !this.deletedUserIds.has(u.uid)) &&
-              !(u.email && /^citizen\d+@remo\.world$/i.test(u.email) && u.role !== 'admin') &&
-              !(u.name && u.name.startsWith('REMO Pioneer #'))
+              (!this.isFakeOrGuestUser(u) || (u.uid === activeUid && u.role === 'guest' && String(u.uid).startsWith('u_guest_')))
             );
           }
           this.state = diskState;
@@ -2996,7 +3011,8 @@ const REMO_STORE = {
       if (!email && !fbUid) {
         return null;
       }
-      const pNum = String(this.state.users.length + 1).padStart(4, '0');
+      const realUsersCount = (this.state.users || []).filter((x) => !this.isFakeOrGuestUser(x)).length;
+      const pNum = String(realUsersCount + 1).padStart(4, '0');
       const bonus = this.state.settings?.rewards?.signupBonus || 150;
       const finalEmail = email || (fbUid ? `user_${fbUid.slice(0, 8)}@gmail.com` : '');
 
@@ -3037,6 +3053,8 @@ const REMO_STORE = {
       if (fbUid && !u.fbUid) u.fbUid = fbUid;
     }
 
+    // Evict any leftover temporary guest sessions once authenticated as a real citizen
+    this.state.users = (this.state.users || []).filter((x) => x && (x.uid === u.uid || !this.isFakeOrGuestUser(x)));
     localStorage.setItem(this.USER_KEY, u.uid);
     const adminEmail = (this.state && this.state.settings && this.state.settings.adminEmail) || 'andart1174@gmail.com';
     if (u && u.email && u.email.toLowerCase().trim() === adminEmail.toLowerCase().trim()) {
@@ -3058,7 +3076,7 @@ const REMO_STORE = {
   },
 
   syncUserToCloud(user) {
-    if (!this.fbDb || !user || !user.uid) return;
+    if (!this.fbDb || !user || !user.uid || this.isFakeOrGuestUser(user)) return;
     try {
       const isAdm = this.isCurrentUserAdmin();
       const fbUid = user.fbUid || (this.fbAuth && this.fbAuth.currentUser ? this.fbAuth.currentUser.uid : '');
@@ -3129,7 +3147,7 @@ const REMO_STORE = {
     };
     this.presenceCache.set(u.uid, presDoc);
 
-    if (this.fbDb && u.email && !/^citizen\d+@remo\.world$/i.test(u.email)) {
+    if (this.fbDb && u.email && !this.isFakeOrGuestUser(u)) {
       this.fbDb.collection('remo_presence').doc(u.uid).set(presDoc, { merge: true })
         .catch(() => {});
     }
@@ -3164,9 +3182,10 @@ const REMO_STORE = {
     }
     if (this.presenceCache) {
       this.presenceCache.forEach((p, uid) => {
-        if (!p || !uid || (this.deletedUserIds && this.deletedUserIds.has(uid))) return;
+        if (!p || !uid || (this.deletedUserIds && this.deletedUserIds.has(uid)) || this.isFakeOrGuestUser(Object.assign({ uid }, p))) return;
         if (now - Number(p.lastSeenAt || 0) <= ONLINE_WINDOW_MS) {
           const usr = (this.state.users || []).find((x) => x.uid === uid);
+          if (usr && this.isFakeOrGuestUser(usr)) return;
           merged.set(uid, {
             uid,
             name: (usr && usr.name) || p.name || 'Citizen',
@@ -3180,7 +3199,7 @@ const REMO_STORE = {
     }
     (this.state.users || []).forEach((usr) => {
       if (!usr || !usr.uid || merged.has(usr.uid)) return;
-      if (this.deletedUserIds && this.deletedUserIds.has(usr.uid)) return;
+      if ((this.deletedUserIds && this.deletedUserIds.has(usr.uid)) || this.isFakeOrGuestUser(usr)) return;
       if (now - Number(usr.lastSeenAt || 0) <= ONLINE_WINDOW_MS) {
         merged.set(usr.uid, {
           uid: usr.uid,
@@ -3339,20 +3358,27 @@ const REMO_STORE = {
     return { ok: true, isNewRecord, score };
   },
 
-  deleteUserFromCloud(uid) {
-    if (!uid) return;
+  async deleteUserFromCloud(uid) {
+    if (!uid) return { ok: false, error: 'missing_uid' };
     if (!this.deletedUserIds) this.deletedUserIds = new Set();
     this.deletedUserIds.add(uid);
+    if (this.presenceCache) this.presenceCache.delete(uid);
     try {
       localStorage.setItem('remo_deleted_users', JSON.stringify([...this.deletedUserIds]));
     } catch (e) {}
     this.state.users = (this.state.users || []).filter((u) => u.uid !== uid);
-    this.save(false);
+    this.save(true, 'user_deleted');
     if (this.fbDb) {
       try {
-        this.fbDb.collection('remo_users').doc(uid).delete().catch(() => {});
-      } catch (e) {}
+        await this.fbDb.collection('remo_users').doc(uid).delete();
+        this.fbDb.collection('remo_presence').doc(uid).delete().catch(() => {});
+        return { ok: true };
+      } catch (e) {
+        console.warn('deleteUserFromCloud error:', e);
+        return { ok: false, error: (e && e.message) || 'firestore_delete_failed' };
+      }
     }
+    return { ok: true };
   },
 
   deleteMyAccount(uid) {
@@ -3379,39 +3405,86 @@ const REMO_STORE = {
     this.syncToFirestore('user_self_deleted', true);
   },
 
+  async _deleteDocRefsInBatches(docRefs, chunkSize = 400) {
+    if (!this.fbDb || !Array.isArray(docRefs) || docRefs.length === 0) return 0;
+    let deleted = 0;
+    for (let i = 0; i < docRefs.length; i += chunkSize) {
+      const slice = docRefs.slice(i, i + chunkSize);
+      const batch = this.fbDb.batch();
+      slice.forEach((ref) => batch.delete(ref));
+      await batch.commit();
+      deleted += slice.length;
+    }
+    return deleted;
+  },
+
   async purgeFakeUsersFromCloud() {
     if (!this.deletedUserIds) this.deletedUserIds = new Set();
-    const fakeUids = [];
+    const fakeUids = new Set();
+    let localRemoved = 0;
     this.state.users = (this.state.users || []).filter((u) => {
-      const isFake = u && /^citizen\d+@remo\.world$/i.test(u.email || '') && u.role !== 'admin';
+      const isFake = u && this.isFakeOrGuestUser(u);
       if (isFake) {
-        fakeUids.push(u.uid);
-        this.deletedUserIds.add(u.uid);
+        if (u.uid) {
+          fakeUids.add(u.uid);
+          this.deletedUserIds.add(u.uid);
+          if (this.presenceCache) this.presenceCache.delete(u.uid);
+        }
+        localRemoved++;
       }
       return !isFake;
     });
     try {
       localStorage.setItem('remo_deleted_users', JSON.stringify([...this.deletedUserIds]));
     } catch (e) {}
-    this.save(false, 'purge_fake_users');
+    this.save(true, 'purge_fake_users');
+
+    let cloudDeleted = 0;
     if (this.fbDb) {
       try {
         const snap = await this.fbDb.collection('remo_users').get();
-        const batch = this.fbDb.batch();
+        const refsToDelete = [];
         snap.forEach((doc) => {
-          const d = doc.data();
-          if (d && ((d.email && /^citizen\d+@remo\.world$/i.test(d.email) && d.role !== 'admin') || fakeUids.includes(doc.id))) {
-            batch.delete(doc.ref);
+          const d = doc.data() || {};
+          const candidate = Object.assign({ uid: doc.id }, d);
+          if (this.isFakeOrGuestUser(candidate) || fakeUids.has(doc.id) || this.deletedUserIds.has(doc.id)) {
+            refsToDelete.push(doc.ref);
+            this.deletedUserIds.add(doc.id);
           }
         });
-        await batch.commit();
-        console.log('Fake pioneer citizens purged from Firestore successfully');
+        cloudDeleted = await this._deleteDocRefsInBatches(refsToDelete, 400);
+
+        // Also sweep any orphaned guest/fake presence markers cleanly
+        try {
+          const presSnap = await this.fbDb.collection('remo_presence').get();
+          const presRefs = [];
+          presSnap.forEach((doc) => {
+            const d = doc.data() || {};
+            const candidate = Object.assign({ uid: doc.id }, d);
+            if (this.isFakeOrGuestUser(candidate) || fakeUids.has(doc.id) || this.deletedUserIds.has(doc.id)) {
+              presRefs.push(doc.ref);
+            }
+          });
+          await this._deleteDocRefsInBatches(presRefs, 400);
+        } catch (presErr) {
+          console.warn('purgeFakeUsers presence cleanup notice:', presErr);
+        }
+
+        try {
+          localStorage.setItem('remo_deleted_users', JSON.stringify([...this.deletedUserIds]));
+        } catch (e) {}
+        this.save(true, 'purge_fake_users');
+        console.log(`Purged ${cloudDeleted} fake/guest pioneer accounts from Firestore`);
       } catch (e) {
         console.warn('purgeFakeUsersFromCloud error:', e);
+        window.dispatchEvent(new CustomEvent('remo:stateupdate', { detail: { reason: 'purge_users' } }));
+        if (typeof refreshAllAdminPanels === 'function') refreshAllAdminPanels();
+        return { ok: false, localRemoved, cloudDeleted, error: (e && e.message) || 'cloud_purge_failed' };
       }
     }
     window.dispatchEvent(new CustomEvent('remo:stateupdate', { detail: { reason: 'purge_users' } }));
     if (typeof refreshAllAdminPanels === 'function') refreshAllAdminPanels();
+    return { ok: true, localRemoved, cloudDeleted };
   },
 
   syncDmToCloud(dm) {
@@ -4346,8 +4419,8 @@ const REMO_STORE = {
     if (!this.fbDb || this._fbSyncStarted) return;
     this._fbSyncStarted = true;
     try {
-      // 1. Sync & Watch ACTIVE CITIZEN PROFILES (Capped at 120 for fast startup)
-      this.fbDb.collection('remo_users').limit(120).onSnapshot((snap) => {
+      // 1. Sync & Watch ACTIVE CITIZEN PROFILES (Capped at 150 for fast startup)
+      this.fbDb.collection('remo_users').limit(150).onSnapshot((snap) => {
         if (!snap) return;
         const cloudUsers = [];
         const cloudUserIds = new Set();
@@ -4356,9 +4429,10 @@ const REMO_STORE = {
         const isAdm0 = this.isCurrentUserAdmin();
         snap.forEach((doc) => {
           const uData = doc.data();
-          if (!uData || !uData.uid) return;
+          if (!uData) return;
+          if (!uData.uid) uData.uid = doc.id;
 
-          const isFakeCitizen = (uData.name && uData.name.startsWith('REMO Pioneer #')) || (uData.email && /^citizen\d+@remo\.world$/i.test(uData.email) && uData.role !== 'admin');
+          const isFakeCitizen = this.isFakeOrGuestUser(uData);
           const isDeleted = (this.deletedUserIds && this.deletedUserIds.has(uData.uid));
           if (isFakeCitizen || isDeleted) {
             if (isAdm0) {
@@ -4392,7 +4466,7 @@ const REMO_STORE = {
         const activeUsers = [...cloudUsers];
         if (curU) {
           if (!cloudUserIds.has(curU.uid) && !this.deletedUserIds?.has(curU.uid)) {
-            if (!/^citizen\d+@remo\.world$/i.test(curU.email || '')) {
+            if (!this.isFakeOrGuestUser(curU) || (curU.role === 'guest' && String(curU.uid).startsWith('u_guest_'))) {
               activeUsers.push(curU);
             }
           } else {

@@ -20,11 +20,23 @@ function admToast(msg) {
 }
 
 /* ── 1. ADMIN FIREBASE AUTH LOCK / UNLOCK (Synced with Verified Founder Account) ── */
+function getAdminRealUsers() {
+  return (REMO_STORE.state.users || []).filter((u) =>
+    u && u.uid && !(typeof REMO_STORE.isFakeOrGuestUser === 'function' && REMO_STORE.isFakeOrGuestUser(u))
+  );
+}
+
 function checkAdminSession() {
   const unlocked = REMO_STORE.isAdminUnlocked() && REMO_STORE.isCurrentUserAdmin();
   const lockEl = document.getElementById('admLockScreen');
   if (lockEl) lockEl.style.display = unlocked ? 'none' : 'flex';
-  if (unlocked) refreshAllAdminPanels();
+  if (unlocked) {
+    refreshAllAdminPanels();
+    if (!window._remoAutoPurgeDone && typeof REMO_STORE.purgeFakeUsersFromCloud === 'function') {
+      window._remoAutoPurgeDone = true;
+      REMO_STORE.purgeFakeUsersFromCloud().catch(() => {});
+    }
+  }
 }
 
 async function adminGoogleSignIn() {
@@ -123,13 +135,14 @@ function refreshAllAdminPanels() {
   const lang = REMO_I18N.getLang();
 
   // KPI counters
-  const totalCoins = (st.users || []).reduce((s, u) => s + (u.coins || 0), 0);
+  const realUsers = getAdminRealUsers();
+  const totalCoins = realUsers.reduce((s, u) => s + (u.coins || 0), 0);
   const topCityEntry = Object.entries(st.cityScores || {}).sort((a, b) => b[1] - a[1])[0] || ['montreal', 4820];
   const topCity = getCityById(topCityEntry[0]);
   const fbCfg = REMO_STORE.getFirebaseConfig();
 
   const setTxt = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
-  setTxt('kpiUsers', (st.users || []).length);
+  setTxt('kpiUsers', realUsers.length);
   setTxt('kpiPosts', (st.posts || []).length);
   setTxt('kpiCards', (st.droppedCardsPool || []).length);
   setTxt('kpiCoins', totalCoins.toLocaleString() + ' 🪙');
@@ -168,7 +181,7 @@ function triggerGlobalCoinRainAdmin() {
   const lang = REMO_I18N.getLang();
   const amt = Number(prompt(lang === 'fr' ? 'Combien de Pièces REMO envoyer à TOUS les citoyens ?' : 'How many REMO Coins to gift to ALL citizens?', '100'));
   if (!amt || amt <= 0) return;
-  REMO_STORE.state.users.forEach((u) => {
+  getAdminRealUsers().forEach((u) => {
     u.coins = (u.coins || 0) + amt;
     u.lifetimeCoins = (u.lifetimeCoins || 0) + amt;
   });
@@ -198,7 +211,7 @@ function renderAdminCardStudioSelectors() {
 
   if (recipientSel) {
     recipientSel.innerHTML = `<option value="">🌐 REMO Public Drop Pool</option>` +
-      REMO_STORE.state.users.map((u) => `<option value="${u.uid}">👤 ${u.name} (#${u.passportNum})</option>`).join('');
+      getAdminRealUsers().map((u) => `<option value="${u.uid}">👤 ${escapeHtmlStr(u.name)} (#${escapeHtmlStr(u.passportNum)})</option>`).join('');
   }
 }
 
@@ -682,9 +695,9 @@ function renderAdminEconomyPanel() {
   const uSel = document.getElementById('admBankTargetUser');
   if (uSel) {
     const prev = uSel.value;
-    uSel.innerHTML = (REMO_STORE.state.users || []).map((u) => {
+    uSel.innerHTML = getAdminRealUsers().map((u) => {
       const c = getCityById(u.homeCity);
-      return `<option value="${u.uid}" ${u.uid === prev ? 'selected' : ''}>${c.flag} @${u.name} (#${u.passportNum}) — 🪙 ${u.coins.toLocaleString()}</option>`;
+      return `<option value="${u.uid}" ${u.uid === prev ? 'selected' : ''}>${c.flag} @${escapeHtmlStr(u.name)} (#${escapeHtmlStr(u.passportNum)}) — 🪙 ${u.coins.toLocaleString()}</option>`;
     }).join('');
   }
 
@@ -698,9 +711,9 @@ function renderAdminEconomyPanel() {
   const mintUserSel = document.getElementById('admMintTargetUser');
   if (mintUserSel) {
     mintUserSel.innerHTML = `<option value="vault">🏛️ Keep in Founder Treasury Vault</option>` +
-      (REMO_STORE.state.users || []).map((u) => {
+      getAdminRealUsers().map((u) => {
         const c = getCityById(u.homeCity);
-        return `<option value="${u.uid}">${c ? c.flag : '👤'} @${u.name} (#${u.passportNum})</option>`;
+        return `<option value="${u.uid}">${c ? c.flag : '👤'} @${escapeHtmlStr(u.name)} (#${escapeHtmlStr(u.passportNum)})</option>`;
       }).join('');
   }
 
@@ -983,7 +996,7 @@ function adminCreateNewCitizenPrompt() {
   const name = prompt(lang === 'fr' ? 'Nom du nouveau Citoyen :' : 'New Citizen Name:');
   if (!name || !name.trim()) return;
   const coins = Math.max(0, Number(prompt(lang === 'fr' ? 'Solde initial de Pièces REMO :' : 'Starting REMO Coins:', '500') || 0));
-  const pNum = String((REMO_STORE.state.users || []).length + 1).padStart(4, '0');
+  const pNum = String(getAdminRealUsers().length + 1).padStart(4, '0');
   REMO_STORE.state.users.push({
     uid: 'u_' + Date.now().toString(36),
     name: name.trim(),
@@ -1094,7 +1107,7 @@ function renderAdminModerationPanel() {
   const lang = REMO_I18N.getLang();
   const uBody = document.getElementById('admUsersTable');
   if (uBody) {
-    uBody.innerHTML = (REMO_STORE.state.users || []).map((u) => {
+    uBody.innerHTML = getAdminRealUsers().map((u) => {
       const hc = getCityById(u.homeCity);
       const isMayor = REMO_STORE.state.cityMayors && REMO_STORE.state.cityMayors[u.homeCity] === u.uid;
       const safeUid = escapeHtmlStr(u.uid);
@@ -1270,26 +1283,42 @@ function adminToggleBanUser(uid) {
   renderAdminModerationPanel();
 }
 
-function adminDeleteCitizen(uid) {
+async function adminDeleteCitizen(uid) {
   const lang = REMO_I18N.getLang();
   if (!confirm(lang === 'fr' ? 'Supprimer définitivement ce compte ?' : 'Permanently delete this citizen account?')) return;
-  REMO_STORE.deleteUserFromCloud(uid);
+  const res = await REMO_STORE.deleteUserFromCloud(uid);
   refreshAllAdminPanels();
+  if (res && res.ok === false) {
+    admToast(lang === 'fr'
+      ? `⚠️ Supprimé localement, erreur Cloud (${res.error}). Reconnectez-vous en Admin.`
+      : `⚠️ Removed locally, Cloud error (${res.error}). Please re-authenticate as Admin.`);
+    return;
+  }
   admToast(lang === 'fr' ? '🗑️ Compte supprimé définitivement !' : '🗑️ Citizen account permanently deleted!');
 }
 
 async function adminPurgeFakeUsers() {
   const lang = REMO_I18N.getLang();
   const msg = lang === 'fr'
-    ? '⚠️ Nettoyer tous les faux comptes "citizenXXXX@remo.world" ?\nLes vrais comptes (admin, gmail, etc.) seront conservés.'
-    : '⚠️ Clean all fake citizen accounts? Real accounts will be kept.';
+    ? '⚠️ Nettoyer tous les comptes invités/faux ("REMO Pioneer #0000", "u_guest_*", "citizenXXXX@remo.world") ?\nLes vrais comptes (admin, Google, emails vérifiés) seront conservés.'
+    : '⚠️ Purge all guest/fake accounts ("REMO Pioneer #0000", "u_guest_*", "citizenXXXX@remo.world")? Real accounts will be kept.';
   if (!confirm(msg)) return;
-  admToast('⏳ Nettoyage des comptes en cours...');
+  admToast(lang === 'fr' ? '⏳ Nettoyage complet Cloud en cours...' : '⏳ Purging Cloud accounts...');
+  let res = null;
   if (typeof REMO_STORE.purgeFakeUsersFromCloud === 'function') {
-    await REMO_STORE.purgeFakeUsersFromCloud();
+    res = await REMO_STORE.purgeFakeUsersFromCloud();
   }
   refreshAllAdminPanels();
-  admToast('🗑️ Faux comptes nettoyés avec succès !');
+  if (res && res.ok === false) {
+    admToast(lang === 'fr'
+      ? `❌ Erreur Cloud (${res.error}) — reconnexion Admin Firebase requise.`
+      : `❌ Cloud purge failed (${res.error}) — Admin Firebase auth required.`);
+    return;
+  }
+  const totalCleaned = res ? Number(res.cloudDeleted || res.localRemoved || 0) : 0;
+  admToast(lang === 'fr'
+    ? `🗑️ ${totalCleaned} faux comptes / invités nettoyés avec succès !`
+    : `🗑️ ${totalCleaned} fake/guest accounts purged successfully!`);
 }
 
 function adminTogglePinPost(pid) {
