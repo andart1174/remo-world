@@ -1,3 +1,19 @@
 [build]
   publish = "."
   functions = "netlify/functions"
+
+[[edge_functions]]
+  path = "/"
+  function = "og-post"
+
+[[edge_functions]]
+  path = "/index.html"
+  function = "og-post"
+
+[[edge_functions]]
+  path = "/fr/"
+  function = "og-post"
+
+[[edge_functions]]
+  path = "/fr/index.html"
+  function = "og-post"
