@@ -1382,11 +1382,13 @@ document.addEventListener('DOMContentLoaded', () => {
   renderAdminCardStudioSelectors();
   onStudioCityChange();
   checkAdminSession();
+  if (typeof updateIndexNowStatusUI === 'function') updateIndexNowStatusUI();
 });
 
 window.addEventListener('remo:langchange', () => {
   refreshAllAdminPanels();
   renderAdminCardStudio();
+  if (typeof updateIndexNowStatusUI === 'function') updateIndexNowStatusUI();
 });
 
 window.addEventListener('remo:stateupdate', () => {

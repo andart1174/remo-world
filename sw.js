@@ -3,7 +3,7 @@
    Offline Shell Caching + Native Push & Incoming Call Notifications
    ════════════════════════════════════════════════════════════════════ */
 
-const CACHE_NAME = 'remo-pwa-v104';
+const CACHE_NAME = 'remo-pwa-v105';
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -61,9 +61,10 @@ self.addEventListener('fetch', (event) => {
   } catch (e) {
     return;
   }
-  // Never intercept cross-origin requests (live radio streams, Firebase, map tiles) or streaming audio/video/Range
+  // Never intercept cross-origin requests, serverless functions, or streaming audio/video/Range
   if (
     reqUrl.origin !== self.location.origin ||
+    reqUrl.pathname.startsWith('/.netlify/') ||
     event.request.destination === 'audio' ||
     event.request.destination === 'video' ||
     event.request.headers.has('range')

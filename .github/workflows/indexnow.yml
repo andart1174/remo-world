@@ -1,0 +1,33 @@
+name: Ping IndexNow on Deploy
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '*.html'
+      - 'fr/**/*.html'
+      - 'cities/**/*.html'
+      - 'sitemap.xml'
+      - 'remoindexnow2026key8f4a2b9c1d7e3a5f.txt'
+      - 'scripts/ping-indexnow.js'
+  workflow_dispatch:
+
+jobs:
+  indexnow:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Wait briefly for Netlify deploy propagation
+        if: github.event_name == 'push'
+        run: sleep 30
+
+      - name: Validate & submit all sitemap.xml URLs to IndexNow
+        run: node scripts/ping-indexnow.js

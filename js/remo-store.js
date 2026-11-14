@@ -6705,12 +6705,16 @@ window.REMO_WEATHER = REMO_WEATHER;
 window.REMO_STORE = REMO_STORE;
 window.generateCityPostVisualDataUrl = generateCityPostVisualDataUrl;
 
-/* ── ⚡ OFFICIAL INDEXNOW REAL-TIME SEARCH ENGINE PING (65 PAGES — BING / DUCKDUCKGO / COPILOT AI) ── */
-const REMO_INDEXNOW_KEY = '7a9e4c2b8f1d6035e2a4b9c8d7f61023';
+/* ── ⚡ OFFICIAL INDEXNOW REAL-TIME SEARCH ENGINE PING (NETLIFY SERVERLESS + LIVE SITEMAP.XML) ── */
+const REMO_INDEXNOW_KEY = 'remoindexnow2026key8f4a2b9c1d7e3a5f';
 const REMO_INDEXNOW_KEY_LOCATION = `https://remoworld.com/${REMO_INDEXNOW_KEY}.txt`;
+let _remoIndexNowInFlight = false;
 
 function getRemoIndexNowUrls() {
   const coreSlugs = [
+    'focus-tv.html',
+    'study-room.html',
+    'world-blitz.html',
     'world-ranking.html',
     'city-versus.html',
     'cities/index.html',
@@ -6738,21 +6742,49 @@ function getRemoIndexNowUrls() {
   return urls;
 }
 
+async function getRemoIndexNowSitemapUrls() {
+  const fallback = getRemoIndexNowUrls();
+  if (typeof window === 'undefined' || !window.location || !/^https?:$/i.test(window.location.protocol)) {
+    return fallback;
+  }
+  try {
+    const res = await fetch(`/sitemap.xml?v=${Date.now()}`, { cache: 'no-store' });
+    if (!res.ok) return fallback;
+    const xml = await res.text();
+    const seen = new Set();
+    const parsed = [];
+    const locRe = /<loc>\s*(https:\/\/remoworld\.com\/[^<\s]*)\s*<\/loc>/gi;
+    let m;
+    while ((m = locRe.exec(xml)) !== null) {
+      const u = m[1].trim();
+      if (u && !seen.has(u)) {
+        seen.add(u);
+        parsed.push(u);
+      }
+    }
+    return parsed.length > 0 ? parsed : fallback;
+  } catch (e) {
+    return fallback;
+  }
+}
+
 function updateIndexNowStatusUI(statusText = '') {
   const isFr = (typeof REMO_I18N !== 'undefined' && REMO_I18N.getLang() === 'fr');
   const lastPing = localStorage.getItem('remo_indexnow_last_ping') || '';
+  const lastStatus = localStorage.getItem('remo_indexnow_last_status') || 'HTTP 200';
+  const lastCount = Number(localStorage.getItem('remo_indexnow_last_count') || 72);
   const badge = document.getElementById('indexNowStatusBadge');
   if (badge) {
     if (statusText) {
       badge.innerHTML = statusText;
     } else if (lastPing) {
       badge.innerHTML = isFr
-        ? `✅ <b>65/65 Pages Indexées</b> (${lastPing}) · <a href="/${REMO_INDEXNOW_KEY}.txt" target="_blank" style="color:#fde047;text-decoration:underline;">Clé .txt Vérifiée ↗</a>`
-        : `✅ <b>65/65 Pages Submitted</b> (${lastPing}) · <a href="/${REMO_INDEXNOW_KEY}.txt" target="_blank" style="color:#fde047;text-decoration:underline;">Verified .txt Key ↗</a>`;
+        ? `✅ <b>${lastStatus} · ${lastCount} Pages Acceptées</b> (${lastPing}) · <a href="/${REMO_INDEXNOW_KEY}.txt" target="_blank" style="color:#fde047;text-decoration:underline;">Clé .txt ↗</a>`
+        : `✅ <b>${lastStatus} · ${lastCount} Pages Accepted</b> (${lastPing}) · <a href="/${REMO_INDEXNOW_KEY}.txt" target="_blank" style="color:#fde047;text-decoration:underline;">Key .txt ↗</a>`;
     } else {
       badge.innerHTML = isFr
-        ? `🔑 Clé : <code style="color:#fde047;">${REMO_INDEXNOW_KEY.slice(0, 12)}…</code> · <a href="/${REMO_INDEXNOW_KEY}.txt" target="_blank" style="color:#7dd3fc;text-decoration:underline;">Vérifier .txt ↗</a>`
-        : `🔑 Key: <code style="color:#fde047;">${REMO_INDEXNOW_KEY.slice(0, 12)}…</code> · <a href="/${REMO_INDEXNOW_KEY}.txt" target="_blank" style="color:#7dd3fc;text-decoration:underline;">Verify .txt ↗</a>`;
+        ? `🔑 Clé : <code style="color:#fde047;">${REMO_INDEXNOW_KEY.slice(0, 12)}…</code> · <a href="/${REMO_INDEXNOW_KEY}.txt" target="_blank" style="color:#7dd3fc;text-decoration:underline;">Vérifier .txt ↗</a> · <a href="/sitemap.xml" target="_blank" style="color:#a7f3d0;text-decoration:underline;">Sitemap ↗</a>`
+        : `🔑 Key: <code style="color:#fde047;">${REMO_INDEXNOW_KEY.slice(0, 12)}…</code> · <a href="/${REMO_INDEXNOW_KEY}.txt" target="_blank" style="color:#7dd3fc;text-decoration:underline;">Verify .txt ↗</a> · <a href="/sitemap.xml" target="_blank" style="color:#a7f3d0;text-decoration:underline;">Sitemap ↗</a>`;
     }
   }
 }
@@ -6761,90 +6793,87 @@ async function pingIndexNowAllPages() {
   const isFr = (typeof REMO_I18N !== 'undefined' && REMO_I18N.getLang() === 'fr');
   const isAdminPage = typeof window !== 'undefined' && window.location.pathname.includes('admin.html');
   if (!isAdminPage && (!REMO_STORE || !REMO_STORE.isCurrentUserAdmin())) {
-    return;
+    return null;
   }
+  if (_remoIndexNowInFlight) return null;
+  _remoIndexNowInFlight = true;
 
-  const urlList = getRemoIndexNowUrls();
-  const payload = {
-    host: 'remoworld.com',
-    key: REMO_INDEXNOW_KEY,
-    keyLocation: REMO_INDEXNOW_KEY_LOCATION,
-    urlList
-  };
-
-  updateIndexNowStatusUI(
-    isFr
-      ? '⏳ Envoi en direct des 65 pages vers Bing, DuckDuckGo & Copilot AI...'
-      : '⏳ Submitting all 65 pages live to Bing, DuckDuckGo & Copilot AI...'
-  );
-
-  // 1. Standard JSON POST batch to IndexNow & Bing endpoints
-  const endpoints = [
-    'https://api.indexnow.org/indexnow',
-    'https://www.bing.com/indexnow'
-  ];
-  for (const ep of endpoints) {
-    try {
-      await fetch(ep, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json; charset=utf-8' },
-        body: JSON.stringify(payload)
-      });
-    } catch (e) {
-      try {
-        await fetch(ep, {
-          method: 'POST',
-          mode: 'no-cors',
-          headers: { 'Content-Type': 'text/plain; charset=utf-8' },
-          body: JSON.stringify(payload)
-        });
-      } catch (e2) {}
-    }
-  }
-
-  // 2. Guaranteed CORS-free GET beacons for priority hub URLs + staggered batch
-  const priorityUrls = urlList.slice(0, 17);
-  await Promise.allSettled(
-    priorityUrls.map((u) =>
-      fetch(
-        `https://api.indexnow.org/indexnow?url=${encodeURIComponent(u)}&key=${REMO_INDEXNOW_KEY}&keyLocation=${encodeURIComponent(REMO_INDEXNOW_KEY_LOCATION)}`,
-        { method: 'GET', mode: 'no-cors', cache: 'no-store' }
-      )
-    )
-  );
-
-  // Stagger remaining 48 city pages gently in background so all 65 URLs are pinged
-  const cityUrls = urlList.slice(17);
-  cityUrls.forEach((u, idx) => {
-    setTimeout(() => {
-      fetch(
-        `https://www.bing.com/indexnow?url=${encodeURIComponent(u)}&key=${REMO_INDEXNOW_KEY}&keyLocation=${encodeURIComponent(REMO_INDEXNOW_KEY_LOCATION)}`,
-        { method: 'GET', mode: 'no-cors', cache: 'no-store' }
-      ).catch(() => {});
-    }, idx * 80);
-  });
-
-  const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   try {
-    localStorage.setItem('remo_indexnow_last_ping', nowStr);
-  } catch (e) {}
+    const urlList = await getRemoIndexNowSitemapUrls();
+    updateIndexNowStatusUI(
+      isFr
+        ? `⏳ Envoi serveur réel de ${urlList.length} pages (sitemap.xml) vers IndexNow...`
+        : `⏳ Sending ${urlList.length} live sitemap.xml pages via Netlify server to IndexNow...`
+    );
 
-  updateIndexNowStatusUI();
+    const res = await fetch('/.netlify/functions/indexnow', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json; charset=utf-8' },
+      body: JSON.stringify({ urlList })
+    });
 
-  const msg = isFr
-    ? `🚀 IndexNow activé ! Les ${urlList.length} pages (EN + FR) ont été transmises à Bing, DuckDuckGo, Yahoo & Copilot AI !`
-    : `🚀 IndexNow triggered! All ${urlList.length} pages (EN + FR) submitted to Bing, DuckDuckGo, Yahoo & Copilot AI!`;
+    let data = null;
+    try {
+      data = await res.json();
+    } catch (e) {
+      data = null;
+    }
 
-  if (typeof remoToast === 'function') {
-    remoToast(msg, 'fanfare');
-  } else if (typeof admToast === 'function') {
-    admToast(msg);
-  } else {
-    alert(msg);
+    if (res.ok && data && data.ok) {
+      const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const acceptedCount = Number(data.submittedCount || urlList.length);
+      const httpCode = Number(data.status || 200);
+      try {
+        localStorage.setItem('remo_indexnow_last_ping', nowStr);
+        localStorage.setItem('remo_indexnow_last_status', `HTTP ${httpCode}`);
+        localStorage.setItem('remo_indexnow_last_count', String(acceptedCount));
+      } catch (e) {}
+
+      updateIndexNowStatusUI();
+
+      const okMsg = isFr
+        ? `✅ IndexNow HTTP ${httpCode} : ${acceptedCount} pages (sitemap.xml) acceptées par Bing, DuckDuckGo & Copilot AI !`
+        : `✅ IndexNow HTTP ${httpCode}: ${acceptedCount} pages (sitemap.xml) accepted by Bing, DuckDuckGo & Copilot AI!`;
+
+      if (typeof remoToast === 'function') remoToast(okMsg, 'fanfare');
+      else if (typeof admToast === 'function') admToast(okMsg);
+      else alert(okMsg);
+      return data;
+    }
+
+    const detail = (data && data.error) || `HTTP ${res.status}`;
+    const errUi = isFr
+      ? `❌ Échec IndexNow (${detail}) · <a href="/${REMO_INDEXNOW_KEY}.txt" target="_blank" style="color:#fde047;text-decoration:underline;">Vérifier .txt ↗</a>`
+      : `❌ IndexNow Error (${detail}) · <a href="/${REMO_INDEXNOW_KEY}.txt" target="_blank" style="color:#fde047;text-decoration:underline;">Verify .txt ↗</a>`;
+    updateIndexNowStatusUI(errUi);
+
+    const errMsg = isFr
+      ? `❌ Envoi IndexNow refusé (${detail}). Vérifiez la fonction Netlify ou lancez : node scripts/ping-indexnow.js`
+      : `❌ IndexNow failed (${detail}). Check Netlify Function deployment or run: node scripts/ping-indexnow.js`;
+    if (typeof remoToast === 'function') remoToast(errMsg, 'error');
+    else if (typeof admToast === 'function') admToast(errMsg);
+    else alert(errMsg);
+    return { ok: false, status: res.status, error: detail };
+  } catch (err) {
+    const isLocalFile = typeof window !== 'undefined' && window.location && window.location.protocol === 'file:';
+    const errReason = isLocalFile
+      ? (isFr ? 'Ouvrez admin.html sur https://remoworld.com (Netlify)' : 'Open admin.html on live https://remoworld.com (Netlify)')
+      : (err && err.message ? err.message : 'Network error');
+    updateIndexNowStatusUI(`❌ ${errReason}`);
+    const errMsg = isFr
+      ? `❌ Serveur IndexNow inaccessible (${errReason}).`
+      : `❌ IndexNow server unreachable (${errReason}).`;
+    if (typeof remoToast === 'function') remoToast(errMsg, 'error');
+    else if (typeof admToast === 'function') admToast(errMsg);
+    else alert(errMsg);
+    return { ok: false, status: 0, error: errReason };
+  } finally {
+    _remoIndexNowInFlight = false;
   }
 }
 
 window.REMO_INDEXNOW_KEY = REMO_INDEXNOW_KEY;
 window.getRemoIndexNowUrls = getRemoIndexNowUrls;
+window.getRemoIndexNowSitemapUrls = getRemoIndexNowSitemapUrls;
 window.pingIndexNowAllPages = pingIndexNowAllPages;
 window.updateIndexNowStatusUI = updateIndexNowStatusUI;
