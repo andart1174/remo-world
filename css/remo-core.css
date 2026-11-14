@@ -944,6 +944,16 @@ button, input, select, textarea {
   outline: none;
 }
 
+select.remo-input {
+  background-color: #0b132b;
+  color: #f8fafc;
+  cursor: pointer;
+}
+select.remo-input option {
+  background: #0f172a;
+  color: #f8fafc;
+}
+
 .remo-input:focus { border-color: var(--cyan); }
 
 /* ── Toast & Coin Rain ── */
@@ -2180,9 +2190,10 @@ button, input, select, textarea {
     display: flex !important;
     flex-direction: column !important;
     gap: 0 !important;
-    height: var(--tiktok-stage-h) !important;
-    min-height: var(--tiktok-stage-h) !important;
-    max-height: var(--tiktok-stage-h) !important;
+    flex: 1 1 0% !important;
+    height: 0 !important;
+    min-height: 0 !important;
+    max-height: none !important;
     overflow-y: scroll !important;
     overflow-x: hidden !important;
     scroll-snap-type: y mandatory !important;
@@ -2197,10 +2208,10 @@ button, input, select, textarea {
 
   #view-feed.active .post-card {
     width: 100% !important;
-    height: var(--tiktok-stage-h) !important;
-    min-height: var(--tiktok-stage-h) !important;
-    max-height: var(--tiktok-stage-h) !important;
-    flex: 0 0 var(--tiktok-stage-h) !important;
+    height: 100% !important;
+    min-height: 100% !important;
+    max-height: 100% !important;
+    flex: 0 0 100% !important;
     scroll-snap-align: start !important;
     scroll-snap-stop: always !important;
     border-radius: 0 !important;
@@ -8750,7 +8761,43 @@ button, input, select, textarea {
 }
 @media (max-width: 860px) {
   .tc-dedicate-row { flex-direction: column; align-items: stretch; gap: 5px; }
-  .feed-city-spotlight-bar { padding: 8px 10px; font-size: 0.72rem; }
+  .feed-city-spotlight-bar {
+    flex-wrap: nowrap !important;
+    padding: 4px 8px !important;
+    gap: 6px !important;
+    border-radius: 10px !important;
+    margin-top: 2px;
+  }
+  .spotlight-left {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+  }
+  .spotlight-crown-chip {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding: 3px 8px !important;
+    font-size: 0.67rem !important;
+    gap: 4px !important;
+  }
+  .spotlight-pts-lbl {
+    font-size: 0.65rem !important;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .spotlight-action-btn {
+    padding: 3px 7px !important;
+    font-size: 0.67rem !important;
+    white-space: nowrap;
+  }
+  @media (max-width: 440px) {
+    .spotlight-pts-lbl { display: none; }
+  }
 }
 
 /* ── FEATURE 4: LIVE CITY WIDGET EMBED STUDIO ── */

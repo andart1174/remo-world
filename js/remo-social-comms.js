@@ -385,15 +385,15 @@ function renderFeedCitySpotlightBar() {
 
   bar.style.display = 'flex';
   bar.innerHTML = `
-    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:0;">
+    <div class="spotlight-left" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:0;">
       <button type="button" class="spotlight-crown-chip" onclick="openCitizenProfileModal('${escapeHtmlStr(sp.leaderUid || '')}', '${escapeHtmlStr(sp.leaderName || '')}')">
         <span>${city.flag} ${escapeHtmlStr(getCityName(city, lang))}</span>
         <span style="opacity:0.65;">·</span>
         <span>${escapeHtmlStr(badgeTitle)}: @${escapeHtmlStr(sp.leaderName)}</span>
       </button>
-      <span style="font-size:0.71rem;font-weight:800;color:#93c5fd;">⚡ ${escapeHtmlStr(scoreSub)}${hasSeparateMayor ? ` · 🏛️ @${escapeHtmlStr(sp.officialMayor.name)}` : ''}</span>
+      <span class="spotlight-pts-lbl" style="font-size:0.71rem;font-weight:800;color:#93c5fd;">⚡ ${escapeHtmlStr(scoreSub)}${hasSeparateMayor ? ` · 🏛️ @${escapeHtmlStr(sp.officialMayor.name)}` : ''}</span>
     </div>
-    <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
+    <div class="spotlight-actions" style="display:flex;align-items:center;gap:5px;flex-shrink:0;">
       <button type="button" class="spotlight-action-btn" onclick="openCitySpotlightComposer('${city.id}')">${escapeHtmlStr(t('spotlight_claim_btn'))}</button>
       <button type="button" class="spotlight-action-btn" onclick="openWidgetEmbedModal('${city.id}')" title="${escapeHtmlStr(t('nav_city_widget'))}">🧩</button>
     </div>
@@ -8676,14 +8676,21 @@ function setWidgetEmbedLang(langCode) {
   _widgetEmbedState.lang = langCode === 'fr' ? 'fr' : 'en';
   document.getElementById('widgetLangBtnEn')?.classList.toggle('active', _widgetEmbedState.lang === 'en');
   document.getElementById('widgetLangBtnFr')?.classList.toggle('active', _widgetEmbedState.lang === 'fr');
+  const sel = document.getElementById('widgetEmbedCitySel');
+  if (sel && sel.options.length === 0) {
+    _populateWidgetCityOptions(_widgetEmbedState.cityId);
+  }
   updateWidgetEmbedPreview();
 }
 window.setWidgetEmbedLang = setWidgetEmbedLang;
 
 function updateWidgetEmbedPreview() {
   const sel = document.getElementById('widgetEmbedCitySel');
-  if (sel && REMO_WIDGET_CITY_IDS.includes(sel.value)) {
-    _widgetEmbedState.cityId = sel.value;
+  if (sel) {
+    if (sel.options.length === 0) _populateWidgetCityOptions(_widgetEmbedState.cityId);
+    if (REMO_WIDGET_CITY_IDS.includes(sel.value)) {
+      _widgetEmbedState.cityId = sel.value;
+    }
   }
   const cid = _widgetEmbedState.cityId || 'montreal';
   const wLang = _widgetEmbedState.lang === 'fr' ? 'fr' : 'en';
@@ -8717,6 +8724,12 @@ function openWidgetEmbedModal(preferredCityId = '') {
   modal.classList.add('open');
 }
 window.openWidgetEmbedModal = openWidgetEmbedModal;
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => _populateWidgetCityOptions());
+} else {
+  _populateWidgetCityOptions();
+}
 
 function closeWidgetEmbedModal() {
   document.getElementById('widgetEmbedModal')?.classList.remove('open');
