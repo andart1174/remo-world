@@ -120,7 +120,7 @@
   <noscript><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"></noscript>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
 
-  <link rel="stylesheet" href="css/remo-core.css?v=120">
+  <link rel="stylesheet" href="css/remo-core.css?v=121">
 </head>
 <body>
 
@@ -1116,42 +1116,68 @@
 
   <!-- 📲 Viral Post & City Duel 9:16 Story Share Studio Modal -->
   <div class="remo-modal-backdrop" id="viralPostShareModal" onclick="if(event.target===this)closeViralPostShareModal()">
-    <div class="remo-modal" style="max-width:440px;text-align:center;">
+    <div class="remo-modal" style="max-width:468px;text-align:center;">
       <div class="modal-hdr">
-        <b id="viralPostModalTitle" style="font-family:'Orbitron',sans-serif;color:#38bdf8;font-size:0.92rem;">📲 Share &amp; 9:16 Viral Story (+25 🪙)</b>
+        <b id="viralPostModalTitle" style="font-family:'Orbitron',sans-serif;color:#38bdf8;font-size:0.9rem;">📲 Universal Viral Share Studio (+25 🪙)</b>
         <button class="modal-close" onclick="closeViralPostShareModal()">✕</button>
       </div>
-      <p id="viralPostModalSub" style="font-size:0.78rem;color:var(--muted);margin-bottom:10px;">
-        Share this City Moment or Duel on TikTok, Instagram Stories, WhatsApp or Telegram &amp; earn +25 🪙!
+      <p id="viralPostModalSub" style="font-size:0.75rem;color:var(--muted);margin-bottom:8px;line-height:1.35;">
+        Pick your format (9:16, 1:1, 16:9), stamp a QR Code &amp; share on every network (+25 🪙)!
       </p>
 
-      <div style="display:flex;justify-content:center;margin-bottom:12px;">
-        <canvas id="viralPostStoryCanvas" width="540" height="960" style="width:100%;max-width:235px;aspect-ratio:9/16;border-radius:16px;box-shadow:0 14px 36px rgba(0,0,0,0.85);border:2px solid rgba(56,189,248,0.55);background:#050816;"></canvas>
+      <!-- Aspect Format & QR Controls -->
+      <div class="viral-format-bar" id="viralPostFormatBar">
+        <button type="button" class="viral-fmt-pill active" data-fmt="9:16" data-i18n="share_format_story" onclick="setViralPostShareFormat('9:16')">📱 9:16 Story</button>
+        <button type="button" class="viral-fmt-pill" data-fmt="1:1" data-i18n="share_format_square" onclick="setViralPostShareFormat('1:1')">🖼️ 1:1 Post</button>
+        <button type="button" class="viral-fmt-pill" data-fmt="16:9" data-i18n="share_format_wide" onclick="setViralPostShareFormat('16:9')">🖥️ 16:9 Wide</button>
+        <button type="button" class="viral-qr-pill active" id="viralPostQrToggleBtn" data-i18n="share_qr_toggle" onclick="toggleViralPostQr()">📲 QR Code</button>
       </div>
 
-      <div style="display:flex;gap:8px;flex-direction:column;">
-        <button type="button" id="viralPostNativeShareBtn" class="btn-cyber" style="width:100%;justify-content:center;padding:10px;background:linear-gradient(135deg,#0284c7,#06b6d4);color:#fff;font-size:0.84rem;" onclick="shareViralPostStoryNative()">
-          📲 Share 9:16 Story (TikTok / Insta / Native)
-        </button>
+      <div style="display:flex;justify-content:center;align-items:center;margin-bottom:10px;min-height:190px;">
+        <canvas id="viralPostStoryCanvas" width="540" height="960" style="width:100%;max-width:205px;aspect-ratio:9/16;border-radius:16px;box-shadow:0 14px 36px rgba(0,0,0,0.85);border:2px solid rgba(56,189,248,0.55);background:#050816;"></canvas>
+      </div>
 
-        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;">
-          <button type="button" class="btn-ghost" style="justify-content:center;padding:8px 4px;font-size:0.74rem;border-color:rgba(16,185,129,0.55);color:#6ee7b7;" onclick="shareViralPostToSocial('whatsapp')">
-            🟢 WhatsApp
+      <div style="display:flex;gap:7px;flex-direction:column;">
+        <!-- Primary Studio Actions: Native/TikTok Share + 5s Video Loop -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+          <button type="button" id="viralPostNativeShareBtn" class="btn-cyber" style="justify-content:center;padding:9px 8px;background:linear-gradient(135deg,#0284c7,#06b6d4);color:#fff;font-size:0.78rem;" onclick="shareViralPostStoryNative()">
+            📲 Native / TikTok
           </button>
-          <button type="button" class="btn-ghost" style="justify-content:center;padding:8px 4px;font-size:0.74rem;border-color:rgba(56,189,248,0.55);color:#7dd3fc;" onclick="shareViralPostToSocial('telegram')">
-            ✈️ Telegram
-          </button>
-          <button type="button" class="btn-ghost" style="justify-content:center;padding:8px 4px;font-size:0.74rem;border-color:rgba(96,165,250,0.55);color:#93c5fd;" onclick="shareViralPostToSocial('facebook')">
-            📘 Facebook
-          </button>
-          <button type="button" class="btn-cyber btn-gold" style="justify-content:center;padding:8px 4px;font-size:0.74rem;" onclick="downloadViralPostStoryPNG()">
-            📥 PNG 9:16
+          <button type="button" id="viralPostVideoBtn" class="btn-cyber" style="justify-content:center;padding:9px 8px;background:linear-gradient(135deg,#7c3aed,#db2777);color:#fff;font-size:0.78rem;" data-i18n="share_video_btn" onclick="downloadViralPostStoryVideo()">
+            🎬 5s Video (TikTok/IG)
           </button>
         </div>
 
+        <!-- Quick Save & Copy Actions -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+          <button type="button" class="btn-cyber btn-gold" style="justify-content:center;padding:8px 6px;font-size:0.76rem;" data-i18n="share_png_btn" onclick="downloadViralPostStoryPNG()">
+            📥 PNG
+          </button>
+          <button type="button" class="btn-ghost" style="justify-content:center;padding:8px 6px;font-size:0.76rem;border-color:rgba(167,139,250,0.55);color:#ddd6fe;" data-i18n="share_copy_caption_btn" onclick="copyViralPostCaptionAndTags()">
+            📋 Caption + #
+          </button>
+        </div>
+
+        <!-- Complete 10-Network Grid -->
+        <div class="remo-net-grid">
+          <button type="button" class="remo-net-btn net-wa" onclick="shareViralPostToSocial('whatsapp')">🟢 WhatsApp</button>
+          <button type="button" class="remo-net-btn net-tg" onclick="shareViralPostToSocial('telegram')">✈️ Telegram</button>
+          <button type="button" class="remo-net-btn net-fb" onclick="shareViralPostToSocial('facebook')">📘 Facebook</button>
+          <button type="button" class="remo-net-btn net-x" onclick="shareViralPostToSocial('x')">𝕏 Share</button>
+          <button type="button" class="remo-net-btn net-tt" onclick="shareViralPostToSocial('tiktok')">🎵 TikTok</button>
+          <button type="button" class="remo-net-btn net-ig" onclick="shareViralPostToSocial('instagram')">📸 Instagram</button>
+          <button type="button" class="remo-net-btn net-rd" onclick="shareViralPostToSocial('reddit')">👽 Reddit</button>
+          <button type="button" class="remo-net-btn net-li" onclick="shareViralPostToSocial('linkedin')">💼 LinkedIn</button>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+          <button type="button" class="remo-net-btn" onclick="shareViralPostToSocial('sms')">💬 SMS</button>
+          <button type="button" class="remo-net-btn" onclick="shareViralPostToSocial('email')">✉️ Email</button>
+        </div>
+
         <div style="display:flex;gap:6px;align-items:center;margin-top:2px;">
-          <input type="text" id="viralPostDirectLinkInput" class="remo-input" readonly style="flex:1;padding:7px 9px;font-size:0.75rem;color:#cbd5e1;" onclick="this.select()">
-          <button type="button" id="viralPostCopyLinkBtn" class="btn-ghost" style="padding:7px 11px;font-size:0.76rem;border-color:#fbbf24;color:#fde047;white-space:nowrap;" onclick="copyViralPostDirectLink()">
+          <input type="text" id="viralPostDirectLinkInput" class="remo-input" readonly style="flex:1;padding:7px 9px;font-size:0.74rem;color:#cbd5e1;" onclick="this.select()">
+          <button type="button" id="viralPostCopyLinkBtn" class="btn-ghost" style="padding:7px 11px;font-size:0.75rem;border-color:#fbbf24;color:#fde047;white-space:nowrap;" onclick="copyViralPostDirectLink()">
             🔗 Copy (+25 🪙)
           </button>
         </div>
@@ -2344,6 +2370,12 @@
           <button type="button" class="btn-ghost" style="justify-content:center;border-color:#3b82f6;color:#93c5fd;padding:8px 6px;font-size:0.76rem;font-weight:800;" onclick="shareCityAmbassadorDiploma('facebook')">📘 Facebook</button>
           <button type="button" class="btn-cyber btn-gold" style="justify-content:center;padding:8px 6px;font-size:0.76rem;font-weight:900;" onclick="shareCityAmbassadorDiploma('download')">📥 PNG 9:16</button>
         </div>
+        <div class="remo-net-grid">
+          <button type="button" class="remo-net-btn net-x" onclick="shareCityAmbassadorDiploma('x')">𝕏 Share</button>
+          <button type="button" class="remo-net-btn net-tt" onclick="shareCityAmbassadorDiploma('tiktok')">🎵 TikTok</button>
+          <button type="button" class="remo-net-btn net-ig" onclick="shareCityAmbassadorDiploma('instagram')">📸 Instagram</button>
+          <button type="button" class="remo-net-btn net-rd" onclick="shareCityAmbassadorDiploma('reddit')">👽 Reddit</button>
+        </div>
       </div>
     </div>
   </div>
@@ -2387,6 +2419,9 @@
           <button type="button" class="btn-ghost" style="justify-content:center;border-color:#3b82f6;color:#93c5fd;padding:8px 6px;font-size:0.75rem;font-weight:800;" onclick="shareToUnlockSecondScratchCard('facebook')">📘 Facebook</button>
           <button type="button" class="btn-ghost" style="justify-content:center;border-color:#22c55e;color:#86efac;padding:8px 6px;font-size:0.75rem;font-weight:800;" onclick="shareToUnlockSecondScratchCard('whatsapp')">🟢 WhatsApp</button>
           <button type="button" class="btn-ghost" style="justify-content:center;border-color:#38bdf8;color:#7dd3fc;padding:8px 6px;font-size:0.75rem;font-weight:800;" onclick="shareToUnlockSecondScratchCard('telegram')">✈️ Telegram</button>
+          <button type="button" class="remo-net-btn net-x" style="padding:8px 6px;font-size:0.75rem;" onclick="shareToUnlockSecondScratchCard('x')">𝕏 Share</button>
+          <button type="button" class="remo-net-btn net-rd" style="padding:8px 6px;font-size:0.75rem;" onclick="shareToUnlockSecondScratchCard('reddit')">👽 Reddit</button>
+          <button type="button" class="remo-net-btn net-li" style="padding:8px 6px;font-size:0.75rem;" onclick="shareToUnlockSecondScratchCard('linkedin')">💼 LinkedIn</button>
         </div>
       </div>
     </div>
@@ -2685,15 +2720,15 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 
   <!-- REMO Modular Engines -->
-  <script src="js/remo-i18n.js?v=120"></script>
-  <script src="js/remo-cities-data.js?v=120"></script>
-  <script src="js/remo-store.js?v=120"></script>
-  <script src="js/remo-card-engine.js?v=120"></script>
-  <script src="js/remo-radar-arena.js?v=120"></script>
-  <script src="js/remo-social-comms.js?v=120"></script>
-  <script src="js/remo-radio-engine.js?v=120"></script>
-  <script src="js/remo-focus-tv.js?v=120"></script>
-  <script src="js/remo-world-blitz.js?v=120"></script>
+  <script src="js/remo-i18n.js?v=121"></script>
+  <script src="js/remo-cities-data.js?v=121"></script>
+  <script src="js/remo-store.js?v=121"></script>
+  <script src="js/remo-card-engine.js?v=121"></script>
+  <script src="js/remo-radar-arena.js?v=121"></script>
+  <script src="js/remo-social-comms.js?v=121"></script>
+  <script src="js/remo-radio-engine.js?v=121"></script>
+  <script src="js/remo-focus-tv.js?v=121"></script>
+  <script src="js/remo-world-blitz.js?v=121"></script>
 
   <noscript>
     <nav aria-label="REMO World Static Directory" style="padding:20px;background:#050816;color:#f8fafc;">

@@ -1404,9 +1404,35 @@
           <button type="button" class="blitz-share-main-btn ${state.copiedRecently ? 'copied' : ''}" id="blitzCopyShareBtn">
             ${_esc(state.copiedRecently ? _t('blitz_copied_btn') : copyLabel)}
           </button>
-          <div class="blitz-share-quick-row">
-            <a class="blitz-social-link" id="blitzWaLink" href="https://wa.me/?text=${encodedShare}" target="_blank" rel="noopener noreferrer">${_esc(_t('blitz_wa_share'))}</a>
-            <a class="blitz-social-link" id="blitzXLink" href="https://twitter.com/intent/tweet?text=${encodedShare}" target="_blank" rel="noopener noreferrer">${_esc(_t('blitz_x_share'))}</a>
+          <div style="display:grid;grid-template-columns:1fr auto;gap:6px;">
+            <button type="button" class="blitz-social-link blitz-card-cta-btn" id="blitzToggleCardBtn">
+              ${_esc(_t('blitz_story_card_btn'))}
+            </button>
+            <button type="button" class="blitz-social-link blitz-video-cta-btn" id="blitzStoryVideoBtn">
+              ${_esc(_t('blitz_video_btn'))}
+            </button>
+          </div>
+          <div id="blitzVisualCardTray" class="blitz-visual-card-tray" style="display:none;">
+            <canvas id="blitzStoryCanvas" width="540" height="960" class="blitz-story-canvas"></canvas>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px;">
+              <button type="button" class="blitz-social-link net-tt" id="blitzTrayNativeBtn">${_esc(_t('blitz_card_native'))}</button>
+              <button type="button" class="blitz-social-link net-fb" id="blitzTrayDownloadBtn">${_esc(_t('blitz_card_download'))}</button>
+            </div>
+          </div>
+          <div class="remo-net-grid" id="blitzNetGrid">
+            <button type="button" class="remo-net-btn net-wa" data-blitz-net="whatsapp">🟢 WhatsApp</button>
+            <button type="button" class="remo-net-btn net-tg" data-blitz-net="telegram">✈️ Telegram</button>
+            <button type="button" class="remo-net-btn net-fb" data-blitz-net="facebook">📘 Facebook</button>
+            <button type="button" class="remo-net-btn net-x" data-blitz-net="x">𝕏 Share</button>
+            <button type="button" class="remo-net-btn net-tt" data-blitz-net="tiktok">🎵 TikTok</button>
+            <button type="button" class="remo-net-btn net-ig" data-blitz-net="instagram">📸 Instagram</button>
+            <button type="button" class="remo-net-btn net-rd" data-blitz-net="reddit">👽 Reddit</button>
+            <button type="button" class="remo-net-btn net-li" data-blitz-net="linkedin">💼 LinkedIn</button>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;">
+            <button type="button" class="remo-net-btn" data-blitz-net="sms">💬 SMS</button>
+            <button type="button" class="remo-net-btn" data-blitz-net="email">✉️ Email</button>
+            <button type="button" class="remo-net-btn" data-blitz-net="native">📲 ${_esc(_t('blitz_more_nets'))}</button>
           </div>
         </div>
 
@@ -1439,13 +1465,73 @@
     if (nickInput) {
       nickInput.addEventListener('input', () => {
         const clean = setSavedDuelNick(nickInput.value);
-        const updTxt = encodeURIComponent(buildShareText(res, _lang(), clean || getDefaultDuelNick()));
-        const wa = document.getElementById('blitzWaLink');
-        const xl = document.getElementById('blitzXLink');
-        if (wa) wa.href = `https://wa.me/?text=${updTxt}`;
-        if (xl) xl.href = `https://twitter.com/intent/tweet?text=${updTxt}`;
+        const tray = document.getElementById('blitzVisualCardTray');
+        const cv = document.getElementById('blitzStoryCanvas');
+        if (tray && tray.style.display !== 'none' && cv) {
+          _drawBlitzScoreCanvas(cv, res, clean || getDefaultDuelNick(), verdict, store.streak || 1, 0);
+        }
       });
     }
+
+    const cardToggleBtn = document.getElementById('blitzToggleCardBtn');
+    if (cardToggleBtn) {
+      cardToggleBtn.onclick = () => {
+        const tray = document.getElementById('blitzVisualCardTray');
+        const cv = document.getElementById('blitzStoryCanvas');
+        if (!tray || !cv) return;
+        const opening = tray.style.display === 'none';
+        tray.style.display = opening ? 'block' : 'none';
+        if (opening) {
+          const curNick = nickInput ? setSavedDuelNick(nickInput.value) : getDefaultDuelNick();
+          _drawBlitzScoreCanvas(cv, res, curNick || getDefaultDuelNick(), verdict, store.streak || 1, 0);
+        }
+      };
+    }
+
+    const trayNativeBtn = document.getElementById('blitzTrayNativeBtn');
+    if (trayNativeBtn) trayNativeBtn.onclick = () => _shareBlitzToNetwork('native', res, verdict, store.streak || 1);
+
+    const trayDownloadBtn = document.getElementById('blitzTrayDownloadBtn');
+    if (trayDownloadBtn) {
+      trayDownloadBtn.onclick = () => {
+        const curNick = nickInput ? setSavedDuelNick(nickInput.value) : getDefaultDuelNick();
+        const cv = document.getElementById('blitzStoryCanvas') || document.createElement('canvas');
+        _drawBlitzScoreCanvas(cv, res, curNick || getDefaultDuelNick(), verdict, store.streak || 1, 0);
+        const dataUrl = cv.toDataURL('image/png');
+        if (window.REMO_SHARE_HUB && typeof window.REMO_SHARE_HUB.downloadDataUrl === 'function') {
+          window.REMO_SHARE_HUB.downloadDataUrl(dataUrl, `REMO_Blitz_${res.num}_9x16.png`);
+        }
+        if (typeof window.remoToast === 'function') {
+          window.remoToast(_lang() === 'fr' ? '📥 Carte Score 9:16 téléchargée !' : '📥 9:16 Score Card downloaded!', 'coin');
+        }
+      };
+    }
+
+    const videoBtn = document.getElementById('blitzStoryVideoBtn');
+    if (videoBtn) {
+      videoBtn.onclick = () => {
+        const tray = document.getElementById('blitzVisualCardTray');
+        const cv = document.getElementById('blitzStoryCanvas');
+        if (!cv) return;
+        if (tray) tray.style.display = 'block';
+        const curNick = nickInput ? setSavedDuelNick(nickInput.value) : getDefaultDuelNick();
+        const useNick = curNick || getDefaultDuelNick();
+        _drawBlitzScoreCanvas(cv, res, useNick, verdict, store.streak || 1, 0);
+        if (window.REMO_SHARE_HUB && typeof window.REMO_SHARE_HUB.recordCanvasVideoLoop === 'function') {
+          window.REMO_SHARE_HUB.recordCanvasVideoLoop(
+            cv,
+            (tVal) => _drawBlitzScoreCanvas(cv, res, useNick, verdict, store.streak || 1, tVal),
+            { isFr: _lang() === 'fr', durationMs: 4500, fileName: `REMO_Blitz_${res.num}_9x16.webm` }
+          );
+        }
+      };
+    }
+
+    document.querySelectorAll('[data-blitz-net]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        _shareBlitzToNetwork(btn.getAttribute('data-blitz-net'), res, verdict, store.streak || 1);
+      });
+    });
 
     const claimBtn = document.getElementById('blitzClaimPassportBtn');
     if (claimBtn) {
@@ -1622,6 +1708,238 @@
         b.textContent = state.challenger ? _t('blitz_duel_counter_btn') : _t('blitz_copy_share');
       }
     }, 2600);
+  }
+
+  function _drawBlitzScoreCanvas(cv, resultObj, customNick, verdict, streakVal = 1, animT = 0) {
+    if (!cv || !resultObj) return;
+    const W = 540;
+    const H = 960;
+    cv.width = W;
+    cv.height = H;
+    const ctx = cv.getContext('2d');
+    const lang = _lang();
+    const isFr = lang === 'fr';
+    const score = (resultObj.results || []).filter((r) => r === 'G').length;
+    const timeVal = Number(resultObj.timeSec || 1).toFixed(1);
+    const nick = String(customNick || getDefaultDuelNick()).trim().slice(0, 24) || 'Citizen';
+    const duelUrl = buildDuelShareUrl(resultObj, nick);
+    const streak = Math.max(1, Number(streakVal || 1));
+
+    const roundRectSafe = (x, y, w, h, r) => {
+      const rad = Math.min(r, w / 2, h / 2);
+      ctx.beginPath();
+      if (typeof ctx.roundRect === 'function') ctx.roundRect(x, y, w, h, rad);
+      else {
+        ctx.moveTo(x + rad, y);
+        ctx.arcTo(x + w, y, x + w, y + h, rad);
+        ctx.arcTo(x + w, y + h, x, y + h, rad);
+        ctx.arcTo(x, y + h, x, y, rad);
+        ctx.arcTo(x, y, x + w, y, rad);
+        ctx.closePath();
+      }
+    };
+
+    const bg = ctx.createLinearGradient(0, 0, W, H);
+    bg.addColorStop(0, '#040817');
+    bg.addColorStop(0.5, '#0c1638');
+    bg.addColorStop(1, '#040817');
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, W, H);
+
+    const glow = animT > 0 ? (0.62 + 0.35 * Math.sin(animT * 3.5)) : 0.72;
+    ctx.strokeStyle = `rgba(56, 189, 248, ${glow.toFixed(2)})`;
+    ctx.lineWidth = 4;
+    roundRectSafe(16, 16, W - 32, H - 32, 24);
+    ctx.stroke();
+
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#38bdf8';
+    ctx.font = '900 21px Orbitron, sans-serif';
+    ctx.fillText('⚡ REMO WORLD BLITZ', W / 2, 70);
+
+    ctx.fillStyle = '#fde047';
+    ctx.font = '900 30px Orbitron, sans-serif';
+    ctx.fillText(`#${resultObj.num} · ${isFr ? 'DÉFI MONDIAL' : 'GLOBAL CHALLENGE'}`, W / 2, 114);
+
+    // Player chip
+    ctx.fillStyle = 'rgba(56, 189, 248, 0.14)';
+    ctx.strokeStyle = 'rgba(56, 189, 248, 0.45)';
+    ctx.lineWidth = 2;
+    roundRectSafe(86, 140, W - 172, 46, 23);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = '#f8fafc';
+    ctx.font = '800 18px sans-serif';
+    ctx.fillText(`🧭 @${nick}   ·   🔥 ${streak}d`, W / 2, 170);
+
+    // Big Score Circle / Stage
+    const pulse = animT > 0 ? (1 + 0.03 * Math.sin(animT * 4)) : 1;
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+    ctx.strokeStyle = score >= 4 ? '#22c55e' : '#38bdf8';
+    ctx.lineWidth = 3;
+    roundRectSafe(44, 214, W - 88, 224, 22);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = '#ffffff';
+    ctx.font = `900 ${Math.round(76 * pulse)}px Orbitron, sans-serif`;
+    ctx.fillText(`${score}/${ROUNDS_COUNT}`, W / 2, 314);
+
+    ctx.fillStyle = '#fde047';
+    ctx.font = '900 28px Orbitron, sans-serif';
+    ctx.fillText(`⏱️ ${timeVal}s`, W / 2, 366);
+
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = '700 14px sans-serif';
+    ctx.fillText(
+      isFr ? '5 VILLES DU MONDE • CHRONO LIVE' : '5 WORLD CITIES • LIVE SPEEDRUN',
+      W / 2,
+      408
+    );
+
+    // 5 Spoiler-Free Vector Result Tiles (No city names!)
+    const tileW = 74;
+    const tileGap = 14;
+    const totalRowW = ROUNDS_COUNT * tileW + (ROUNDS_COUNT - 1) * tileGap;
+    const rowStartX = (W - totalRowW) / 2;
+    const rowY = 470;
+    const resArr = Array.isArray(resultObj.results) ? resultObj.results : [];
+
+    for (let i = 0; i < ROUNDS_COUNT; i++) {
+      const ok = resArr[i] === 'G';
+      const bob = animT > 0 ? Math.sin(animT * 4 + i * 0.7) * 5 : 0;
+      const tx = rowStartX + i * (tileW + tileGap);
+      const ty = rowY + bob;
+      ctx.fillStyle = ok ? 'rgba(34, 197, 94, 0.24)' : 'rgba(244, 63, 94, 0.24)';
+      ctx.strokeStyle = ok ? '#22c55e' : '#f43f5e';
+      ctx.lineWidth = 3;
+      roundRectSafe(tx, ty, tileW, tileW, 16);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.strokeStyle = ok ? '#86efac' : '#fda4af';
+      ctx.lineWidth = 5;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.beginPath();
+      if (ok) {
+        ctx.moveTo(tx + 20, ty + 39);
+        ctx.lineTo(tx + 33, ty + 52);
+        ctx.lineTo(tx + 54, ty + 25);
+      } else {
+        ctx.moveTo(tx + 23, ty + 23);
+        ctx.lineTo(tx + 51, ty + 51);
+        ctx.moveTo(tx + 51, ty + 23);
+        ctx.lineTo(tx + 23, ty + 51);
+      }
+      ctx.stroke();
+    }
+
+    // Duel Verdict OR Spoiler Shield Banner
+    if (verdict && state.challenger) {
+      ctx.fillStyle = 'rgba(251, 191, 36, 0.14)';
+      ctx.strokeStyle = '#fbbf24';
+      ctx.lineWidth = 2;
+      roundRectSafe(44, 574, W - 88, 92, 16);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = '#fde047';
+      ctx.font = '900 18px Orbitron, sans-serif';
+      ctx.fillText(String(verdict.title || '').slice(0, 34), W / 2, 610);
+      ctx.fillStyle = '#e2e8f0';
+      ctx.font = '800 16px sans-serif';
+      ctx.fillText(
+        `${verdict.myScore}/${ROUNDS_COUNT} (${verdict.myTime}s)  VS  ${state.challenger.n}: ${state.challenger.s}/${ROUNDS_COUNT} (${Number(state.challenger.t).toFixed(1)}s)`,
+        W / 2,
+        646
+      );
+    } else {
+      ctx.fillStyle = '#7dd3fc';
+      ctx.font = '800 16px sans-serif';
+      ctx.fillText(
+        isFr ? '🔒 VILLES MASQUÉES — ZÉRO SPOILER !' : '🔒 CITIES HIDDEN — ZERO SPOILERS!',
+        W / 2,
+        608
+      );
+      ctx.fillStyle = '#e2e8f0';
+      ctx.font = '800 18px sans-serif';
+      ctx.fillText(
+        isFr ? '⚔️ PEUX-TU BATTRE MON CHRONO ?' : '⚔️ CAN YOU BEAT MY TIME?',
+        W / 2,
+        646
+      );
+    }
+
+    // CTA Footer + Crisp Scannable QR Code
+    const ctaX = 36;
+    const ctaY = 708;
+    const ctaW = W - 72;
+    const ctaH = 176;
+    ctx.fillStyle = 'rgba(56, 189, 248, 0.14)';
+    ctx.strokeStyle = '#38bdf8';
+    ctx.lineWidth = 2.5;
+    roundRectSafe(ctaX, ctaY, ctaW, ctaH, 18);
+    ctx.fill();
+    ctx.stroke();
+
+    const qrSize = 136;
+    const textCx = ctaX + (ctaW - qrSize - 26) / 2;
+    if (window.REMO_SHARE_HUB && typeof window.REMO_SHARE_HUB.drawQrOnCanvas === 'function') {
+      window.REMO_SHARE_HUB.drawQrOnCanvas(ctx, duelUrl, ctaX + ctaW - qrSize - 16, ctaY + 20, qrSize);
+    }
+
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '900 15px Orbitron, sans-serif';
+    ctx.fillText(isFr ? '⚔️ RELÈVE LE DUEL :' : '⚔️ PLAY THIS DUEL:', textCx, ctaY + 56);
+
+    ctx.fillStyle = '#fde047';
+    ctx.font = '900 22px Orbitron, sans-serif';
+    ctx.fillText('REMOWORLD.COM', textCx, ctaY + 98);
+
+    ctx.fillStyle = '#7dd3fc';
+    ctx.font = '800 13px sans-serif';
+    ctx.fillText(isFr ? '📲 Scanne le QR 1v1 !' : '📲 Scan 1v1 Challenge QR!', textCx, ctaY + 136);
+
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = '700 12px sans-serif';
+    ctx.fillText('TikTok • Instagram • WhatsApp • 𝕏 • Reddit • REMO World', W / 2, 922);
+  }
+
+  async function _shareBlitzToNetwork(platform, resObj, verdict, streakVal) {
+    const res = resObj || state.finalResult;
+    if (!res) return;
+    const lang = _lang();
+    const isFr = lang === 'fr';
+    const nickInput = document.getElementById('blitzDuelNickInput');
+    const nick = (nickInput ? setSavedDuelNick(nickInput.value) : '') || getDefaultDuelNick();
+    const score = (res.results || []).filter((r) => r === 'G').length;
+    const grid = (res.results || []).map((r) => (r === 'G' ? '🟩' : '🟥')).join('');
+    const timeVal = Number(res.timeSec || 1).toFixed(1);
+    const duelUrl = buildDuelShareUrl(res, nick);
+    const promptLine = isFr
+      ? `⚔️ REMO World Blitz #${res.num} — ${score}/${ROUNDS_COUNT} (${timeVal}s)\n${grid}\n⚡ Tu peux battre ${nick} sur les mêmes 5 villes ?`
+      : `⚔️ REMO World Blitz #${res.num} — ${score}/${ROUNDS_COUNT} (${timeVal}s)\n${grid}\n⚡ Think you can beat ${nick} on the exact same 5 cities?`;
+    const title = `⚔️ REMO World Blitz #${res.num} — ${score}/${ROUNDS_COUNT} (${timeVal}s)`;
+
+    const getPng = async () => {
+      const cv = document.getElementById('blitzStoryCanvas') || document.createElement('canvas');
+      _drawBlitzScoreCanvas(cv, res, nick, verdict, streakVal || 1, 0);
+      return cv.toDataURL('image/png');
+    };
+
+    if (window.REMO_SHARE_HUB && typeof window.REMO_SHARE_HUB.shareToNetwork === 'function') {
+      await window.REMO_SHARE_HUB.shareToNetwork(platform, {
+        url: duelUrl,
+        title,
+        shareText: promptLine,
+        isFr,
+        context: 'blitz',
+        fileName: `REMO_Blitz_${res.num}_9x16`,
+        getDataUrlFn: getPng
+      });
+    } else {
+      window.open(`https://wa.me/?text=${encodeURIComponent(`${promptLine}\n${duelUrl}`)}`, '_blank', 'noopener,noreferrer');
+    }
   }
 
   /* ── 7. ENTRY BADGES & PUBLIC CONTROLS ── */

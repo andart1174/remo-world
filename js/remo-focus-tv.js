@@ -165,9 +165,16 @@
                   </div>
                 </div>
                 <button type="button" class="ftv-room-copy-btn" id="ftvRoomCopyBtn" onclick="copyFocusTvRoomInvite()" data-i18n="ftv_room_copy_btn">📋 Copy Room Invite Link</button>
+                <div class="ftv-room-net-row" id="ftvRoomNetRow">
+                  <button type="button" class="ftv-amb-btn" onclick="shareFocusTvRoomTo('whatsapp')">🟢 WA</button>
+                  <button type="button" class="ftv-amb-btn" onclick="shareFocusTvRoomTo('telegram')">✈️ TG</button>
+                  <button type="button" class="ftv-amb-btn" onclick="shareFocusTvRoomTo('facebook')">📘 FB</button>
+                  <button type="button" class="ftv-amb-btn" onclick="shareFocusTvRoomTo('x')">𝕏</button>
+                  <button type="button" class="ftv-amb-btn" onclick="shareFocusTvRoomTo('reddit')">👽 RD</button>
+                  <button type="button" class="ftv-amb-btn" onclick="shareFocusTvRoomTo('native')">📲</button>
+                </div>
                 <div class="ftv-room-pop-actions">
-                  <a class="ftv-amb-btn ftv-room-wa" id="ftvRoomWaLink" href="https://wa.me/" target="_blank" rel="noopener noreferrer" data-i18n="ftv_room_wa_btn">💬 WhatsApp Invite</a>
-                  <button type="button" class="ftv-amb-btn ftv-room-leave" id="ftvRoomLeaveBtn" onclick="leaveFocusTvRoom()" style="display:none;" data-i18n="ftv_room_leave_btn">🚪 Leave Room</button>
+                  <button type="button" class="ftv-amb-btn ftv-room-leave" id="ftvRoomLeaveBtn" onclick="leaveFocusTvRoom()" style="display:none;width:100%;justify-content:center;" data-i18n="ftv_room_leave_btn">🚪 Leave Room</button>
                 </div>
               </div>
             </div>
@@ -983,7 +990,6 @@
     const btn = document.getElementById('ftvInviteRoomBtn');
     const codeInp = document.getElementById('ftvRoomCodeInput');
     const leaveBtn = document.getElementById('ftvRoomLeaveBtn');
-    const waLink = document.getElementById('ftvRoomWaLink');
     const d25 = document.getElementById('ftvRoomDur25');
     const d50 = document.getElementById('ftvRoomDur50');
 
@@ -1008,19 +1014,31 @@
     if (d25) d25.classList.toggle('active', Number(selDur) === 25);
     if (d50) d50.classList.toggle('active', Number(selDur) === 50);
     if (leaveBtn) leaveBtn.style.display = state.room.active ? 'inline-flex' : 'none';
-    if (waLink) {
-      const previewUrl = _buildRoomShareUrl(
-        _sanitizeRoomCode(codeInp ? codeInp.value : '') || state.room.id || _defaultRoomCode(),
-        state.room.active ? state.room.startEpochSec : Math.floor(Date.now() / 1000),
-        selDur
-      );
-      const city = _getCity(state.cityId);
-      const msg = _lang() === 'fr'
-        ? `Rejoins ma salle Focus 4D (${selDur}m synchro) à ${city.flag} ${_cityName(city)} sur REMO :\n${previewUrl}`
-        : `Join my synced ${selDur}m 4D Focus Room in ${city.flag} ${_cityName(city)} on REMO:\n${previewUrl}`;
-      waLink.href = `https://wa.me/?text=${encodeURIComponent(msg)}`;
-    }
   }
+
+  window.shareFocusTvRoomTo = async function (platform) {
+    const codeInp = document.getElementById('ftvRoomCodeInput');
+    const selDur = state.room.active ? state.room.durMin : state.room.selectedDurMin;
+    const roomId = _sanitizeRoomCode(codeInp ? codeInp.value : '') || state.room.id || _defaultRoomCode();
+    const startSec = state.room.active ? state.room.startEpochSec : Math.floor(Date.now() / 1000);
+    const previewUrl = _buildRoomShareUrl(roomId, startSec, selDur);
+    const city = _getCity(state.cityId);
+    const isFr = _lang() === 'fr';
+    const msg = isFr
+      ? `Rejoins ma salle Focus 4D (${selDur}m synchro) à ${city.flag} ${_cityName(city)} sur REMO World :`
+      : `Join my synced ${selDur}m 4D Focus Room in ${city.flag} ${_cityName(city)} on REMO World:`;
+    if (window.REMO_SHARE_HUB && typeof window.REMO_SHARE_HUB.shareToNetwork === 'function') {
+      await window.REMO_SHARE_HUB.shareToNetwork(platform || 'whatsapp', {
+        url: previewUrl,
+        title: `REMO Focus Room — ${city.flag} ${_cityName(city)}`,
+        shareText: msg,
+        isFr,
+        context: 'focus'
+      });
+    } else {
+      window.open(`https://wa.me/?text=${encodeURIComponent(`${msg}\n${previewUrl}`)}`, '_blank', 'noopener,noreferrer');
+    }
+  };
 
   function _leaveFocusRoom(clearUrlState = true) {
     if (state.room.active) {
@@ -1667,11 +1685,83 @@
   window.getFocusTvVibeUrl = _buildVibeShareUrl;
   window.getFocusTvRoomUrl = _buildRoomShareUrl;
 
+  function _drawFocusVibeCanvas(c, city, wx, st, shareUrl, animT = 0) {
+    if (!c) return;
+    c.width = 540;
+    c.height = 960;
+    const ctx = c.getContext('2d');
+    const rgb = _hexToRgb(city.themeColor || '#38bdf8');
+    const isFr = _lang() === 'fr';
+
+    const grad = ctx.createLinearGradient(0, 0, 0, 960);
+    grad.addColorStop(0, '#040818');
+    grad.addColorStop(0.55, `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.42)`);
+    grad.addColorStop(1, '#050816');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, 540, 960);
+
+    const glow = animT > 0 ? (0.55 + 0.35 * Math.sin(animT * 3)) : 0.65;
+    ctx.strokeStyle = `rgba(56, 189, 248, ${glow.toFixed(2)})`;
+    ctx.lineWidth = 4;
+    ctx.strokeRect(14, 14, 512, 932);
+
+    const pulseSize = animT > 0 ? (256 + Math.sin(animT * 3.2) * 12) : 260;
+    if (typeof window.drawCityLandmark === 'function') {
+      window.drawCityLandmark(ctx, city.id, city.themeColor || '#38bdf8', 270, 465, pulseSize);
+    }
+
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#38bdf8';
+    ctx.font = 'bold 20px Orbitron, sans-serif';
+    ctx.fillText('REMO 4D FOCUS TV · LIVE', 270, 82);
+
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 40px Orbitron, sans-serif';
+    ctx.fillText(`${city.flag} ${_cityName(city).toUpperCase()}`, 270, 146);
+
+    ctx.fillStyle = '#e2e8f0';
+    ctx.font = 'bold 22px sans-serif';
+    ctx.fillText(`🕒 ${wx.timeStr || '--:--'}  ·  ${wx.icon || '🌤️'} ${wx.tempC ?? 20}°C`, 270, 190);
+
+    // Bottom CTA Panel with QR
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.78)';
+    ctx.strokeStyle = 'rgba(56, 189, 248, 0.5)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    if (typeof ctx.roundRect === 'function') ctx.roundRect(28, 764, 484, 152, 18);
+    else ctx.rect(28, 764, 484, 152);
+    ctx.fill();
+    ctx.stroke();
+
+    const textCx = 205;
+    ctx.fillStyle = '#fde047';
+    ctx.font = 'bold 19px sans-serif';
+    const stLabel = `🎧 ${st.name}`.slice(0, 26);
+    ctx.fillText(stLabel, textCx, 808);
+
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '900 20px Orbitron, sans-serif';
+    ctx.fillText('REMOWORLD.COM', textCx, 846);
+
+    ctx.fillStyle = '#7dd3fc';
+    ctx.font = '700 13px sans-serif';
+    ctx.fillText(isFr ? '📻 Radio Live + Météo 4D' : '📻 Live Radio + 4D Weather', textCx, 882);
+
+    if (window.REMO_SHARE_HUB && typeof window.REMO_SHARE_HUB.drawQrOnCanvas === 'function') {
+      window.REMO_SHARE_HUB.drawQrOnCanvas(ctx, shareUrl, 378, 780, 118);
+    }
+  }
+
   window.shareFocusTvVibe = async function () {
     const city = _getCity(state.cityId);
     const wx = _getLiveWx(city);
     const st = (window.REMO_RADIO && window.REMO_RADIO.currentStation) || { name: 'REMO Cyber-LoFi', flag: '📻' };
     const shareUrl = _buildVibeShareUrl();
+    const isFr = _lang() === 'fr';
+    const shareText = isFr
+      ? `🎧 En direct sur REMO 4D Focus TV à ${city.flag} ${_cityName(city)} (${wx.tempC ?? 20}°C) avec ${st.name} :`
+      : `🎧 Vibing live on REMO 4D Focus TV in ${city.flag} ${_cityName(city)} (${wx.tempC ?? 20}°C) with ${st.name}:`;
+    const title = `REMO 4D Focus TV — ${city.flag} ${_cityName(city)}`;
 
     try {
       if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -1679,51 +1769,82 @@
       }
     } catch (e) {}
 
-    // Render sleek 9:16 Vibe Story card on offscreen canvas & download PNG
-    try {
-      const c = document.createElement('canvas');
-      c.width = 540;
-      c.height = 960;
-      const ctx = c.getContext('2d');
-      const rgb = _hexToRgb(city.themeColor || '#38bdf8');
+    const overlay = document.getElementById('remoFocusTvOverlay');
+    if (!overlay) return;
+    let sheet = document.getElementById('ftvVibeShareSheet');
+    if (!sheet) {
+      sheet = document.createElement('div');
+      sheet.id = 'ftvVibeShareSheet';
+      sheet.className = 'ftv-vibe-share-sheet';
+      sheet.innerHTML = `
+        <div class="ftv-vibe-share-card">
+          <div class="ftv-vibe-share-hdr">
+            <b data-i18n="ftv_vibe_title">📲 4D Focus Vibe Story</b>
+            <button type="button" class="ftv-vibe-close" id="ftvVibeShareCloseBtn">✕</button>
+          </div>
+          <canvas id="ftvVibeShareCanvas" width="540" height="960" class="ftv-vibe-canvas"></canvas>
+          <div class="ftv-vibe-primary-row">
+            <button type="button" class="ftv-hud-btn ftv-share-btn" id="ftvVibeNativeBtn" style="flex:1;justify-content:center;">📲 TikTok / IG / Native</button>
+            <button type="button" class="ftv-hud-btn" id="ftvVibeVideoBtn" style="justify-content:center;background:linear-gradient(135deg,#7c3aed,#db2777);color:#fff;border:none;">🎬 5s Video</button>
+            <button type="button" class="ftv-hud-btn" id="ftvVibePngBtn" style="justify-content:center;border-color:#fbbf24;color:#fde047;">📥 PNG</button>
+          </div>
+          <div class="remo-net-grid" id="ftvVibeNetGrid">
+            <button type="button" class="remo-net-btn net-wa" data-ftv-net="whatsapp">🟢 WhatsApp</button>
+            <button type="button" class="remo-net-btn net-tg" data-ftv-net="telegram">✈️ Telegram</button>
+            <button type="button" class="remo-net-btn net-fb" data-ftv-net="facebook">📘 Facebook</button>
+            <button type="button" class="remo-net-btn net-x" data-ftv-net="x">𝕏 Share</button>
+            <button type="button" class="remo-net-btn net-tt" data-ftv-net="tiktok">🎵 TikTok</button>
+            <button type="button" class="remo-net-btn net-ig" data-ftv-net="instagram">📸 Instagram</button>
+            <button type="button" class="remo-net-btn net-rd" data-ftv-net="reddit">👽 Reddit</button>
+            <button type="button" class="remo-net-btn net-li" data-ftv-net="linkedin">💼 LinkedIn</button>
+          </div>
+        </div>
+      `;
+      sheet.addEventListener('click', (e) => {
+        if (e.target === sheet) sheet.classList.remove('open');
+      });
+      overlay.appendChild(sheet);
+      document.getElementById('ftvVibeShareCloseBtn').onclick = () => sheet.classList.remove('open');
+    }
 
-      const grad = ctx.createLinearGradient(0, 0, 0, 960);
-      grad.addColorStop(0, '#040818');
-      grad.addColorStop(0.55, `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.42)`);
-      grad.addColorStop(1, '#050816');
-      ctx.fillStyle = grad;
-      ctx.fillRect(0, 0, 540, 960);
+    const cv = document.getElementById('ftvVibeShareCanvas');
+    _drawFocusVibeCanvas(cv, city, wx, st, shareUrl, 0);
+    sheet.classList.add('open');
 
-      if (typeof window.drawCityLandmark === 'function') {
-        window.drawCityLandmark(ctx, city.id, city.themeColor || '#38bdf8', 270, 490, 260);
+    const getPng = () => cv.toDataURL('image/png');
+    const netShare = (net) => {
+      if (window.REMO_SHARE_HUB && typeof window.REMO_SHARE_HUB.shareToNetwork === 'function') {
+        window.REMO_SHARE_HUB.shareToNetwork(net, {
+          url: shareUrl,
+          title,
+          shareText,
+          isFr,
+          context: 'focus',
+          fileName: `REMO_4D_FocusTV_${city.id}`,
+          getDataUrlFn: getPng
+        });
       }
+    };
 
-      ctx.textAlign = 'center';
-      ctx.fillStyle = '#38bdf8';
-      ctx.font = 'bold 20px Orbitron, sans-serif';
-      ctx.fillText('REMO 4D FOCUS TV · LIVE', 270, 90);
-
-      ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 42px Orbitron, sans-serif';
-      ctx.fillText(`${city.flag} ${_cityName(city).toUpperCase()}`, 270, 155);
-
-      ctx.fillStyle = '#e2e8f0';
-      ctx.font = 'bold 24px sans-serif';
-      ctx.fillText(`🕒 ${wx.timeStr || '--:--'}  ·  ${wx.icon || '🌤️'} ${wx.tempC ?? 20}°C`, 270, 200);
-
-      ctx.fillStyle = '#fde047';
-      ctx.font = 'bold 24px sans-serif';
-      ctx.fillText(`🎧 ${st.name}`, 270, 820);
-
-      ctx.fillStyle = '#94a3b8';
-      ctx.font = '16px monospace';
-      ctx.fillText(shareUrl.replace(/^https?:\/\//, '').slice(0, 48), 270, 875);
-
-      const link = document.createElement('a');
-      link.download = `REMO_4D_FocusTV_${city.id}.png`;
-      link.href = c.toDataURL('image/png');
-      link.click();
-    } catch (e) {}
+    document.getElementById('ftvVibeNativeBtn').onclick = () => netShare('native');
+    document.getElementById('ftvVibePngBtn').onclick = () => {
+      if (window.REMO_SHARE_HUB && typeof window.REMO_SHARE_HUB.downloadDataUrl === 'function') {
+        window.REMO_SHARE_HUB.downloadDataUrl(getPng(), `REMO_4D_FocusTV_${city.id}.png`);
+      }
+      if (typeof window.remoToast === 'function') window.remoToast(_t('ftv_share_ready'), 'fanfare');
+    };
+    document.getElementById('ftvVibeVideoBtn').onclick = () => {
+      if (window.REMO_SHARE_HUB && typeof window.REMO_SHARE_HUB.recordCanvasVideoLoop === 'function') {
+        window.REMO_SHARE_HUB.recordCanvasVideoLoop(
+          cv,
+          (tVal) => _drawFocusVibeCanvas(cv, city, wx, st, shareUrl, tVal),
+          { isFr, durationMs: 4500, fileName: `REMO_4D_FocusTV_${city.id}.webm` }
+        );
+      }
+    };
+    sheet.querySelectorAll('[data-ftv-net]').forEach((b) => {
+      b.onclick = () => netShare(b.getAttribute('data-ftv-net'));
+    });
 
     if (typeof window.remoToast === 'function') {
       window.remoToast(_t('ftv_share_ready'), 'fanfare');

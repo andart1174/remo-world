@@ -1084,7 +1084,23 @@ const REMO_DICT = {
     ftv_room_copied_toast: '👥 Focus Room invite link copied! Synced timer active!',
     ftv_room_focusing: 'focusing',
     ftv_room_welcome: '👥 Joined Focus Room #{room} — synced {dur}m sprint live! Share 👥 to invite.',
-    ftv_room_synced: 'Synced'
+    ftv_room_synced: 'Synced',
+
+    // 🌐 Universal Multi-Network Share Hub (EN)
+    share_format_story: '📱 9:16 Story',
+    share_format_square: '🖼️ 1:1 Post',
+    share_format_wide: '🖥️ 16:9 Wide',
+    share_qr_toggle: '📲 QR Code',
+    share_video_btn: '🎬 5s Video (TikTok/IG)',
+    share_copy_caption_btn: '📋 Caption + #',
+    share_png_btn: '📥 PNG',
+    share_link_btn: '🔗 Copy (+25 🪙)',
+    blitz_story_card_btn: '📲 9:16 Score Card (TikTok / Insta)',
+    blitz_video_btn: '🎬 5s Video',
+    blitz_card_download: '📥 Save PNG',
+    blitz_card_native: '📲 Share Native / TikTok',
+    blitz_more_nets: 'More',
+    ftv_vibe_title: '📲 4D Focus Vibe Story'
   },
 
   fr: {
@@ -2165,7 +2181,23 @@ const REMO_DICT = {
     ftv_room_copied_toast: '👥 Lien de Salle Focus copié ! Chrono synchronisé activé !',
     ftv_room_focusing: 'en focus',
     ftv_room_welcome: '👥 Salle #{room} rejointe — session synchro {dur}m en direct ! Partage 👥.',
-    ftv_room_synced: 'Synchro'
+    ftv_room_synced: 'Synchro',
+
+    // 🌐 Hub de Partage Universel Multi-Réseaux (FR)
+    share_format_story: '📱 Story 9:16',
+    share_format_square: '🖼️ Carré 1:1',
+    share_format_wide: '🖥️ Format 16:9',
+    share_qr_toggle: '📲 Code QR',
+    share_video_btn: '🎬 Vidéo 5s (TikTok/IG)',
+    share_copy_caption_btn: '📋 Légende + #',
+    share_png_btn: '📥 PNG',
+    share_link_btn: '🔗 Copier (+25 🪙)',
+    blitz_story_card_btn: '📲 Carte Score 9:16 (TikTok / Insta)',
+    blitz_video_btn: '🎬 Vidéo 5s',
+    blitz_card_download: '📥 PNG 9:16',
+    blitz_card_native: '📲 Partager / TikTok',
+    blitz_more_nets: 'Plus',
+    ftv_vibe_title: '📲 Story Ambiance 4D'
   }
 };
 

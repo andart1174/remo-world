@@ -2884,6 +2884,783 @@ function sharePostLink(postId) {
   copyPostUrlToClipboard(url, lang);
 }
 
+/* ── 🌐 UNIVERSAL MULTI-NETWORK SHARE HUB & PURE-JS QR GENERATOR (v121) ── */
+const REMO_QR = (function () {
+  // ISO/IEC 18004 Byte-Mode QR Encoder (ECC Level L, Versions 1..10, max ~271 UTF-8 bytes)
+  const VER_TABLE = [
+    null,
+    { size: 21, totalData: 19, ec: 7, g1b: 1, g1d: 19, g2b: 0, g2d: 0, rem: 0, align: [] },
+    { size: 25, totalData: 34, ec: 10, g1b: 1, g1d: 34, g2b: 0, g2d: 0, rem: 7, align: [6, 18] },
+    { size: 29, totalData: 55, ec: 15, g1b: 1, g1d: 55, g2b: 0, g2d: 0, rem: 7, align: [6, 22] },
+    { size: 33, totalData: 80, ec: 20, g1b: 1, g1d: 80, g2b: 0, g2d: 0, rem: 7, align: [6, 26] },
+    { size: 37, totalData: 108, ec: 26, g1b: 1, g1d: 108, g2b: 0, g2d: 0, rem: 7, align: [6, 30] },
+    { size: 41, totalData: 136, ec: 18, g1b: 2, g1d: 68, g2b: 0, g2d: 0, rem: 7, align: [6, 34] },
+    { size: 45, totalData: 156, ec: 20, g1b: 2, g1d: 78, g2b: 0, g2d: 0, rem: 0, align: [6, 22, 38] },
+    { size: 49, totalData: 194, ec: 24, g1b: 2, g1d: 97, g2b: 0, g2d: 0, rem: 0, align: [6, 24, 42] },
+    { size: 53, totalData: 232, ec: 30, g1b: 2, g1d: 116, g2b: 0, g2d: 0, rem: 0, align: [6, 26, 46] },
+    { size: 57, totalData: 274, ec: 18, g1b: 2, g1d: 68, g2b: 2, g2d: 69, rem: 0, align: [6, 28, 50] }
+  ];
+
+  const GF_EXP = new Uint8Array(512);
+  const GF_LOG = new Uint8Array(256);
+  (() => {
+    let x = 1;
+    for (let i = 0; i < 255; i++) {
+      GF_EXP[i] = x;
+      GF_LOG[x] = i;
+      x = (x << 1) ^ (x & 0x80 ? 0x11d : 0);
+    }
+    for (let i = 255; i < 512; i++) GF_EXP[i] = GF_EXP[i - 255];
+  })();
+
+  function gfMul(a, b) {
+    if (a === 0 || b === 0) return 0;
+    return GF_EXP[GF_LOG[a] + GF_LOG[b]];
+  }
+
+  function rsGeneratorPoly(deg) {
+    let poly = [1];
+    for (let i = 0; i < deg; i++) {
+      const next = new Array(poly.length + 1).fill(0);
+      const factor = GF_EXP[i];
+      for (let j = 0; j < poly.length; j++) {
+        next[j] ^= poly[j];
+        next[j + 1] ^= gfMul(poly[j], factor);
+      }
+      poly = next;
+    }
+    return poly;
+  }
+
+  function rsComputeEc(data, ecCount) {
+    const gen = rsGeneratorPoly(ecCount);
+    const res = new Array(ecCount).fill(0);
+    for (let i = 0; i < data.length; i++) {
+      const factor = data[i] ^ res[0];
+      res.shift();
+      res.push(0);
+      if (factor !== 0) {
+        for (let j = 0; j < ecCount; j++) {
+          res[j] ^= gfMul(gen[j + 1], factor);
+        }
+      }
+    }
+    return res;
+  }
+
+  function utf8Bytes(str) {
+    if (typeof TextEncoder !== 'undefined') {
+      return Array.from(new TextEncoder().encode(String(str || '')));
+    }
+    const enc = unescape(encodeURIComponent(String(str || '')));
+    const out = [];
+    for (let i = 0; i < enc.length; i++) out.push(enc.charCodeAt(i));
+    return out;
+  }
+
+  function pickVersion(byteLen) {
+    for (let v = 1; v < VER_TABLE.length; v++) {
+      const ccBits = v >= 10 ? 16 : 8;
+      const capBytes = Math.floor((VER_TABLE[v].totalData * 8 - 4 - ccBits) / 8);
+      if (byteLen <= capBytes) return v;
+    }
+    return -1;
+  }
+
+  function bchFormat(mask) {
+    const data = (1 << 3) | (mask & 7); // ECC L = 01
+    let d = data << 10;
+    for (let i = 4; i >= 0; i--) {
+      if ((d >>> (i + 10)) & 1) d ^= 0x537 << i;
+    }
+    return ((data << 10) | d) ^ 0x5412;
+  }
+
+  function bchVersion(ver) {
+    let d = ver << 12;
+    for (let i = 5; i >= 0; i--) {
+      if ((d >>> (i + 12)) & 1) d ^= 0x1f25 << i;
+    }
+    return (ver << 12) | d;
+  }
+
+  function encode(text) {
+    let bytes = utf8Bytes(text);
+    let ver = pickVersion(bytes.length);
+    if (ver < 0) {
+      bytes = bytes.slice(0, 271);
+      ver = 10;
+    }
+    const spec = VER_TABLE[ver];
+    const bits = [];
+    const pushBits = (val, n) => {
+      for (let i = n - 1; i >= 0; i--) bits.push((val >>> i) & 1);
+    };
+
+    pushBits(0b0100, 4); // Byte mode
+    pushBits(bytes.length, ver >= 10 ? 16 : 8);
+    for (let i = 0; i < bytes.length; i++) pushBits(bytes[i], 8);
+    const totalDataBits = spec.totalData * 8;
+    pushBits(0, Math.min(4, totalDataBits - bits.length));
+    while (bits.length % 8 !== 0) bits.push(0);
+
+    const codewords = [];
+    for (let i = 0; i < bits.length; i += 8) {
+      let cw = 0;
+      for (let b = 0; b < 8; b++) cw = (cw << 1) | bits[i + b];
+      codewords.push(cw);
+    }
+    let padToggle = 0;
+    while (codewords.length < spec.totalData) {
+      codewords.push(padToggle === 0 ? 0xec : 0x11);
+      padToggle ^= 1;
+    }
+
+    const dataBlocks = [];
+    const ecBlocks = [];
+    let offset = 0;
+    for (let i = 0; i < spec.g1b; i++) {
+      const blk = codewords.slice(offset, offset + spec.g1d);
+      offset += spec.g1d;
+      dataBlocks.push(blk);
+      ecBlocks.push(rsComputeEc(blk, spec.ec));
+    }
+    for (let i = 0; i < spec.g2b; i++) {
+      const blk = codewords.slice(offset, offset + spec.g2d);
+      offset += spec.g2d;
+      dataBlocks.push(blk);
+      ecBlocks.push(rsComputeEc(blk, spec.ec));
+    }
+
+    const interleaved = [];
+    const maxD = Math.max(spec.g1d, spec.g2d);
+    for (let col = 0; col < maxD; col++) {
+      for (let b = 0; b < dataBlocks.length; b++) {
+        if (col < dataBlocks[b].length) interleaved.push(dataBlocks[b][col]);
+      }
+    }
+    for (let col = 0; col < spec.ec; col++) {
+      for (let b = 0; b < ecBlocks.length; b++) interleaved.push(ecBlocks[b][col]);
+    }
+
+    const bitStream = [];
+    for (let i = 0; i < interleaved.length; i++) {
+      const v = interleaved[i];
+      for (let b = 7; b >= 0; b--) bitStream.push((v >>> b) & 1);
+    }
+    for (let i = 0; i < spec.rem; i++) bitStream.push(0);
+
+    const N = spec.size;
+    const mods = Array.from({ length: N }, () => new Int8Array(N).fill(-1));
+    const isFunc = Array.from({ length: N }, () => new Uint8Array(N));
+
+    const setMod = (r, c, v, fn = false) => {
+      if (r < 0 || c < 0 || r >= N || c >= N) return;
+      mods[r][c] = v ? 1 : 0;
+      if (fn) isFunc[r][c] = 1;
+    };
+
+    const drawFinder = (r0, c0) => {
+      for (let dr = -1; dr <= 7; dr++) {
+        for (let dc = -1; dc <= 7; dc++) {
+          const r = r0 + dr;
+          const c = c0 + dc;
+          if (r < 0 || c < 0 || r >= N || c >= N) continue;
+          const dark =
+            dr >= 0 && dr <= 6 && dc >= 0 && dc <= 6 &&
+            (dr === 0 || dr === 6 || dc === 0 || dc === 6 || (dr >= 2 && dr <= 4 && dc >= 2 && dc <= 4));
+          setMod(r, c, dark ? 1 : 0, true);
+        }
+      }
+    };
+    drawFinder(0, 0);
+    drawFinder(0, N - 7);
+    drawFinder(N - 7, 0);
+
+    const al = spec.align;
+    for (let i = 0; i < al.length; i++) {
+      for (let j = 0; j < al.length; j++) {
+        if ((i === 0 && j === 0) || (i === 0 && j === al.length - 1) || (i === al.length - 1 && j === 0)) continue;
+        const cr = al[i];
+        const cc = al[j];
+        for (let dr = -2; dr <= 2; dr++) {
+          for (let dc = -2; dc <= 2; dc++) {
+            const dark = Math.max(Math.abs(dr), Math.abs(dc)) !== 1;
+            setMod(cr + dr, cc + dc, dark ? 1 : 0, true);
+          }
+        }
+      }
+    }
+
+    for (let i = 8; i < N - 8; i++) {
+      const dark = i % 2 === 0 ? 1 : 0;
+      if (!isFunc[6][i]) setMod(6, i, dark, true);
+      if (!isFunc[i][6]) setMod(i, 6, dark, true);
+    }
+
+    setMod(N - 8, 8, 1, true);
+    for (let i = 0; i < 9; i++) {
+      if (!isFunc[8][i]) setMod(8, i, 0, true);
+      if (!isFunc[i][8]) setMod(i, 8, 0, true);
+    }
+    for (let i = 0; i < 8; i++) {
+      if (!isFunc[8][N - 1 - i]) setMod(8, N - 1 - i, 0, true);
+      if (!isFunc[N - 1 - i][8]) setMod(N - 1 - i, 8, 0, true);
+    }
+    if (ver >= 7) {
+      const vBits = bchVersion(ver);
+      for (let i = 0; i < 18; i++) {
+        const bit = (vBits >>> i) & 1;
+        const rBL = N - 11 + (i % 3);
+        const cBL = Math.floor(i / 3);
+        setMod(rBL, cBL, bit, true);
+        setMod(cBL, rBL, bit, true);
+      }
+    }
+
+    let bitIdx = 0;
+    let up = true;
+    for (let rightCol = N - 1; rightCol >= 1; rightCol -= 2) {
+      if (rightCol === 6) rightCol--;
+      for (let step = 0; step < N; step++) {
+        const r = up ? N - 1 - step : step;
+        for (let k = 0; k < 2; k++) {
+          const c = rightCol - k;
+          if (!isFunc[r][c]) {
+            mods[r][c] = bitIdx < bitStream.length ? bitStream[bitIdx++] : 0;
+          }
+        }
+      }
+      up = !up;
+    }
+
+    const maskPreds = [
+      (r, c) => (r + c) % 2 === 0,
+      (r) => r % 2 === 0,
+      (r, c) => c % 3 === 0,
+      (r, c) => (r + c) % 3 === 0,
+      (r, c) => (Math.floor(r / 2) + Math.floor(c / 3)) % 2 === 0,
+      (r, c) => ((r * c) % 2) + ((r * c) % 3) === 0,
+      (r, c) => (((r * c) % 2) + ((r * c) % 3)) % 2 === 0,
+      (r, c) => (((r + c) % 2) + ((r * c) % 3)) % 2 === 0
+    ];
+
+    const applyMaskAndFormat = (grid, mask) => {
+      const pred = maskPreds[mask];
+      for (let r = 0; r < N; r++) {
+        for (let c = 0; c < N; c++) {
+          if (!isFunc[r][c] && pred(r, c)) grid[r][c] ^= 1;
+        }
+      }
+      const fmt = bchFormat(mask);
+      for (let i = 0; i < 6; i++) grid[8][i] = (fmt >>> (14 - i)) & 1;
+      grid[8][7] = (fmt >>> 8) & 1;
+      grid[8][8] = (fmt >>> 7) & 1;
+      grid[7][8] = (fmt >>> 6) & 1;
+      for (let i = 0; i < 6; i++) grid[5 - i][8] = (fmt >>> (5 - i)) & 1;
+      for (let i = 0; i < 7; i++) grid[N - 1 - i][8] = (fmt >>> (14 - i)) & 1;
+      for (let i = 0; i < 8; i++) grid[8][N - 8 + i] = (fmt >>> (7 - i)) & 1;
+    };
+
+    const scorePenalty = (grid) => {
+      let pen = 0;
+      for (let r = 0; r < N; r++) {
+        let runCol = 1;
+        let runRow = 1;
+        for (let c = 1; c < N; c++) {
+          if (grid[r][c] === grid[r][c - 1]) {
+            runRow++;
+            if (runRow === 5) pen += 3;
+            else if (runRow > 5) pen++;
+          } else runRow = 1;
+          if (grid[c][r] === grid[c - 1][r]) {
+            runCol++;
+            if (runCol === 5) pen += 3;
+            else if (runCol > 5) pen++;
+          } else runCol = 1;
+        }
+      }
+      for (let r = 0; r < N - 1; r++) {
+        for (let c = 0; c < N - 1; c++) {
+          const v = grid[r][c];
+          if (v === grid[r][c + 1] && v === grid[r + 1][c] && v === grid[r + 1][c + 1]) pen += 3;
+        }
+      }
+      let darkCount = 0;
+      for (let r = 0; r < N; r++) {
+        for (let c = 0; c < N; c++) if (grid[r][c]) darkCount++;
+      }
+      pen += Math.floor(Math.abs(darkCount * 100 / (N * N) - 50) / 5) * 10;
+      return pen;
+    };
+
+    let bestMask = 0;
+    let bestPen = Infinity;
+    let bestGrid = null;
+    for (let m = 0; m < 8; m++) {
+      const clone = mods.map((row) => Int8Array.from(row));
+      applyMaskAndFormat(clone, m);
+      const p = scorePenalty(clone);
+      if (p < bestPen) {
+        bestPen = p;
+        bestMask = m;
+        bestGrid = clone;
+      }
+    }
+
+    return {
+      version: ver,
+      size: N,
+      mask: bestMask,
+      matrix: bestGrid.map((r) => Array.from(r))
+    };
+  }
+
+  return { encode };
+})();
+
+const REMO_SHARE_HUB = (function () {
+  const DAILY_CAP_NETS = 4;
+  const DAILY_BONUS_COINS = 5;
+
+  function _cleanUrl(url) {
+    const raw = String(url || '').trim();
+    if (!raw) return 'https://remoworld.com/';
+    if (raw.startsWith('http://localhost') || raw.startsWith('http://127.0.0.1')) {
+      return raw.replace(/^http:\/\/[^/]+/i, 'https://remoworld.com');
+    }
+    return raw;
+  }
+
+  function _getDefaultTags(context, isFr) {
+    if (context === 'blitz') {
+      return isFr ? '#REMOWorld #WorldBlitz #DéfiGéo #VillesDuMonde' : '#REMOWorld #WorldBlitz #GeoChallenge #WorldCities';
+    }
+    if (context === 'focus') {
+      return '#REMOWorld #FocusTV #StudyWithMe #LoFi';
+    }
+    if (context === 'ambassador') {
+      return isFr ? '#REMOWorld #Ambassadeur #VillesDuMonde' : '#REMOWorld #CityAmbassador #WorldCities';
+    }
+    if (context === 'duel') {
+      return isFr ? '#REMOWorld #DuelDesVilles #Votez' : '#REMOWorld #CityDuel #WorldCities';
+    }
+    return isFr ? '#REMOWorld #VillesDuMonde #Voyage4D' : '#REMOWorld #REMOWorldCities #LiveWorld #4DCities';
+  }
+
+  function formatCopy(platform, opts = {}) {
+    const lang = opts.isFr !== undefined ? (opts.isFr ? 'fr' : 'en') : (REMO_I18N.getLang() === 'fr' ? 'fr' : 'en');
+    const isFr = lang === 'fr';
+    const url = _cleanUrl(opts.url);
+    const title = String(opts.title || 'REMO World 🌐 4D World Cities').trim();
+    const baseText = String(opts.shareText || (isFr ? '🌐 Découvre ce moment en direct sur REMO World :' : '🌐 Check out this live city moment on REMO World:')).trim();
+    const tags = String(opts.hashtags || _getDefaultTags(opts.context, isFr)).trim();
+
+    if (platform === 'x') {
+      const suffix = tags ? ` ${tags}` : '';
+      const maxBody = Math.max(80, 240 - suffix.length);
+      const body = baseText.length > maxBody ? (baseText.slice(0, maxBody - 3).trim() + '...') : baseText;
+      const xTweetText = `${body}${suffix}`.trim();
+      return { url, title, tags, body, xTweetText, fullMsg: `${xTweetText}\n${url}` };
+    }
+    if (platform === 'tiktok' || platform === 'instagram') {
+      const cta = isFr ? '🌐 Joue & vote en direct 👉' : '🌐 Join & vote live 👉';
+      const cap = `${baseText}\n${cta} ${url}\n\n${tags}`.trim();
+      return { url, title, tags, body: baseText, fullMsg: cap, xTweetText: cap };
+    }
+    const fullMsg = `${baseText}\n${url}${tags ? `\n${tags}` : ''}`.trim();
+    return { url, title, tags, body: baseText, fullMsg, xTweetText: fullMsg };
+  }
+
+  function drawQrOnCanvas(ctx, text, x, y, boxSize, opts = {}) {
+    if (!ctx || !text || boxSize < 36) return;
+    try {
+      const clean = _cleanUrl(text);
+      const qr = REMO_QR.encode(clean);
+      const pad = Math.max(4, Math.round(boxSize * 0.065));
+      const inner = boxSize - pad * 2;
+      const modPx = Math.floor(inner / qr.size);
+      const drawnSize = modPx * qr.size;
+      const startX = Math.round(x + (boxSize - drawnSize) / 2);
+      const startY = Math.round(y + (boxSize - drawnSize) / 2);
+
+      ctx.save();
+      const rad = opts.radius !== undefined ? opts.radius : 12;
+      ctx.fillStyle = opts.bgColor || '#ffffff';
+      ctx.beginPath();
+      if (typeof ctx.roundRect === 'function') ctx.roundRect(x, y, boxSize, boxSize, rad);
+      else ctx.rect(x, y, boxSize, boxSize);
+      ctx.fill();
+
+      ctx.strokeStyle = opts.borderColor || '#38bdf8';
+      ctx.lineWidth = opts.borderWidth || 2;
+      ctx.stroke();
+
+      ctx.fillStyle = opts.fgColor || '#050816';
+      for (let r = 0; r < qr.size; r++) {
+        for (let c = 0; c < qr.size; c++) {
+          if (qr.matrix[r][c]) {
+            ctx.fillRect(startX + c * modPx, startY + r * modPx, modPx, modPx);
+          }
+        }
+      }
+      ctx.restore();
+    } catch (e) {}
+  }
+
+  function awardDailyNetworkShareBonus(platform) {
+    const cleanNet = String(platform || '').toLowerCase();
+    if (!cleanNet || cleanNet === 'download' || cleanNet === 'copy') return { awarded: 0, countToday: 0 };
+    try {
+      const now = new Date();
+      const dayKey = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}-${String(now.getUTCDate()).padStart(2, '0')}`;
+      const storeKey = `remo_share_net_${dayKey}`;
+      const raw = JSON.parse(localStorage.getItem(storeKey) || '[]');
+      const list = Array.isArray(raw) ? raw : [];
+      if (list.includes(cleanNet) || list.length >= DAILY_CAP_NETS) {
+        return { awarded: 0, countToday: list.length };
+      }
+      list.push(cleanNet);
+      localStorage.setItem(storeKey, JSON.stringify(list));
+      const u = window.REMO_STORE && typeof window.REMO_STORE.getCurrentUser === 'function'
+        ? window.REMO_STORE.getCurrentUser()
+        : null;
+      if (u && u.uid && typeof window.REMO_STORE.addCoins === 'function') {
+        window.REMO_STORE.addCoins(u.uid, DAILY_BONUS_COINS, DAILY_BONUS_COINS);
+        if (typeof window.spawnRemoCoinsFX === 'function') window.spawnRemoCoinsFX(4);
+        if (typeof window.syncHeaderAndSidebars === 'function') window.syncHeaderAndSidebars();
+        return { awarded: DAILY_BONUS_COINS, countToday: list.length };
+      }
+      return { awarded: 0, countToday: list.length };
+    } catch (e) {
+      return { awarded: 0, countToday: 0 };
+    }
+  }
+
+  async function copyTextSafe(txt) {
+    const s = String(txt || '');
+    if (!s) return false;
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(s);
+        return true;
+      }
+    } catch (e) {}
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = s;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      const ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+      return Boolean(ok);
+    } catch (e) {
+      return false;
+    }
+  }
+
+  async function copyImageDataUrlToClipboard(dataUrl) {
+    if (!dataUrl || !navigator.clipboard || !window.ClipboardItem) return false;
+    try {
+      const res = await fetch(dataUrl);
+      const blob = await res.blob();
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function downloadDataUrl(dataUrl, fileName) {
+    if (!dataUrl) return;
+    const a = document.createElement('a');
+    a.href = dataUrl;
+    a.download = fileName || `REMO_Share_${Date.now()}.png`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  }
+
+  async function _resolveVisualDataUrl(opts) {
+    if (typeof opts.getDataUrlFn === 'function') {
+      try {
+        const res = await opts.getDataUrlFn();
+        if (res) return res;
+      } catch (e) {}
+    }
+    if (opts.canvas && typeof opts.canvas.toDataURL === 'function') {
+      try { return opts.canvas.toDataURL('image/png'); } catch (e) {}
+    }
+    return '';
+  }
+
+  async function recordCanvasVideoLoop(canvas, renderFrameAtT, opts = {}) {
+    const isFr = opts.isFr !== undefined ? opts.isFr : (REMO_I18N.getLang() === 'fr');
+    if (!canvas || typeof canvas.captureStream !== 'function' || typeof MediaRecorder === 'undefined') {
+      if (typeof window.remoToast === 'function') {
+        window.remoToast(
+          isFr ? '🎥 Export vidéo non supporté sur ce navigateur — utilise 📥 PNG !' : '🎥 Video loop not supported on this browser — use 📥 PNG!',
+          'coin'
+        );
+      }
+      return false;
+    }
+    const candidates = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm', 'video/mp4'];
+    const mimeType = candidates.find((m) => MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(m)) || '';
+    const durationMs = Number(opts.durationMs || 4500);
+    const fileName = opts.fileName || `REMO_Loop_${Date.now()}.webm`;
+
+    if (typeof window.remoToast === 'function') {
+      window.remoToast(isFr ? '🎬 Création de la boucle vidéo 5s (TikTok / Reels)...' : '🎬 Rendering 5s video loop (TikTok / Reels)...');
+    }
+
+    const stream = canvas.captureStream(30);
+    const chunks = [];
+    let rec;
+    try {
+      rec = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+    } catch (e) {
+      rec = new MediaRecorder(stream);
+    }
+
+    return await new Promise((resolve) => {
+      rec.ondataavailable = (ev) => {
+        if (ev.data && ev.data.size > 0) chunks.push(ev.data);
+      };
+      rec.onstop = async () => {
+        try {
+          const outMime = mimeType || 'video/webm';
+          const blob = new Blob(chunks, { type: outMime });
+          const ext = outMime.includes('mp4') ? 'mp4' : 'webm';
+          const outName = fileName.replace(/\.(webm|mp4)$/i, '') + '.' + ext;
+          const urlObj = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = urlObj;
+          a.download = outName;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          setTimeout(() => { try { URL.revokeObjectURL(urlObj); } catch (e) {} }, 8000);
+          if (typeof window.remoToast === 'function') {
+            window.remoToast(
+              isFr ? '🎥 Boucle vidéo 5s téléchargée pour TikTok / Instagram Reels !' : '🎥 5s video loop downloaded for TikTok / Instagram Reels!',
+              'fanfare'
+            );
+          }
+          resolve(true);
+        } catch (err) {
+          resolve(false);
+        }
+      };
+
+      try {
+        rec.start();
+      } catch (startErr) {
+        resolve(false);
+        return;
+      }
+
+      const startTs = performance.now();
+      const step = (now) => {
+        const elapsed = now - startTs;
+        try {
+          renderFrameAtT(elapsed / 1000);
+        } catch (e) {}
+        if (elapsed < durationMs) {
+          requestAnimationFrame(step);
+        } else {
+          try { renderFrameAtT(0); } catch (e) {}
+          if (rec.state !== 'inactive') rec.stop();
+        }
+      };
+      requestAnimationFrame(step);
+    });
+  }
+
+  async function shareToNetwork(platform, opts = {}) {
+    const net = String(platform || 'native').toLowerCase();
+    const isFr = opts.isFr !== undefined ? opts.isFr : (REMO_I18N.getLang() === 'fr');
+    const formatted = formatCopy(net, opts);
+    const bonusRes = opts.skipDailyBonus ? { awarded: 0 } : awardDailyNetworkShareBonus(net);
+    const netBonusSuffix = bonusRes.awarded > 0 ? ` (+${bonusRes.awarded} 🪙!)` : '';
+    const extraSuffix = (opts.extraToastSuffix || '') + netBonusSuffix;
+
+    if (typeof opts.onShared === 'function') {
+      try { opts.onShared(net, bonusRes); } catch (e) {}
+    }
+
+    if (net === 'native') {
+      await copyTextSafe(formatted.fullMsg);
+      const dataUrl = await _resolveVisualDataUrl(opts);
+      if (navigator.share) {
+        try {
+          if (dataUrl) {
+            const res = await fetch(dataUrl);
+            const blob = await res.blob();
+            const file = new File([blob], (opts.fileName || 'REMO_Story') + '.png', { type: 'image/png' });
+            if (navigator.canShare && navigator.canShare({ files: [file] })) {
+              await navigator.share({ files: [file], title: formatted.title, text: formatted.fullMsg });
+              if (!opts.suppressToast && typeof window.remoToast === 'function') {
+                window.remoToast((isFr ? '📲 Partagé avec image !' : '📲 Shared with image!') + extraSuffix, 'fanfare');
+              }
+              return true;
+            }
+          }
+          await navigator.share({ title: formatted.title, text: `${formatted.body} ${formatted.tags}`.trim(), url: formatted.url });
+          if (!opts.suppressToast && typeof window.remoToast === 'function') {
+            window.remoToast((isFr ? '🔗 Lien partagé avec succès !' : '🔗 Shared successfully!') + extraSuffix, 'coin');
+          }
+          return true;
+        } catch (e) {}
+      }
+      if (dataUrl) {
+        downloadDataUrl(dataUrl, (opts.fileName || 'REMO_Story') + '.png');
+      }
+      if (!opts.suppressToast && typeof window.remoToast === 'function') {
+        window.remoToast(
+          (dataUrl
+            ? (isFr ? '📥 Image téléchargée & légende copiée !' : '📥 Image saved & caption copied!')
+            : (isFr ? '📋 Légende & lien copiés !' : '📋 Caption & link copied!')) + extraSuffix,
+          'coin'
+        );
+      }
+      return true;
+    }
+
+    if (net === 'tiktok' || net === 'instagram') {
+      await copyTextSafe(formatted.fullMsg);
+      const dataUrl = await _resolveVisualDataUrl(opts);
+      if (dataUrl && navigator.share) {
+        try {
+          const res = await fetch(dataUrl);
+          const blob = await res.blob();
+          const file = new File([blob], (opts.fileName || 'REMO_Story') + '.png', { type: 'image/png' });
+          if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            await navigator.share({ files: [file], title: formatted.title, text: formatted.fullMsg });
+            if (!opts.suppressToast && typeof window.remoToast === 'function') {
+              window.remoToast((isFr ? `🎬 Prêt sur ${net === 'tiktok' ? 'TikTok' : 'Instagram'} !` : `🎬 Shared to ${net === 'tiktok' ? 'TikTok' : 'Instagram'}!`) + extraSuffix, 'fanfare');
+            }
+            return true;
+          }
+        } catch (e) {}
+      }
+      if (dataUrl) {
+        downloadDataUrl(dataUrl, (opts.fileName || `REMO_${net}_Card`) + '.png');
+      }
+      const label = net === 'tiktok' ? 'TikTok' : 'Instagram';
+      if (!opts.suppressToast && typeof window.remoToast === 'function') {
+        window.remoToast(
+          (isFr
+            ? `📥 Image PNG prête & légende #hashtags copiée pour ${label} ! Colle-la dans ta publication.`
+            : `📥 PNG card saved & #hashtag caption copied for ${label}! Paste it into your post.`) + extraSuffix,
+          'fanfare'
+        );
+      }
+      return true;
+    }
+
+    let targetUrl = '';
+    if (net === 'whatsapp') {
+      targetUrl = `https://wa.me/?text=${encodeURIComponent(formatted.fullMsg)}`;
+    } else if (net === 'telegram') {
+      targetUrl = `https://t.me/share/url?url=${encodeURIComponent(formatted.url)}&text=${encodeURIComponent(formatted.body)}`;
+    } else if (net === 'x') {
+      targetUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(formatted.xTweetText)}&url=${encodeURIComponent(formatted.url)}`;
+    } else if (net === 'reddit') {
+      targetUrl = `https://www.reddit.com/submit?url=${encodeURIComponent(formatted.url)}&title=${encodeURIComponent(formatted.title)}`;
+    } else if (net === 'linkedin') {
+      await copyTextSafe(formatted.fullMsg);
+      targetUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(formatted.url)}`;
+    } else if (net === 'sms') {
+      targetUrl = `sms:?&body=${encodeURIComponent(formatted.fullMsg)}`;
+    } else if (net === 'email') {
+      targetUrl = `mailto:?subject=${encodeURIComponent(formatted.title)}&body=${encodeURIComponent(formatted.fullMsg)}`;
+    } else if (net === 'facebook') {
+      targetUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(formatted.url)}&quote=${encodeURIComponent(formatted.body)}`;
+      const dataUrl = await _resolveVisualDataUrl(opts);
+      if (dataUrl) {
+        const copiedImg = await copyImageDataUrlToClipboard(dataUrl);
+        if (!copiedImg) downloadDataUrl(dataUrl, (opts.fileName || 'REMO_Facebook_Card') + '.png');
+        if (!opts.suppressToast && typeof window.remoToast === 'function') {
+          window.remoToast(
+            (copiedImg
+              ? (isFr ? '📋 Image copiée ! Appuie sur Ctrl+V dans Facebook pour coller le visuel !' : '📋 Image copied! Press Ctrl+V inside Facebook to attach your visual!')
+              : (isFr ? '📥 Visuel téléchargé ! Ajoute-le à ton post Facebook !' : '📥 Visual downloaded! Attach it to your Facebook post!')) + extraSuffix,
+            'fanfare'
+          );
+        }
+      }
+    } else if (net === 'copy') {
+      await copyTextSafe(opts.copyRawUrlOnly ? formatted.url : formatted.fullMsg);
+      if (!opts.suppressToast && typeof window.remoToast === 'function') {
+        window.remoToast(
+          (isFr ? '📋 Légende, #hashtags et lien copiés !' : '📋 Caption, #hashtags & link copied!') + extraSuffix,
+          'coin'
+        );
+      }
+      return true;
+    }
+
+    if (targetUrl) {
+      window.open(targetUrl, '_blank', 'noopener,noreferrer');
+      if (net !== 'facebook' && !opts.suppressToast && typeof window.remoToast === 'function') {
+        const labelMap = {
+          whatsapp: 'WhatsApp', telegram: 'Telegram', x: '𝕏',
+          reddit: 'Reddit', linkedin: 'LinkedIn', sms: 'SMS', email: 'Email'
+        };
+        const lbl = labelMap[net] || net;
+        window.remoToast(
+          (isFr ? `🚀 Prêt à partager sur ${lbl} !` : `🚀 Opening ${lbl} share!`) + extraSuffix,
+          bonusRes.awarded > 0 ? 'coin' : 'info'
+        );
+      }
+      return true;
+    }
+    return false;
+  }
+
+  return {
+    encodeQr: (txt) => REMO_QR.encode(txt),
+    drawQrOnCanvas,
+    formatCopy,
+    shareToNetwork,
+    awardDailyNetworkShareBonus,
+    copyTextSafe,
+    copyImageDataUrlToClipboard,
+    downloadDataUrl,
+    recordCanvasVideoLoop
+  };
+})();
+window.REMO_SHARE_HUB = REMO_SHARE_HUB;
+
+window._viralShareFormat = '9:16';
+window._viralShareShowQr = true;
+
+function getViralStoryDims(fmt = window._viralShareFormat) {
+  if (fmt === '1:1') return { fmt: '1:1', W: 720, H: 720, cssMaxW: '245px', cssAspect: '1 / 1', suffix: '1x1' };
+  if (fmt === '16:9') return { fmt: '16:9', W: 960, H: 540, cssMaxW: '360px', cssAspect: '16 / 9', suffix: '16x9' };
+  return { fmt: '9:16', W: 540, H: 960, cssMaxW: '205px', cssAspect: '9 / 16', suffix: '9x16' };
+}
+
+function setViralPostShareFormat(fmt) {
+  window._viralShareFormat = (fmt === '1:1' || fmt === '16:9') ? fmt : '9:16';
+  document.querySelectorAll('.viral-fmt-pill').forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.fmt === window._viralShareFormat);
+  });
+  drawViralPostStoryCanvas(window._activeViralSharePostId);
+}
+window.setViralPostShareFormat = setViralPostShareFormat;
+
+function toggleViralPostQr(force) {
+  window._viralShareShowQr = typeof force === 'boolean' ? force : !window._viralShareShowQr;
+  const btn = document.getElementById('viralPostQrToggleBtn');
+  if (btn) btn.classList.toggle('active', window._viralShareShowQr);
+  drawViralPostStoryCanvas(window._activeViralSharePostId);
+}
+window.toggleViralPostQr = toggleViralPostQr;
+
 function openViralPostShareModal(postId) {
   window._activeViralSharePostId = postId;
   const modal = document.getElementById('viralPostShareModal');
@@ -2898,28 +3675,36 @@ function openViralPostShareModal(postId) {
 
   if (titleEl) {
     titleEl.textContent = isFr
-      ? '📲 Partager & Story Virale 9:16 (+25 🪙)'
-      : '📲 Share & 9:16 Viral Story (+25 🪙)';
+      ? '📲 Studio de Partage Universel (+25 🪙)'
+      : '📲 Universal Viral Share Studio (+25 🪙)';
   }
   if (subEl) {
     subEl.textContent = post && post.versus
       ? (isFr
-          ? 'Invitez vos amis à voter dans ce Duel de Villes sur TikTok, Instagram, WhatsApp ou Telegram et gagnez +25 🪙 !'
-          : 'Invite friends to vote in this City Duel on TikTok, Instagram, WhatsApp or Telegram & earn +25 🪙!')
+          ? 'Partage ce Duel sur TikTok, Instagram, WhatsApp, 𝕏, Telegram, Reddit ou Facebook (+25 🪙 + Bonus Réseaux)!'
+          : 'Share this Duel on TikTok, Instagram, WhatsApp, 𝕏, Telegram, Reddit or Facebook (+25 🪙 + Network Bonus)!')
       : (isFr
-          ? 'Partagez ce moment sur TikTok, Instagram Stories, WhatsApp ou Telegram et gagnez +25 🪙 !'
-          : 'Share this City Moment on TikTok, Instagram Stories, WhatsApp or Telegram & earn +25 🪙!');
+          ? 'Choisis ton format (9:16, 1:1, 16:9), active le Code QR et partage partout (+25 🪙)!'
+          : 'Pick your format (9:16, 1:1, 16:9), stamp a QR Code & share on every network (+25 🪙)!');
   }
   if (nativeBtn) {
-    nativeBtn.textContent = isFr
-      ? '📲 Partager Story 9:16 (TikTok / Insta / Natif)'
-      : '📲 Share 9:16 Story (TikTok / Insta / Native)';
+    nativeBtn.textContent = isFr ? '📲 Partage Natif / TikTok' : '📲 Native / TikTok';
   }
   if (copyBtn) {
     copyBtn.textContent = isFr ? '🔗 Copier (+25 🪙)' : '🔗 Copy (+25 🪙)';
   }
   if (linkInp) {
     linkInp.value = url;
+  }
+
+  document.querySelectorAll('.viral-fmt-pill').forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.fmt === window._viralShareFormat);
+  });
+  const qrBtn = document.getElementById('viralPostQrToggleBtn');
+  if (qrBtn) qrBtn.classList.toggle('active', window._viralShareShowQr);
+
+  if (window.REMO_I18N && typeof window.REMO_I18N.applyDOM === 'function') {
+    window.REMO_I18N.applyDOM();
   }
 
   modal.classList.add('open');
@@ -2933,19 +3718,22 @@ function closeViralPostShareModal() {
 }
 window.closeViralPostShareModal = closeViralPostShareModal;
 
-function drawViralPostStoryCanvas(postId) {
+function drawViralPostStoryCanvas(postId, animT = 0) {
   const cv = document.getElementById('viralPostStoryCanvas');
   if (!cv) return;
   const ctx = cv.getContext('2d');
-  const W = 540;
-  const H = 960;
+  const dims = getViralStoryDims(window._viralShareFormat);
+  const { fmt, W, H } = dims;
   cv.width = W;
   cv.height = H;
+  cv.style.maxWidth = dims.cssMaxW;
+  cv.style.aspectRatio = dims.cssAspect;
 
-  const { post, isFr, u } = getViralPostShareData(postId);
+  const { post, url, isFr, u } = getViralPostShareData(postId);
   const lang = isFr ? 'fr' : 'en';
+  const showQr = Boolean(window._viralShareShowQr);
 
-  const drawCoverImg = (img, x, y, w, h) => {
+  const drawCoverImg = (img, x, y, w, h, zoom = 1) => {
     if (!img) return false;
     try {
       const iw = img.naturalWidth || img.videoWidth || img.width || w;
@@ -2954,7 +3742,7 @@ function drawViralPostStoryCanvas(postId) {
         ctx.drawImage(img, x, y, w, h);
         return true;
       }
-      const scale = Math.max(w / iw, h / ih);
+      const scale = Math.max(w / iw, h / ih) * zoom;
       const sw = w / scale;
       const sh = h / scale;
       const sx = Math.max(0, (iw - sw) / 2);
@@ -2986,12 +3774,34 @@ function drawViralPostStoryCanvas(postId) {
     }
   };
 
-  const renderFrame = (imgLeft, imgRight) => {
-    // Reset canvas dimensions before drawing to clear any prior CORS taint state
+  const drawWrappedCenterText = (text, cx, startY, maxWidth, lineHeight, maxLines) => {
+    const words = String(text || '').trim().split(/\s+/).filter(Boolean);
+    if (!words.length) return;
+    const lines = [];
+    let cur = '';
+    for (let i = 0; i < words.length; i++) {
+      const candidate = cur ? `${cur} ${words[i]}` : words[i];
+      if (ctx.measureText(candidate).width <= maxWidth) {
+        cur = candidate;
+      } else {
+        if (cur) lines.push(cur);
+        cur = words[i];
+      }
+    }
+    if (cur) lines.push(cur);
+    const clipped = lines.slice(0, maxLines);
+    if (lines.length > maxLines && clipped.length) {
+      clipped[clipped.length - 1] = clipped[clipped.length - 1].slice(0, Math.max(4, clipped[clipped.length - 1].length - 3)) + '...';
+    }
+    clipped.forEach((line, idx) => {
+      ctx.fillText(line, cx, startY + idx * lineHeight);
+    });
+  };
+
+  const renderFrame = (imgLeft, imgRight, tVal = animT) => {
     cv.width = W;
     cv.height = H;
 
-    // 1. Cyber Dark Background
     const bgGrad = ctx.createLinearGradient(0, 0, W, H);
     bgGrad.addColorStop(0, '#050816');
     bgGrad.addColorStop(0.5, '#0b132b');
@@ -2999,178 +3809,152 @@ function drawViralPostStoryCanvas(postId) {
     ctx.fillStyle = bgGrad;
     ctx.fillRect(0, 0, W, H);
 
-    // Outer neon border
-    ctx.strokeStyle = 'rgba(56, 189, 248, 0.55)';
+    const borderGlow = tVal > 0 ? (0.52 + 0.36 * Math.sin(tVal * 3.4)) : 0.55;
+    ctx.strokeStyle = `rgba(56, 189, 248, ${borderGlow.toFixed(2)})`;
     ctx.lineWidth = 4;
     ctx.strokeRect(14, 14, W - 28, H - 28);
 
-    // 2. Top Brand Header
-    ctx.fillStyle = '#38bdf8';
-    ctx.font = '900 22px Orbitron, sans-serif';
+    const inviterCode = (u && (u.referralCode || u.passportNum)) ? String(u.referralCode || ('REMO-' + u.passportNum)) : 'REMO-0001';
+    const pulseZoom = tVal > 0 ? (1 + 0.035 * Math.sin(tVal * 1.4)) : 1;
+
+    let stageX, stageY, stageW, stageH;
+    if (fmt === '16:9') {
+      stageX = 32;
+      stageY = 38;
+      stageW = 496;
+      stageH = 464;
+    } else if (fmt === '1:1') {
+      stageX = 36;
+      stageY = 88;
+      stageW = W - 72;
+      stageH = 418;
+    } else {
+      stageX = 32;
+      stageY = 108;
+      stageW = W - 64;
+      stageH = (post && post.versus) ? 512 : 484;
+    }
+
+    const hdrCx = fmt === '16:9' ? 744 : W / 2;
+    const hdrY1 = fmt === '16:9' ? 70 : (fmt === '1:1' ? 46 : 56);
+    const hdrY2 = hdrY1 + 26;
+
     ctx.textAlign = 'center';
-    ctx.fillText('🌐 REMOWORLD.COM', W / 2, 62);
+    ctx.fillStyle = '#38bdf8';
+    ctx.font = `900 ${fmt === '1:1' ? 21 : 22}px Orbitron, sans-serif`;
+    ctx.fillText('🌐 REMOWORLD.COM', hdrCx, hdrY1);
 
     ctx.fillStyle = '#fde047';
-    ctx.font = '800 14px sans-serif';
+    ctx.font = '800 13px sans-serif';
     ctx.fillText(
       post && post.versus
         ? (isFr ? '⚔️ DUEL OFFICIEL DES VILLES DU MONDE' : '⚔️ OFFICIAL WORLD CITY DUEL')
         : (isFr ? '✨ LE MÉTAVERS SOCIAL DES VILLES 4D' : '✨ THE 4D WORLD CITIES SOCIAL NETWORK'),
-      W / 2,
-      88
+      hdrCx,
+      hdrY2
     );
 
-    if (post && post.versus) {
-      const v = post.versus;
-      const cA = getCityById(v.leftCityId || 'montreal');
-      const cB = getCityById(v.rightCityId || 'paris');
-      const nA = getCityName(cA, lang).toUpperCase();
-      const nB = getCityName(cB, lang).toUpperCase();
-      const lVotes = Number(v.leftVotes || 0);
-      const rVotes = Number(v.rightVotes || 0);
-      const tot = lVotes + rVotes;
-      const pA = tot > 0 ? Math.round((lVotes / tot) * 100) : 50;
-      const pB = tot > 0 ? (100 - pA) : 50;
+    const renderStageVisual = () => {
+      if (post && post.versus) {
+        const v = post.versus;
+        const cA = getCityById(v.leftCityId || 'montreal');
+        const cB = getCityById(v.rightCityId || 'paris');
+        const nA = getCityName(cA, lang).toUpperCase();
+        const nB = getCityName(cB, lang).toUpperCase();
+        const lVotes = Number(v.leftVotes || 0);
+        const rVotes = Number(v.rightVotes || 0);
+        const tot = lVotes + rVotes;
+        const pA = tot > 0 ? Math.round((lVotes / tot) * 100) : 50;
+        const pB = tot > 0 ? (100 - pA) : 50;
+        const halfW = stageW / 2;
 
-      // Split Image Stage (Y: 115 to 645)
-      const stageX = 32;
-      const stageY = 115;
-      const stageW = W - 64;
-      const stageH = 520;
-      const halfW = stageW / 2;
+        ctx.save();
+        roundRectSafe(stageX, stageY, stageW, stageH, 20);
+        ctx.clip();
+        if (!drawCoverImg(imgLeft, stageX, stageY, halfW, stageH, pulseZoom)) {
+          ctx.fillStyle = '#1e293b';
+          ctx.fillRect(stageX, stageY, halfW, stageH);
+        }
+        if (!drawCoverImg(imgRight, stageX + halfW, stageY, halfW, stageH, pulseZoom)) {
+          ctx.fillStyle = '#0f172a';
+          ctx.fillRect(stageX + halfW, stageY, halfW, stageH);
+        }
+        ctx.strokeStyle = '#fbbf24';
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.moveTo(stageX + halfW, stageY);
+        ctx.lineTo(stageX + halfW, stageY + stageH);
+        ctx.stroke();
 
-      ctx.save();
-      roundRectSafe(stageX, stageY, stageW, stageH, 22);
-      ctx.clip();
+        const botGrad = ctx.createLinearGradient(0, stageY + stageH - 130, 0, stageY + stageH);
+        botGrad.addColorStop(0, 'rgba(5,8,22,0)');
+        botGrad.addColorStop(1, 'rgba(5,8,22,0.92)');
+        ctx.fillStyle = botGrad;
+        ctx.fillRect(stageX, stageY + stageH - 130, stageW, 130);
+        ctx.restore();
 
-      if (!drawCoverImg(imgLeft, stageX, stageY, halfW, stageH)) {
-        ctx.fillStyle = '#1e293b';
-        ctx.fillRect(stageX, stageY, halfW, stageH);
+        ctx.fillStyle = '#050816';
+        ctx.beginPath();
+        ctx.arc(stageX + halfW, stageY + stageH / 2, 26, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#fbbf24';
+        ctx.lineWidth = 3;
+        ctx.stroke();
+        ctx.fillStyle = '#fde047';
+        ctx.font = '900 20px Orbitron, sans-serif';
+        ctx.fillText('⚡', stageX + halfW, stageY + stageH / 2 + 7);
+
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '900 17px Orbitron, sans-serif';
+        ctx.fillText(`${cA.flag} ${nA}`, stageX + halfW / 2, stageY + stageH - 50);
+        ctx.fillText(`${cB.flag} ${nB}`, stageX + halfW + halfW / 2, stageY + stageH - 50);
+
+        ctx.fillStyle = '#38bdf8';
+        ctx.font = '900 25px Orbitron, sans-serif';
+        ctx.fillText(`${pA}%`, stageX + halfW / 2, stageY + stageH - 16);
+        ctx.fillStyle = '#f43f5e';
+        ctx.fillText(`${pB}%`, stageX + halfW + halfW / 2, stageY + stageH - 16);
+
+        return { pA, isDuel: true };
       }
-      if (!drawCoverImg(imgRight, stageX + halfW, stageY, halfW, stageH)) {
-        ctx.fillStyle = '#0f172a';
-        ctx.fillRect(stageX + halfW, stageY, halfW, stageH);
+
+      if (post && post.mediaType === 'text_card' && post.textCard) {
+        const city = getCityById(post.cityId || 'montreal');
+        const mysteryMasked = _isTextCardMysteryMasked(post);
+        const tcPages = _getTextCardSpecPages(post.textCard);
+        const activePageIdx = (((_carouselState[post.id] || 0) % tcPages.length) + tcPages.length) % tcPages.length;
+        const tcCv = document.createElement('canvas');
+        tcCv.width = stageW * 2;
+        tcCv.height = stageH * 2;
+        const tcCtx = tcCv.getContext('2d');
+        const tcSpecForStory = { ...post.textCard, dedicatedTo: getEffectiveTextCardRecipient(post) };
+        drawTextCardCanvasFrame(
+          tcCtx, tcCv.width, tcCv.height, tcSpecForStory, activePageIdx,
+          city, post.authorName || 'REMO Citizen', lang, mysteryMasked, tVal
+        );
+
+        ctx.save();
+        roundRectSafe(stageX, stageY, stageW, stageH, 20);
+        ctx.clip();
+        ctx.drawImage(tcCv, stageX, stageY, stageW, stageH);
+        ctx.restore();
+
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.24)';
+        ctx.lineWidth = 2;
+        roundRectSafe(stageX, stageY, stageW, stageH, 20);
+        ctx.stroke();
+
+        const cap = isFr ? (post.caption_fr || post.caption_en || '') : (post.caption_en || post.caption_fr || '');
+        const rawPageTxt = (tcPages[activePageIdx] || '').replace(/\s+/g, ' ').trim();
+        return { capText: cap || rawPageTxt, isDuel: false };
       }
 
-      // Center Lightning Divider
-      ctx.strokeStyle = '#fbbf24';
-      ctx.lineWidth = 4;
-      ctx.beginPath();
-      ctx.moveTo(W / 2, stageY);
-      ctx.lineTo(W / 2, stageY + stageH);
-      ctx.stroke();
-
-      // Dark bottom gradient inside stage
-      const botGrad = ctx.createLinearGradient(0, stageY + stageH - 130, 0, stageY + stageH);
-      botGrad.addColorStop(0, 'rgba(5,8,22,0)');
-      botGrad.addColorStop(1, 'rgba(5,8,22,0.92)');
-      ctx.fillStyle = botGrad;
-      ctx.fillRect(stageX, stageY + stageH - 130, stageW, 130);
-      ctx.restore();
-
-      // VS Bolt Circle
-      ctx.fillStyle = '#050816';
-      ctx.beginPath();
-      ctx.arc(W / 2, stageY + stageH / 2, 28, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.strokeStyle = '#fbbf24';
-      ctx.lineWidth = 3;
-      ctx.stroke();
-      ctx.fillStyle = '#fde047';
-      ctx.font = '900 22px Orbitron, sans-serif';
-      ctx.fillText('⚡', W / 2, stageY + stageH / 2 + 8);
-
-      // City Names & Percentages inside stage bottom
-      ctx.fillStyle = '#ffffff';
-      ctx.font = '900 18px Orbitron, sans-serif';
-      ctx.fillText(`${cA.flag} ${nA}`, stageX + halfW / 2, stageY + stageH - 52);
-      ctx.fillText(`${cB.flag} ${nB}`, stageX + halfW + halfW / 2, stageY + stageH - 52);
-
-      ctx.fillStyle = '#38bdf8';
-      ctx.font = '900 26px Orbitron, sans-serif';
-      ctx.fillText(`${pA}%`, stageX + halfW / 2, stageY + stageH - 18);
-      ctx.fillStyle = '#f43f5e';
-      ctx.fillText(`${pB}%`, stageX + halfW + halfW / 2, stageY + stageH - 18);
-
-      // Score Bar below stage
-      const barY = 660;
-      const barW = W - 64;
-      ctx.fillStyle = '#f43f5e';
-      ctx.fillRect(32, barY, barW, 14);
-      ctx.fillStyle = '#38bdf8';
-      ctx.fillRect(32, barY, Math.round((barW * pA) / 100), 14);
-
-      ctx.fillStyle = '#f8fafc';
-      ctx.font = '900 22px Orbitron, sans-serif';
-      ctx.fillText(
-        isFr ? 'QUELLE VILLE GAGNE CE DUEL ?' : 'WHICH CITY WINS THIS DUEL?',
-        W / 2,
-        718
-      );
-    } else if (post && post.mediaType === 'text_card' && post.textCard) {
-      // Text Card 9:16 Stage
-      const city = getCityById(post.cityId || 'montreal');
-      const mysteryMasked = _isTextCardMysteryMasked(post);
-      const stageX = 32;
-      const stageY = 115;
-      const stageW = W - 64;
-      const stageH = 490;
-      const tcPages = _getTextCardSpecPages(post.textCard);
-      const activePageIdx = (((_carouselState[post.id] || 0) % tcPages.length) + tcPages.length) % tcPages.length;
-
-      const tcCv = document.createElement('canvas');
-      tcCv.width = stageW * 2;
-      tcCv.height = stageH * 2;
-      const tcCtx = tcCv.getContext('2d');
-      const tcSpecForStory = {
-        ...post.textCard,
-        dedicatedTo: getEffectiveTextCardRecipient(post)
-      };
-      drawTextCardCanvasFrame(
-        tcCtx, tcCv.width, tcCv.height, tcSpecForStory, activePageIdx,
-        city, post.authorName || 'REMO Citizen', lang, mysteryMasked, 0
-      );
-
-      ctx.save();
-      roundRectSafe(stageX, stageY, stageW, stageH, 22);
-      ctx.clip();
-      ctx.drawImage(tcCv, stageX, stageY, stageW, stageH);
-      ctx.restore();
-
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.24)';
-      ctx.lineWidth = 2;
-      roundRectSafe(stageX, stageY, stageW, stageH, 22);
-      ctx.stroke();
-
-      const cap = isFr ? (post.caption_fr || post.caption_en || '') : (post.caption_en || post.caption_fr || '');
-      const rawPageTxt = (tcPages[activePageIdx] || '').replace(/\s+/g, ' ').trim();
-      const subRaw = cap || rawPageTxt;
-      const shortCap = subRaw.length > 56 ? subRaw.slice(0, 53) + '...' : subRaw;
-      ctx.fillStyle = '#e2e8f0';
-      ctx.font = '700 17px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText(shortCap || (isFr ? 'En direct sur REMO World' : 'Live on REMO World'), W / 2, 655);
-
-      ctx.fillStyle = '#fde047';
-      ctx.font = '900 18px Orbitron, sans-serif';
-      ctx.fillText(
-        isFr ? '24 VILLES • RADIO LIVE • PASSEPORT 4D' : '24 CITIES • LIVE RADIO • 4D PASSPORT',
-        W / 2,
-        705
-      );
-    } else {
-      // Regular Post 9:16 Card
       const city = getCityById((post && post.cityId) || 'montreal');
       const cityName = getCityName(city, lang).toUpperCase();
-      const stageX = 32;
-      const stageY = 115;
-      const stageW = W - 64;
-      const stageH = 490;
-
       ctx.save();
-      roundRectSafe(stageX, stageY, stageW, stageH, 22);
+      roundRectSafe(stageX, stageY, stageW, stageH, 20);
       ctx.clip();
-      if (!drawCoverImg(imgLeft, stageX, stageY, stageW, stageH)) {
+      if (!drawCoverImg(imgLeft, stageX, stageY, stageW, stageH, pulseZoom)) {
         ctx.fillStyle = '#1e293b';
         ctx.fillRect(stageX, stageY, stageW, stageH);
       }
@@ -3182,72 +3966,206 @@ function drawViralPostStoryCanvas(postId) {
       ctx.restore();
 
       ctx.fillStyle = '#ffffff';
-      ctx.font = '900 22px Orbitron, sans-serif';
-      ctx.fillText(`${city.flag} ${cityName}`, W / 2, stageY + stageH - 46);
+      ctx.font = '900 21px Orbitron, sans-serif';
+      ctx.fillText(`${city.flag} ${cityName}`, stageX + stageW / 2, stageY + stageH - 44);
       ctx.fillStyle = '#38bdf8';
-      ctx.font = '800 16px sans-serif';
-      ctx.fillText(`@${(post && post.authorName) || 'REMO Citizen'}`, W / 2, stageY + stageH - 18);
+      ctx.font = '800 15px sans-serif';
+      ctx.fillText(`@${(post && post.authorName) || 'REMO Citizen'}`, stageX + stageW / 2, stageY + stageH - 16);
 
       const cap = post ? (isFr ? (post.caption_fr || post.caption_en || '') : (post.caption_en || post.caption_fr || '')) : '';
-      const shortCap = cap.length > 68 ? cap.slice(0, 65) + '...' : cap;
-      ctx.fillStyle = '#e2e8f0';
-      ctx.font = '700 17px sans-serif';
-      ctx.fillText(shortCap || (isFr ? 'En direct sur REMO World' : 'Live on REMO World'), W / 2, 655);
+      return { capText: cap, isDuel: false };
+    };
 
-      ctx.fillStyle = '#fde047';
-      ctx.font = '900 18px Orbitron, sans-serif';
-      ctx.fillText(
-        isFr ? '24 VILLES • RADIO LIVE • PASSEPORT 4D' : '24 CITIES • LIVE RADIO • 4D PASSPORT',
-        W / 2,
-        705
-      );
+    const meta = renderStageVisual();
+
+    let ctaX, ctaY, ctaW, ctaH;
+    if (fmt === '16:9') {
+      const colX = 552;
+      const colW = W - colX - 32;
+      const colCx = colX + colW / 2;
+
+      if (meta.isDuel) {
+        const barY = 148;
+        ctx.fillStyle = '#f43f5e';
+        ctx.fillRect(colX, barY, colW, 14);
+        ctx.fillStyle = '#38bdf8';
+        ctx.fillRect(colX, barY, Math.round((colW * meta.pA) / 100), 14);
+
+        ctx.fillStyle = '#f8fafc';
+        ctx.font = '900 20px Orbitron, sans-serif';
+        drawWrappedCenterText(
+          isFr ? 'QUELLE VILLE GAGNE CE DUEL ?' : 'WHICH CITY WINS THIS DUEL?',
+          colCx, 198, colW - 8, 28, 2
+        );
+      } else {
+        ctx.fillStyle = '#e2e8f0';
+        ctx.font = '700 17px sans-serif';
+        drawWrappedCenterText(
+          meta.capText || (isFr ? 'En direct sur REMO World' : 'Live on REMO World'),
+          colCx, 152, colW - 10, 25, 3
+        );
+        ctx.fillStyle = '#fde047';
+        ctx.font = '900 15px Orbitron, sans-serif';
+        ctx.fillText(
+          isFr ? '24 VILLES • RADIO LIVE • PASSEPORT 4D' : '24 CITIES • LIVE RADIO • 4D PASSPORT',
+          colCx,
+          266
+        );
+      }
+      ctaX = colX;
+      ctaY = 306;
+      ctaW = colW;
+      ctaH = 196;
+    } else if (fmt === '1:1') {
+      if (meta.isDuel) {
+        ctx.fillStyle = '#f43f5e';
+        ctx.fillRect(36, 518, W - 72, 12);
+        ctx.fillStyle = '#38bdf8';
+        ctx.fillRect(36, 518, Math.round(((W - 72) * meta.pA) / 100), 12);
+        ctx.fillStyle = '#f8fafc';
+        ctx.font = '900 18px Orbitron, sans-serif';
+        ctx.fillText(isFr ? 'QUELLE VILLE GAGNE CE DUEL ?' : 'WHICH CITY WINS THIS DUEL?', W / 2, 556);
+      } else {
+        const subTxt = String(meta.capText || '').trim();
+        const shortCap = subTxt.length > 68 ? subTxt.slice(0, 65) + '...' : subTxt;
+        ctx.fillStyle = '#e2e8f0';
+        ctx.font = '700 16px sans-serif';
+        ctx.fillText(shortCap || (isFr ? 'En direct sur REMO World' : 'Live on REMO World'), W / 2, 538);
+        ctx.fillStyle = '#fde047';
+        ctx.font = '900 15px Orbitron, sans-serif';
+        ctx.fillText(
+          isFr ? '24 VILLES • RADIO LIVE • PASSEPORT 4D' : '24 CITIES • LIVE RADIO • 4D PASSPORT',
+          W / 2,
+          562
+        );
+      }
+      ctaX = 36;
+      ctaY = 580;
+      ctaW = W - 72;
+      ctaH = 112;
+    } else {
+      if (meta.isDuel) {
+        const barY = 638;
+        ctx.fillStyle = '#f43f5e';
+        ctx.fillRect(32, barY, W - 64, 14);
+        ctx.fillStyle = '#38bdf8';
+        ctx.fillRect(32, barY, Math.round(((W - 64) * meta.pA) / 100), 14);
+        ctx.fillStyle = '#f8fafc';
+        ctx.font = '900 21px Orbitron, sans-serif';
+        ctx.fillText(
+          isFr ? 'QUELLE VILLE GAGNE CE DUEL ?' : 'WHICH CITY WINS THIS DUEL?',
+          W / 2,
+          698
+        );
+      } else {
+        const subTxt = String(meta.capText || '').trim();
+        const shortCap = subTxt.length > 58 ? subTxt.slice(0, 55) + '...' : subTxt;
+        ctx.fillStyle = '#e2e8f0';
+        ctx.font = '700 17px sans-serif';
+        ctx.fillText(shortCap || (isFr ? 'En direct sur REMO World' : 'Live on REMO World'), W / 2, 642);
+        ctx.fillStyle = '#fde047';
+        ctx.font = '900 18px Orbitron, sans-serif';
+        ctx.fillText(
+          isFr ? '24 VILLES • RADIO LIVE • PASSEPORT 4D' : '24 CITIES • LIVE RADIO • 4D PASSPORT',
+          W / 2,
+          692
+        );
+      }
+      ctaX = 32;
+      ctaY = 740;
+      ctaW = W - 64;
+      ctaH = 148;
     }
 
-    // 3. Call-To-Action Viral Footer Box
     ctx.fillStyle = 'rgba(56, 189, 248, 0.14)';
     ctx.strokeStyle = '#38bdf8';
     ctx.lineWidth = 2;
-    roundRectSafe(36, 755, W - 72, 130, 18);
+    roundRectSafe(ctaX, ctaY, ctaW, ctaH, 18);
     ctx.fill();
     ctx.stroke();
 
-    ctx.fillStyle = '#ffffff';
-    ctx.font = '900 19px Orbitron, sans-serif';
-    ctx.fillText(
-      post && post.versus
-        ? (isFr ? '🗳️ VOTEZ EN DIRECT SUR :' : '🗳️ VOTE LIVE NOW AT:')
-        : (isFr ? '🌍 REJOIGNEZ LA VILLE SUR :' : '🌍 JOIN YOUR CITY LIVE AT:'),
-      W / 2,
-      795
-    );
+    const qrSize = showQr ? (fmt === '9:16' ? 116 : (fmt === '1:1' ? 92 : 124)) : 0;
+    const ctaTextAreaW = showQr ? (ctaW - qrSize - 26) : ctaW;
+    const ctaTextCx = ctaX + ctaTextAreaW / 2;
 
-    ctx.fillStyle = '#fde047';
-    ctx.font = '900 28px Orbitron, sans-serif';
-    ctx.fillText('REMOWORLD.COM', W / 2, 835);
+    if (showQr) {
+      const qrX = ctaX + ctaW - qrSize - 12;
+      const qrY = ctaY + Math.round((ctaH - qrSize) / 2);
+      drawQrOnCanvas(ctx, url, qrX, qrY, qrSize);
+      if (fmt === '9:16' || fmt === '16:9') {
+        ctx.fillStyle = '#7dd3fc';
+        ctx.font = '800 9px Orbitron, sans-serif';
+        ctx.fillText(isFr ? 'SCAN QR' : 'SCAN QR', qrX + qrSize / 2, Math.min(ctaY + ctaH - 5, qrY + qrSize + 12));
+      }
+    }
 
-    const inviterCode = (u && (u.referralCode || u.passportNum)) ? String(u.referralCode || ('REMO-' + u.passportNum)) : 'REMO-0001';
-    ctx.fillStyle = '#7dd3fc';
-    ctx.font = '800 14px sans-serif';
-    ctx.fillText(
-      isFr
-        ? `🎁 Code Invité : ${inviterCode} (+100 🪙 Bonus Gratuits)`
-        : `🎁 Invite Code: ${inviterCode} (+100 🪙 Free Welcome Bonus)`,
-      W / 2,
-      868
-    );
-
-    ctx.fillStyle = '#94a3b8';
-    ctx.font = '700 12px sans-serif';
-    ctx.fillText('TikTok • Instagram Stories • WhatsApp • REMO 4D World', W / 2, 922);
+    ctx.textAlign = 'center';
+    if (fmt === '16:9') {
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '900 15px Orbitron, sans-serif';
+      ctx.fillText(
+        post && post.versus ? (isFr ? '🗳️ VOTEZ EN DIRECT :' : '🗳️ VOTE LIVE AT:') : (isFr ? '🌍 REJOIGNEZ-NOUS :' : '🌍 JOIN LIVE AT:'),
+        ctaTextCx, ctaY + 46
+      );
+      ctx.fillStyle = '#fde047';
+      ctx.font = `900 ${showQr ? 17 : 26}px Orbitron, sans-serif`;
+      ctx.fillText('REMOWORLD.COM', ctaTextCx, ctaY + 88);
+      ctx.fillStyle = '#7dd3fc';
+      ctx.font = '800 12px sans-serif';
+      ctx.fillText(
+        isFr ? `🎁 Code : ${inviterCode} (+100 🪙)` : `🎁 Code: ${inviterCode} (+100 🪙 Free)`,
+        ctaTextCx, ctaY + 126
+      );
+      ctx.fillStyle = '#94a3b8';
+      ctx.font = '700 11px sans-serif';
+      ctx.fillText('TikTok • IG • X • WhatsApp • Reddit', ctaTextCx, ctaY + 162);
+    } else if (fmt === '1:1') {
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '900 15px Orbitron, sans-serif';
+      ctx.fillText(
+        post && post.versus ? (isFr ? '🗳️ VOTEZ EN DIRECT SUR :' : '🗳️ VOTE LIVE NOW AT:') : (isFr ? '🌍 REJOIGNEZ LA VILLE SUR :' : '🌍 JOIN YOUR CITY LIVE AT:'),
+        ctaTextCx, ctaY + 32
+      );
+      ctx.fillStyle = '#fde047';
+      ctx.font = '900 24px Orbitron, sans-serif';
+      ctx.fillText('REMOWORLD.COM', ctaTextCx, ctaY + 65);
+      ctx.fillStyle = '#7dd3fc';
+      ctx.font = '800 13px sans-serif';
+      ctx.fillText(
+        isFr ? `🎁 Code Invité : ${inviterCode} (+100 🪙 Gratuits)` : `🎁 Invite Code: ${inviterCode} (+100 🪙 Free Bonus)`,
+        ctaTextCx, ctaY + 93
+      );
+    } else {
+      ctx.fillStyle = '#ffffff';
+      ctx.font = `900 ${showQr ? 15 : 19}px Orbitron, sans-serif`;
+      ctx.fillText(
+        post && post.versus ? (isFr ? '🗳️ VOTEZ EN DIRECT SUR :' : '🗳️ VOTE LIVE NOW AT:') : (isFr ? '🌍 REJOIGNEZ LA VILLE SUR :' : '🌍 JOIN YOUR CITY LIVE AT:'),
+        ctaTextCx, ctaY + 42
+      );
+      ctx.fillStyle = '#fde047';
+      ctx.font = `900 ${showQr ? 22 : 28}px Orbitron, sans-serif`;
+      ctx.fillText('REMOWORLD.COM', ctaTextCx, ctaY + 84);
+      ctx.fillStyle = '#7dd3fc';
+      ctx.font = `800 ${showQr ? 12 : 14}px sans-serif`;
+      ctx.fillText(
+        isFr
+          ? (showQr ? `🎁 Code : ${inviterCode} (+100 🪙)` : `🎁 Code Invité : ${inviterCode} (+100 🪙 Bonus Gratuits)`)
+          : (showQr ? `🎁 Code: ${inviterCode} (+100 🪙 Free)` : `🎁 Invite Code: ${inviterCode} (+100 🪙 Free Welcome Bonus)`),
+        ctaTextCx, ctaY + 118
+      );
+      ctx.fillStyle = '#94a3b8';
+      ctx.font = '700 12px sans-serif';
+      ctx.fillText('TikTok • Instagram • WhatsApp • 𝕏 • Telegram • REMO 4D', W / 2, 924);
+    }
   };
 
   if (post && post.mediaType === 'text_card' && post.textCard) {
-    renderFrame(null, null);
+    renderFrame(null, null, animT);
+    window._viralStoryFrameRenderer = (t) => renderFrame(null, null, t);
     window._viralStoryRenderPromise = Promise.resolve();
     return;
   }
 
-  // Check if the post card in the DOM already has a loaded image or video frame
   const domCard = postId ? document.getElementById('post_card_' + postId) : null;
   const domImgEl = domCard ? domCard.querySelector('.post-media img') : null;
   const domVidEl = domCard ? domCard.querySelector('.post-media video') : null;
@@ -3255,8 +4173,10 @@ function drawViralPostStoryCanvas(postId) {
     ? domImgEl
     : ((domVidEl && domVidEl.readyState >= 2) ? domVidEl : null);
 
-  // Initial immediate draw
-  renderFrame(post && !post.versus ? readyDomMedia : null, null);
+  window._viralStoryLastImgs = { left: post && !post.versus ? readyDomMedia : null, right: null };
+  window._viralStoryFrameRenderer = (t) => renderFrame(window._viralStoryLastImgs.left, window._viralStoryLastImgs.right, t);
+
+  renderFrame(window._viralStoryLastImgs.left, null, animT);
 
   // Load images asynchronously with CORS-clean proxy fallback so PNG export keeps the real photo 100% of the time
   const loadImg = (src, fallbackEl = null) => new Promise((resolve) => {
@@ -3299,7 +4219,8 @@ function drawViralPostStoryCanvas(postId) {
     const srcA = v.leftMedia || generateCityPostVisualDataUrl(cA.id, getCityName(cA, 'en'));
     const srcB = v.rightMedia || generateCityPostVisualDataUrl(cB.id, getCityName(cB, 'en'));
     window._viralStoryRenderPromise = Promise.all([loadImg(srcA), loadImg(srcB)]).then(([imA, imB]) => {
-      renderFrame(imA, imB);
+      window._viralStoryLastImgs = { left: imA, right: imB };
+      renderFrame(imA, imB, animT);
     });
   } else if (post) {
     const city = getCityById(post.cityId || 'montreal');
@@ -3315,9 +4236,13 @@ function drawViralPostStoryCanvas(postId) {
     const src = rawSrc || fallbackArt;
     window._viralStoryRenderPromise = loadImg(src, readyDomMedia).then((im) => {
       if (im) {
-        renderFrame(im, null);
+        window._viralStoryLastImgs = { left: im, right: null };
+        renderFrame(im, null, animT);
       } else {
-        return loadImg(fallbackArt).then((artIm) => renderFrame(artIm, null));
+        return loadImg(fallbackArt).then((artIm) => {
+          window._viralStoryLastImgs = { left: artIm, right: null };
+          renderFrame(artIm, null, animT);
+        });
       }
     });
   }
@@ -3332,7 +4257,6 @@ async function exportViralStoryCanvasDataUrl(postId) {
   try {
     return cv.toDataURL('image/png');
   } catch (secErr) {
-    // If external non-CORS image still tainted the canvas, try fetching via wsrv.nl CORS proxy first before procedural art
     const { post } = getViralPostShareData(postId);
     if (post && !post.versus) {
       const city = getCityById(post.cityId || 'montreal');
@@ -3342,9 +4266,10 @@ async function exportViralStoryCanvasDataUrl(postId) {
       const proxyOrArtUrl = (rawUrl && (String(rawUrl).startsWith('http://') || String(rawUrl).startsWith('https://')))
         ? `https://wsrv.nl/?url=${encodeURIComponent(rawUrl)}&output=jpg`
         : generateCityPostVisualDataUrl(city.id, post.visualHeadline || getCityName(city, 'en'), post.visualSub || '');
+      const dims = getViralStoryDims(window._viralShareFormat);
       const cleanCv = document.createElement('canvas');
-      cleanCv.width = 540;
-      cleanCv.height = 960;
+      cleanCv.width = dims.W;
+      cleanCv.height = dims.H;
       const origId = cv.id;
       cv.id = 'viralPostStoryCanvas_orig';
       cleanCv.id = 'viralPostStoryCanvas';
@@ -3370,37 +4295,18 @@ async function exportViralStoryCanvasDataUrl(postId) {
 
 async function shareViralPostStoryNative() {
   const postId = window._activeViralSharePostId;
-  const { url, title, shareText, isFr } = getViralPostShareData(postId);
-  const cv = document.getElementById('viralPostStoryCanvas');
+  const { post, url, title, shareText, isFr } = getViralPostShareData(postId);
+  const dims = getViralStoryDims(window._viralShareFormat);
   rewardViralShareOnce(postId);
-
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    try { await navigator.clipboard.writeText(url); } catch (e) {}
-  }
-
-  if (cv && navigator.share) {
-    try {
-      const dataUrl = await exportViralStoryCanvasDataUrl(postId);
-      if (dataUrl) {
-        const res = await fetch(dataUrl);
-        const blob = await res.blob();
-        const file = new File([blob], `REMO_Story_${postId || 'moment'}.png`, { type: 'image/png' });
-        if (navigator.canShare && navigator.canShare({ files: [file] })) {
-          await navigator.share({
-            files: [file],
-            title,
-            text: `${shareText} ${url}`
-          });
-          remoToast(isFr ? '📲 Story 9:16 partagée ! +25 🪙' : '📲 9:16 Story shared! +25 🪙', 'coin');
-          return;
-        }
-      }
-      await navigator.share({ title, text: shareText, url });
-      remoToast(isFr ? '🔗 Lien partagé avec succès ! +25 🪙' : '🔗 Link shared successfully! +25 🪙', 'coin');
-      return;
-    } catch (e) {}
-  }
-  downloadViralPostStoryPNG();
+  return await REMO_SHARE_HUB.shareToNetwork('native', {
+    url,
+    title,
+    shareText,
+    isFr,
+    context: post && post.versus ? 'duel' : 'post',
+    fileName: `REMO_${dims.suffix}_${postId || 'moment'}`,
+    getDataUrlFn: () => exportViralStoryCanvasDataUrl(postId)
+  });
 }
 window.shareViralPostStoryNative = shareViralPostStoryNative;
 
@@ -3409,75 +4315,71 @@ async function downloadViralPostStoryPNG() {
   const { isFr } = getViralPostShareData(postId);
   const cv = document.getElementById('viralPostStoryCanvas');
   if (!cv) return;
+  const dims = getViralStoryDims(window._viralShareFormat);
   rewardViralShareOnce(postId);
   try {
     const dataUrl = await exportViralStoryCanvasDataUrl(postId);
     if (!dataUrl) throw new Error('export_failed');
-    const a = document.createElement('a');
-    a.download = `REMO_Story_9x16_${postId || Date.now()}.png`;
-    a.href = dataUrl;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    remoToast(isFr ? '📥 Story 9:16 HD téléchargée ! Prête pour TikTok / Insta (+25 🪙)' : '📥 9:16 HD Story downloaded! Ready for TikTok / Insta (+25 🪙)', 'coin');
+    REMO_SHARE_HUB.downloadDataUrl(dataUrl, `REMO_Card_${dims.suffix}_${postId || Date.now()}.png`);
+    remoToast(
+      isFr ? `📥 Visuel ${dims.fmt} HD téléchargé ! (+25 🪙)` : `📥 ${dims.fmt} HD Card downloaded! (+25 🪙)`,
+      'coin'
+    );
   } catch (e) {
     copyViralPostDirectLink();
   }
 }
 window.downloadViralPostStoryPNG = downloadViralPostStoryPNG;
 
+async function downloadViralPostStoryVideo() {
+  const postId = window._activeViralSharePostId;
+  const { isFr } = getViralPostShareData(postId);
+  const cv = document.getElementById('viralPostStoryCanvas');
+  if (!cv) return;
+  if (window._viralStoryRenderPromise) {
+    try { await window._viralStoryRenderPromise; } catch (e) {}
+  }
+  rewardViralShareOnce(postId);
+  const dims = getViralStoryDims(window._viralShareFormat);
+  const renderer = typeof window._viralStoryFrameRenderer === 'function'
+    ? window._viralStoryFrameRenderer
+    : (t) => drawViralPostStoryCanvas(postId, t);
+  await REMO_SHARE_HUB.recordCanvasVideoLoop(cv, renderer, {
+    isFr,
+    durationMs: 4500,
+    fileName: `REMO_Video_${dims.suffix}_${postId || Date.now()}.webm`
+  });
+}
+window.downloadViralPostStoryVideo = downloadViralPostStoryVideo;
+
+async function copyViralPostCaptionAndTags() {
+  const postId = window._activeViralSharePostId;
+  const { post, url, title, shareText, isFr } = getViralPostShareData(postId);
+  rewardViralShareOnce(postId);
+  return await REMO_SHARE_HUB.shareToNetwork('copy', {
+    url,
+    title,
+    shareText,
+    isFr,
+    context: post && post.versus ? 'duel' : 'post'
+  });
+}
+window.copyViralPostCaptionAndTags = copyViralPostCaptionAndTags;
+
 async function shareViralPostToSocial(platform) {
   const postId = window._activeViralSharePostId;
-  const { url, shareText, isFr } = getViralPostShareData(postId);
+  const { post, url, title, shareText, isFr } = getViralPostShareData(postId);
+  const dims = getViralStoryDims(window._viralShareFormat);
   rewardViralShareOnce(postId);
-  const fullMsg = `${shareText} ${url}`;
-  let targetUrl = '';
-  if (platform === 'whatsapp') {
-    targetUrl = `https://wa.me/?text=${encodeURIComponent(fullMsg)}`;
-  } else if (platform === 'telegram') {
-    targetUrl = `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(shareText)}`;
-  } else if (platform === 'facebook') {
-    targetUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}&quote=${encodeURIComponent(shareText)}`;
-    // Copy the 9:16 Story PNG image directly to the clipboard so the user can press Ctrl+V in Facebook
-    try {
-      const dataUrl = await exportViralStoryCanvasDataUrl(postId);
-      if (dataUrl) {
-        let copiedImg = false;
-        if (navigator.clipboard && window.ClipboardItem) {
-          try {
-            const res = await fetch(dataUrl);
-            const blob = await res.blob();
-            await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
-            copiedImg = true;
-          } catch (clipErr) {}
-        }
-        if (copiedImg) {
-          remoToast(
-            isFr
-              ? '📋 Photo 9:16 copiée ! Appuyez sur Ctrl+V (Coller) dans Facebook pour publier la vraie photo ! (+25 🪙)'
-              : '📋 9:16 Photo copied! Press Ctrl+V (Paste) in Facebook to post the real photo! (+25 🪙)',
-            'fanfare'
-          );
-        } else {
-          const a = document.createElement('a');
-          a.download = `REMO_Story_9x16_${postId || Date.now()}.png`;
-          a.href = dataUrl;
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          remoToast(
-            isFr
-              ? '📥 Photo 9:16 téléchargée ! Ajoutez-la à votre publication Facebook (+25 🪙)'
-              : '📥 9:16 Photo downloaded! Attach it to your Facebook post (+25 🪙)',
-            'coin'
-          );
-        }
-      }
-    } catch (e) {}
-  }
-  if (targetUrl) {
-    window.open(targetUrl, '_blank', 'noopener,noreferrer');
-  }
+  return await REMO_SHARE_HUB.shareToNetwork(platform, {
+    url,
+    title,
+    shareText,
+    isFr,
+    context: post && post.versus ? 'duel' : 'post',
+    fileName: `REMO_${dims.suffix}_${postId || 'moment'}`,
+    getDataUrlFn: () => exportViralStoryCanvasDataUrl(postId)
+  });
 }
 window.shareViralPostToSocial = shareViralPostToSocial;
 
@@ -15563,97 +16465,28 @@ async function shareCityAmbassadorDiploma(channel = 'native') {
   const inviteCode = u.referralCode || `REMO-${u.passportNum || '0001'}`;
   const shareUrl = `https://remoworld.com/?ref=${encodeURIComponent(inviteCode)}&city=${encodeURIComponent(city.id)}`;
   const shareText = isFr
-    ? `🏅 Fier d'être Ambassadeur Officiel de ${city.flag} ${cityName} sur REMO World ! Rejoignez notre ville dans la Coupe Mondiale (+100 🪙 offerts avec le code ${inviteCode}) : ${shareUrl}`
-    : `🏅 Proud Official Ambassador of ${city.flag} ${cityName} on REMO World! Join our city in the World City Cup (+100 🪙 free bonus with code ${inviteCode}): ${shareUrl}`;
+    ? `🏅 Fier d'être Ambassadeur Officiel de ${city.flag} ${cityName} sur REMO World ! Rejoignez notre ville dans la Coupe Mondiale (+100 🪙 offerts avec le code ${inviteCode}) :`
+    : `🏅 Proud Official Ambassador of ${city.flag} ${cityName} on REMO World! Join our city in the World City Cup (+100 🪙 free bonus with code ${inviteCode}):`;
 
   const earned = awardAmbassadorDiplomaShareCoins();
   const bonusTxt = earned ? ' (+25 🪙!)' : '';
 
   if (channel === 'download') {
-    const a = document.createElement('a');
-    a.href = cv.toDataURL('image/png');
-    a.download = `REMO-Ambassador-${city.id}-9x16.png`;
-    a.click();
+    REMO_SHARE_HUB.downloadDataUrl(cv.toDataURL('image/png'), `REMO-Ambassador-${city.id}-9x16.png`);
     remoToast((isFr ? '📥 Diplôme 9:16 téléchargé !' : '📥 9:16 Diploma downloaded!') + bonusTxt, 'fanfare');
     return;
   }
 
-  if (channel === 'whatsapp') {
-    window.open(`https://wa.me/?text=${encodeURIComponent(shareText)}`, '_blank', 'noopener');
-    remoToast((isFr ? '🟢 Prêt à partager sur WhatsApp !' : '🟢 Ready to share on WhatsApp!') + bonusTxt);
-    return;
-  }
-
-  if (channel === 'telegram') {
-    window.open(`https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(shareText)}`, '_blank', 'noopener');
-    remoToast((isFr ? '✈️ Prêt à partager sur Telegram !' : '✈️ Ready to share on Telegram!') + bonusTxt);
-    return;
-  }
-
-  if (channel === 'facebook') {
-    // Copy the 9:16 Diploma PNG image directly to clipboard so the user can press Ctrl+V inside Facebook
-    try {
-      const dataUrl = cv.toDataURL('image/png');
-      let copied = false;
-      if (navigator.clipboard && window.ClipboardItem) {
-        try {
-          const res = await fetch(dataUrl);
-          const blob = await res.blob();
-          await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
-          copied = true;
-        } catch (clipErr) {}
-      }
-      if (!copied) {
-        const a = document.createElement('a');
-        a.href = dataUrl;
-        a.download = `REMO-Ambassador-${city.id}-9x16.png`;
-        a.click();
-      }
-      window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}&quote=${encodeURIComponent(shareText)}`, '_blank', 'noopener');
-      remoToast(
-        (copied
-          ? (isFr
-            ? '📋 Diplôme 9:16 copié ! Appuyez sur Ctrl+V (Coller) dans Facebook pour publier votre Diplôme !'
-            : '📋 9:16 Diploma copied! Press Ctrl+V (Paste) in Facebook to post your Diploma!')
-          : (isFr
-            ? '📥 Diplôme 9:16 téléchargé ! Ajoutez-le à votre publication Facebook !'
-            : '📥 9:16 Diploma downloaded! Attach it to your Facebook post!')) + bonusTxt,
-        'fanfare'
-      );
-    } catch (e) {
-      window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}&quote=${encodeURIComponent(shareText)}`, '_blank', 'noopener');
-    }
-    return;
-  }
-
-  // Native Share with PNG file for TikTok / Instagram / Mobile
-  try {
-    const blob = await new Promise((resolve) => cv.toBlob(resolve, 'image/png'));
-    if (blob && navigator.canShare) {
-      const file = new File([blob], `REMO-Ambassador-${city.id}.png`, { type: 'image/png' });
-      if (navigator.canShare({ files: [file] })) {
-        await navigator.share({
-          title: `REMO World — ${cityName} Ambassador`,
-          text: shareText,
-          files: [file]
-        });
-        remoToast((isFr ? '📲 Diplôme partagé avec succès !' : '📲 Diploma shared successfully!') + bonusTxt, 'fanfare');
-        return;
-      }
-    }
-    if (navigator.share) {
-      await navigator.share({ title: `REMO World — ${cityName}`, text: shareText, url: shareUrl });
-      return;
-    }
-  } catch (e) {}
-
-  // Fallback on Desktop: download the 9:16 PNG and copy invite text
-  const a = document.createElement('a');
-  a.href = cv.toDataURL('image/png');
-  a.download = `REMO-Ambassador-${city.id}-9x16.png`;
-  a.click();
-  try { await navigator.clipboard.writeText(shareText); } catch (e) {}
-  remoToast((isFr ? '📥 Diplôme 9:16 téléchargé & lien copié !' : '📥 9:16 Diploma downloaded & invite link copied!') + bonusTxt, 'fanfare');
+  return await REMO_SHARE_HUB.shareToNetwork(channel || 'native', {
+    url: shareUrl,
+    title: `REMO World — ${cityName} Ambassador`,
+    shareText,
+    isFr,
+    context: 'ambassador',
+    fileName: `REMO-Ambassador-${city.id}-9x16`,
+    canvas: cv,
+    extraToastSuffix: bonusTxt
+  });
 }
 
 window.openCityAmbassadorModal = openCityAmbassadorModal;
@@ -15935,20 +16768,17 @@ async function shareToUnlockSecondScratchCard(platform) {
   const inviteCode = u.referralCode || `REMO-${u.passportNum || '0001'}`;
   const shareUrl = `https://remoworld.com/?ref=${encodeURIComponent(inviteCode)}&city=${encodeURIComponent(city.id)}`;
   const shareText = isFr
-    ? `🎟️ Je viens de gagner des Pièces d'Or au Ticket à Gratter 24K pour ${city.flag} ${cityName} sur REMO World ! Gratte ton ticket gratuit et reçois +100 🪙 avec mon code ${inviteCode} : ${shareUrl}`
-    : `🎟️ I just won Gold Coins on the 24K City Scratch-Card for ${city.flag} ${cityName} on REMO World! Scratch your free ticket & claim +100 🪙 with my code ${inviteCode}: ${shareUrl}`;
+    ? `🎟️ Je viens de gagner des Pièces d'Or au Ticket à Gratter 24K pour ${city.flag} ${cityName} sur REMO World ! Gratte ton ticket gratuit et reçois +100 🪙 avec mon code ${inviteCode} :`
+    : `🎟️ I just won Gold Coins on the 24K City Scratch-Card for ${city.flag} ${cityName} on REMO World! Scratch your free ticket & claim +100 🪙 with my code ${inviteCode}:`;
 
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    try { await navigator.clipboard.writeText(shareText); } catch (e) {}
-  }
-
-  if (platform === 'whatsapp') {
-    window.open(`https://wa.me/?text=${encodeURIComponent(shareText)}`, '_blank', 'noopener');
-  } else if (platform === 'telegram') {
-    window.open(`https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(shareText)}`, '_blank', 'noopener');
-  } else {
-    window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}&quote=${encodeURIComponent(shareText)}`, '_blank', 'noopener');
-  }
+  await REMO_SHARE_HUB.shareToNetwork(platform || 'facebook', {
+    url: shareUrl,
+    title: `REMO World 24K Scratch-Card — ${cityName}`,
+    shareText,
+    isFr,
+    context: 'scratch',
+    suppressToast: true
+  });
 
   const { day } = getGoldenScratchDayState();
   localStorage.setItem('remo_scratch_shared_' + day, '1');
