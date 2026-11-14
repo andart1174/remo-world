@@ -233,10 +233,10 @@ function syncHeaderAndSidebars() {
   if (authBtn) {
     if (u && u.email && u.role !== 'guest' && u.name) {
       const hc = getCityById(u.homeCity) || { flag: '🌐' };
-      authBtn.innerHTML = `${hc.flag} ${u.name}`;
+      authBtn.innerHTML = `${hc.flag} ${escapeHtmlStr(u.name)}`;
       authBtn.onclick = () => switchRemoView('passport');
     } else {
-      authBtn.innerHTML = `✨ ${t('btn_sign_in') || 'Sign In'}`;
+      authBtn.innerHTML = `✨ ${escapeHtmlStr(t('btn_sign_in') || 'Sign In')}`;
       authBtn.onclick = () => openAuthModal();
     }
   }
@@ -977,7 +977,7 @@ function renderPostCardBack(p, city, lang, wx) {
       <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;">
         <div style="display:flex;align-items:center;gap:7px;">
           <div class="avatar-circle ${cosm.frameClass}" style="width:28px;height:28px;font-size:0.75rem;overflow:hidden;padding:0;">
-            ${authorAvatarUrl ? `<img src="${authorAvatarUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block;" alt="${escapeHtmlStr(p.authorName)}">` : escapeHtmlStr((p.authorName || 'R')[0].toUpperCase())}
+            ${sanitizeSafeMediaUrl(authorAvatarUrl) ? `<img src="${sanitizeSafeMediaUrl(authorAvatarUrl)}" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block;" alt="${escapeHtmlStr(p.authorName)}">` : escapeHtmlStr((p.authorName || 'R')[0].toUpperCase())}
           </div>
           <div>
             <b style="color:#fbbf24;font-size:0.82rem;">@${escapeHtmlStr(p.authorName)}</b>
@@ -1145,14 +1145,21 @@ function renderStoriesAndBanners() {
 function renderWorldWeatherTicker() {
   const ticker = document.getElementById('worldWeatherTickerBar');
   if (!ticker || typeof REMO_WEATHER === 'undefined') return;
+  if (typeof REMO_WEATHER.hydrateAllCitiesBatch === 'function') {
+    REMO_WEATHER.hydrateAllCitiesBatch();
+  }
   const lang = REMO_I18N.getLang();
   const u = REMO_STORE.getCurrentUser();
   const allCities = getRemoCities();
+  const wxMap = Object.create(null);
+  allCities.forEach((c) => {
+    wxMap[c.id] = REMO_WEATHER.getCityLiveStatus(c);
+  });
 
   // Prioritize active 2X Weather Surge cities, user's Home City, community cities, and top capitals
   const ordered = allCities.slice().sort((a, b) => {
-    const wA = REMO_WEATHER.getCityLiveStatus(a).isSurge ? 1 : 0;
-    const wB = REMO_WEATHER.getCityLiveStatus(b).isSurge ? 1 : 0;
+    const wA = wxMap[a.id]?.isSurge ? 1 : 0;
+    const wB = wxMap[b.id]?.isSurge ? 1 : 0;
     if (wB !== wA) return wB - wA;
     if (u && a.id === u.homeCity) return -1;
     if (u && b.id === u.homeCity) return 1;
@@ -1160,11 +1167,11 @@ function renderWorldWeatherTicker() {
   });
 
   ticker.innerHTML =
-    `<span style="flex-shrink:0;font-size:0.68rem;font-weight:900;color:#38bdf8;letter-spacing:0.6px;padding-right:4px;">${t('weather_bar_lbl')}:</span>` +
+    `<span style="flex-shrink:0;font-size:0.68rem;font-weight:900;color:#38bdf8;letter-spacing:0.6px;padding-right:4px;">${escapeHtmlStr(t('weather_bar_lbl'))}:</span>` +
     ordered.map((c) => {
-      const wx = REMO_WEATHER.getCityLiveStatus(c);
+      const wx = wxMap[c.id] || REMO_WEATHER.getCityLiveStatus(c);
       return `
-        <button type="button" class="weather-chip ${wx.isSurge ? 'surge' : ''}" onclick="filterFeedByCityFromMap('${c.id}')" title="${escapeHtmlStr(getCityName(c, lang))} — ${escapeHtmlStr(lang === 'fr' ? wx.cond_fr : wx.cond_en)}">
+        <button type="button" class="weather-chip ${wx.isSurge ? 'surge' : ''}" onclick="filterFeedByCityFromMap('${escapeJsSingleArg(c.id)}')" title="${escapeHtmlStr(getCityName(c, lang))} — ${escapeHtmlStr(lang === 'fr' ? wx.cond_fr : wx.cond_en)}">
           <span>${c.flag} <b>${escapeHtmlStr(c.code || getCityName(c, lang))}</b></span>
           <span style="color:#94a3b8;">${wx.timeStr}</span>
           <span>${wx.icon} ${wx.tempC}°C</span>
@@ -1249,7 +1256,28 @@ function escapeHtmlStr(str = '') {
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function escapeJsSingleArg(str = '') {
+  return String(str)
+    .replace(/\\/g, '\\\\')
+    .replace(/'/g, '\\x27')
+    .replace(/"/g, '\\x22')
+    .replace(/</g, '\\x3c')
+    .replace(/>/g, '\\x3e')
+    .replace(/&/g, '\\x26')
+    .replace(/[\r\n]/g, ' ');
+}
+
+function sanitizeSafeMediaUrl(url = '') {
+  const s = String(url || '').trim();
+  if (!s) return '';
+  if (/^https?:\/\//i.test(s) || /^data:(?:image|audio|video)\//i.test(s) || /^blob:/i.test(s) || /^idb:\/\//i.test(s) || /^(?:img\/|\.\/|\/(?!\/))/i.test(s)) {
+    return escapeHtmlStr(s);
+  }
+  return '';
 }
 
 function escapeSrcDocAttr(str = '') {
@@ -1335,7 +1363,7 @@ function renderSinglePaneMedia(item, cityObj, lang) {
   }
   const flt = item.photoFilter || 'flt-none';
   if (item.mediaType === 'html_app' && item.htmlCode) {
-    return `<iframe sandbox="allow-scripts" loading="lazy" srcdoc="${escapeSrcDocAttr(item.htmlCode)}"></iframe>`;
+    return `<iframe sandbox="allow-scripts" loading="lazy" data-post-id="${escapeHtmlStr(item.id || '')}" srcdoc="${escapeSrcDocAttr(item.htmlCode)}"></iframe>`;
   }
   if (item.mediaType === 'video' && item.mediaUrl) {
     const rawK = item.mediaUrl;
@@ -1354,7 +1382,7 @@ function renderSinglePaneMedia(item, cityObj, lang) {
     }
     src = item._cachedArt;
   }
-  return `<img src="${src}" ${idbTag} class="${flt}" alt="${getCityName(cityObj, lang)}">`;
+  return `<img src="${sanitizeSafeMediaUrl(src)}" ${idbTag} class="${flt}" loading="lazy" decoding="async" alt="${escapeHtmlStr(getCityName(cityObj, lang))}">`;
 }
 
 function renderPostMediaStage(p, city, lang) {
@@ -1434,7 +1462,7 @@ function renderPostMediaStage(p, city, lang) {
   if (p.mediaType === 'html_app' && p.htmlCode) {
     const cleanCode = buildFittedHtmlSrcdoc(p.htmlCode, p.id);
     return `
-      <iframe class="html-post-frame" id="htmlFrame_${p.id}" sandbox="allow-scripts" loading="lazy" scrolling="no" srcdoc="${escapeSrcDocAttr(cleanCode)}" style="width:100%;height:100%;border:none;border-radius:12px;background:#050816;overflow:hidden;"></iframe>
+      <iframe class="html-post-frame" id="htmlFrame_${escapeHtmlStr(p.id)}" data-post-id="${escapeHtmlStr(p.id)}" sandbox="allow-scripts" loading="lazy" scrolling="no" srcdoc="${escapeSrcDocAttr(cleanCode)}" style="width:100%;height:100%;border:none;border-radius:12px;background:#050816;overflow:hidden;"></iframe>
     `;
   }
 
@@ -1463,11 +1491,11 @@ function renderPostMediaStage(p, city, lang) {
           <div style="font-size:1.8rem;margin-bottom:6px;">📹</div>
           <div style="font-size:0.84rem;color:#f43f5e;font-weight:700;">${lang === 'fr' ? 'Vidéo locale non disponible sur cet appareil' : 'Local device video'}</div>
           <div style="font-size:0.75rem;color:var(--muted);margin-top:4px;">${lang === 'fr' ? 'Cette ancienne vidéo a été enregistrée avant l’activation du Cloud Storage.' : 'Legacy video before Cloud Storage.'}</div>
-          ${isAdm ? `<button type="button" class="adm-pbtn danger" style="margin-top:10px;padding:6px 14px;font-size:0.8rem;" onclick="adminDeletePostInline('${p.id}')">🗑️ Supprimer définitivement</button>` : ''}
+          ${isAdm ? `<button type="button" class="adm-pbtn danger" style="margin-top:10px;padding:6px 14px;font-size:0.8rem;" onclick="adminDeletePostInline('${escapeJsSingleArg(p.id)}')">🗑️ Supprimer définitivement</button>` : ''}
         </div>
       `;
     }
-    return `<video src="${resolved}" ${idbAttr} ${cap60Attr} controls playsinline preload="metadata" style="width:100%;max-height:480px;border-radius:12px;background:#050816;object-fit:cover;"></video>`;
+    return `<video src="${sanitizeSafeMediaUrl(resolved)}" ${idbAttr} ${cap60Attr} controls playsinline preload="metadata" style="width:100%;max-height:480px;border-radius:12px;background:#050816;object-fit:cover;"></video>`;
   }
 
   // 3. INTERACTIVE BEFORE / AFTER 2-PHOTO COMPARISON SLIDER
@@ -1477,9 +1505,9 @@ function renderPostMediaStage(p, city, lang) {
     const u2 = RemoMediaDB.resolveSyncOrPlaceholder(k2);
     return `
       <div class="ba-slider-box">
-        <img src="${u1}" ${String(k1).startsWith('idb://') ? `data-idb-src="${k1}"` : ''} class="${flt}" alt="Before">
+        <img src="${sanitizeSafeMediaUrl(u1)}" ${String(k1).startsWith('idb://') ? `data-idb-src="${k1}"` : ''} class="${flt}" loading="lazy" decoding="async" alt="Before">
         <div class="ba-after-layer">
-          <img src="${u2}" ${String(k2).startsWith('idb://') ? `data-idb-src="${k2}"` : ''} class="${flt}" alt="After">
+          <img src="${sanitizeSafeMediaUrl(u2)}" ${String(k2).startsWith('idb://') ? `data-idb-src="${k2}"` : ''} class="${flt}" loading="lazy" decoding="async" alt="After">
         </div>
         <div class="ba-divider-line"><div class="ba-knob">◀ ▶</div></div>
         <input type="range" min="3" max="97" value="50" class="ba-range-input" oninput="updateBeforeAfterSlider(this)">
@@ -1498,12 +1526,12 @@ function renderPostMediaStage(p, city, lang) {
         : (p._cachedArt || generateCityPostVisualDataUrl(city.id, p.visualHeadline, p.visualSub));
     }
     return `
-      <div style="position:relative;width:100%;height:100%;touch-action:pan-y;" ontouchstart="initCarouselTouchSwipe(this, '${p.id}')">
-        <img src="${curUrl}" class="carousel-slide-img ${flt}" alt="${getCityName(city, lang)}" style="width:100%;height:100%;object-fit:cover;transition:opacity 0.2s ease;">
-        <button type="button" class="carousel-nav-btn prev" onclick="stepPostCarousel('${p.id}', -1, event)" title="Précédent">‹</button>
-        <button type="button" class="carousel-nav-btn next" onclick="stepPostCarousel('${p.id}', 1, event)" title="Suivant">›</button>
+      <div style="position:relative;width:100%;height:100%;touch-action:pan-y;" ontouchstart="initCarouselTouchSwipe(this, '${escapeJsSingleArg(p.id)}')">
+        <img src="${sanitizeSafeMediaUrl(curUrl)}" class="carousel-slide-img ${flt}" loading="lazy" decoding="async" alt="${escapeHtmlStr(getCityName(city, lang))}" style="width:100%;height:100%;object-fit:cover;transition:opacity 0.2s ease;">
+        <button type="button" class="carousel-nav-btn prev" onclick="stepPostCarousel('${escapeJsSingleArg(p.id)}', -1, event)" title="Précédent">‹</button>
+        <button type="button" class="carousel-nav-btn next" onclick="stepPostCarousel('${escapeJsSingleArg(p.id)}', 1, event)" title="Suivant">›</button>
         <div class="carousel-dots">
-          ${p.mediaUrls.map((_, i) => `<span class="carousel-dot ${i === idx ? 'active' : ''}" onclick="setPostCarouselIndex('${p.id}', ${i}, event)"></span>`).join('')}
+          ${p.mediaUrls.map((_, i) => `<span class="carousel-dot ${i === idx ? 'active' : ''}" onclick="setPostCarouselIndex('${escapeJsSingleArg(p.id)}', ${i}, event)"></span>`).join('')}
         </div>
         <div class="carousel-count-pill" style="position:absolute;top:10px;right:10px;background:rgba(6,10,24,0.78);backdrop-filter:blur(6px);color:#fff;font-size:0.72rem;font-weight:900;padding:3px 9px;border-radius:99px;border:1px solid rgba(255,255,255,0.22);pointer-events:none;z-index:6;">
           🎠 ${idx + 1}/${p.mediaUrls.length}
@@ -1535,7 +1563,7 @@ function renderPostMediaStage(p, city, lang) {
     }
     mediaSrc = p._cachedArt;
   }
-  return `<img src="${mediaSrc}" ${idbTag} class="${flt}" alt="${getCityName(city, lang)}" style="width:100%;height:100%;object-fit:cover;">`;
+  return `<img src="${sanitizeSafeMediaUrl(mediaSrc)}" ${idbTag} class="${flt}" loading="lazy" decoding="async" alt="${escapeHtmlStr(getCityName(city, lang))}" style="width:100%;height:100%;object-fit:cover;">`;
 }
 
 function renderViralGoalWidget(p, lang, isAdm) {
@@ -1643,16 +1671,34 @@ window.isPostBoostActive = isPostBoostActive;
 
 function getPostBoostBadgeHtml(p, lang) {
   if (!isPostBoostActive(p)) return '';
-  const now = Date.now();
-  const msLeft = Math.max(0, Number(p.boostedUntil || 0) - now);
+  const untilTs = Number(p.boostedUntil || 0);
+  const msLeft = Math.max(0, untilTs - Date.now());
   const hoursLeft = Math.floor(msLeft / 3600000);
   const minsLeft = Math.max(1, Math.floor((msLeft % 3600000) / 60000));
   const isFr = lang === 'fr';
   const timeStr = hoursLeft > 0 ? `${hoursLeft}h ${minsLeft}m` : `${minsLeft}m`;
   const lbl = isFr ? `🚀 BOOSTÉ · ⏳ ${timeStr}` : `🚀 BOOSTED · ⏳ ${timeStr}`;
-  return `<span class="pbadge boost" style="background:linear-gradient(135deg,#f59e0b,#ec4899);color:#fff;font-weight:900;box-shadow:0 0 12px rgba(245,158,11,0.55);border:1px solid rgba(254,240,138,0.55);letter-spacing:0.3px;">${lbl}</span>`;
+  return `<span class="pbadge boost post-boost-badge-live" data-boost-until="${untilTs}" style="background:linear-gradient(135deg,#f59e0b,#ec4899);color:#fff;font-weight:900;box-shadow:0 0 12px rgba(245,158,11,0.55);border:1px solid rgba(254,240,138,0.55);letter-spacing:0.3px;">${lbl}</span>`;
 }
 window.getPostBoostBadgeHtml = getPostBoostBadgeHtml;
+
+function refreshLiveBoostBadgesInPlace() {
+  const isFr = REMO_I18N.getLang() === 'fr';
+  const now = Date.now();
+  document.querySelectorAll('.post-boost-badge-live[data-boost-until]').forEach((el) => {
+    const untilTs = Number(el.getAttribute('data-boost-until') || 0);
+    const msLeft = untilTs - now;
+    if (msLeft <= 0) {
+      el.remove();
+      return;
+    }
+    const hoursLeft = Math.floor(msLeft / 3600000);
+    const minsLeft = Math.max(1, Math.floor((msLeft % 3600000) / 60000));
+    const timeStr = hoursLeft > 0 ? `${hoursLeft}h ${minsLeft}m` : `${minsLeft}m`;
+    el.textContent = isFr ? `🚀 BOOSTÉ · ⏳ ${timeStr}` : `🚀 BOOSTED · ⏳ ${timeStr}`;
+  });
+}
+window.refreshLiveBoostBadgesInPlace = refreshLiveBoostBadgesInPlace;
 
 function computePostRenderSig(p, u, lang) {
   if (!p || !p.id) return '';
@@ -1719,9 +1765,9 @@ function renderSinglePostCardHtml(p, lang, u, isAdm) {
       <article id="post_card_${p.id}" class="post-card ${isPostBoostActive(p) || p.pinned || sealed ? 'boosted' : ''} ${p.mediaType === 'html_app' ? 'is-html-app' : ''} ${p.mediaType === 'city_versus' ? 'is-city-versus' : ''}" ${interactiveNoTilt ? '' : 'onmousemove="applyHoloTilt(event, this)" onmouseleave="resetHoloTilt(this)"'}>
         <div class="post-head">
           <div style="display:flex;align-items:center;gap:6px;min-width:0;">
-            <div class="post-author" style="cursor:pointer;" onclick="${p.isShowcase ? `openFocusTvModal('${city.id}')` : `openCitizenProfileModal('${p.uid || ''}', '${escapeHtmlStr(p.authorName || '')}')`}" title="🪪 @${escapeHtmlStr(p.authorName)}">
+            <div class="post-author" style="cursor:pointer;" onclick="${p.isShowcase ? `openFocusTvModal('${escapeJsSingleArg(city.id)}')` : `openCitizenProfileModal('${escapeJsSingleArg(p.uid || '')}', '${escapeJsSingleArg(p.authorName || '')}')`}" title="🪪 @${escapeHtmlStr(p.authorName)}">
               <div class="avatar-circle ${cosm.frameClass}" style="overflow:hidden;padding:0;">
-                ${authorAvatarUrl ? `<img src="${authorAvatarUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block;" alt="${escapeHtmlStr(p.authorName)}">` : escapeHtmlStr((p.authorName || 'R')[0].toUpperCase())}
+                ${sanitizeSafeMediaUrl(authorAvatarUrl) ? `<img src="${sanitizeSafeMediaUrl(authorAvatarUrl)}" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block;" alt="${escapeHtmlStr(p.authorName)}">` : escapeHtmlStr((p.authorName || 'R')[0].toUpperCase())}
               </div>
               <div>
                 <div style="font-weight:800;font-size:0.88rem;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
@@ -1733,12 +1779,12 @@ function renderSinglePostCardHtml(p, lang, u, isAdm) {
                 <div style="font-size:0.72rem;color:var(--muted);margin-top:2px;">
                   ${mysteryMasked
                     ? `<span class="mystery-masked-tag">${t('guess_masked_city')}</span>`
-                    : `<span>${city.flag} ${getCityName(city, lang)}</span> · <span>🕒 ${wx.timeStr}</span>`}
+                    : `<span>${city.flag} ${escapeHtmlStr(getCityName(city, lang))}</span> · <span>🕒 ${wx.timeStr}</span>`}
                   ${p.remixedFromAuthor ? ` · <span style="color:#34d399;">${t('post_remix_from')} @${escapeHtmlStr(p.remixedFromAuthor)}</span>` : ''}
                 </div>
               </div>
             </div>
-            ${(!isPostOwner && p.uid) ? `<button type="button" class="post-author-dm-mini" onclick="event.stopPropagation();openDirectChatWithUser('${p.uid || ''}')" title="💌 @${escapeHtmlStr(p.authorName)}">💌</button>` : ''}
+            ${(!isPostOwner && p.uid) ? `<button type="button" class="post-author-dm-mini" onclick="event.stopPropagation();openDirectChatWithUser('${escapeJsSingleArg(p.uid || '')}')" title="💌 @${escapeHtmlStr(p.authorName)}">💌</button>` : ''}
           </div>
           <div style="display:flex;align-items:center;gap:8px;">
             ${mysteryMasked
@@ -1784,7 +1830,7 @@ function renderSinglePostCardHtml(p, lang, u, isAdm) {
           ${(!hiddenByCapsule && showTcReplyBar) ? `
             <div class="tc-dedicated-reply-bar">
               <span class="tc-dedicated-reply-txt">${tcRecipient ? escapeHtmlStr(t('tc_dedicated_banner', { name: tcRecipient })) : `✍️ @${escapeHtmlStr(p.authorName || 'Citizen')}`}</span>
-              <button type="button" class="tc-send-back-btn" onclick="openReplyTextCardTo('${escapeHtmlStr(p.authorName || '')}', '${city.id}')">${escapeHtmlStr(t('tc_send_back_btn'))}</button>
+              <button type="button" class="tc-send-back-btn" onclick="openReplyTextCardTo('${escapeJsSingleArg(p.authorName || '')}', '${escapeJsSingleArg(city.id)}')">${escapeHtmlStr(t('tc_send_back_btn'))}</button>
             </div>` : ''}
           ${mysteryMasked ? '' : getInterCityDistanceBridge(city, lang)}
           ${!hiddenByCapsule && typeof renderMysteryCityWidget === 'function' ? renderMysteryCityWidget(p, city, lang, u, isPostOwner) : ''}
@@ -1852,9 +1898,9 @@ function renderSinglePostCardHtml(p, lang, u, isAdm) {
 
         <!-- Mobile TikTok Right Floating Rail -->
         <div class="tiktok-rail">
-          <div class="tk-avatar-wrap" onclick="openCitizenProfileModal('${p.uid || ''}', '${escapeHtmlStr(p.authorName || '')}')" title="@${escapeHtmlStr(p.authorName)}">
+          <div class="tk-avatar-wrap" onclick="openCitizenProfileModal('${escapeJsSingleArg(p.uid || '')}', '${escapeJsSingleArg(p.authorName || '')}')" title="@${escapeHtmlStr(p.authorName)}">
             <div class="avatar-circle ${cosm.frameClass}" style="width:42px;height:42px;font-size:0.95rem;border:2px solid #fff;overflow:hidden;padding:0;">
-              ${authorAvatarUrl ? `<img src="${authorAvatarUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block;" alt="${escapeHtmlStr(p.authorName)}">` : escapeHtmlStr((p.authorName || 'R')[0].toUpperCase())}
+              ${sanitizeSafeMediaUrl(authorAvatarUrl) ? `<img src="${sanitizeSafeMediaUrl(authorAvatarUrl)}" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block;" alt="${escapeHtmlStr(p.authorName)}">` : escapeHtmlStr((p.authorName || 'R')[0].toUpperCase())}
             </div>
             <span class="tk-avatar-plus">+</span>
           </div>
@@ -2179,12 +2225,15 @@ function getFilteredSortedFeedPosts(searchQuery = '') {
   return posts;
 }
 
+let _feedVisibleLimit = 10;
+let _lastFeedFilterKey = '';
+
 function computeVisibleFeedSignature(searchQuery = '', prefilteredPosts = null) {
   const lang = REMO_I18N.getLang();
   const u = REMO_STORE.getCurrentUser();
   const isAdm = REMO_STORE.isAdminUnlocked();
   const posts = prefilteredPosts || getFilteredSortedFeedPosts(searchQuery);
-  return `${lang}_${isAdm ? 1 : 0}_${u?.uid || 'guest'}_${u?.homeCity || ''}_${currentFeedMode}_${currentFeedCityFilter}_${currentFeedVibeFilter}_${searchQuery || ''}::` +
+  return `${lang}_${isAdm ? 1 : 0}_${u?.uid || 'guest'}_${u?.homeCity || ''}_${currentFeedMode}_${currentFeedCityFilter}_${currentFeedVibeFilter}_${searchQuery || ''}_${posts.length}::` +
     posts.map((p) => computePostRenderSig(p, u, lang)).join('|');
 }
 
@@ -2207,6 +2256,35 @@ function syncMobileFeedLayoutModeUI() {
   }
 }
 
+function renderFeedLoadMoreBox(grid, totalCount, shownCount, lang) {
+  let box = document.getElementById('remoFeedLoadMoreBox');
+  if (!box && grid && grid.parentNode) {
+    box = document.createElement('div');
+    box.id = 'remoFeedLoadMoreBox';
+    box.style.cssText = 'display:flex;justify-content:center;padding:16px 8px 24px;';
+    grid.parentNode.insertBefore(box, grid.nextSibling);
+  }
+  if (!box) return;
+  const remaining = Math.max(0, totalCount - shownCount);
+  if (remaining <= 0) {
+    box.style.display = 'none';
+    box.innerHTML = '';
+    return;
+  }
+  box.style.display = 'flex';
+  const lbl = lang === 'fr'
+    ? `✨ Charger plus de moments (${remaining} restant${remaining > 1 ? 's' : ''})`
+    : `✨ Load More Moments (${remaining} remaining)`;
+  box.innerHTML = `<button type="button" class="btn-cyber btn-gold" style="padding:11px 22px;font-size:0.84rem;" onclick="loadMoreFeedPosts()">${escapeHtmlStr(lbl)}</button>`;
+}
+
+function loadMoreFeedPosts() {
+  _feedVisibleLimit += 10;
+  const searchInp = document.querySelector('.header-search input');
+  renderSocialFeed(searchInp ? searchInp.value : '', true);
+}
+window.loadMoreFeedPosts = loadMoreFeedPosts;
+
 function renderSocialFeed(searchQuery = '', forceFull = false) {
   renderStoriesAndBanners();
   if (typeof renderFeedCitySpotlightBar === 'function') {
@@ -2220,25 +2298,43 @@ function renderSocialFeed(searchQuery = '', forceFull = false) {
   if (!grid) return;
 
   const lang = REMO_I18N.getLang();
+  const qStr = String(searchQuery || '');
+  const filterKey = `${currentFeedMode}|${currentFeedCityFilter}|${currentFeedVibeFilter}|${qStr.trim().toLowerCase()}`;
+  if (filterKey !== _lastFeedFilterKey) {
+    _lastFeedFilterKey = filterKey;
+    _feedVisibleLimit = 10;
+  }
+
   const u = REMO_STORE.getCurrentUser();
   const isAdm = REMO_STORE.isAdminUnlocked();
-  const posts = getFilteredSortedFeedPosts(searchQuery);
+  const posts = getFilteredSortedFeedPosts(qStr);
 
   if (posts.length === 0) {
-    window._lastRenderedFeedSignature = 'empty_' + lang + '_' + currentFeedMode + '_' + currentFeedCityFilter + '_' + currentFeedVibeFilter + '_' + searchQuery;
+    window._lastRenderedFeedSignature = 'empty_' + lang + '_' + filterKey;
     grid.innerHTML = `<div class="glass-box" style="grid-column:1/-1;text-align:center;padding:40px;">
       ${lang === 'fr' ? 'Aucun moment trouvé pour ce filtre. Soyez le premier à publier ! ✨' : 'No moments match this filter yet. Be the first to post! ✨'}
     </div>`;
+    renderFeedLoadMoreBox(grid, 0, 0, lang);
     return;
   }
 
-  const nextSig = computeVisibleFeedSignature(searchQuery, posts);
-  if (!forceFull && grid.children.length === posts.length && window._lastRenderedFeedSignature === nextSig) {
+  if (window._deepLinkedPostId) {
+    const deepIdx = posts.findIndex((x) => x && x.id === window._deepLinkedPostId);
+    if (deepIdx >= _feedVisibleLimit) {
+      _feedVisibleLimit = deepIdx + 1;
+    }
+  }
+
+  const visiblePosts = posts.slice(0, Math.min(posts.length, _feedVisibleLimit));
+  const nextSig = computeVisibleFeedSignature(qStr, visiblePosts) + `_tot:${posts.length}`;
+  if (!forceFull && grid.children.length === visiblePosts.length && window._lastRenderedFeedSignature === nextSig) {
+    renderFeedLoadMoreBox(grid, posts.length, visiblePosts.length, lang);
     return;
   }
   window._lastRenderedFeedSignature = nextSig;
 
-  grid.innerHTML = posts.map((p) => renderSinglePostCardHtml(p, lang, u, isAdm)).join('');
+  grid.innerHTML = visiblePosts.map((p) => renderSinglePostCardHtml(p, lang, u, isAdm)).join('');
+  renderFeedLoadMoreBox(grid, posts.length, visiblePosts.length, lang);
 
   // Asynchronously attach any IndexedDB video/photo/audio Blobs
   RemoMediaDB.hydrateDom(grid);
@@ -2325,6 +2421,10 @@ function toggleLikePost(postId) {
 
 function tipPostAuthor(postId) {
   const lang = REMO_I18N.getLang();
+  if (REMO_STORE.isCurrentUserBanned()) {
+    remoToast(t('auth_err_banned'));
+    return;
+  }
   const p = findFeedPostById(postId);
   if (!p) return;
   if (p.isShowcase) {
@@ -2333,7 +2433,7 @@ function tipPostAuthor(postId) {
   }
   const u = REMO_STORE.getCurrentUser();
   if (!u) { openAuthModal(); return; }
-  const amt = Number(prompt(lang === 'fr' ? 'Combien de Pièces REMO offrir ?' : 'How many REMO Coins to tip?', '25'));
+  const amt = Math.min(10000, Math.floor(Number(prompt(lang === 'fr' ? 'Combien de Pièces REMO offrir ?' : 'How many REMO Coins to tip?', '25'))));
   if (!amt || amt <= 0) return;
   if (!REMO_STORE.addCoins(u.uid, -amt, 10)) {
     remoToast(lang === 'fr' ? 'Pièces REMO insuffisantes !' : 'Not enough REMO Coins!');
@@ -2342,8 +2442,8 @@ function tipPostAuthor(postId) {
   p.tipsTotal = (p.tipsTotal || 0) + amt;
   if (p.duetOf && p.duetOf.uid) {
     const half = Math.ceil(amt / 2);
-    if (p.uid) REMO_STORE.adminAdjustUserCoins(p.uid, 'add', half);
-    REMO_STORE.adminAdjustUserCoins(p.duetOf.uid, 'add', amt - half);
+    if (p.uid) REMO_STORE.creditSystemCoins(p.uid, half, 'Duet tip', 10000);
+    REMO_STORE.creditSystemCoins(p.duetOf.uid, amt - half, 'Duet tip', 10000);
     remoToast(
       lang === 'fr'
         ? `🎭 +${amt} 🪙 partagés 50/50 entre @${p.authorName} & @${p.duetOf.authorName} !`
@@ -2351,7 +2451,7 @@ function tipPostAuthor(postId) {
       'fanfare'
     );
   } else {
-    if (p.uid) REMO_STORE.adminAdjustUserCoins(p.uid, 'add', amt);
+    if (p.uid) REMO_STORE.creditSystemCoins(p.uid, amt, 'Post tip', 10000);
     remoToast(lang === 'fr' ? `🪙 +${amt} Pièces offertes à ${p.authorName} !` : `🪙 Tipped ${amt} Coins to ${p.authorName}!`, 'coin');
   }
   if (p.uid && p.uid !== u.uid) {
@@ -2639,17 +2739,17 @@ function openCommentsModal(postId) {
           <div style="flex:1;">
             <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;">
               <div class="avatar-circle" style="width:24px;height:24px;font-size:0.7rem;flex-shrink:0;overflow:hidden;padding:0;">
-                ${cAvatarUrl ? `<img src="${cAvatarUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block;" alt="${escapeHtmlStr(c.author)}">` : escapeHtmlStr((c.author || 'R')[0].toUpperCase())}
+                ${sanitizeSafeMediaUrl(cAvatarUrl) ? `<img src="${sanitizeSafeMediaUrl(cAvatarUrl)}" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block;" alt="${escapeHtmlStr(c.author)}">` : escapeHtmlStr((c.author || 'R')[0].toUpperCase())}
               </div>
-              <b style="color:#38bdf8;font-size:0.83rem;cursor:pointer;" onclick="document.getElementById('commentsModal').classList.remove('open');openDirectChatWithUser('${c.uid || ''}')">@${escapeHtmlStr(c.author)} 💌</b>
+              <b style="color:#38bdf8;font-size:0.83rem;cursor:pointer;" onclick="document.getElementById('commentsModal').classList.remove('open');openDirectChatWithUser('${escapeJsSingleArg(c.uid || '')}')">@${escapeHtmlStr(c.author)} 💌</b>
               ${tip > 0 ? `<span class="surge-mini-pill">💎 +${tip} 🪙 ${t('cmt_super_badge')}</span>` : ''}
             </div>
             ${c.text ? `<div style="font-size:0.86rem;margin-top:4px;color:#f8fafc;">${escapeHtmlStr(c.text)}</div>` : ''}
             ${altTxt && altTxt.toLowerCase() !== String(c.text || '').toLowerCase() ? `<div style="font-size:0.74rem;color:#94a3b8;margin-top:2px;">🌐 ${escapeHtmlStr(altTxt)}</div>` : ''}
-            ${c.voiceUrl ? `<audio src="${vUrl}" ${vIdb} controls style="width:100%;height:30px;margin-top:5px;"></audio>` : ''}
+            ${c.voiceUrl ? `<audio src="${sanitizeSafeMediaUrl(vUrl)}" ${vIdb} controls style="width:100%;height:30px;margin-top:5px;"></audio>` : ''}
             ${flexCity ? `
               <div>
-                <button type="button" class="cmt-card-flex-pill" onclick="inspectCommentFlexCard('${flexCity.id}', '${escapeHtmlStr(c.flexCardRarity || 'Mythic 4D')}')">
+                <button type="button" class="cmt-card-flex-pill" onclick="inspectCommentFlexCard('${escapeJsSingleArg(flexCity.id)}', '${escapeJsSingleArg(c.flexCardRarity || 'Mythic 4D')}')">
                   🎴 ${flexCity.flag} ${escapeHtmlStr(getCityName(flexCity, lang))} · ${escapeHtmlStr(c.flexCardRarity || '4D')}
                 </button>
               </div>
@@ -2708,9 +2808,13 @@ async function toggleCommentVoiceRecord() {
 
 function submitPostComment() {
   const lang = REMO_I18N.getLang();
+  if (REMO_STORE.isCurrentUserBanned()) {
+    remoToast(t('auth_err_banned'));
+    return;
+  }
   const inp = document.getElementById('commentInputBox');
   const txt = inp ? inp.value.trim() : '';
-  const tipAmt = Math.max(0, Number(document.getElementById('commentSuperTipSel')?.value || 0));
+  const tipAmt = Math.min(10000, Math.max(0, Math.floor(Number(document.getElementById('commentSuperTipSel')?.value || 0))));
   const flexRaw = document.getElementById('commentCardFlexSelect')?.value || '';
   if (!activeCommentPostId || (!txt && !pendingCommentVoiceKey && !flexRaw)) return;
 
@@ -2724,7 +2828,7 @@ function submitPostComment() {
       return;
     }
     p.tipsTotal = (p.tipsTotal || 0) + tipAmt;
-    if (p.uid) REMO_STORE.adminAdjustUserCoins(p.uid, 'add', tipAmt);
+    if (p.uid) REMO_STORE.creditSystemCoins(p.uid, tipAmt, 'Super-comment tip', 10000);
     spawnRemoCoinsFX(10);
   } else if (!p.isShowcase) {
     REMO_STORE.addCoins(u.uid, 5, 5);
@@ -4190,20 +4294,6 @@ function drawViralPostStoryCanvas(postId, animT = 0) {
     im.onload = () => resolve(im);
     im.onerror = () => {
       if (isDataOrBlob) return resolve(fallbackEl);
-      // Try CORS-friendly image proxy so Firebase Storage / external images export cleanly to PNG without tainting
-      if (strSrc.startsWith('http://') || strSrc.startsWith('https://')) {
-        const proxyIm = new Image();
-        proxyIm.crossOrigin = 'anonymous';
-        proxyIm.onload = () => resolve(proxyIm);
-        proxyIm.onerror = () => {
-          const imNoCors = new Image();
-          imNoCors.onload = () => resolve(imNoCors);
-          imNoCors.onerror = () => resolve(fallbackEl);
-          imNoCors.src = strSrc;
-        };
-        proxyIm.src = `https://wsrv.nl/?url=${encodeURIComponent(strSrc)}&output=jpg`;
-        return;
-      }
       const imNoCors = new Image();
       imNoCors.onload = () => resolve(imNoCors);
       imNoCors.onerror = () => resolve(fallbackEl);
@@ -4260,12 +4350,7 @@ async function exportViralStoryCanvasDataUrl(postId) {
     const { post } = getViralPostShareData(postId);
     if (post && !post.versus) {
       const city = getCityById(post.cityId || 'montreal');
-      const domCard = postId ? document.getElementById('post_card_' + postId) : null;
-      const domImgEl = domCard ? domCard.querySelector('.post-media img') : null;
-      const rawUrl = post.mediaUrl || (Array.isArray(post.mediaUrls) && post.mediaUrls[0]) || (domImgEl && domImgEl.src) || '';
-      const proxyOrArtUrl = (rawUrl && (String(rawUrl).startsWith('http://') || String(rawUrl).startsWith('https://')))
-        ? `https://wsrv.nl/?url=${encodeURIComponent(rawUrl)}&output=jpg`
-        : generateCityPostVisualDataUrl(city.id, post.visualHeadline || getCityName(city, 'en'), post.visualSub || '');
+      const cleanFallbackArt = generateCityPostVisualDataUrl(city.id, post.visualHeadline || getCityName(city, 'en'), post.visualSub || '');
       const dims = getViralStoryDims(window._viralShareFormat);
       const cleanCv = document.createElement('canvas');
       cleanCv.width = dims.W;
@@ -4276,7 +4361,7 @@ async function exportViralStoryCanvasDataUrl(postId) {
       cleanCv.style.display = 'none';
       document.body.appendChild(cleanCv);
       const savedMediaUrl = post.mediaUrl;
-      post.mediaUrl = proxyOrArtUrl;
+      post.mediaUrl = cleanFallbackArt;
       drawViralPostStoryCanvas(postId);
       if (window._viralStoryRenderPromise) {
         try { await window._viralStoryRenderPromise; } catch (e) {}
@@ -6017,6 +6102,10 @@ function checkGpsForNewPost() {
 
 async function publishNewRemoPost() {
   const lang = REMO_I18N.getLang();
+  if (REMO_STORE.isCurrentUserBanned()) {
+    remoToast(t('auth_err_banned'));
+    return;
+  }
   const cityId = document.getElementById('createCitySelect')?.value || 'montreal';
   const vibe = document.getElementById('createVibeSelect')?.value || 'energy';
   let cap = document.getElementById('createCaptionInp')?.value.trim() || '';
@@ -6600,6 +6689,10 @@ function publishCitizen24hStory() {
   const lang = REMO_I18N.getLang();
   const isFr = lang === 'fr';
   const u = REMO_STORE.getCurrentUser();
+  if (REMO_STORE.isCurrentUserBanned()) {
+    remoToast(t('auth_err_banned'));
+    return;
+  }
   if (!u || u.role === 'guest') {
     document.getElementById('storyViewerModal')?.classList.remove('open');
     openAuthModal();
@@ -7146,6 +7239,10 @@ function selectCityChatRoom(room) {
 }
 
 function sendCityChatMessage() {
+  if (REMO_STORE.isCurrentUserBanned()) {
+    remoToast(t('auth_err_banned'));
+    return;
+  }
   const inp = document.getElementById('chatRoomInput');
   if (!inp || !inp.value.trim()) return;
   const u = REMO_STORE.getCurrentUser() || REMO_STORE.ensureGuestOrCitizen('Citizen', '', 'montreal');
@@ -7236,6 +7333,10 @@ function stopCityWalkieTalkie(ev) {
 
 function publishWalkieTalkieTransmission(voiceKey) {
   const lang = REMO_I18N.getLang();
+  if (REMO_STORE.isCurrentUserBanned()) {
+    remoToast(t('auth_err_banned'));
+    return;
+  }
   const u = REMO_STORE.getCurrentUser() || REMO_STORE.ensureGuestOrCitizen('Radio Operator', '', 'montreal');
   const c = getCityById(u.homeCity);
   REMO_STORE.state.chatMessages[currentChatRoom] = REMO_STORE.state.chatMessages[currentChatRoom] || [];
@@ -7509,7 +7610,7 @@ function renderDirectMessagesView() {
     const pc = getCityById(partner.homeCity);
     activeHdr.innerHTML = `
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;">
-        <div style="display:flex;align-items:center;gap:9px;min-width:0;cursor:pointer;" onclick="openCitizenProfileModal('${partner.uid}', '${escapeHtmlStr(partner.name)}')">
+        <div style="display:flex;align-items:center;gap:9px;min-width:0;cursor:pointer;" onclick="openCitizenProfileModal('${escapeJsSingleArg(partner.uid)}', '${escapeJsSingleArg(partner.name)}')">
           <span style="font-size:1.35rem;">${pc.flag}</span>
           <div style="min-width:0;">
             <div style="font-size:0.7rem;color:#7dd3fc;font-weight:800;text-transform:uppercase;letter-spacing:0.4px;">${t('dm_active_chat_with')}</div>
@@ -7518,7 +7619,7 @@ function renderDirectMessagesView() {
             </div>
           </div>
         </div>
-        <button type="button" class="btn-ghost" style="font-size:0.73rem;padding:4px 10px;flex-shrink:0;" onclick="openCitizenProfileModal('${partner.uid}', '${escapeHtmlStr(partner.name)}')">${t('dm_view_profile')}</button>
+        <button type="button" class="btn-ghost" style="font-size:0.73rem;padding:4px 10px;flex-shrink:0;" onclick="openCitizenProfileModal('${escapeJsSingleArg(partner.uid)}', '${escapeJsSingleArg(partner.name)}')">${t('dm_view_profile')}</button>
       </div>
     `;
   }
@@ -7536,7 +7637,7 @@ function renderDirectMessagesView() {
     const dual = d.text ? REMO_TRANSLATOR.makeBilingualPair(d.text) : null;
     const isInlineAudio = d.voiceUrl && (String(d.voiceUrl).startsWith('data:') || String(d.voiceUrl).startsWith('http') || String(d.voiceUrl).startsWith('blob:'));
     const vUrl = isInlineAudio ? d.voiceUrl : (d.voiceUrl ? RemoMediaDB.resolveSyncOrPlaceholder(d.voiceUrl) : '');
-    const vIdb = d.voiceUrl && String(d.voiceUrl).startsWith('idb://') ? `data-idb-src="${d.voiceUrl}"` : '';
+    const vIdb = d.voiceUrl && String(d.voiceUrl).startsWith('idb://') ? `data-idb-src="${escapeHtmlStr(d.voiceUrl)}"` : '';
     const offerCity = d.cardOffer ? getCityById(d.cardOffer.cityId) : null;
     const msgTime = d.ts ? formatNotifTimeAgo(d.ts, lang) : '';
 
@@ -7549,7 +7650,7 @@ function renderDirectMessagesView() {
             ${isJustOpened ? `<span class="dm-new-msg-pill">${t('dm_new_badge')}</span>` : ''}
             ${msgTime ? `<span style="font-size:0.68rem;color:var(--muted);">${escapeHtmlStr(msgTime)}</span>` : ''}
           </div>
-          ${isAdm ? `<button type="button" class="adm-pbtn danger" style="padding:2px 6px;" onclick="adminDeleteDmInline('${d.id}')">🗑️</button>` : ''}
+          ${isAdm ? `<button type="button" class="adm-pbtn danger" style="padding:2px 6px;" onclick="adminDeleteDmInline('${escapeJsSingleArg(d.id)}')">🗑️</button>` : ''}
         </div>
         ${d.text ? `<div style="margin-top:4px;font-size:0.88rem;color:#f8fafc;">${escapeHtmlStr(d.text)}</div>` : ''}
         ${autoTrans && dual ? `
@@ -7557,7 +7658,7 @@ function renderDirectMessagesView() {
             🇬🇧 ${escapeHtmlStr(dual.en)}<br>🇫🇷 ${escapeHtmlStr(dual.fr)}
           </div>
         ` : ''}
-        ${vUrl || vIdb ? `<audio src="${vUrl}" ${vIdb} controls preload="auto" style="width:100%;height:32px;margin-top:6px;outline:none;border-radius:8px;"></audio>` : ''}
+        ${vUrl || vIdb ? `<audio src="${sanitizeSafeMediaUrl(vUrl)}" ${vIdb} controls preload="auto" style="width:100%;height:32px;margin-top:6px;outline:none;border-radius:8px;"></audio>` : ''}
 
         ${d.envelopeCoins > 0 ? `
           <div class="dm-envelope-card">
@@ -7567,7 +7668,7 @@ function renderDirectMessagesView() {
             </div>
             ${d.envelopeClaimed
               ? `<span style="font-size:0.76rem;font-weight:900;color:#86efac;">${t('dm_env_opened_lbl', { coins: d.envelopeCoins })}</span>`
-              : `<button type="button" class="btn-cyber btn-gold" style="padding:6px 12px;font-size:0.76rem;" onclick="claimDmCoinEnvelope('${d.id}')">${t('dm_env_open_btn', { coins: d.envelopeCoins })}</button>`}
+              : `<button type="button" class="btn-cyber btn-gold" style="padding:6px 12px;font-size:0.76rem;" onclick="claimDmCoinEnvelope('${escapeJsSingleArg(d.id)}')">${t('dm_env_open_btn', { coins: d.envelopeCoins })}</button>`}
           </div>
         ` : ''}
 
@@ -7580,13 +7681,13 @@ function renderDirectMessagesView() {
             ${d.cardOffer.accepted
               ? `<span style="font-size:0.76rem;font-weight:900;color:#a7f3d0;">${t('dm_trade_done_lbl')}</span>`
               : (!isMine
-                  ? `<button type="button" class="btn-cyber" style="padding:6px 12px;font-size:0.76rem;" onclick="acceptDmCardTradeOffer('${d.id}')">${t('dm_trade_accept_btn', { price: d.cardOffer.price > 0 ? d.cardOffer.price + ' 🪙' : 'FREE' })}</button>`
+                  ? `<button type="button" class="btn-cyber" style="padding:6px 12px;font-size:0.76rem;" onclick="acceptDmCardTradeOffer('${escapeJsSingleArg(d.id)}')">${t('dm_trade_accept_btn', { price: d.cardOffer.price > 0 ? d.cardOffer.price + ' 🪙' : 'FREE' })}</button>`
                   : `<span style="font-size:0.73rem;color:#94a3b8;">⏳ Sent</span>`)}
           </div>
         ` : ''}
       </div>
     `;
-  }).join('') || `<div style="text-align:center;color:var(--muted);padding:26px;">${lang === 'fr' ? `Démarrez votre conversation privée 1-à-1 avec @${partner.name} !` : `Start your private 1-on-1 conversation with @${partner.name}!`}</div>`;
+  }).join('') || `<div style="text-align:center;color:var(--muted);padding:26px;">${lang === 'fr' ? `Démarrez votre conversation privée 1-à-1 avec @${escapeHtmlStr(partner.name)} !` : `Start your private 1-on-1 conversation with @${escapeHtmlStr(partner.name)}!`}</div>`;
 
   // Mark unread messages from this active partner as read ONLY when Messages view is actually open
   if (isMessagesViewActive) {
@@ -7626,6 +7727,10 @@ function renderDirectMessagesView() {
 }
 
 function sendDirectMessage() {
+  if (REMO_STORE.isCurrentUserBanned()) {
+    remoToast(t('auth_err_banned'));
+    return;
+  }
   const inp = document.getElementById('dmInputBox');
   if (!inp || !inp.value.trim()) return;
   const u = REMO_STORE.getCurrentUser() || REMO_STORE.ensureGuestOrCitizen('Citizen', '', 'montreal');
@@ -7773,11 +7878,15 @@ function sendDmCoinEnvelopePrompt(isRoyalAdmin = false) {
 
 function claimDmCoinEnvelope(msgId) {
   const lang = REMO_I18N.getLang();
+  if (REMO_STORE.isCurrentUserBanned()) {
+    remoToast(t('auth_err_banned'));
+    return;
+  }
   const d = (REMO_STORE.state.directMessages || []).find((x) => x.id === msgId);
   if (!d || d.envelopeClaimed || !d.envelopeCoins) return;
   const u = REMO_STORE.getCurrentUser() || REMO_STORE.ensureGuestOrCitizen('Citizen', '', 'montreal');
   d.envelopeClaimed = true;
-  REMO_STORE.adminAdjustUserCoins(u.uid, 'add', d.envelopeCoins);
+  REMO_STORE.creditSystemCoins(u.uid, d.envelopeCoins, 'DM Coin Envelope', 10000);
   REMO_STORE.save(true, 'dm_env_claim');
   REMO_STORE.syncDmToCloud(d);
   spawnRemoCoinsFX(14);
@@ -7843,7 +7952,7 @@ function acceptDmCardTradeOffer(msgId) {
       remoToast(lang === 'fr' ? `Il vous faut ${price} 🪙 pour accepter cette carte !` : `Need ${price} 🪙 to accept this card!`);
       return;
     }
-    if (d.fromUid) REMO_STORE.adminAdjustUserCoins(d.fromUid, 'add', price);
+    if (d.fromUid) REMO_STORE.creditSystemCoins(d.fromUid, price, '4D Card Trade Sale', 50000);
   }
 
   const card = (REMO_STORE.state.mintedCards || []).find((mc) => mc.id === d.cardOffer.cardId);
@@ -7900,18 +8009,78 @@ function openLiveStreamModal() {
 /* ── 6. UNIVERSAL AUTH MODAL (WITH TIKTOK / IG / FB BROWSER DETECTOR) ── */
 let isRegisterMode = true;
 
-function openAuthModal() {
+function setAuthModalMode(isReg = true) {
+  isRegisterMode = Boolean(isReg);
+  const regBtn = document.getElementById('authTabRegisterBtn');
+  const logBtn = document.getElementById('authTabLoginBtn');
+  const cityWrap = document.getElementById('authCityFieldWrap');
+  const nameWrap = document.getElementById('authNameFieldWrap');
+  const nameInp = document.getElementById('authNameInp');
+  const termsWrap = document.getElementById('authTermsFieldWrap');
+  const termsChk = document.getElementById('authTermsCheck');
+  const passInp = document.getElementById('authPassInp');
+  const submitBtn = document.getElementById('authSubmitBtn');
+
+  if (regBtn) {
+    regBtn.classList.toggle('btn-cyber', isRegisterMode);
+    regBtn.classList.toggle('btn-gold', isRegisterMode);
+    regBtn.classList.toggle('btn-ghost', !isRegisterMode);
+  }
+  if (logBtn) {
+    logBtn.classList.toggle('btn-cyber', !isRegisterMode);
+    logBtn.classList.toggle('btn-gold', !isRegisterMode);
+    logBtn.classList.toggle('btn-ghost', isRegisterMode);
+  }
+  if (cityWrap) cityWrap.style.display = isRegisterMode ? 'block' : 'none';
+  if (nameWrap) nameWrap.style.display = isRegisterMode ? 'block' : 'none';
+  if (nameInp) nameInp.required = isRegisterMode;
+  if (termsWrap) termsWrap.style.display = isRegisterMode ? 'flex' : 'none';
+  if (termsChk) termsChk.required = isRegisterMode;
+  if (passInp) passInp.setAttribute('autocomplete', isRegisterMode ? 'new-password' : 'current-password');
+  if (submitBtn) {
+    submitBtn.setAttribute('data-i18n', isRegisterMode ? 'auth_submit_register' : 'auth_submit_login');
+    submitBtn.textContent = t(isRegisterMode ? 'auth_submit_register' : 'auth_submit_login');
+  }
+}
+window.setAuthModalMode = setAuthModalMode;
+
+function openAuthModal(defaultRegister = true) {
   const sel = document.getElementById('authHomeCitySelect');
   const lang = REMO_I18N.getLang();
   if (sel) {
     sel.innerHTML = getRemoCities().map((c) =>
-      `<option value="${c.id}">${c.flag} ${getCityName(c, lang)}</option>`
+      `<option value="${c.id}">${c.flag} ${escapeHtmlStr(getCityName(c, lang))}</option>`
     ).join('');
   }
   const iabWarn = document.getElementById('authIabWarningBox');
   if (iabWarn) iabWarn.style.display = REMO_STORE.isInAppBrowser() ? 'block' : 'none';
+  setAuthModalMode(defaultRegister !== false);
   document.getElementById('authModal')?.classList.add('open');
 }
+
+async function sendAuthPasswordReset() {
+  const email = (document.getElementById('authEmailInp')?.value || '').trim();
+  const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+  if (!emailRegex.test(email)) {
+    remoToast(t('auth_err_email_invalid'));
+    document.getElementById('authEmailInp')?.focus();
+    return;
+  }
+  if (!REMO_STORE.fbAuth && typeof REMO_STORE.initFirebaseIfConfigured === 'function') {
+    REMO_STORE.initFirebaseIfConfigured();
+  }
+  if (!REMO_STORE.fbAuth) {
+    remoToast('Firebase Auth loading...');
+    return;
+  }
+  try {
+    await REMO_STORE.fbAuth.sendPasswordResetEmail(email);
+    remoToast(t('auth_reset_sent'), 'fanfare');
+  } catch (err) {
+    remoToast(err && err.message ? err.message : t('auth_err_email_invalid'));
+  }
+}
+window.sendAuthPasswordReset = sendAuthPasswordReset;
 
 function openInExternalBrowser() {
   const url = window.location.href;
@@ -7943,10 +8112,11 @@ async function submitUniversalAuth(ev) {
   const lang = REMO_I18N.getLang();
   const name = document.getElementById('authNameInp')?.value.trim() || 'REMO Pioneer';
   const email = (document.getElementById('authEmailInp')?.value || '').trim();
+  const password = document.getElementById('authPassInp')?.value || '';
   const cityId = document.getElementById('authHomeCitySelect')?.value || 'montreal';
   const termsChecked = document.getElementById('authTermsCheck')?.checked;
 
-  if (!termsChecked) {
+  if (isRegisterMode && !termsChecked) {
     remoToast(t('auth_err_terms'));
     return;
   }
@@ -7957,45 +8127,16 @@ async function submitUniversalAuth(ev) {
     return;
   }
 
-  if (isDisposableEmail(email)) {
+  if (isRegisterMode && isDisposableEmail(email)) {
     remoToast(t('auth_err_disposable_email'));
     return;
   }
 
-  const adminEmail = (REMO_STORE.state?.settings?.adminEmail || 'andart1174@gmail.com').toLowerCase();
-  const isTargetingAdmin = email.toLowerCase() === adminEmail;
-
-  if (isTargetingAdmin) {
-    const pin = prompt(
-      lang === 'fr'
-        ? '🔐 Compte Fondateur & Administrateur\nEntrez votre code PIN Maître :'
-        : '🔐 Founder & Admin Account\nEnter your Master Admin PIN:'
-    );
-    if (!pin || !REMO_STORE.verifyAdminPin(pin)) {
-      remoToast(lang === 'fr' ? '❌ Code PIN Admin incorrect ! Connexion refusée.' : '❌ Invalid Admin PIN! Access denied.');
-      return;
-    }
-    const u = REMO_STORE.ensureGuestOrCitizen(name, email, cityId, true);
-    REMO_STORE.setAdminUnlocked(true);
-    document.getElementById('authModal')?.classList.remove('open');
-    spawnRemoCoinsFX(10);
-    syncHeaderAndSidebars();
-    renderSocialFeed();
-    remoToast(lang === 'fr' ? `🎉 Bon retour ${u.name} !` : `🎉 Welcome back ${u.name}!`, 'fanfare');
+  if (!password || password.length < 8) {
+    remoToast(t('auth_err_password_short'));
+    document.getElementById('authPassInp')?.focus();
     return;
   }
-
-  const pendingData = {
-    name,
-    email,
-    cityId,
-    expiresAt: Date.now() + 30 * 60 * 1000,
-    isTargetingAdmin: false
-  };
-  try {
-    sessionStorage.setItem('remo_pending_signup', JSON.stringify(pendingData));
-    localStorage.setItem('remo_pending_signup', JSON.stringify(pendingData));
-  } catch (e) {}
 
   if (!REMO_STORE.fbAuth && typeof REMO_STORE.initFirebaseIfConfigured === 'function') {
     REMO_STORE.initFirebaseIfConfigured();
@@ -8006,29 +8147,59 @@ async function submitUniversalAuth(ev) {
     return;
   }
 
-  const autoKey = 'Remo4D#Auth!' + email.toLowerCase().trim();
-  let fbUser = null;
-  let isNewAccount = false;
+  const adminEmail = (REMO_STORE.ADMIN_EMAIL || 'andart1174@gmail.com').toLowerCase();
+  const isTargetingAdmin = email.toLowerCase() === adminEmail;
 
+  const pendingData = {
+    name,
+    email,
+    cityId,
+    expiresAt: Date.now() + 30 * 60 * 1000,
+    isTargetingAdmin
+  };
   try {
-    const cred = await REMO_STORE.fbAuth.createUserWithEmailAndPassword(email, autoKey);
-    fbUser = cred && cred.user;
-    isNewAccount = true;
-    if (fbUser && name) {
-      try { await fbUser.updateProfile({ displayName: name }); } catch (e) {}
+    sessionStorage.setItem('remo_pending_signup', JSON.stringify(pendingData));
+    localStorage.setItem('remo_pending_signup', JSON.stringify(pendingData));
+  } catch (e) {}
+
+  let fbUser = null;
+
+  if (isTargetingAdmin || !isRegisterMode) {
+    try {
+      const signInCred = await REMO_STORE.fbAuth.signInWithEmailAndPassword(email, password);
+      fbUser = signInCred && signInCred.user;
+    } catch (signInErr) {
+      if (isTargetingAdmin) {
+        remoToast(
+          lang === 'fr'
+            ? '🔐 Compte Admin : connectez-vous via Google ou utilisez « Mot de passe oublié » pour définir votre mot de passe Firebase.'
+            : '🔐 Admin Account: sign in with Google or use "Forgot / Set Password" to set your Firebase password.'
+        );
+      } else {
+        remoToast(signInErr?.message || (lang === 'fr' ? 'Email ou mot de passe incorrect.' : 'Invalid email or password.'));
+      }
+      return;
     }
-  } catch (err) {
-    if (err && (err.code === 'auth/email-already-in-use' || String(err.message || '').includes('already-in-use'))) {
-      try {
-        const signInCred = await REMO_STORE.fbAuth.signInWithEmailAndPassword(email, autoKey);
-        fbUser = signInCred && signInCred.user;
-      } catch (signInErr) {
-        remoToast(lang === 'fr' ? '⚠️ Cet email existe déjà. Utilisez Continuer avec Google ou vérifiez votre boîte mail.' : '⚠️ This email is already registered. Use Continue with Google or check your inbox.');
+  } else {
+    try {
+      const cred = await REMO_STORE.fbAuth.createUserWithEmailAndPassword(email, password);
+      fbUser = cred && cred.user;
+      if (fbUser && name) {
+        try { await fbUser.updateProfile({ displayName: name }); } catch (e) {}
+      }
+    } catch (err) {
+      if (err && (err.code === 'auth/email-already-in-use' || String(err.message || '').includes('already-in-use'))) {
+        try {
+          const signInCred = await REMO_STORE.fbAuth.signInWithEmailAndPassword(email, password);
+          fbUser = signInCred && signInCred.user;
+        } catch (signInErr) {
+          remoToast(lang === 'fr' ? '⚠️ Cet email existe déjà. Passez en mode « Connexion » ou utilisez Google.' : '⚠️ Email already registered. Switch to Sign In mode or use Google.');
+          return;
+        }
+      } else {
+        remoToast(err.message || t('auth_err_email_invalid'));
         return;
       }
-    } else {
-      remoToast(err.message || t('auth_err_email_invalid'));
-      return;
     }
   }
 
@@ -8039,13 +8210,11 @@ async function submitUniversalAuth(ev) {
     fbUser = REMO_STORE.fbAuth.currentUser || fbUser;
   } catch (e) {}
 
-  // If this user has ALREADY verified their real email in Firebase, log them in right away!
   if (fbUser.emailVerified) {
     completeVerifiedEmailLogin(fbUser, pendingData);
     return;
   }
 
-  // Otherwise, dispatch a REAL verification email from Google Firebase to their inbox!
   try {
     await fbUser.sendEmailVerification({ url: window.location.origin + '/' });
   } catch (e) {
@@ -8056,7 +8225,6 @@ async function submitUniversalAuth(ev) {
     }
   }
 
-  // Show the Email Verification screen inside the modal
   const regForm = document.getElementById('authRegisterForm');
   const otpBox = document.getElementById('authOtpBox');
   const emailDisplay = document.getElementById('authOtpEmailDisplay');
@@ -8071,7 +8239,6 @@ async function submitUniversalAuth(ev) {
     8000
   );
 
-  // Start automatic 3-second polling so the moment they click the link in Yahoo/Gmail, it activates automatically!
   startEmailVerificationWatcher();
 }
 
@@ -8102,11 +8269,22 @@ function startEmailVerificationWatcher() {
 
 function completeVerifiedEmailLogin(fbUser, pending) {
   const lang = REMO_I18N.getLang();
+  const existing = (REMO_STORE.state.users || []).find((x) => x && (x.uid === fbUser.uid || (x.email && x.email.toLowerCase() === (fbUser.email || '').toLowerCase())));
+  if (existing && existing.banned) {
+    try { REMO_STORE.fbAuth && REMO_STORE.fbAuth.signOut(); } catch (e) {}
+    REMO_STORE.signOut();
+    remoToast(t('auth_err_banned'));
+    return;
+  }
+
+  const adminEmail = (REMO_STORE.ADMIN_EMAIL || 'andart1174@gmail.com').toLowerCase();
+  const isAdminVerified = Boolean(fbUser.emailVerified && (fbUser.email || '').toLowerCase().trim() === adminEmail);
+
   const u = REMO_STORE.ensureGuestOrCitizen(
-    (pending && pending.name) || fbUser.displayName || 'Citizen',
+    (pending && pending.name) || fbUser.displayName || (isAdminVerified ? 'REMO Founder' : 'Citizen'),
     (pending && pending.email) || fbUser.email,
     (pending && pending.cityId) || 'montreal',
-    false,
+    isAdminVerified,
     fbUser.uid
   );
   if (u) {
@@ -8114,6 +8292,12 @@ function completeVerifiedEmailLogin(fbUser, pending) {
     u.termsVersion = '1.0';
     u.emailVerified = true;
     REMO_STORE.save(true, 'user_registered_verified');
+  }
+  if (isAdminVerified) {
+    REMO_STORE.setAdminUnlocked(true);
+  }
+  if (typeof REMO_STORE.refreshPrivateCloudListeners === 'function') {
+    REMO_STORE.refreshPrivateCloudListeners();
   }
 
   try {
@@ -8132,15 +8316,16 @@ function completeVerifiedEmailLogin(fbUser, pending) {
   syncHeaderAndSidebars();
   renderSocialFeed();
   remoToast(
-    lang === 'fr'
-      ? `🎉 Email réel vérifié avec succès ! Bienvenue ${u ? u.name : ''} (Passeport #${u ? u.passportNum : '0001'}) !`
-      : `🎉 Real Email Verified! Welcome ${u ? u.name : ''} (Passport #${u ? u.passportNum : '0001'})!`,
+    isAdminVerified
+      ? (lang === 'fr' ? '👑 Session Fondateur Admin activée !' : '👑 Founder Admin session active!')
+      : (lang === 'fr'
+        ? `🎉 Email réel vérifié avec succès ! Bienvenue ${u ? u.name : ''} (Passeport #${u ? u.passportNum : '0001'}) !`
+        : `🎉 Real Email Verified! Welcome ${u ? u.name : ''} (Passport #${u ? u.passportNum : '0001'})!`),
     'fanfare'
   );
 }
 
 async function verifyAuthOtpCode() {
-  const lang = REMO_I18N.getLang();
   let pending = null;
   try {
     const raw = sessionStorage.getItem('remo_pending_signup') || localStorage.getItem('remo_pending_signup');
@@ -8249,22 +8434,37 @@ function quickGoogleSignInSim() {
     REMO_STORE.fbAuth.signInWithPopup(provider).then((res) => {
       const fbU = res && res.user;
       if (!fbU) return;
+      const existing = (REMO_STORE.state.users || []).find((x) => x && (x.uid === fbU.uid || (x.email && fbU.email && x.email.toLowerCase() === fbU.email.toLowerCase())));
+      if (existing && existing.banned) {
+        try { REMO_STORE.fbAuth.signOut(); } catch (e) {}
+        REMO_STORE.signOut();
+        remoToast(t('auth_err_banned'));
+        return;
+      }
+
       const cityId = document.getElementById('authHomeCitySelect')?.value || 'montreal';
-      const adminEmail = (REMO_STORE.state?.settings?.adminEmail || 'andart1174@gmail.com').toLowerCase();
-      const isAdminEmail = (fbU.email || '').toLowerCase().trim() === adminEmail;
+      const adminEmail = (REMO_STORE.ADMIN_EMAIL || 'andart1174@gmail.com').toLowerCase();
+      const isAdminEmail = Boolean(fbU.emailVerified && (fbU.email || '').toLowerCase().trim() === adminEmail);
 
       const u = REMO_STORE.ensureGuestOrCitizen(
         fbU.displayName || (isAdminEmail ? 'REMO Founder' : 'Citizen'),
         fbU.email,
         cityId,
-        isAdminEmail
+        isAdminEmail,
+        fbU.uid
       );
       if (isAdminEmail) {
         REMO_STORE.setAdminUnlocked(true);
       }
+      if (typeof REMO_STORE.refreshPrivateCloudListeners === 'function') {
+        REMO_STORE.refreshPrivateCloudListeners();
+      }
       document.getElementById('authModal')?.classList.remove('open');
       syncHeaderAndSidebars();
       renderSocialFeed();
+      if (document.getElementById('adminQuickModal')?.classList.contains('open') && typeof openAdminQuickModal === 'function') {
+        openAdminQuickModal();
+      }
       remoToast(
         isAdminEmail
           ? (lang === 'fr' ? '👑 Session Fondateur Admin activée !' : '👑 Founder Admin session active!')
@@ -8858,7 +9058,7 @@ function openAdminQuickModal(preselectUid = '') {
     if (uSel) {
       uSel.innerHTML = (REMO_STORE.state.users || []).map((u) => {
         const c = getCityById(u.homeCity);
-        return `<option value="${u.uid}" ${u.uid === preselectUid ? 'selected' : ''}>${c.flag} @${u.name} (#${u.passportNum}) — 🪙 ${u.coins.toLocaleString()}</option>`;
+        return `<option value="${escapeHtmlStr(u.uid)}" ${u.uid === preselectUid ? 'selected' : ''}>${c.flag} @${escapeHtmlStr(u.name)} (#${escapeHtmlStr(u.passportNum)}) — 🪙 ${Number(u.coins || 0).toLocaleString()}</option>`;
       }).join('');
     }
     const cSel = document.getElementById('admNewPromoCityCard');
@@ -8890,12 +9090,7 @@ function openAdminQuickModal(preselectUid = '') {
 function unlockAdminGodModeInline() {
   const lang = REMO_I18N.getLang();
   if (!REMO_STORE.isCurrentUserAdmin()) {
-    remoToast(lang === 'fr' ? '🔒 Accès réservé au compte Fondateur.' : '🔒 Access restricted to Founder account.');
-    return;
-  }
-  const pin = document.getElementById('admQuickPinInput')?.value.trim();
-  if (!REMO_STORE.verifyAdminPin(pin)) {
-    remoToast(lang === 'fr' ? '❌ Code PIN Admin incorrect !' : '❌ Invalid Admin PIN!');
+    quickGoogleSignInSim();
     return;
   }
   REMO_STORE.setAdminUnlocked(true);
@@ -9324,7 +9519,7 @@ function redeemPromoCodeInput(inputId) {
     return;
   }
   found.redeemedBy.push(u.uid);
-  REMO_STORE.adminAdjustUserCoins(u.uid, 'add', found.coins, `🎟️ Promo Code ${code}`);
+  REMO_STORE.creditSystemCoins(u.uid, found.coins, `🎟️ Promo Code ${code}`, 50000);
   if (inp) inp.value = '';
   spawnRemoCoinsFX(12);
   syncHeaderAndSidebars();
@@ -9520,7 +9715,7 @@ function sellCityStockShare(cityId) {
   }
   const price = REMO_STORE.getCitySharePrice(cityId);
   port[cityId] -= 1;
-  REMO_STORE.adminAdjustUserCoins(u.uid, 'add', price);
+  REMO_STORE.creditSystemCoins(u.uid, price, 'City Stock Sale', 50000);
   REMO_STORE.save(true, 'city_stock_sell');
   spawnRemoCoinsFX(6);
   syncHeaderAndSidebars();
@@ -10685,8 +10880,8 @@ function replyToWorldBottle(bottleId) {
   b.replyText = reply.trim();
 
   const totalPrize = 25 + Number(b.bonusCoins || 0);
-  REMO_STORE.adminAdjustUserCoins(u.uid, 'add', totalPrize);
-  if (b.fromUid) REMO_STORE.adminAdjustUserCoins(b.fromUid, 'add', 25);
+  REMO_STORE.creditSystemCoins(u.uid, totalPrize, 'Bottle Reply Prize', 5000);
+  if (b.fromUid) REMO_STORE.creditSystemCoins(b.fromUid, 25, 'Bottle Bridge Bonus', 5000);
 
   // Stamp sender's city visa in catcher's Passport & link in 1-on-1 DMs!
   u.visas = Array.isArray(u.visas) ? u.visas : [];
@@ -12549,7 +12744,7 @@ function openCitizenProfileModal(uidOrName, fallbackName = '', silentIfMissing =
   body.innerHTML = `
     <div class="public-profile-hero">
       <div class="pp-avatar-lg ${cosm.frameClass || ''}" style="overflow:hidden;padding:0;position:relative;">
-        ${targetAvatarUrl ? `<img src="${targetAvatarUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block;" alt="${escapeHtmlStr(target.name)}">` : escapeHtmlStr((target.name || 'R')[0].toUpperCase())}
+        ${sanitizeSafeMediaUrl(targetAvatarUrl) ? `<img src="${sanitizeSafeMediaUrl(targetAvatarUrl)}" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block;" alt="${escapeHtmlStr(target.name)}">` : escapeHtmlStr((target.name || 'R')[0].toUpperCase())}
         ${onlineNow ? '<span class="online-pulse-dot" style="position:absolute;bottom:2px;right:2px;border:2px solid #070b18;"></span>' : ''}
       </div>
       <div style="flex:1;min-width:180px;">
@@ -12601,7 +12796,7 @@ function openCitizenProfileModal(uidOrName, fallbackName = '', silentIfMissing =
           🪪 ${isFr ? 'Ouvrir Mon Passeport 4D' : 'Open My 4D Passport'}
         </button>
       `}
-      <button type="button" class="btn-ghost" onclick="shareCitizenProfileLink('${escapeHtmlStr(target.name || target.uid)}')">
+      <button type="button" class="btn-ghost" onclick="shareCitizenProfileLink('${escapeJsSingleArg(target.name || target.uid)}')">
         ${t('profile_share_btn')}
       </button>
     </div>
@@ -12827,8 +13022,14 @@ window.refreshAllGameLeaderboardsDOM = refreshAllGameLeaderboardsDOM;
 window.addEventListener('message', (ev) => {
   const d = ev && ev.data;
   if (!d || d.type !== 'REMO_HTML_SCORE' || !d.postId) return;
+  const pid = String(d.postId);
+  const matchingFrames = Array.from(document.querySelectorAll('iframe.html-post-frame[data-post-id], iframe[data-post-id]'))
+    .filter((fr) => fr.getAttribute('data-post-id') === pid);
+  if (!ev.source || !matchingFrames.some((fr) => fr.contentWindow === ev.source)) {
+    return;
+  }
   const score = Math.floor(Number(d.score || 0));
-  if (!Number.isFinite(score) || score <= 0) return;
+  if (!Number.isFinite(score) || score <= 0 || score > 10000000) return;
 
   const prev = Number(_sessionGameScores[d.postId] || 0);
   if (score <= prev) return;
@@ -13337,7 +13538,7 @@ async function shareMysteryCityChallenge(postId) {
   }
   copyTextToClipboard(`${msg} ${url}`);
   const waUrl = `https://wa.me/?text=${encodeURIComponent(msg + ' ' + url)}`;
-  window.open(waUrl, '_blank', 'noopener');
+  window.open(waUrl, '_blank', 'noopener,noreferrer');
 }
 window.shareMysteryCityChallenge = shareMysteryCityChallenge;
 
@@ -17767,11 +17968,11 @@ async function copyViralPromoTemplateText(idx, platform = 'copy') {
   }
 
   if (platform === 'facebook') {
-    window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(tpl.url)}&quote=${encodeURIComponent(tpl.text)}`, '_blank', 'noopener');
+    window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(tpl.url)}&quote=${encodeURIComponent(tpl.text)}`, '_blank', 'noopener,noreferrer');
   } else if (platform === 'whatsapp') {
-    window.open(`https://wa.me/?text=${encodeURIComponent(tpl.text)}`, '_blank', 'noopener');
+    window.open(`https://wa.me/?text=${encodeURIComponent(tpl.text)}`, '_blank', 'noopener,noreferrer');
   } else if (platform === 'reddit') {
-    window.open(`https://www.reddit.com/submit?url=${encodeURIComponent(tpl.url)}&title=${encodeURIComponent(tpl.text.split('\n')[0])}`, '_blank', 'noopener');
+    window.open(`https://www.reddit.com/submit?url=${encodeURIComponent(tpl.url)}&title=${encodeURIComponent(tpl.text.split('\n')[0])}`, '_blank', 'noopener,noreferrer');
   }
 
   remoToast(
@@ -17797,15 +17998,12 @@ if (typeof window !== 'undefined') {
         }
       }
 
-      // Realtime 60s countdown ticker for 24h boosted posts in feed
+      // Realtime 60s countdown ticker for 24h boosted posts (in-place DOM update, no full feed rebuild)
       setInterval(() => {
         try {
           const feedEl = document.getElementById('view-feed');
-          if (feedEl && feedEl.classList.contains('active')) {
-            const hasBoosted = (REMO_STORE.state?.posts || []).some((p) => p && p.boosted);
-            if (hasBoosted && typeof renderSocialFeed === 'function') {
-              renderSocialFeed(null, false);
-            }
+          if (feedEl && feedEl.classList.contains('active') && typeof refreshLiveBoostBadgesInPlace === 'function') {
+            refreshLiveBoostBadgesInPlace();
           }
         } catch (e) {}
       }, 60000);

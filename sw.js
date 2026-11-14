@@ -3,16 +3,13 @@
    Offline Shell Caching + Native Push & Incoming Call Notifications
    ════════════════════════════════════════════════════════════════════ */
 
-const CACHE_NAME = 'remo-pwa-v110';
+const CACHE_NAME = 'remo-pwa-v123';
 const CORE_ASSETS = [
   './',
   './index.html',
-  './admin.html',
   './manifest.json',
   './favicon.ico',
-  './css/remo-core.css',
-  './css/remo-admin.css',
-  './img/remo_icon_512.png',
+  './css/remo-core.css?v=123',
   './img/remo_icon_192.png',
   './img/apple-touch-icon.png',
   './img/remo_brand_coin.png',
@@ -20,22 +17,15 @@ const CORE_ASSETS = [
   './img/favicon-64x64.png',
   './img/remo_coin_front.png',
   './img/remo_coin_back_base.png',
-  './img/remo_coin_back_001.png',
-  './img/remo_coin_front.jpg',
-  './img/remo_coin_back_001.jpg',
-  './img/remo_coin_obverse_gold.jpg',
-  './img/remo_coin_reverse_compass.jpg',
-  './img/remo_coin_prismatic_4d.jpg',
-  './js/remo-i18n.js',
-  './js/remo-cities-data.js',
-  './js/remo-store.js',
-  './js/remo-card-engine.js',
-  './js/remo-radar-arena.js',
-  './js/remo-social-comms.js',
-  './js/remo-radio-engine.js',
-  './js/remo-focus-tv.js',
-  './js/remo-world-blitz.js',
-  './js/remo-admin.js'
+  './js/remo-i18n.js?v=123',
+  './js/remo-cities-data.js?v=123',
+  './js/remo-store.js?v=123',
+  './js/remo-card-engine.js?v=123',
+  './js/remo-radar-arena.js?v=123',
+  './js/remo-social-comms.js?v=123',
+  './js/remo-radio-engine.js?v=123',
+  './js/remo-focus-tv.js?v=123',
+  './js/remo-world-blitz.js?v=123'
 ];
 
 self.addEventListener('install', (event) => {

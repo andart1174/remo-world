@@ -3,7 +3,7 @@
    100% Responsive on Desktop ("ordi") and Mobile ("vtel")
    ════════════════════════════════════════════════════════════════════ */
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Outfit:wght@600;700;800;900&family=Orbitron:wght@700;900&display=swap');
+/* Google Fonts loaded non-blocking from admin.html <head> */
 
 :root {
   --bg: #050814;

@@ -2385,7 +2385,7 @@ function renderPassportView() {
       <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px;">
         <div style="display:flex;align-items:center;gap:16px;min-width:0;">
           <div class="avatar-circle ${frameClass}" style="width:68px;height:68px;font-size:1.75rem;flex-shrink:0;overflow:hidden;padding:0;position:relative;">
-            ${userAvatar ? `<img src="${userAvatar}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block;" alt="${escapeHtmlStr(u.name)}">` : escapeHtmlStr((u.name || 'R')[0].toUpperCase())}
+            ${(userAvatar && (typeof sanitizeSafeMediaUrl === 'function' ? sanitizeSafeMediaUrl(userAvatar) : /^(https?:|data:image\/(?!svg\+xml)|\/|\.\/)/i.test(userAvatar))) ? `<img src="${escapeHtmlStr(userAvatar)}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block;" alt="${escapeHtmlStr(u.name)}">` : escapeHtmlStr((u.name || 'R')[0].toUpperCase())}
           </div>
           <div style="min-width:0;">
             <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
@@ -2927,7 +2927,7 @@ function shareReferralOnWhatsApp() {
   if (navigator.share) {
     navigator.share({ title: 'REMO Invite (+100 Coins)', text: txt, url }).catch(() => {});
   } else {
-    window.open(`https://wa.me/?text=${encodeURIComponent(txt)}`, '_blank');
+    window.open(`https://wa.me/?text=${encodeURIComponent(txt)}`, '_blank', 'noopener,noreferrer');
   }
 }
 
@@ -4644,8 +4644,8 @@ function renderWheelView() {
     ];
     histBox.innerHTML = hist.slice(0, 5).map((h) => `
       <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 10px;border-radius:10px;background:rgba(255,255,255,0.04);">
-        <span><b>${h.flag || '🌐'} @${h.user}</b></span>
-        <span style="color:#fbbf24;font-weight:900;">${h.prize}</span>
+        <span><b>${escapeHtmlStr(h.flag || '🌐')} @${escapeHtmlStr(h.user || 'Citizen')}</b></span>
+        <span style="color:#fbbf24;font-weight:900;">${escapeHtmlStr(h.prize || '')}</span>
       </div>
     `).join('');
   }
@@ -4776,6 +4776,11 @@ window.runCardPvPBattle = runCardPvPBattle;
 window.sharePvPChallengeLink = sharePvPChallengeLink;
 window.renderVaultView = renderVaultView;
 window.triggerCityPackOpening = triggerCityPackOpening;
+function closeGeoVaultInspectModal() {
+  const modal = document.getElementById('geoVaultInspectModal');
+  if (modal) modal.classList.remove('open');
+}
+
 function adminDeleteGeoVault(vaultId) {
   if (!REMO_STORE.isAdminUnlocked() && !REMO_STORE.isCurrentUserAdmin()) return;
   const lang = REMO_I18N.getLang();
@@ -4808,7 +4813,8 @@ window.refreshRadarMarkers = refreshRadarMarkers;
 window.renderRadarCityTeleportBar = renderRadarCityTeleportBar;
 window.openGeoVaultInspector = openGeoVaultInspector;
 window.closeGeoVaultInspectModal = closeGeoVaultInspectModal;
-window.tryUnlockGeoVaultAR = tryUnlockGeoVaultAR;
+window.executeGeoVaultUnlock = executeGeoVaultUnlock;
+window.tryUnlockGeoVaultAR = executeGeoVaultUnlock;
 window.inspectCardById = inspectCardById;
 window.inspectCardModal = inspectCardModal;
 window.exportInspectedCardStory = exportInspectedCardStory;

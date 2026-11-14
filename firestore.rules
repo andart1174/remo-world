@@ -13,28 +13,41 @@ service cloud.firestore {
 
     function isAdmin() {
       return isAuthenticated() && (
-        (request.auth.token.email == 'andart1174@gmail.com' && request.auth.token.email_verified != false) ||
+        (request.auth.token.email == 'andart1174@gmail.com' && request.auth.token.email_verified == true) ||
         request.auth.token.admin == true
       );
+    }
+
+    function isNotBanned() {
+      return isAuthenticated() && (
+        (!exists(/databases/$(database)/documents/remo_users/$(request.auth.uid)) ||
+          get(/databases/$(database)/documents/remo_users/$(request.auth.uid)).data.banned != true) &&
+        (!exists(/databases/$(database)/documents/remo_users/$('u_fb_' + request.auth.uid)) ||
+          get(/databases/$(database)/documents/remo_users/$('u_fb_' + request.auth.uid)).data.banned != true)
+      );
+    }
+
+    function isUidMatch(val) {
+      return isAuthenticated() && (val == request.auth.uid || val == 'u_fb_' + request.auth.uid);
     }
 
     // 1. Social Feed Posts (Strict HTML Mini-App Admin Gate & Citizen Interaction Field Whitelist)
     match /remo_posts/{postId} {
       allow read: if true;
       allow create: if isAdmin() || (
-        isAuthenticated() &&
+        isNotBanned() &&
         (
-          request.resource.data.uid == request.auth.uid ||
-          request.resource.data.authorUid == request.auth.uid ||
-          request.resource.data.authorId == request.auth.uid
+          isUidMatch(request.resource.data.uid) ||
+          isUidMatch(request.resource.data.authorUid) ||
+          isUidMatch(request.resource.data.authorId)
         ) &&
         (!('mediaType' in request.resource.data) || request.resource.data.mediaType != 'html_app')
       );
       allow update: if isAdmin() || (
-        isAuthenticated() && (
-          resource.data.uid == request.auth.uid ||
-          resource.data.authorUid == request.auth.uid ||
-          resource.data.authorId == request.auth.uid ||
+        isNotBanned() && (
+          isUidMatch(resource.data.uid) ||
+          isUidMatch(resource.data.authorUid) ||
+          isUidMatch(resource.data.authorId) ||
           request.resource.data.diff(resource.data).affectedKeys().hasOnly([
             'likes', 'comments', 'versus', 'poll', 'tipsTotal',
             'cityGuesses', 'leaderboard', 'capsuleWatchers',
@@ -43,77 +56,139 @@ service cloud.firestore {
         )
       );
       allow delete: if isAuthenticated() && (
-        resource.data.uid == request.auth.uid ||
-        resource.data.authorUid == request.auth.uid ||
-        resource.data.authorId == request.auth.uid ||
+        isUidMatch(resource.data.uid) ||
+        isUidMatch(resource.data.authorUid) ||
+        isUidMatch(resource.data.authorId) ||
         isAdmin()
       );
     }
 
-    // 2. Citizen Profiles & Passports (Role & Coin Delta Protected + Safe Peer Tipping)
+    // 1B. 24h Stories & Focus Study Rooms
+    match /remo_stories/{storyId} {
+      allow read: if true;
+      allow create, update: if isAdmin() || isNotBanned();
+      allow delete: if isAdmin() || (
+        isAuthenticated() && (
+          isUidMatch(resource.data.uid) ||
+          isUidMatch(resource.data.authorUid)
+        )
+      );
+    }
+
+    match /remo_focus_rooms/{roomId} {
+      allow read: if true;
+      allow create, update: if isAdmin() || isNotBanned();
+      allow delete: if isAdmin();
+    }
+
+    // 2. Citizen Profiles & Passports (Role, Ban, Verified & Coin Delta Protected)
     match /remo_users/{userId} {
       allow read: if true;
       allow create: if isAdmin() || (
-        isAuthenticated() &&
-        request.auth.uid == userId &&
-        (!('role' in request.resource.data) || request.resource.data.role != 'admin') &&
-        (!('coins' in request.resource.data) || request.resource.data.coins <= 1000)
+        isNotBanned() &&
+        isUidMatch(userId) &&
+        (!('role' in request.resource.data) || request.resource.data.role == 'citizen') &&
+        (!('banned' in request.resource.data) || request.resource.data.banned == false) &&
+        (!('verified' in request.resource.data) || request.resource.data.verified == false) &&
+        (!('coins' in request.resource.data) || (request.resource.data.coins >= 0 && request.resource.data.coins <= 500))
       );
       allow update: if isAdmin() || (
         isOwner(userId) &&
-        (!('role' in request.resource.data) || request.resource.data.role == resource.data.role || request.resource.data.role != 'admin') &&
-        (!('coins' in request.resource.data) || !('coins' in resource.data) || (request.resource.data.coins - resource.data.coins) <= 500)
+        isNotBanned() &&
+        (!('role' in request.resource.data) || (('role' in resource.data) && request.resource.data.role == resource.data.role) || (!('role' in resource.data) && request.resource.data.role == 'citizen')) &&
+        (!('banned' in request.resource.data) || (('banned' in resource.data) && request.resource.data.banned == resource.data.banned) || (!('banned' in resource.data) && request.resource.data.banned == false)) &&
+        (!('verified' in request.resource.data) || (('verified' in resource.data) && request.resource.data.verified == resource.data.verified) || (!('verified' in resource.data) && request.resource.data.verified == false)) &&
+        (!('coins' in request.resource.data) || !('coins' in resource.data) || (request.resource.data.coins - resource.data.coins) <= 1500)
       ) || (
-        isAuthenticated() &&
+        isNotBanned() &&
+        !isOwner(userId) &&
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['coins', 'lifetimeCoins']) &&
         (request.resource.data.coins - resource.data.coins) > 0 &&
-        (request.resource.data.coins - resource.data.coins) <= 250
+        (request.resource.data.coins - resource.data.coins) <= 5000
       );
-      allow delete: if isOwner(userId) || isAdmin();
+      allow delete: if isAdmin();
     }
 
-    // 3. Ecosystem Live State (Scores, Duels, Jukebox, Bottles)
+    // 2B. Private User Contact Vault (Email stored privately for Owner & Admin only)
+    match /remo_users_private/{userId} {
+      allow read, write: if isOwner(userId) || isAdmin();
+    }
+
+    // 3. Ecosystem Live State & Admin-Protected Public Config
     match /remo_ecosystem/{docId} {
       allow read: if true;
-      allow write: if isAuthenticated() || isAdmin();
+      allow create: if isAdmin() || (
+        isNotBanned() &&
+        !request.resource.data.keys().hasAny(['settings', 'supportTickets', 'adminPinHash', 'adminEmail'])
+      );
+      allow update: if isAdmin() || (
+        isNotBanned() &&
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['settings', 'supportTickets', 'adminPinHash', 'adminEmail'])
+      );
+      allow delete: if isAdmin();
+    }
+
+    match /remo_public_settings/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
     }
 
     // 4. 3D Digital City Cards Pool & Auctions
     match /remo_cards/{cardId} {
       allow read: if true;
-      allow write: if isAuthenticated() || isAdmin();
+      allow create, update: if isAdmin() || isNotBanned();
+      allow delete: if isAdmin();
     }
 
-    // 5. Direct Messages & Support Tickets
+    // 5. Private Direct Messages, Notifications & Support Tickets
     match /remo_direct_messages/{dmId} {
-      allow read: if isAuthenticated() || isAdmin();
-      allow create, update: if isAuthenticated() || isAdmin() || (
-        request.resource.data.toUid == 'u_admin_founder' &&
-        request.resource.data.text is string &&
-        request.resource.data.text.size() <= 2500
+      allow read: if isAdmin() || isUidMatch(resource.data.fromUid) || isUidMatch(resource.data.toUid);
+      allow create: if isAdmin() || (
+        isNotBanned() && (
+          isUidMatch(request.resource.data.fromUid) ||
+          (request.resource.data.toUid == 'u_admin_founder' && request.resource.data.fromUid == 'u_support_desk')
+        )
       );
-      allow delete: if isAdmin();
+      allow update: if isAdmin() || (
+        isNotBanned() && (isUidMatch(resource.data.toUid) || isUidMatch(resource.data.fromUid))
+      );
+      allow delete: if isAdmin() || (isAuthenticated() && isUidMatch(resource.data.fromUid));
     }
 
     match /remo_notifications/{notifId} {
-      allow read: if isAuthenticated() || isAdmin();
-      allow create, update: if isAuthenticated() || isAdmin() || (
-        request.resource.data.toUid == 'u_admin_founder' &&
-        request.resource.data.text is string &&
-        request.resource.data.text.size() <= 2500
+      allow read: if isAdmin() || isUidMatch(resource.data.toUid);
+      allow create: if isAdmin() || (
+        isNotBanned() && (
+          isUidMatch(request.resource.data.fromUid) ||
+          !('fromUid' in request.resource.data) ||
+          request.resource.data.toUid == 'u_admin_founder'
+        )
       );
+      allow update: if isAdmin() || (isNotBanned() && isUidMatch(resource.data.toUid));
       allow delete: if isAdmin();
+    }
+
+    match /remo_support_tickets/{ticketId} {
+      allow read: if isAdmin() || isUidMatch(resource.data.uid);
+      allow create: if (
+        (isNotBanned() && isUidMatch(request.resource.data.uid)) ||
+        (!isAuthenticated() && request.resource.data.uid is string && request.resource.data.uid.matches('^u_visitor_[0-9]+$'))
+      ) &&
+        request.resource.data.message is string &&
+        request.resource.data.message.size() > 0 &&
+        request.resource.data.message.size() <= 1850;
+      allow update, delete: if isAdmin();
     }
 
     match /remo_presence/{userId} {
       allow read: if true;
-      allow write: if isAuthenticated() || isAdmin();
+      allow create, update: if isAdmin() || (isOwner(userId) && isNotBanned());
+      allow delete: if isAdmin();
     }
 
-    // 6. Default Fallback Gatekeeper
+    // 6. Default Fallback Gatekeeper (Deny all unspecified collections)
     match /{document=**} {
-      allow read: if true;
-      allow write: if isAdmin();
+      allow read, write: if false;
     }
   }
 }

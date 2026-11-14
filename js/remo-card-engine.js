@@ -516,19 +516,8 @@ async function fetchRemotePhotoAsDataUrl(srcUrl) {
     r.readAsDataURL(safeBlob);
   });
 
-  const wsrvSafeUrl = s.replace(/%2F/gi, '%252F');
-  const candidates = [
-    s + (s.includes('?') ? '&' : '?') + '_cors=' + Date.now(),
-    'https://corsproxy.io/?url=' + encodeURIComponent(s),
-    'https://corsproxy.io/?' + encodeURIComponent(s),
-    'https://api.allorigins.win/raw?url=' + encodeURIComponent(s),
-    'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(s),
-    'https://wsrv.nl/?url=' + encodeURIComponent(wsrvSafeUrl) + '&output=jpg',
-    'https://wsrv.nl/?url=' + encodeURIComponent(s) + '&output=jpg'
-  ];
-
   const tryCandidate = async (url) => {
-    const res = await fetch(url, { mode: 'cors', cache: 'no-store' });
+    const res = await fetch(url, { mode: 'cors', cache: 'default' });
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const blob = await res.blob();
     if (!blob || blob.size < 200) throw new Error('Empty blob');
@@ -540,18 +529,10 @@ async function fetchRemotePhotoAsDataUrl(srcUrl) {
   };
 
   try {
-    if (typeof Promise.any === 'function') {
-      return await Promise.any(candidates.map((u) => tryCandidate(u)));
-    }
-  } catch (e) {}
-
-  for (const url of candidates) {
-    try {
-      const dUrl = await tryCandidate(url);
-      if (dUrl) return dUrl;
-    } catch (e) {}
+    return await tryCandidate(s);
+  } catch (e) {
+    return '';
   }
-  return '';
 }
 
 const CARD_PHOTO_MEM_CACHE = new Map();

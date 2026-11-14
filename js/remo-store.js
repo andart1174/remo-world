@@ -1045,7 +1045,6 @@ function createDefaultState() {
   const now = Date.now();
   return {
     settings: {
-      adminPinHash: '170dacfe9990ca',
       adminEmail: 'andart1174@gmail.com',
       customDomain: '',
       announcement_en: '🌐 Welcome to REMO! Choose your Home City, open your Free Daily 4D City Card Pack & join the World City Cup!',
@@ -2035,31 +2034,48 @@ const REMO_WEATHER = {
     };
   },
 
+  _batchFetching: false,
+  _lastBatchTs: 0,
+
+  hydrateAllCitiesBatch() {
+    if (typeof fetch === 'undefined' || typeof REMO_CITIES === 'undefined' || !Array.isArray(REMO_CITIES)) return;
+    const now = Date.now();
+    if (this._batchFetching || (this._lastBatchTs && now - this._lastBatchTs < 15 * 60000)) return;
+    const cities = REMO_CITIES.filter((c) => c && c.id && Number.isFinite(Number(c.lat)) && Number.isFinite(Number(c.lng)));
+    if (cities.length === 0) return;
+    this._batchFetching = true;
+    const lats = cities.map((c) => Number(c.lat).toFixed(2)).join(',');
+    const lngs = cities.map((c) => Number(c.lng).toFixed(2)).join(',');
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lats}&longitude=${lngs}&current_weather=true`;
+    fetch(url)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((payload) => {
+        const list = Array.isArray(payload) ? payload : (payload && payload.current_weather ? [payload] : []);
+        const tsNow = Date.now();
+        list.forEach((item, idx) => {
+          const c = cities[idx];
+          if (!c || !item || !item.current_weather) return;
+          const cw = item.current_weather;
+          const mapped = this.mapWmoCode(Number(cw.weathercode || 0), cw.is_day === 0);
+          this._liveCache[c.id] = {
+            ts: tsNow,
+            tempC: Math.round(cw.temperature),
+            ...mapped
+          };
+        });
+        this._lastBatchTs = tsNow;
+      })
+      .catch(() => {})
+      .finally(() => {
+        this._batchFetching = false;
+      });
+  },
+
   maybeHydrateOnline(city) {
     if (!city || !city.id || typeof fetch === 'undefined') return;
     const cached = this._liveCache[city.id];
     if (cached && Date.now() - cached.ts < 15 * 60000) return;
-    if (this._fetching[city.id]) return;
-    this._fetching[city.id] = true;
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${Number(city.lat).toFixed(2)}&longitude=${Number(city.lng).toFixed(2)}&current_weather=true`;
-    fetch(url)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        if (data && data.current_weather) {
-          const cw = data.current_weather;
-          const code = Number(cw.weathercode || 0);
-          const mapped = this.mapWmoCode(code, cw.is_day === 0);
-          this._liveCache[city.id] = {
-            ts: Date.now(),
-            tempC: Math.round(cw.temperature),
-            ...mapped
-          };
-        }
-      })
-      .catch(() => {})
-      .finally(() => {
-        this._fetching[city.id] = false;
-      });
+    this.hydrateAllCitiesBatch();
   },
 
   mapWmoCode(code, isNight) {
@@ -2561,11 +2577,9 @@ const REMO_STORE = {
       });
     }
     upgradeEcosystemState(this.state);
-    if (this.state && this.state.settings && this.state.settings.adminPin) {
+    if (this.state && this.state.settings) {
       delete this.state.settings.adminPin;
-      if (!this.state.settings.adminPinHash) {
-        this.state.settings.adminPinHash = '170dacfe9990ca';
-      }
+      delete this.state.settings.adminPinHash;
     }
     this.save(false);
     this.initFirebaseIfConfigured();
@@ -2587,53 +2601,16 @@ const REMO_STORE = {
     });
   },
 
-  _hashAdminPin(str = '') {
-    const s = String(str || '').trim();
-    let h1 = 0xdeadbeef ^ s.length;
-    let h2 = 0x41c6ce57 ^ s.length;
-    for (let i = 0; i < s.length; i++) {
-      const ch = s.charCodeAt(i);
-      h1 = Math.imul(h1 ^ ch, 2654435761);
-      h2 = Math.imul(h2 ^ ch, 1597334677);
-    }
-    h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
-    h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
-    return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(16);
-  },
-
-  verifyAdminPin(inputPin = '') {
-    const p = String(inputPin || '').trim();
-    if (!p) return false;
-    try {
-      const lockUntil = Number(localStorage.getItem('remo_adm_lock_until') || 0);
-      if (lockUntil > Date.now()) {
-        return false;
-      }
-    } catch (e) {}
-    const customHash = this.state && this.state.settings && this.state.settings.adminPinHash;
-    const targetHash = customHash || '170dacfe9990ca';
-    const isOk = this._hashAdminPin(p) === targetHash;
-    try {
-      if (isOk) {
-        localStorage.removeItem('remo_adm_fail_cnt');
-        localStorage.removeItem('remo_adm_lock_until');
-      } else {
-        const fails = Number(localStorage.getItem('remo_adm_fail_cnt') || 0) + 1;
-        localStorage.setItem('remo_adm_fail_cnt', String(fails));
-        if (fails >= 5) {
-          localStorage.setItem('remo_adm_lock_until', String(Date.now() + 15 * 60 * 1000));
-        }
-      }
-    } catch (e) {}
-    return isOk;
-  },
-
   isCurrentUserAdmin() {
-    const u = this.getCurrentUser();
-    if (!u) return false;
+    const fbUser = this.fbAuth && this.fbAuth.currentUser;
+    if (!fbUser || !fbUser.email || fbUser.emailVerified !== true) return false;
     const adminEmail = (this.state && this.state.settings && this.state.settings.adminEmail) || 'andart1174@gmail.com';
-    const emailMatch = Boolean(u.email && u.email.toLowerCase().trim() === adminEmail.toLowerCase().trim());
-    return emailMatch && (u.role === 'admin' || u.uid === 'u_admin_founder');
+    return fbUser.email.toLowerCase().trim() === adminEmail.toLowerCase().trim();
+  },
+
+  isCurrentUserBanned() {
+    const u = this.getCurrentUser();
+    return Boolean(u && u.banned === true && !this.isCurrentUserAdmin());
   },
 
   isAdminUnlocked() {
@@ -2643,6 +2620,7 @@ const REMO_STORE = {
 
   setAdminUnlocked(active) {
     if (active) {
+      if (!this.isCurrentUserAdmin()) return false;
       localStorage.setItem(this.ADMIN_MODE_KEY, '1');
       sessionStorage.setItem('remo_admin_unlocked', '1');
     } else {
@@ -2653,10 +2631,38 @@ const REMO_STORE = {
       REMO_LIVE_BUS.postMessage({ type: 'STATE_UPDATED', reason: 'admin_mode', ts: Date.now() });
     }
     window.dispatchEvent(new CustomEvent('remo:stateupdate', { detail: { reason: 'admin_mode' } }));
+    return Boolean(active);
+  },
+
+  creditSystemCoins(targetUid, amount = 0, note = '', maxCap = 5000) {
+    const u = this.state.users.find((x) => x && x.uid === targetUid);
+    if (!u || u.banned) return null;
+    const cap = Math.max(100, Number(maxCap || 5000));
+    const val = Math.min(cap, Math.max(0, Math.round(Number(amount) || 0)));
+    if (val <= 0) return u;
+    u.coins = Number(u.coins || 0) + val;
+    u.lifetimeCoins = Number(u.lifetimeCoins || 0) + val;
+    if (note && note.trim()) {
+      this.state.directMessages = this.state.directMessages || [];
+      const dmObj = {
+        id: 'dm_sys_' + Date.now() + '_' + Math.random().toString(36).slice(2, 5),
+        fromUid: 'u_admin_founder',
+        fromName: '👑 REMO Treasury',
+        toUid: u.uid,
+        text: `🪙 [+${val} REMO Coins → @${u.name}]: ${note.trim()}`,
+        ts: Date.now()
+      };
+      this.state.directMessages.push(dmObj);
+      this.syncDmToCloud(dmObj);
+    }
+    try { RemoAudio.play('coin'); } catch (e) {}
+    this.save(true, 'system_coin_credit', { uid: u.uid, coins: u.coins });
+    this.syncUserToCloud(u);
+    return u;
   },
 
   adminAdjustUserCoins(targetUid, mode = 'add', amount = 100, note = '') {
-    if (!this.isAdminUnlocked() && !this.isCurrentUserAdmin()) return null;
+    if (!this.isCurrentUserAdmin()) return null;
     const u = this.state.users.find((x) => x.uid === targetUid);
     if (!u) return null;
     const val = Math.max(0, Math.round(Number(amount) || 0));
@@ -2671,17 +2677,20 @@ const REMO_STORE = {
     }
     if (note && note.trim()) {
       this.state.directMessages = this.state.directMessages || [];
-      this.state.directMessages.push({
+      const dmObj = {
         id: 'dm_adm_' + Date.now(),
         fromUid: 'u_admin_founder',
         fromName: '👑 REMO Treasury',
         toUid: u.uid,
         text: `🪙 [${mode === 'sub' ? '-' : mode === 'set' ? '=' : '+'}${val} REMO Coins → @${u.name}]: ${note.trim()}`,
         ts: Date.now()
-      });
+      };
+      this.state.directMessages.push(dmObj);
+      this.syncDmToCloud(dmObj);
     }
     RemoAudio.play('coin');
     this.save(true, 'admin_coin_transfer', { uid: u.uid, coins: u.coins });
+    this.syncUserToCloud(u);
     return u;
   },
 
@@ -2782,7 +2791,7 @@ const REMO_STORE = {
     } catch (e) {}
   },
 
-  save(broadcast = true, reason = 'update', payload = null) {
+  _flushLocalSave() {
     try {
       localStorage.setItem(this.KEY, JSON.stringify(this.state));
     } catch (e) {
@@ -2790,7 +2799,6 @@ const REMO_STORE = {
       try {
         const pruned = Object.assign({}, this.state);
         if (Array.isArray(pruned.posts)) {
-          // Keep top 20 posts in localStorage; full posts live safely in Firestore remo_posts
           pruned.posts = pruned.posts.slice(0, 20);
         }
         if (Array.isArray(pruned.auctions)) {
@@ -2798,6 +2806,20 @@ const REMO_STORE = {
         }
         localStorage.setItem(this.KEY, JSON.stringify(pruned));
       } catch (e2) {}
+    }
+  },
+
+  save(broadcast = true, reason = 'update', payload = null) {
+    const isSyncOnly = reason && reason.startsWith('cloud_');
+    if (isSyncOnly) {
+      if (this._saveDebounce) clearTimeout(this._saveDebounce);
+      this._saveDebounce = setTimeout(() => { this._flushLocalSave(); }, 350);
+    } else {
+      if (this._saveDebounce) {
+        clearTimeout(this._saveDebounce);
+        this._saveDebounce = null;
+      }
+      this._flushLocalSave();
     }
     if (reason && (reason.startsWith('auction') || reason === 'update')) {
       this.backupAuctionsToStorage();
@@ -2913,7 +2935,7 @@ const REMO_STORE = {
       const cur = this.getCurrentUser();
       // If current user in storage is u_admin_founder but admin is not unlocked or verified, wipe to protect founder identity
       if (cur) {
-        if (cur.uid === 'u_admin_founder' && !this.isAdminUnlocked()) {
+        if (cur.uid === 'u_admin_founder' && !this.isCurrentUserAdmin()) {
           localStorage.removeItem(this.USER_KEY);
         } else {
           return cur;
@@ -3029,14 +3051,14 @@ const REMO_STORE = {
   syncUserToCloud(user) {
     if (!this.fbDb || !user || !user.uid) return;
     try {
+      const isAdm = this.isCurrentUserAdmin();
+      const fbUid = user.fbUid || (this.fbAuth && this.fbAuth.currentUser ? this.fbAuth.currentUser.uid : '');
       const cleanUser = {
         uid: user.uid,
+        fbUid: fbUid || '',
         name: user.name || 'Citizen',
         avatarUrl: user.avatarUrl || localStorage.getItem('remo_avatar_' + user.uid) || '',
         bio: user.bio || localStorage.getItem('remo_bio_' + user.uid) || '',
-        email: user.email || '',
-        role: user.role || 'citizen',
-        verified: Boolean(user.verified),
         homeCity: user.homeCity || 'montreal',
         passportNum: user.passportNum || '0000',
         referralCode: user.referralCode || `REMO-${user.passportNum}`,
@@ -3053,13 +3075,26 @@ const REMO_STORE = {
         equippedFrame: user.equippedFrame || '',
         equippedTitleId: user.equippedTitleId || '',
         lastPhotoCardMintMonth: user.lastPhotoCardMintMonth || '',
-        banned: Boolean(user.banned),
         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
       };
+      if (isAdm) {
+        cleanUser.role = user.role || 'citizen';
+        cleanUser.verified = Boolean(user.verified);
+        cleanUser.banned = Boolean(user.banned);
+      }
       this.fbDb.collection('remo_users').doc(cleanUser.uid).set(cleanUser, { merge: true })
         .catch((err) => {
           console.warn('Firestore sync user notice:', err.message);
         });
+      // Store private email in access-controlled remo_users_private (Owner & Admin only)
+      if (user.email) {
+        this.fbDb.collection('remo_users_private').doc(cleanUser.uid).set({
+          uid: cleanUser.uid,
+          fbUid: fbUid || '',
+          email: user.email,
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        }, { merge: true }).catch(() => {});
+      }
     } catch (e) {
       console.warn('syncUserToCloud error:', e);
     }
@@ -3445,34 +3480,41 @@ const REMO_STORE = {
       this.state.supportTickets = this.state.supportTickets.slice(0, 60);
     }
 
-    // Also deliver directly to Founder's Messenger & Notification Bell (using 'u_support_desk' if Founder is testing from own session so it shows up as unread)
-    const dmFromUid = (isAdm || !u || u.uid === 'u_admin_founder') ? 'u_support_desk' : u.uid;
-    const dmFromName = (isAdm || !u || u.uid === 'u_admin_founder') ? ('📩 ' + cleanSender) : cleanSender;
-    const dmObj = {
-      id: 'dm_' + ticket.id,
-      fromUid: dmFromUid,
-      fromName: dmFromName,
-      fromCity: ticket.cityId,
-      toUid: 'u_admin_founder',
-      text: `🎫 [${catBadge}] (${cleanSender}${ticket.passportNum ? ' #' + ticket.passportNum : ''}): ${cleanMsg}`,
-      read: false,
-      ts: now
-    };
-    if (!Array.isArray(this.state.directMessages)) this.state.directMessages = [];
-    this.state.directMessages.unshift(dmObj);
-    this.syncDmToCloud(dmObj);
+    if (this.fbDb) {
+      this.fbDb.collection('remo_support_tickets').doc(ticket.id).set(ticket, { merge: true })
+        .catch((err) => console.warn('Support ticket cloud sync notice:', err.message));
+    }
 
-    this.addNotification({
-      id: 'notif_' + ticket.id,
-      toUid: 'u_admin_founder',
-      fromUid: dmFromUid,
-      fromName: dmFromName,
-      fromCity: ticket.cityId,
-      type: 'message',
-      text: `🎫 [${catBadge}] ${cleanSender}: ${cleanMsg.slice(0, 90)}`,
-      rawPreview: cleanMsg.slice(0, 120),
-      ts: now
-    });
+    // Also deliver directly to Founder's Messenger & Notification Bell when authenticated
+    if (this.fbAuth && this.fbAuth.currentUser) {
+      const dmFromUid = (isAdm || !u || u.uid === 'u_admin_founder') ? 'u_support_desk' : u.uid;
+      const dmFromName = (isAdm || !u || u.uid === 'u_admin_founder') ? ('📩 ' + cleanSender) : cleanSender;
+      const dmObj = {
+        id: 'dm_' + ticket.id,
+        fromUid: dmFromUid,
+        fromName: dmFromName,
+        fromCity: ticket.cityId,
+        toUid: 'u_admin_founder',
+        text: `🎫 [${catBadge}] (${cleanSender}${ticket.passportNum ? ' #' + ticket.passportNum : ''}): ${cleanMsg}`,
+        read: false,
+        ts: now
+      };
+      if (!Array.isArray(this.state.directMessages)) this.state.directMessages = [];
+      this.state.directMessages.unshift(dmObj);
+      this.syncDmToCloud(dmObj);
+
+      this.addNotification({
+        id: 'notif_' + ticket.id,
+        toUid: 'u_admin_founder',
+        fromUid: dmFromUid,
+        fromName: dmFromName,
+        fromCity: ticket.cityId,
+        type: 'message',
+        text: `🎫 [${catBadge}] ${cleanSender}: ${cleanMsg.slice(0, 90)}`,
+        rawPreview: cleanMsg.slice(0, 120),
+        ts: now
+      });
+    }
 
     this.save(true, 'support_ticket_created');
     return { ok: true, ticket };
@@ -3521,6 +3563,15 @@ const REMO_STORE = {
       });
     }
 
+    if (this.fbDb && this.isCurrentUserAdmin()) {
+      this.fbDb.collection('remo_support_tickets').doc(tkt.id).set({
+        status: tkt.status,
+        replyText: tkt.replyText,
+        repliedAt: tkt.repliedAt,
+        read: tkt.read
+      }, { merge: true }).catch(() => {});
+    }
+
     this.save(true, 'support_ticket_replied');
     return { ok: true, ticket: tkt };
   },
@@ -3528,6 +3579,9 @@ const REMO_STORE = {
   deleteSupportTicket(ticketId) {
     if (!ticketId || !Array.isArray(this.state.supportTickets)) return;
     this.state.supportTickets = this.state.supportTickets.filter((x) => x && x.id !== ticketId);
+    if (this.fbDb && this.isCurrentUserAdmin()) {
+      this.fbDb.collection('remo_support_tickets').doc(ticketId).delete().catch(() => {});
+    }
     this.save(true, 'support_ticket_deleted');
   },
 
@@ -3536,8 +3590,14 @@ const REMO_STORE = {
     localStorage.removeItem(this.ADMIN_MODE_KEY);
     sessionStorage.removeItem('remo_admin_unlocked');
     this.setAdminUnlocked(false);
+    this.state.directMessages = [];
+    this.state.notifications = [];
+    this.state.supportTickets = [];
     if (this.fbAuth) {
       try { this.fbAuth.signOut().catch(() => {}); } catch (e) {}
+    }
+    if (typeof this.refreshPrivateCloudListeners === 'function') {
+      this.refreshPrivateCloudListeners();
     }
     window.dispatchEvent(new CustomEvent('remo:stateupdate', { detail: { reason: 'auth' } }));
   },
@@ -4015,11 +4075,10 @@ const REMO_STORE = {
           if (fbU) {
             const isGoogle = Array.isArray(fbU.providerData) && fbU.providerData.some((p) => p && p.providerId === 'google.com');
             if (!fbU.emailVerified && !isGoogle) {
-              // Do not create or log in Citizen account until real email link is clicked and verified
               return;
             }
             const adminEmail = (this.state?.settings?.adminEmail || 'andart1174@gmail.com').toLowerCase();
-            const isAdminEmail = (fbU.email || '').toLowerCase() === adminEmail;
+            const isAdminEmail = (fbU.email || '').toLowerCase() === adminEmail && fbU.emailVerified === true;
             let pendingName = fbU.displayName || '';
             let pendingCity = 'montreal';
             try {
@@ -4035,11 +4094,27 @@ const REMO_STORE = {
             const u = this.ensureGuestOrCitizen(pendingName || (isAdminEmail ? 'REMO Founder' : 'Citizen'), fbU.email, pendingCity, isAdminEmail, fbU.uid);
             if (u) {
               u.emailVerified = true;
+              u.fbUid = fbU.uid;
+            }
+            if (u && u.banned && !isAdminEmail) {
+              this.setAdminUnlocked(false);
+              this.refreshPrivateCloudListeners();
+              if (typeof remoToast === 'function') {
+                remoToast('⛔ Account suspended by REMO Moderation.', 'error');
+              }
+              return;
             }
             if (isAdminEmail) {
               this.setAdminUnlocked(true);
             }
+            this.refreshPrivateCloudListeners();
             if (typeof syncHeaderAndSidebars === 'function') syncHeaderAndSidebars();
+            if (typeof updateAuthHeaderUI === 'function') updateAuthHeaderUI();
+            if (typeof refreshAllAdminPanels === 'function') refreshAllAdminPanels();
+          } else {
+            this.setAdminUnlocked(false);
+            this.refreshPrivateCloudListeners();
+            if (typeof updateAuthHeaderUI === 'function') updateAuthHeaderUI();
           }
         });
       }
@@ -4051,44 +4126,259 @@ const REMO_STORE = {
     }
   },
 
+  _mergeDmSnapshot(snap, stateObj) {
+    if (!snap) return;
+    let hasNew = false;
+    const curU = this.getCurrentUser();
+    const myUid = curU ? curU.uid : null;
+    const isAdm = this.isCurrentUserAdmin();
+    const lang = (typeof REMO_I18N !== 'undefined' && REMO_I18N.getLang) ? REMO_I18N.getLang() : 'en';
+    if (!Array.isArray(this.state.directMessages)) this.state.directMessages = [];
+
+    snap.docChanges().forEach((change) => {
+      const dm = change.doc.data();
+      if (!dm || !dm.id) return;
+      if (dm.id === 'dm1' || dm.id === 'dm_env_demo_1') dm.read = true;
+      const recentlyReadTs = this._recentlyReadDmIds ? (this._recentlyReadDmIds.get(dm.id) || 0) : 0;
+      if (recentlyReadTs && (Date.now() - recentlyReadTs < 15000)) {
+        dm.read = true;
+      }
+
+      if (change.type === 'added') {
+        const existingIdx = this.state.directMessages.findIndex((x) => x.id === dm.id);
+        if (existingIdx < 0) {
+          this.state.directMessages.push(dm);
+          hasNew = true;
+          const isForMe = (myUid && (dm.toUid === myUid || (isAdm && (dm.toUid === 'u_admin_founder' || !dm.toUid)))) && dm.fromUid !== myUid;
+          const isFreshLive = !stateObj.isInitial || (Date.now() - (dm.ts || 0) < 35000);
+          if (isForMe && !dm.read && isFreshLive) {
+            try { RemoAudio.play('chime'); } catch (e) {}
+            const msgPreview = dm.text || (dm.voiceUrl
+              ? (lang === 'fr' ? '🎙️ Note vocale privée' : '🎙️ Private voice note')
+              : (dm.envelopeCoins > 0
+                ? (lang === 'fr' ? `🧧 Enveloppe +${dm.envelopeCoins} 🪙` : `🧧 +${dm.envelopeCoins} 🪙 Envelope`)
+                : (lang === 'fr' ? '✉️ Nouveau message privé' : '✉️ New private message')));
+            if (typeof showHeadsUpNotification === 'function') {
+              showHeadsUpNotification({ type: 'message', title: `@${dm.fromName || 'Citizen'}`, text: msgPreview, partnerUid: dm.fromUid });
+            }
+            if (typeof triggerNativeDeviceNotification === 'function') {
+              triggerNativeDeviceNotification({
+                title: `💌 @${dm.fromName || 'Citizen'} • REMO`,
+                body: msgPreview,
+                tag: 'remo_dm_' + dm.fromUid,
+                data: { type: 'message', partnerUid: dm.fromUid, url: './index.html?view=messages' }
+              });
+            }
+          }
+        } else {
+          const prev = this.state.directMessages[existingIdx];
+          if (prev.read || recentlyReadTs) dm.read = true;
+          this.state.directMessages[existingIdx] = Object.assign({}, prev, dm);
+          hasNew = true;
+        }
+      } else if (change.type === 'modified') {
+        const idx = this.state.directMessages.findIndex((x) => x.id === dm.id);
+        if (idx >= 0) {
+          const prev = this.state.directMessages[idx];
+          if (recentlyReadTs) dm.read = true;
+          this.state.directMessages[idx] = Object.assign({}, prev, dm);
+          hasNew = true;
+        }
+      } else if (change.type === 'removed') {
+        this.state.directMessages = this.state.directMessages.filter((x) => x.id !== dm.id);
+        hasNew = true;
+      }
+    });
+
+    this.state.directMessages.sort((a, b) => (a.ts || 0) - (b.ts || 0));
+    stateObj.isInitial = false;
+    if (hasNew) {
+      this.save(false, 'cloud_dms');
+      window.dispatchEvent(new CustomEvent('remo:stateupdate', { detail: { reason: 'cloud_dms' } }));
+      if (typeof renderDirectMessagesView === 'function' && typeof currentRemoView !== 'undefined' && currentRemoView === 'messages') {
+        renderDirectMessagesView();
+      }
+      if (typeof refreshAllAdminPanels === 'function') refreshAllAdminPanels();
+    }
+    if (typeof updateUnreadBadges === 'function') updateUnreadBadges();
+    if (typeof renderNotificationsList === 'function' && document.getElementById('notificationsModal')?.classList.contains('open')) {
+      renderNotificationsList();
+    }
+  },
+
+  _mergeNotifSnapshot(snap, stateObj) {
+    if (!snap) return;
+    const curU = this.getCurrentUser();
+    const myUid = curU ? curU.uid : null;
+    const isAdm = this.isCurrentUserAdmin();
+    if (!Array.isArray(this.state.notifications)) this.state.notifications = [];
+    const localReadSet = this.getLocalReadNotifIds();
+
+    snap.docChanges().forEach((change) => {
+      const n = change.doc.data();
+      if (!n || !n.id) return;
+      if (localReadSet.has(n.id)) n.read = true;
+      if (change.type === 'added') {
+        const idx = this.state.notifications.findIndex((x) => x.id === n.id);
+        if (idx < 0) {
+          this.state.notifications.unshift(n);
+          const isForMe = myUid && (n.toUid === myUid || (isAdm && (n.toUid === 'u_admin_founder' || !n.toUid))) && n.fromUid !== myUid;
+          const isFreshLive = !stateObj.isInitial || (Date.now() - (n.ts || 0) < 35000);
+          if (isForMe && !n.read && n.type !== 'message' && isFreshLive) {
+            try { RemoAudio.play('goldchime'); } catch (e) {}
+            if (typeof showHeadsUpNotification === 'function') {
+              const formattedDesc = (typeof formatNotificationDesc === 'function') ? formatNotificationDesc(n) : (n.text || '');
+              showHeadsUpNotification({ type: n.type, title: `@${n.fromName || 'Citizen'}`, text: formattedDesc, emoji: n.emoji, postId: n.postId, partnerUid: n.fromUid });
+              if (typeof triggerNativeDeviceNotification === 'function') {
+                triggerNativeDeviceNotification({
+                  title: `🔔 @${n.fromName || 'Citizen'} • REMO`,
+                  body: formattedDesc,
+                  tag: 'remo_notif_' + n.id,
+                  data: { type: n.type, postId: n.postId || '', partnerUid: n.fromUid || '', url: n.postId ? `./index.html?post=${n.postId}` : './index.html' }
+                });
+              }
+            }
+          }
+        } else {
+          if (this.state.notifications[idx].read || localReadSet.has(n.id)) n.read = true;
+          this.state.notifications[idx] = Object.assign({}, this.state.notifications[idx], n);
+        }
+      } else if (change.type === 'modified') {
+        const idx = this.state.notifications.findIndex((x) => x.id === n.id);
+        if (idx >= 0) {
+          if (localReadSet.has(n.id)) n.read = true;
+          this.state.notifications[idx] = n;
+        }
+      } else if (change.type === 'removed') {
+        this.state.notifications = this.state.notifications.filter((x) => x.id !== n.id);
+      }
+    });
+
+    stateObj.isInitial = false;
+    this.state.notifications.sort((a, b) => (b.ts || 0) - (a.ts || 0));
+    if (this.state.notifications.length > 80) this.state.notifications = this.state.notifications.slice(0, 80);
+    this.save(false, 'cloud_notifs');
+    if (typeof updateUnreadBadges === 'function') updateUnreadBadges();
+    if (typeof renderNotificationsList === 'function') renderNotificationsList();
+  },
+
+  refreshPrivateCloudListeners() {
+    if (!this.fbDb) return;
+    const curFb = this.fbAuth && this.fbAuth.currentUser;
+    const isGoogle = Boolean(curFb && Array.isArray(curFb.providerData) && curFb.providerData.some((p) => p && p.providerId === 'google.com'));
+    const isVerified = Boolean(curFb && (curFb.emailVerified === true || isGoogle));
+    const isAdm = this.isCurrentUserAdmin();
+    const curU = this.getCurrentUser();
+    const myUid = (curU && curU.uid) || (curFb ? ('u_fb_' + curFb.uid) : '');
+    const nextKey = isVerified ? `${curFb.uid}:${myUid}:${isAdm ? 1 : 0}` : 'anon';
+    if (this._privAuthKey === nextKey && Array.isArray(this._privUnsubs) && this._privUnsubs.length > 0) return;
+
+    if (Array.isArray(this._privUnsubs)) {
+      this._privUnsubs.forEach((fn) => { try { if (typeof fn === 'function') fn(); } catch (e) {} });
+    }
+    this._privUnsubs = [];
+    this._privAuthKey = nextKey;
+
+    if (!isVerified || !curFb) {
+      return;
+    }
+
+    const dmState = { isInitial: true };
+    const notifState = { isInitial: true };
+    const ticketCb = (snap) => {
+      if (!snap) return;
+      const list = [];
+      snap.forEach((doc) => {
+        const d = doc.data();
+        if (d && d.id) list.push(d);
+      });
+      this.state.supportTickets = list.sort((a, b) => Number(b.ts || 0) - Number(a.ts || 0)).slice(0, 60);
+      this.save(false, 'cloud_tickets');
+      if (typeof renderAdminSupportTicketsTables === 'function') renderAdminSupportTicketsTables();
+      if (typeof refreshAllAdminPanels === 'function') refreshAllAdminPanels();
+    };
+
+    if (isAdm) {
+      this._privUnsubs.push(
+        this.fbDb.collection('remo_direct_messages').orderBy('ts', 'desc').limit(150)
+          .onSnapshot((s) => this._mergeDmSnapshot(s, dmState), (err) => console.warn('DM admin watch notice:', err.message)),
+        this.fbDb.collection('remo_notifications').orderBy('ts', 'desc').limit(80)
+          .onSnapshot((s) => this._mergeNotifSnapshot(s, notifState), (err) => console.warn('Notif admin watch notice:', err.message)),
+        this.fbDb.collection('remo_support_tickets').orderBy('ts', 'desc').limit(60)
+          .onSnapshot(ticketCb, (err) => console.warn('Support ticket watch notice:', err.message))
+      );
+    } else if (myUid) {
+      this._privUnsubs.push(
+        this.fbDb.collection('remo_direct_messages').where('toUid', '==', myUid).limit(80)
+          .onSnapshot((s) => this._mergeDmSnapshot(s, dmState), (err) => console.warn('DM inbox watch notice:', err.message)),
+        this.fbDb.collection('remo_direct_messages').where('fromUid', '==', myUid).limit(80)
+          .onSnapshot((s) => this._mergeDmSnapshot(s, dmState), (err) => console.warn('DM sent watch notice:', err.message)),
+        this.fbDb.collection('remo_notifications').where('toUid', '==', myUid).limit(80)
+          .onSnapshot((s) => this._mergeNotifSnapshot(s, notifState), (err) => console.warn('Notif user watch notice:', err.message)),
+        this.fbDb.collection('remo_support_tickets').where('uid', '==', myUid).limit(30)
+          .onSnapshot(ticketCb, (err) => console.warn('Ticket user watch notice:', err.message)),
+        this.fbDb.collection('remo_users_private').doc(myUid)
+          .onSnapshot((doc) => {
+            if (!doc || !doc.exists) return;
+            const pd = doc.data();
+            if (pd && pd.email) {
+              const u = this.getCurrentUser();
+              if (u && u.uid === myUid && !u.email) {
+                u.email = pd.email;
+                try { localStorage.setItem(this.USER_KEY, JSON.stringify(u)); } catch (e) {}
+              }
+            }
+          }, () => {})
+      );
+    }
+  },
+
   startFirestoreSync() {
     if (!this.fbDb || this._fbSyncStarted) return;
     this._fbSyncStarted = true;
     try {
-      // 1. Sync & Watch ALL USERS in Real Time across all devices (Cloud is Authoritative Source of Truth)
-      this.fbDb.collection('remo_users').onSnapshot((snap) => {
+      // 1. Sync & Watch ACTIVE CITIZEN PROFILES (Capped at 120 for fast startup)
+      this.fbDb.collection('remo_users').limit(120).onSnapshot((snap) => {
         if (!snap) return;
         const cloudUsers = [];
         const cloudUserIds = new Set();
+        const curU0 = this.getCurrentUser();
+        const myUid0 = curU0 ? curU0.uid : '';
+        const isAdm0 = this.isCurrentUserAdmin();
         snap.forEach((doc) => {
           const uData = doc.data();
           if (!uData || !uData.uid) return;
 
-          // Delete any fake pioneer citizens or admin-deleted accounts from Firestore on the fly
           const isFakeCitizen = (uData.name && uData.name.startsWith('REMO Pioneer #')) || (uData.email && /^citizen\d+@remo\.world$/i.test(uData.email) && uData.role !== 'admin');
           const isDeleted = (this.deletedUserIds && this.deletedUserIds.has(uData.uid));
           if (isFakeCitizen || isDeleted) {
-            this.fbDb.collection('remo_users').doc(uData.uid).delete().catch(() => {});
+            if (isAdm0) {
+              this.fbDb.collection('remo_users').doc(uData.uid).delete().catch(() => {});
+            }
             return;
           }
-          // Preserve avatarUrl and bio from local cache/memory if Firestore document doesn't have them yet
           const existingLocal = (this.state.users || []).find((x) => x && x.uid === uData.uid);
           const cachedAvatar = (existingLocal && existingLocal.avatarUrl) || localStorage.getItem('remo_avatar_' + uData.uid) || '';
           if (!uData.avatarUrl && cachedAvatar) {
             uData.avatarUrl = cachedAvatar;
-            this.fbDb.collection('remo_users').doc(uData.uid).set({ avatarUrl: cachedAvatar }, { merge: true }).catch(() => {});
+            if (uData.uid === myUid0 || isAdm0) {
+              this.fbDb.collection('remo_users').doc(uData.uid).set({ avatarUrl: cachedAvatar }, { merge: true }).catch(() => {});
+            }
           } else if (uData.avatarUrl) {
             try { localStorage.setItem('remo_avatar_' + uData.uid, uData.avatarUrl); } catch (e) {}
           }
           if (!uData.bio && existingLocal && existingLocal.bio) {
             uData.bio = existingLocal.bio;
           }
+          // Preserve owner's private email locally if already loaded
+          if (existingLocal && existingLocal.email && !uData.email && (uData.uid === myUid0 || isAdm0)) {
+            uData.email = existingLocal.email;
+          }
 
           cloudUsers.push(uData);
           cloudUserIds.add(uData.uid);
         });
 
-        // Current active user
         const curU = this.getCurrentUser();
         const activeUsers = [...cloudUsers];
         if (curU) {
@@ -4098,18 +4388,30 @@ const REMO_STORE = {
             }
           } else {
             const matchInCloud = activeUsers.find((x) => x && x.uid === curU.uid);
-            if (matchInCloud && !matchInCloud.avatarUrl && curU.avatarUrl) {
-              matchInCloud.avatarUrl = curU.avatarUrl;
+            if (matchInCloud) {
+              if (!matchInCloud.avatarUrl && curU.avatarUrl) matchInCloud.avatarUrl = curU.avatarUrl;
+              // Sync moderation/coin flags back into current local session cleanly
+              if (matchInCloud.banned !== undefined && curU.uid === matchInCloud.uid) {
+                curU.banned = Boolean(matchInCloud.banned);
+                try { localStorage.setItem(this.USER_KEY, JSON.stringify(curU)); } catch (e) {}
+              }
             }
           }
         }
+        const visualSig = activeUsers
+          .map((u) => `${u.uid}:${u.name || ''}:${u.avatarUrl || ''}:${u.verified ? 1 : 0}:${u.equippedFrame || ''}:${u.equippedTitleId || ''}:${u.banned ? 1 : 0}`)
+          .sort()
+          .join('|');
+        const visualChanged = this._lastUsersVisualSig !== visualSig;
+        this._lastUsersVisualSig = visualSig;
+
         this.state.users = activeUsers;
         this.save(false, 'cloud_users_sync');
         window.dispatchEvent(new CustomEvent('remo:stateupdate', { detail: { reason: 'cloud_users' } }));
         if (typeof refreshAllAdminPanels === 'function') refreshAllAdminPanels();
         if (typeof syncHeaderAndSidebars === 'function') syncHeaderAndSidebars();
         if (typeof renderPassportView === 'function') renderPassportView();
-        if (typeof renderSocialFeed === 'function') renderSocialFeed();
+        if (visualChanged && typeof renderSocialFeed === 'function') renderSocialFeed();
         if (typeof renderDirectMessagesView === 'function' && typeof currentRemoView !== 'undefined' && currentRemoView === 'messages') {
           renderDirectMessagesView();
         }
@@ -4136,163 +4438,28 @@ const REMO_STORE = {
         console.warn('Firestore remo_presence sync notice:', err.message);
       });
 
-      // 2. Sync & Watch ALL DIRECT MESSAGES in Real Time
-      let isInitialDmSnap = true;
-      this.fbDb.collection('remo_direct_messages').orderBy('ts', 'desc').limit(150).onSnapshot((snap) => {
-        if (!snap) return;
-        let hasNew = false;
-        const curU = this.getCurrentUser();
-        const myUid = curU ? curU.uid : null;
-        const isAdm = this.isCurrentUserAdmin();
-        const lang = (typeof REMO_I18N !== 'undefined' && REMO_I18N.getLang) ? REMO_I18N.getLang() : 'en';
+      // 2. Private User-Scoped Direct Messages, Notifications & Support Tickets (Auth-gated)
+      this.refreshPrivateCloudListeners();
 
-        snap.docChanges().forEach((change) => {
-          const dm = change.doc.data();
-          if (!dm || !dm.id) return;
-          if (dm.id === 'dm1' || dm.id === 'dm_env_demo_1') dm.read = true;
-          const recentlyReadTs = this._recentlyReadDmIds ? (this._recentlyReadDmIds.get(dm.id) || 0) : 0;
-          if (recentlyReadTs && (Date.now() - recentlyReadTs < 15000)) {
-            dm.read = true;
-          }
-
-          if (change.type === 'added') {
-            const existingIdx = this.state.directMessages.findIndex((x) => x.id === dm.id);
-            if (existingIdx < 0) {
-              this.state.directMessages.push(dm);
-              hasNew = true;
-
-              // Live incoming message alert & sound if addressed to me or Admin
-              const isForMe = (myUid && (dm.toUid === myUid || (isAdm && (dm.toUid === 'u_admin_founder' || !dm.toUid)))) && dm.fromUid !== myUid;
-              const isFreshLive = !isInitialDmSnap || (Date.now() - (dm.ts || 0) < 35000);
-              if (isForMe && !dm.read && isFreshLive) {
-                try { RemoAudio.play('chime'); } catch (e) {}
-                const msgPreview = dm.text || (dm.voiceUrl
-                  ? (lang === 'fr' ? '🎙️ Note vocale privée' : '🎙️ Private voice note')
-                  : (dm.envelopeCoins > 0
-                    ? (lang === 'fr' ? `🧧 Enveloppe +${dm.envelopeCoins} 🪙` : `🧧 +${dm.envelopeCoins} 🪙 Envelope`)
-                    : (lang === 'fr' ? '✉️ Nouveau message privé' : '✉️ New private message')));
-                if (typeof showHeadsUpNotification === 'function') {
-                  showHeadsUpNotification({
-                    type: 'message',
-                    title: `@${dm.fromName || 'Citizen'}`,
-                    text: msgPreview,
-                    partnerUid: dm.fromUid
-                  });
-                }
-                if (typeof triggerNativeDeviceNotification === 'function') {
-                  triggerNativeDeviceNotification({
-                    title: `💌 @${dm.fromName || 'Citizen'} • REMO`,
-                    body: msgPreview,
-                    tag: 'remo_dm_' + dm.fromUid,
-                    data: { type: 'message', partnerUid: dm.fromUid, url: './index.html?view=messages' }
-                  });
-                }
-              }
-            } else {
-              const prev = this.state.directMessages[existingIdx];
-              if (prev.read || recentlyReadTs) dm.read = true;
-              this.state.directMessages[existingIdx] = Object.assign({}, prev, dm);
-              hasNew = true;
-            }
-          } else if (change.type === 'modified') {
-            const idx = this.state.directMessages.findIndex((x) => x.id === dm.id);
-            if (idx >= 0) {
-              const prev = this.state.directMessages[idx];
-              if (recentlyReadTs) dm.read = true;
-              this.state.directMessages[idx] = Object.assign({}, prev, dm);
-              hasNew = true;
-            }
-          } else if (change.type === 'removed') {
-            this.state.directMessages = this.state.directMessages.filter((x) => x.id !== dm.id);
-            hasNew = true;
-          }
+      // 2C. Watch Admin-Protected Public Config (Announcements, Rewards, Daily Pulse, Happy Hour)
+      this.fbDb.collection('remo_public_settings').doc('config').onSnapshot((snap) => {
+        if (!snap || !snap.exists) return;
+        const cfgData = snap.data();
+        if (!cfgData || typeof cfgData !== 'object') return;
+        const safePublic = Object.assign({}, this.state.settings || {});
+        ['customDomain', 'announcement_en', 'announcement_fr', 'announcementActive', 'rewards', 'dailyPulse', 'flashDrop', 'happyHour2x', 'vipShopItems'].forEach((k) => {
+          if (cfgData[k] !== undefined) safePublic[k] = cfgData[k];
         });
-
-        this.state.directMessages.sort((a, b) => (a.ts || 0) - (b.ts || 0));
-        isInitialDmSnap = false;
-
-        if (hasNew) {
-          this.save(false, 'cloud_dms');
-          window.dispatchEvent(new CustomEvent('remo:stateupdate', { detail: { reason: 'cloud_dms' } }));
-          if (typeof renderDirectMessagesView === 'function' && typeof currentRemoView !== 'undefined' && currentRemoView === 'messages') {
-            renderDirectMessagesView();
-          }
-          if (typeof refreshAllAdminPanels === 'function') refreshAllAdminPanels();
+        delete safePublic.adminPin;
+        delete safePublic.adminPinHash;
+        this.state.settings = safePublic;
+        if (Array.isArray(cfgData.vipShopItems) && cfgData.vipShopItems.length > 0) {
+          this.state.vipShopItems = cfgData.vipShopItems;
         }
-        if (typeof updateUnreadBadges === 'function') updateUnreadBadges();
-        if (typeof renderNotificationsList === 'function' && document.getElementById('notificationsModal')?.classList.contains('open')) {
-          renderNotificationsList();
-        }
+        this.save(false, 'cloud_settings');
+        window.dispatchEvent(new CustomEvent('remo:stateupdate', { detail: { reason: 'cloud_settings' } }));
       }, (err) => {
-        console.warn('Firestore remo_direct_messages sync notice:', err.message);
-      });
-
-      // 2B. Sync & Watch ALL NOTIFICATIONS in Real Time
-      let isInitialNotifSnap = true;
-      this.fbDb.collection('remo_notifications').orderBy('ts', 'desc').limit(80).onSnapshot((snap) => {
-        if (!snap) return;
-        const curU = this.getCurrentUser();
-        const myUid = curU ? curU.uid : null;
-        const isAdm = this.isCurrentUserAdmin();
-        if (!Array.isArray(this.state.notifications)) this.state.notifications = [];
-        const localReadSet = this.getLocalReadNotifIds();
-
-        snap.docChanges().forEach((change) => {
-          const n = change.doc.data();
-          if (!n || !n.id) return;
-          if (localReadSet.has(n.id)) n.read = true;
-          if (change.type === 'added') {
-            const idx = this.state.notifications.findIndex((x) => x.id === n.id);
-            if (idx < 0) {
-              this.state.notifications.unshift(n);
-              const isForMe = myUid && (n.toUid === myUid || (isAdm && (n.toUid === 'u_admin_founder' || !n.toUid))) && n.fromUid !== myUid;
-              const isFreshLive = !isInitialNotifSnap || (Date.now() - (n.ts || 0) < 35000);
-              // Direct messages already trigger their own Heads-Up toast from remo_direct_messages
-              if (isForMe && !n.read && n.type !== 'message' && isFreshLive) {
-                try { RemoAudio.play('goldchime'); } catch (e) {}
-                if (typeof showHeadsUpNotification === 'function') {
-                  const formattedDesc = (typeof formatNotificationDesc === 'function') ? formatNotificationDesc(n) : (n.text || '');
-                  showHeadsUpNotification({
-                    type: n.type,
-                    title: `@${n.fromName || 'Citizen'}`,
-                    text: formattedDesc,
-                    emoji: n.emoji,
-                    postId: n.postId,
-                    partnerUid: n.fromUid
-                  });
-                  if (typeof triggerNativeDeviceNotification === 'function') {
-                    triggerNativeDeviceNotification({
-                      title: `🔔 @${n.fromName || 'Citizen'} • REMO`,
-                      body: formattedDesc,
-                      tag: 'remo_notif_' + n.id,
-                      data: { type: n.type, postId: n.postId || '', partnerUid: n.fromUid || '', url: n.postId ? `./index.html?post=${n.postId}` : './index.html' }
-                    });
-                  }
-                }
-              }
-            } else {
-              if (this.state.notifications[idx].read || localReadSet.has(n.id)) n.read = true;
-              this.state.notifications[idx] = Object.assign({}, this.state.notifications[idx], n);
-            }
-          } else if (change.type === 'modified') {
-            const idx = this.state.notifications.findIndex((x) => x.id === n.id);
-            if (idx >= 0) {
-              if (localReadSet.has(n.id)) n.read = true;
-              this.state.notifications[idx] = n;
-            }
-          } else if (change.type === 'removed') {
-            this.state.notifications = this.state.notifications.filter((x) => x.id !== n.id);
-          }
-        });
-
-        isInitialNotifSnap = false;
-        this.state.notifications.sort((a, b) => (b.ts || 0) - (a.ts || 0));
-        if (this.state.notifications.length > 80) this.state.notifications = this.state.notifications.slice(0, 80);
-        this.save(false, 'cloud_notifs');
-        if (typeof updateUnreadBadges === 'function') updateUnreadBadges();
-        if (typeof renderNotificationsList === 'function') renderNotificationsList();
-      }, (err) => {
-        console.warn('Firestore remo_notifications sync notice:', err.message);
+        console.log('Firestore public settings watch status:', err.message);
       });
 
       // 3. Sync & Watch ALL SOCIAL POSTS in Real Time across all devices (Cloud is Authoritative Source of Truth)
@@ -4676,20 +4843,6 @@ const REMO_STORE = {
           if (typeof renderViralContestsView === 'function') renderViralContestsView();
           if (typeof renderFeedActiveContestsBanner === 'function') renderFeedActiveContestsBanner();
         }
-        if (Array.isArray(data.supportTickets)) {
-          const localMap = new Map();
-          (this.state.supportTickets || []).forEach((t) => {
-            if (t && t.id) localMap.set(t.id, t);
-          });
-          data.supportTickets.forEach((ct) => {
-            if (!ct || !ct.id) return;
-            const lt = localMap.get(ct.id);
-            if (!lt || Number(ct.repliedAt || ct.ts || 0) >= Number(lt.repliedAt || lt.ts || 0)) {
-              localMap.set(ct.id, Object.assign({}, lt || {}, ct));
-            }
-          });
-          this.state.supportTickets = Array.from(localMap.values()).sort((a, b) => Number(b.ts || 0) - Number(a.ts || 0)).slice(0, 60);
-        }
       };
       
       docRef.get().then((snap) => {
@@ -4698,7 +4851,6 @@ const REMO_STORE = {
             cityScores: this.state.cityScores || {},
             cityMayors: this.state.cityMayors || {},
             duels: (this.state.duels || []).slice(0, 15),
-            settings: this.state.settings || {},
             bottles: (this.state.bottles || []).slice(0, 30),
             jukeboxTracks: (this.state.jukeboxTracks || []).slice(0, 30),
             auctions: (this.state.auctions || []).slice(0, 25),
@@ -5379,7 +5531,7 @@ const REMO_STORE = {
     ev.updatedAt = Date.now();
     const prize = Number(ev.prizeCoins || 5000);
     if (winner.uid) {
-      this.adminAdjustUserCoins(winner.uid, 'add', prize);
+      this.creditSystemCoins(winner.uid, prize, '', 50000);
     }
     this.addCityScore(winner.cityId, 500);
     this._notifyContestUpdate('eurovision_concluded');
@@ -5488,7 +5640,7 @@ const REMO_STORE = {
     const prizes = [Number(pgp.prize1st || 3000), Number(pgp.prize2nd || 1500), Number(pgp.prize3rd || 750)];
     sorted.slice(0, 3).forEach((ent, idx) => {
       if (ent && ent.uid) {
-        this.adminAdjustUserCoins(ent.uid, 'add', prizes[idx]);
+        this.creditSystemCoins(ent.uid, prizes[idx], '', 50000);
       }
       if (ent && ent.cityId) {
         this.addCityScore(ent.cityId, idx === 0 ? 300 : idx === 1 ? 150 : 75);
@@ -5723,7 +5875,7 @@ const REMO_STORE = {
       if (picked) {
         winners.push(picked);
         if (picked.uid) {
-          this.adminAdjustUserCoins(picked.uid, 'add', Number(gr.prizeCoins || 2500));
+          this.creditSystemCoins(picked.uid, Number(gr.prizeCoins || 2500), '', 50000);
         }
       }
     }
@@ -5921,7 +6073,7 @@ const REMO_STORE = {
     const count = Math.max(1, uniqueUids.length);
     const share = Math.max(50, Math.round(Number(tr.jackpotCoins || 5000) / count));
     uniqueUids.forEach((uid) => {
-      this.adminAdjustUserCoins(uid, 'add', share);
+      this.creditSystemCoins(uid, share, '', 50000);
     });
     (tr.visitedCities || []).forEach((cid) => {
       this.addCityScore(cid, 100);
@@ -6128,7 +6280,7 @@ const REMO_STORE = {
     if (!u || u.role === 'guest') return { ok: false, error: 'auth_required' };
     const cid = cityId || u.homeCity || 'montreal';
     const currentMayorUid = (this.state.cityMayors && this.state.cityMayors[cid]) || '';
-    const isAdmin = this.isAdminUnlocked() || u.uid === 'u_admin_founder';
+    const isAdmin = this.isCurrentUserAdmin();
     if (currentMayorUid !== u.uid && !isAdmin) {
       return { ok: false, error: 'not_mayor' };
     }
@@ -6336,7 +6488,7 @@ const REMO_STORE = {
     pc.mintedCardsCount = Number(pc.mintedCardsCount || 0) + 1;
     // Reward all contributors +100 bonus coins!
     Object.keys(pc.contributors || {}).forEach((uid) => {
-      this.adminAdjustUserCoins(uid, 'add', 100);
+      this.creditSystemCoins(uid, 100, '', 5000);
     });
     pc.updatedAt = Date.now();
     this._notifyContestUpdate('pixel_canvas_minted');
@@ -6399,7 +6551,7 @@ const REMO_STORE = {
     mv.sealed = false;
     // Bonus +50 coins to every citizen who deposited a capsule!
     (mv.capsules || []).forEach((c) => {
-      if (c && c.uid) this.adminAdjustUserCoins(c.uid, 'add', 50);
+      if (c && c.uid) this.creditSystemCoins(c.uid, 50, '', 5000);
     });
     mv.updatedAt = Date.now();
     RemoAudio.play('fanfare');
@@ -6473,7 +6625,7 @@ const REMO_STORE = {
 
     // Creator receives +10 🪙 royalty when a fan invests in their stock
     if (stock.creatorUid && stock.creatorUid !== u.uid) {
-      this.adminAdjustUserCoins(stock.creatorUid, 'add', 10);
+      this.creditSystemCoins(stock.creatorUid, 10, '', 5000);
     }
     this.addCityScore(stock.cityId || 'montreal', 15);
     cb.updatedAt = Date.now();
@@ -6513,13 +6665,13 @@ const REMO_STORE = {
       const sh = Number(shares || 0);
       if (sh > 0) {
         const payout = sh * divPer;
-        this.adminAdjustUserCoins(holderUid, 'add', payout);
+        this.creditSystemCoins(holderUid, payout, '', 50000);
         totalPaid += payout;
         holdersCount++;
       }
     });
     // Also reward the creator themselves!
-    this.adminAdjustUserCoins(stock.creatorUid, 'add', divPer * 2);
+    this.creditSystemCoins(stock.creatorUid, divPer * 2, '', 50000);
     stock.lastDividendCoins = divPer;
     stock.dividendsPaidCount = Number(stock.dividendsPaidCount || 0) + 1;
     cb.updatedAt = Date.now();
@@ -6655,7 +6807,6 @@ const REMO_STORE = {
           cityScores: this.state.cityScores || {},
           cityMayors: this.state.cityMayors || {},
           duels: (this.state.duels || []).slice(0, 15),
-          settings: this.state.settings || {},
           bottles: (this.state.bottles || []).slice(0, 30),
           jukeboxTracks: (this.state.jukeboxTracks || []).slice(0, 30),
           auctions: cleanAuctions,
@@ -6670,7 +6821,6 @@ const REMO_STORE = {
               createdAt: s.createdAt || 0
             }))
             .slice(0, 15),
-          supportTickets: (this.state.supportTickets || []).slice(0, 60),
           viralContests: this.state.viralContests || getDefaultViralContests(),
           worldSystems: this.state.worldSystems || getDefaultUniqueWorldSystems(),
           deletedPostIds: [...(this.deletedPostIds || [])].slice(-100),
@@ -6682,6 +6832,22 @@ const REMO_STORE = {
         }, { merge: true }).catch((err) => {
           console.log('Firestore background sync info:', err.message);
         });
+        if (this.isCurrentUserAdmin() && this.state.settings) {
+          const publicCfg = {
+            customDomain: this.state.settings.customDomain || '',
+            announcement_en: this.state.settings.announcement_en || '',
+            announcement_fr: this.state.settings.announcement_fr || '',
+            announcementActive: Boolean(this.state.settings.announcementActive),
+            rewards: this.state.settings.rewards || {},
+            dailyPulse: this.state.settings.dailyPulse || {},
+            flashDrop: this.state.settings.flashDrop || {},
+            happyHour2x: Boolean(this.state.settings.happyHour2x),
+            vipShopItems: Array.isArray(this.state.vipShopItems) ? this.state.vipShopItems : undefined,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+          };
+          Object.keys(publicCfg).forEach((k) => { if (publicCfg[k] === undefined) delete publicCfg[k]; });
+          this.fbDb.collection('remo_public_settings').doc('config').set(publicCfg, { merge: true }).catch(() => {});
+        }
       } catch (e) {}
     };
     if (immediate) {
@@ -6806,9 +6972,28 @@ async function pingIndexNowAllPages() {
         : `⏳ Sending ${urlList.length} live sitemap.xml pages via Netlify server to IndexNow...`
     );
 
+    let idToken = '';
+    try {
+      if (REMO_STORE && REMO_STORE.fbAuth && REMO_STORE.fbAuth.currentUser) {
+        idToken = await REMO_STORE.fbAuth.currentUser.getIdToken();
+      }
+    } catch (e) {}
+    if (!idToken) {
+      const needAuthMsg = isFr
+        ? '🔒 Connectez-vous avec votre compte Google Admin (andart1174@gmail.com) pour lancer IndexNow.'
+        : '🔒 Sign in with your verified Admin account (andart1174@gmail.com) to trigger IndexNow.';
+      updateIndexNowStatusUI(`🔒 ${needAuthMsg}`);
+      if (typeof admToast === 'function') admToast(needAuthMsg, 'error');
+      else if (typeof remoToast === 'function') remoToast(needAuthMsg, 'error');
+      return { ok: false, status: 401, error: 'admin_auth_required' };
+    }
+
     const res = await fetch('/.netlify/functions/indexnow', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json; charset=utf-8' },
+      headers: {
+        'Content-Type': 'application/json; charset=utf-8',
+        'Authorization': 'Bearer ' + idToken
+      },
       body: JSON.stringify({ urlList })
     });
 

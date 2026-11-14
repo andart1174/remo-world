@@ -4,8 +4,97 @@
  * and returning the genuine upstream HTTP status code (200/202 vs 4xx/5xx).
  */
 const https = require('https');
+const crypto = require('crypto');
 
 const HOST = 'remoworld.com';
+const FIREBASE_PROJECT_ID = 'remo-world';
+const ADMIN_EMAIL = 'andart1174@gmail.com';
+const GOOGLE_CERTS_URL = 'https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com';
+let _cachedCerts = null;
+let _cachedCertsExpiresAt = 0;
+
+function fetchGoogleCerts(requestImpl) {
+  if (_cachedCerts && Date.now() < _cachedCertsExpiresAt) {
+    return Promise.resolve(_cachedCerts);
+  }
+  return new Promise((resolve, reject) => {
+    const req = https.request(GOOGLE_CERTS_URL, { method: 'GET' }, (res) => {
+      let body = '';
+      res.setEncoding('utf8');
+      res.on('data', (chunk) => { body += chunk; });
+      res.on('end', () => {
+        if (res.statusCode !== 200) return reject(new Error(`Certs HTTP ${res.statusCode}`));
+        try {
+          _cachedCerts = JSON.parse(body);
+          _cachedCertsExpiresAt = Date.now() + 3600000;
+          resolve(_cachedCerts);
+        } catch (e) {
+          reject(e);
+        }
+      });
+    });
+    req.on('error', reject);
+    req.end();
+  });
+}
+
+async function verifyAdminAuth(event, requestImpl) {
+  const headers = (event && event.headers) || {};
+  const secretHeader = headers['x-indexnow-secret'] || headers['X-Indexnow-Secret'] || '';
+  const envSecret = process.env.INDEXNOW_ADMIN_SECRET || '';
+  if (envSecret && typeof secretHeader === 'string' && secretHeader.length === envSecret.length) {
+    try {
+      if (crypto.timingSafeEqual(Buffer.from(secretHeader), Buffer.from(envSecret))) {
+        return { ok: true, mode: 'secret' };
+      }
+    } catch (e) {}
+  }
+
+  const authHeader = String(headers.authorization || headers.Authorization || '');
+  if (!authHeader.startsWith('Bearer ')) {
+    return { ok: false, statusCode: 401, error: 'Missing admin Authorization Bearer token.' };
+  }
+  const token = authHeader.slice(7).trim();
+  const parts = token.split('.');
+  if (parts.length !== 3) {
+    return { ok: false, statusCode: 401, error: 'Malformed Bearer token.' };
+  }
+
+  try {
+    const headerJson = JSON.parse(Buffer.from(parts[0], 'base64url').toString('utf8'));
+    const payloadJson = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'));
+    if (headerJson.alg !== 'RS256' || !headerJson.kid) {
+      return { ok: false, statusCode: 401, error: 'Unsupported token algorithm.' };
+    }
+    const certs = await fetchGoogleCerts(requestImpl);
+    const certPem = certs && certs[headerJson.kid];
+    if (!certPem) {
+      return { ok: false, statusCode: 401, error: 'Unknown signing key id.' };
+    }
+    const verifier = crypto.createVerify('RSA-SHA256');
+    verifier.update(`${parts[0]}.${parts[1]}`);
+    verifier.end();
+    const sigValid = verifier.verify(certPem, Buffer.from(parts[2], 'base64url'));
+    if (!sigValid) {
+      return { ok: false, statusCode: 401, error: 'Invalid token signature.' };
+    }
+    const nowSec = Math.floor(Date.now() / 1000);
+    if (payloadJson.aud !== FIREBASE_PROJECT_ID || payloadJson.iss !== `https://securetoken.google.com/${FIREBASE_PROJECT_ID}`) {
+      return { ok: false, statusCode: 403, error: 'Invalid Firebase project claim.' };
+    }
+    if (!payloadJson.exp || Number(payloadJson.exp) <= nowSec || !payloadJson.sub) {
+      return { ok: false, statusCode: 401, error: 'Expired Firebase token.' };
+    }
+    const email = String(payloadJson.email || '').toLowerCase();
+    const isAdminUser = (email === ADMIN_EMAIL && payloadJson.email_verified === true) || payloadJson.admin === true;
+    if (!isAdminUser) {
+      return { ok: false, statusCode: 403, error: 'Admin privileges required.' };
+    }
+    return { ok: true, mode: 'firebase', email };
+  } catch (err) {
+    return { ok: false, statusCode: 401, error: 'Token verification failed.' };
+  }
+}
 const KEY = 'remoindexnow2026key8f4a2b9c1d7e3a5f';
 const KEY_LOCATION = `https://${HOST}/${KEY}.txt`;
 const SITEMAP_URL = `https://${HOST}/sitemap.xml`;
@@ -87,6 +176,16 @@ exports.handler = async (event, _context, deps = {}) => {
     return jsonResponse(405, { ok: false, error: 'Method Not Allowed. Use POST.' });
   }
 
+  const authCheck = typeof deps.verifyAdminAuth === 'function'
+    ? await deps.verifyAdminAuth(event, requestImpl)
+    : await verifyAdminAuth(event, requestImpl);
+  if (!authCheck || !authCheck.ok) {
+    return jsonResponse((authCheck && authCheck.statusCode) || 401, {
+      ok: false,
+      error: (authCheck && authCheck.error) || 'Unauthorized.'
+    });
+  }
+
   let bodyObj = {};
   if (event && event.body) {
     try {
@@ -160,5 +259,6 @@ exports._internals = {
   KEY,
   KEY_LOCATION,
   sanitizeUrlList,
-  fetchLiveSitemapUrls
+  fetchLiveSitemapUrls,
+  verifyAdminAuth
 };

@@ -19,28 +19,78 @@ function admToast(msg) {
   setTimeout(() => d.remove(), 3400);
 }
 
-/* ── 1. ADMIN PIN LOCK / UNLOCK (Synced with REMO Social Network God-Mode) ── */
+/* ── 1. ADMIN FIREBASE AUTH LOCK / UNLOCK (Synced with Verified Founder Account) ── */
 function checkAdminSession() {
-  const unlocked = REMO_STORE.isAdminUnlocked();
+  const unlocked = REMO_STORE.isAdminUnlocked() && REMO_STORE.isCurrentUserAdmin();
   const lockEl = document.getElementById('admLockScreen');
   if (lockEl) lockEl.style.display = unlocked ? 'none' : 'flex';
   if (unlocked) refreshAllAdminPanels();
 }
 
-function unlockAdminOffice(ev) {
-  if (ev) ev.preventDefault();
+async function adminGoogleSignIn() {
   const lang = REMO_I18N.getLang();
-  const inp = document.getElementById('admPinInput')?.value.trim();
-  if (REMO_STORE.verifyAdminPin(inp)) {
-    if (!REMO_STORE.isCurrentUserAdmin()) {
-      REMO_STORE.ensureGuestOrCitizen('REMO Founder', 'andart1174@gmail.com', 'montreal', true);
+  if (!REMO_STORE.fbAuth && typeof REMO_STORE.initFirebaseIfConfigured === 'function') {
+    REMO_STORE.initFirebaseIfConfigured();
+  }
+  if (!REMO_STORE.fbAuth || typeof firebase === 'undefined' || !firebase.auth) {
+    alert(lang === 'fr' ? 'Serveur Firebase Auth en cours de chargement, réessayez.' : 'Firebase Auth is initializing, please retry.');
+    return;
+  }
+  try {
+    const provider = new firebase.auth.GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: 'select_account' });
+    const cred = await REMO_STORE.fbAuth.signInWithPopup(provider);
+    const fbU = cred && cred.user;
+    const adminEmail = (REMO_STORE.state?.settings?.adminEmail || 'andart1174@gmail.com').toLowerCase().trim();
+    if (!fbU || (fbU.email || '').toLowerCase().trim() !== adminEmail || fbU.emailVerified !== true) {
+      await REMO_STORE.fbAuth.signOut();
+      alert(lang === 'fr' ? '❌ Accès refusé : connectez-vous avec le compte Fondateur vérifié (' + adminEmail + ').' : '❌ Access denied: please sign in with the verified Founder account (' + adminEmail + ').');
+      return;
     }
+    REMO_STORE.ensureGuestOrCitizen(fbU.displayName || 'REMO Founder', fbU.email, 'montreal', true, fbU.uid);
     REMO_STORE.setAdminUnlocked(true);
+    REMO_STORE.refreshPrivateCloudListeners();
     checkAdminSession();
     RemoAudio.play('fanfare');
     admToast(lang === 'fr' ? '🛡️ Bureau Exécutif Admin déverrouillé !' : '🛡️ Admin Executive Office unlocked!');
-  } else {
-    alert(lang === 'fr' ? 'Code PIN Administrateur incorrect !' : 'Invalid Admin PIN!');
+  } catch (err) {
+    alert((err && err.message) || 'Google Sign-In error');
+  }
+}
+
+async function unlockAdminOffice(ev) {
+  if (ev) ev.preventDefault();
+  const lang = REMO_I18N.getLang();
+  const email = (document.getElementById('admEmailInput')?.value || '').trim();
+  const pass = document.getElementById('admPinInput')?.value || '';
+  if (!email || !pass) {
+    alert(lang === 'fr' ? 'Email et mot de passe Admin requis.' : 'Admin email and password required.');
+    return;
+  }
+  if (!REMO_STORE.fbAuth && typeof REMO_STORE.initFirebaseIfConfigured === 'function') {
+    REMO_STORE.initFirebaseIfConfigured();
+  }
+  if (!REMO_STORE.fbAuth) {
+    alert(lang === 'fr' ? 'Serveur Firebase Auth en cours de connexion.' : 'Firebase Auth server connecting.');
+    return;
+  }
+  try {
+    const cred = await REMO_STORE.fbAuth.signInWithEmailAndPassword(email, pass);
+    const fbU = cred && cred.user;
+    const adminEmail = (REMO_STORE.state?.settings?.adminEmail || 'andart1174@gmail.com').toLowerCase().trim();
+    if (!fbU || (fbU.email || '').toLowerCase().trim() !== adminEmail || fbU.emailVerified !== true) {
+      await REMO_STORE.fbAuth.signOut();
+      alert(lang === 'fr' ? '❌ Compte non autorisé pour l’Administration.' : '❌ Unauthorized Admin credentials.');
+      return;
+    }
+    REMO_STORE.ensureGuestOrCitizen(fbU.displayName || 'REMO Founder', fbU.email, 'montreal', true, fbU.uid);
+    REMO_STORE.setAdminUnlocked(true);
+    REMO_STORE.refreshPrivateCloudListeners();
+    checkAdminSession();
+    RemoAudio.play('fanfare');
+    admToast(lang === 'fr' ? '🛡️ Bureau Exécutif Admin déverrouillé !' : '🛡️ Admin Executive Office unlocked!');
+  } catch (err) {
+    alert(lang === 'fr' ? '❌ Échec d’authentification Admin : ' + (err && err.message ? err.message : 'Erreur') : '❌ Admin Sign-In failed: ' + (err && err.message ? err.message : 'Error'));
   }
 }
 
@@ -723,10 +773,10 @@ function renderAdminEconomyPanel() {
   if (shopTbl) {
     shopTbl.innerHTML = (REMO_STORE.state.vipShopItems || []).map((it) => `
       <tr>
-        <td><b>${it.icon || '💎'} ${lang === 'fr' ? (it.name_fr || it.name_en) : it.name_en}</b></td>
-        <td>${it.category.toUpperCase()}</td>
-        <td><b style="color:#fbbf24;">🪙 ${it.price}</b></td>
-        <td><button class="adm-btn rose" style="padding:4px 9px;" onclick="adminRemoveVipShopItem('${it.id}')">🗑️</button></td>
+        <td><b>${escapeHtmlStr(it.icon || '💎')} ${escapeHtmlStr(lang === 'fr' ? (it.name_fr || it.name_en) : it.name_en)}</b></td>
+        <td>${escapeHtmlStr(String(it.category || '').toUpperCase())}</td>
+        <td><b style="color:#fbbf24;">🪙 ${Number(it.price || 0)}</b></td>
+        <td><button class="adm-btn rose" style="padding:4px 9px;" onclick="adminRemoveVipShopItem('${escapeHtmlStr(it.id)}')">🗑️</button></td>
       </tr>
     `).join('');
   }
@@ -737,13 +787,13 @@ function renderAdminEconomyPanel() {
       ? `<tr><td colspan="4" style="color:var(--muted);">No VIP vouchers redeemed yet.</td></tr>`
       : ords.map((o) => `
           <tr>
-            <td><b style="color:#fbbf24;font-family:monospace;">${o.ticketCode}</b></td>
-            <td>@${o.userName}</td>
-            <td>${o.itemName}</td>
+            <td><b style="color:#fbbf24;font-family:monospace;">${escapeHtmlStr(o.ticketCode)}</b></td>
+            <td>@${escapeHtmlStr(o.userName)}</td>
+            <td>${escapeHtmlStr(o.itemName)}</td>
             <td>
               ${o.status === 'delivered'
                 ? '<span style="color:#10b981;font-weight:900;">✓ DELIVERED</span>'
-                : `<button class="adm-btn emerald" style="padding:4px 9px;" onclick="adminDeliverVipOrder('${o.id}')">✓ Mark Delivered</button>`}
+                : `<button class="adm-btn emerald" style="padding:4px 9px;" onclick="adminDeliverVipOrder('${escapeHtmlStr(o.id)}')">✓ Mark Delivered</button>`}
             </td>
           </tr>
         `).join('');
@@ -755,10 +805,10 @@ function renderAdminEconomyPanel() {
       const c = getCityById(a.cardSpec.cityId);
       return `
         <tr>
-          <td>${c.flag} ${c.code} #${a.cardSpec.serial} (${a.cardSpec.rarity})</td>
-          <td>${a.sellerName}</td>
-          <td><b style="color:#fbbf24;">🪙 ${a.currentBid}</b> (${a.highestBidder})</td>
-          <td><button class="adm-btn rose" style="padding:5px 10px;" onclick="adminRemoveAuction('${a.id}')">✕</button></td>
+          <td>${c.flag} ${escapeHtmlStr(c.code)} #${escapeHtmlStr(a.cardSpec.serial)} (${escapeHtmlStr(a.cardSpec.rarity)})</td>
+          <td>${escapeHtmlStr(a.sellerName)}</td>
+          <td><b style="color:#fbbf24;">🪙 ${Number(a.currentBid || 0)}</b> (${escapeHtmlStr(a.highestBidder)})</td>
+          <td><button class="adm-btn rose" style="padding:5px 10px;" onclick="adminRemoveAuction('${escapeHtmlStr(a.id)}')">✕</button></td>
         </tr>
       `;
     }).join('');
@@ -1036,7 +1086,8 @@ function escapeHtmlStr(str = '') {
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 function renderAdminModerationPanel() {
@@ -1046,23 +1097,24 @@ function renderAdminModerationPanel() {
     uBody.innerHTML = (REMO_STORE.state.users || []).map((u) => {
       const hc = getCityById(u.homeCity);
       const isMayor = REMO_STORE.state.cityMayors && REMO_STORE.state.cityMayors[u.homeCity] === u.uid;
+      const safeUid = escapeHtmlStr(u.uid);
       return `
         <tr style="${u.banned ? 'opacity:0.5;' : ''}">
           <td>
             <b>${escapeHtmlStr(u.name)}</b> ${u.verified ? '<span style="color:#38bdf8;">✓</span>' : ''}
             ${isMayor ? '<span style="background:#f59e0b;color:#000;padding:2px 6px;border-radius:99px;font-size:0.68rem;font-weight:900;">👑 MAYOR</span>' : ''}
-            <span style="color:var(--muted);">#${u.passportNum}</span>
-            <span style="color:#34d399;font-size:0.75rem;font-weight:800;"> · 🤝 ${u.referralsCount || 0} (${u.referralCode || 'REMO-' + u.passportNum})</span>
+            <span style="color:var(--muted);">#${escapeHtmlStr(u.passportNum)}</span>
+            <span style="color:#34d399;font-size:0.75rem;font-weight:800;"> · 🤝 ${Number(u.referralsCount || 0)} (${escapeHtmlStr(u.referralCode || 'REMO-' + u.passportNum)})</span>
             ${u.email ? `<br><small style="color:#94a3b8;font-size:0.72rem;">✉️ ${escapeHtmlStr(u.email)}</small>` : ''}
           </td>
-          <td>${hc.flag} ${getCityName(hc, lang)}</td>
+          <td>${hc.flag} ${escapeHtmlStr(getCityName(hc, lang))}</td>
           <td><b style="color:#fbbf24;">🪙 ${(u.coins || 0).toLocaleString()}</b></td>
           <td style="display:flex;gap:6px;flex-wrap:wrap;">
-            <button class="adm-btn gold" style="padding:5px 10px;" onclick="adminCustomCoinPrompt('${u.uid}')">🪙 Give / Set Coins</button>
-            <button class="adm-btn emerald" style="padding:5px 10px;" onclick="adminToggleCityMayor('${u.uid}')">👑 Mayor</button>
-            <button class="adm-btn outline" style="padding:5px 10px;" onclick="adminToggleVerifyUser('${u.uid}')">✓ VIP</button>
-            <button class="adm-btn rose" style="padding:5px 10px;" onclick="adminToggleBanUser('${u.uid}')">${u.banned ? 'Unban' : '🚫 Ban'}</button>
-            ${u.role !== 'admin' ? `<button class="adm-btn rose" style="padding:5px 10px;" onclick="adminDeleteCitizen('${u.uid}')">🗑️</button>` : ''}
+            <button class="adm-btn gold" style="padding:5px 10px;" onclick="adminCustomCoinPrompt('${safeUid}')">🪙 Give / Set Coins</button>
+            <button class="adm-btn emerald" style="padding:5px 10px;" onclick="adminToggleCityMayor('${safeUid}')">👑 Mayor</button>
+            <button class="adm-btn outline" style="padding:5px 10px;" onclick="adminToggleVerifyUser('${safeUid}')">✓ VIP</button>
+            <button class="adm-btn rose" style="padding:5px 10px;" onclick="adminToggleBanUser('${safeUid}')">${u.banned ? 'Unban' : '🚫 Ban'}</button>
+            ${u.role !== 'admin' ? `<button class="adm-btn rose" style="padding:5px 10px;" onclick="adminDeleteCitizen('${safeUid}')">🗑️</button>` : ''}
           </td>
         </tr>
       `;
@@ -1077,15 +1129,16 @@ function renderAdminModerationPanel() {
       const fromU = (REMO_STORE.state.users || []).find((x) => x.uid === d.fromUid) || { name: d.fromName || 'Citizen' };
       const toU = (REMO_STORE.state.users || []).find((x) => x.uid === d.toUid) || { name: d.toUid === 'u_admin_founder' ? 'REMO Founder' : 'Citizen' };
       const dateStr = d.ts ? new Date(d.ts).toLocaleTimeString() : '';
+      const safeDmId = escapeHtmlStr(d.id);
       return `
         <tr>
           <td><b style="color:#7dd3fc;">@${escapeHtmlStr(fromU.name || d.fromName)}</b></td>
           <td><b style="color:#fbbf24;">@${escapeHtmlStr(toU.name || d.toUid)}</b></td>
-          <td><span style="color:#f8fafc;">${d.text ? escapeHtmlStr(d.text) : (d.voiceUrl ? '🎤 Note Vocale' : (d.envelopeCoins ? '🧧 Enveloppe ' + d.envelopeCoins + '🪙' : '✉️ Message'))}</span></td>
-          <td style="color:var(--muted);font-size:0.75rem;">${dateStr}</td>
+          <td><span style="color:#f8fafc;">${d.text ? escapeHtmlStr(d.text) : (d.voiceUrl ? '🎤 Note Vocale' : (d.envelopeCoins ? '🧧 Enveloppe ' + Number(d.envelopeCoins) + '🪙' : '✉️ Message'))}</span></td>
+          <td style="color:var(--muted);font-size:0.75rem;">${escapeHtmlStr(dateStr)}</td>
           <td style="display:flex;gap:5px;">
-            <button class="adm-btn indigo" style="padding:4px 8px;" onclick="adminReplyDmFromOffice('${d.id}')">💬 Reply</button>
-            <button class="adm-btn rose" style="padding:4px 8px;" onclick="adminDeleteDmFromOffice('${d.id}')">🗑️</button>
+            <button class="adm-btn indigo" style="padding:4px 8px;" onclick="adminReplyDmFromOffice('${safeDmId}')">💬 Reply</button>
+            <button class="adm-btn rose" style="padding:4px 8px;" onclick="adminDeleteDmFromOffice('${safeDmId}')">🗑️</button>
           </td>
         </tr>
       `;
@@ -1112,24 +1165,25 @@ function renderAdminModerationPanel() {
       };
       const fmtBadge = fmtMap[p.mediaType] || fmtMap.city_art;
       const isSealedCapsule = Boolean(p.unlockAt && Number(p.unlockAt) > Date.now());
+      const safePostId = escapeHtmlStr(p.id);
       return `
         <tr>
           <td>
-            <b>@${p.authorName}</b> (${c.flag}) · ${fmtBadge}
+            <b>@${escapeHtmlStr(p.authorName)}</b> (${c.flag}) · ${fmtBadge}
             ${p.duetOf ? ' <span style="color:#f472b6;font-weight:900;">🎭 Duet</span>' : ''}
             ${isSealedCapsule ? ' <span style="color:#e879f9;font-weight:900;">⏳ Sealed</span>' : ''}
             ${p.pinned ? ' <span style="color:#fbbf24;font-weight:900;">📌#1</span>' : ''}
             ${p.founderAward ? ' 👑' : ''}
           </td>
-          <td>${cap.slice(0, 62)}...</td>
-          <td>❤️ ${(p.likes || []).length} · 🪙 ${p.tipsTotal || 0}</td>
+          <td>${escapeHtmlStr(cap.slice(0, 62))}...</td>
+          <td>❤️ ${(p.likes || []).length} · 🪙 ${Number(p.tipsTotal || 0)}</td>
           <td style="display:flex;gap:5px;flex-wrap:wrap;">
-            ${isSealedCapsule ? `<button class="adm-btn emerald" style="padding:5px 9px;" onclick="adminUnsealCapsuleFromOffice('${p.id}')">🔓 Unseal</button>` : ''}
-            <button class="adm-btn gold" style="padding:5px 9px;" onclick="adminTogglePinPost('${p.id}')">${p.pinned ? 'Unpin' : '📌 Pin'}</button>
-            <button class="adm-btn emerald" style="padding:5px 9px;" onclick="adminCrownPostAward('${p.id}')">👑 +250🪙</button>
-            <button class="adm-btn outline" style="padding:5px 9px;" onclick="adminToggleBoostPost('${p.id}')">${p.boosted ? 'Unboost' : '🚀 Boost'}</button>
-            <button class="adm-btn outline" style="padding:5px 9px;" onclick="adminEditPostCaption('${p.id}')">✏️</button>
-            <button class="adm-btn rose" style="padding:5px 9px;" onclick="adminDeletePost('${p.id}')">🗑️</button>
+            ${isSealedCapsule ? `<button class="adm-btn emerald" style="padding:5px 9px;" onclick="adminUnsealCapsuleFromOffice('${safePostId}')">🔓 Unseal</button>` : ''}
+            <button class="adm-btn gold" style="padding:5px 9px;" onclick="adminTogglePinPost('${safePostId}')">${p.pinned ? 'Unpin' : '📌 Pin'}</button>
+            <button class="adm-btn emerald" style="padding:5px 9px;" onclick="adminCrownPostAward('${safePostId}')">👑 +250🪙</button>
+            <button class="adm-btn outline" style="padding:5px 9px;" onclick="adminToggleBoostPost('${safePostId}')">${p.boosted ? 'Unboost' : '🚀 Boost'}</button>
+            <button class="adm-btn outline" style="padding:5px 9px;" onclick="adminEditPostCaption('${safePostId}')">✏️</button>
+            <button class="adm-btn rose" style="padding:5px 9px;" onclick="adminDeletePost('${safePostId}')">🗑️</button>
           </td>
         </tr>
       `;
@@ -1342,13 +1396,12 @@ function adminSaveSystemSettings() {
   const dom = document.getElementById('admCustomDomain')?.value.trim() || '';
   if (dom) localStorage.setItem('remo_custom_domain', dom);
   else localStorage.removeItem('remo_custom_domain');
-
-  const newPin = document.getElementById('admNewPin')?.value.trim();
-  if (newPin && newPin.length >= 4) {
-    REMO_STORE.state.settings.adminPinHash = REMO_STORE._hashAdminPin(newPin);
+  if (REMO_STORE.state && REMO_STORE.state.settings) {
+    REMO_STORE.state.settings.customDomain = dom;
     delete REMO_STORE.state.settings.adminPin;
-    REMO_STORE.save(true, 'pin');
+    delete REMO_STORE.state.settings.adminPinHash;
   }
+  REMO_STORE.save(true, 'system_settings');
   admToast('⚙️ System Settings saved!');
 }
 
@@ -1366,7 +1419,15 @@ function adminImportBackupJSON(ev) {
   const rd = new FileReader();
   rd.onload = (e) => {
     try {
-      REMO_STORE.state = JSON.parse(e.target.result);
+      const parsed = JSON.parse(e.target.result);
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed) || !Array.isArray(parsed.users) || !Array.isArray(parsed.posts)) {
+        throw new Error('Invalid REMO backup schema (missing users or posts arrays).');
+      }
+      if (parsed.settings && typeof parsed.settings === 'object') {
+        delete parsed.settings.adminPin;
+        delete parsed.settings.adminPinHash;
+      }
+      REMO_STORE.state = parsed;
       REMO_STORE.save(true, 'backup_restore');
       refreshAllAdminPanels();
       admToast('✓ REMO Backup restored successfully!');
@@ -1391,9 +1452,16 @@ window.addEventListener('remo:langchange', () => {
   if (typeof updateIndexNowStatusUI === 'function') updateIndexNowStatusUI();
 });
 
-window.addEventListener('remo:stateupdate', () => {
-  if (adminCurrentTab !== 'cards') refreshAllAdminPanels();
+window.addEventListener('remo:stateupdate', (ev) => {
+  const reason = ev && ev.detail && ev.detail.reason;
+  if (reason === 'admin_mode' || reason === 'auth') {
+    checkAdminSession();
+  } else if (adminCurrentTab !== 'cards') {
+    refreshAllAdminPanels();
+  }
 });
+
+window.adminGoogleSignIn = adminGoogleSignIn;
 
 window.unlockAdminOffice = unlockAdminOffice;
 window.lockAdminOffice = lockAdminOffice;
@@ -2007,8 +2075,8 @@ function renderAdminSupportTicketsTables() {
             </td>
             <td style="color:var(--muted);font-size:0.75rem;">${dateStr}</td>
             <td style="display:flex;gap:6px;flex-wrap:wrap;">
-              <button class="adm-btn ${isReplied ? 'emerald' : 'gold'}" style="padding:5px 10px;" onclick="adminReplySupportTicketFromOffice('${tk.id}')">💬 ${isReplied ? 'Répondre encore' : 'Répondre'}</button>
-              <button class="adm-btn rose" style="padding:5px 8px;" onclick="adminDeleteSupportTicketFromOffice('${tk.id}')">🗑️</button>
+              <button class="adm-btn ${isReplied ? 'emerald' : 'gold'}" style="padding:5px 10px;" onclick="adminReplySupportTicketFromOffice('${escapeHtmlStr(tk.id)}')">💬 ${isReplied ? 'Répondre encore' : 'Répondre'}</button>
+              <button class="adm-btn rose" style="padding:5px 8px;" onclick="adminDeleteSupportTicketFromOffice('${escapeHtmlStr(tk.id)}')">🗑️</button>
             </td>
           </tr>
         `;
