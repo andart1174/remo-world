@@ -120,7 +120,7 @@
   <noscript><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"></noscript>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
 
-  <link rel="stylesheet" href="css/remo-core.css?v=116">
+  <link rel="stylesheet" href="css/remo-core.css?v=117">
 </head>
 <body>
 
@@ -1237,6 +1237,7 @@
         <button type="button" class="studio-tab-btn" data-studio-tab="video" onclick="switchCreateStudioTab('video')" data-i18n="create_tab_video">🎬 Video &amp; Link</button>
         <button type="button" class="studio-tab-btn" data-studio-tab="html" id="studioTabHtmlBtn" style="display:none;" onclick="switchCreateStudioTab('html')" data-i18n="create_tab_html">💻 Live HTML Code</button>
         <button type="button" class="studio-tab-btn" data-studio-tab="art" onclick="switchCreateStudioTab('art')" data-i18n="create_tab_art">🏙️ City Poster</button>
+        <button type="button" class="studio-tab-btn" data-studio-tab="textcard" onclick="switchCreateStudioTab('textcard')" data-i18n="create_tab_textcard">✍️ Text Card</button>
         <button type="button" class="studio-tab-btn" data-studio-tab="versus" id="studioTabVersusBtn" style="display:none;" onclick="switchCreateStudioTab('versus')" data-i18n="create_tab_versus">👑 ⚔️ City Versus Duel</button>
       </div>
 
@@ -1374,6 +1375,50 @@
       <div class="studio-pane" id="studioPane-art">
         <div class="form-field">
           <input type="text" id="createArtHeadlineInp" class="remo-input" placeholder="Poster Headline (e.g. CHIȘINĂU NIGHT PULSE)">
+        </div>
+      </div>
+
+      <!-- TAB 4B: COLORED PAGINATED TEXT CARD (Proverbs, Wishes, Quotes, Stories) -->
+      <div class="studio-pane" id="studioPane-textcard">
+        <div class="tc-studio-preview-wrap" id="tcStudioPreviewWrap"></div>
+
+        <div class="form-field" style="margin-bottom:6px;">
+          <textarea id="createTextCardInp" rows="4" maxlength="1800" class="remo-input" oninput="handleTextCardInputChange()" data-i18n-placeholder="tc_placeholder" placeholder="Write a proverb, good wish, quote, or short story...&#10;Tip: write --- on its own line to start a new page!"></textarea>
+        </div>
+
+        <div class="tc-studio-toolbar">
+          <span class="tc-counter-pill" id="tcCharCounter">0 / 1800 · 📖 1/1</span>
+          <div class="tc-toolbar-btns">
+            <button type="button" class="copilot-btn" onclick="insertTextCardPageBreak()" data-i18n="tc_btn_new_page">📄 + Page (---)</button>
+            <button type="button" class="copilot-btn" onclick="fillTextCardInspiration()" data-i18n="tc_btn_inspire">✨ Idea</button>
+            <button type="button" class="copilot-btn" onclick="randomizeTextCardStyle()" data-i18n="tc_btn_mix">🎲 Mix</button>
+            <button type="button" class="copilot-btn" onclick="clearTextCardInput()" title="Clear">✕</button>
+          </div>
+        </div>
+
+        <div class="tc-style-panel">
+          <div class="tc-swatches-row">
+            <span class="tc-style-lbl" data-i18n="tc_lbl_theme">🎨 Color</span>
+            <div id="tcThemeSwatches" class="tc-swatches-list"></div>
+          </div>
+
+          <div class="tc-controls-grid">
+            <select id="createTextCardBadgeSel" class="remo-input tc-mini-sel" onchange="handleTextCardStyleChange()">
+              <option value="proverb" data-i18n="tc_badge_proverb">📜 Proverb</option>
+              <option value="wish" data-i18n="tc_badge_wish">✨ Good Wish</option>
+              <option value="thought" data-i18n="tc_badge_thought">💭 Thought</option>
+              <option value="story" data-i18n="tc_badge_story">📖 Story</option>
+              <option value="none" data-i18n="tc_badge_none">◻️ Clean</option>
+            </select>
+            <select id="createTextCardFontSel" class="remo-input tc-mini-sel" onchange="handleTextCardStyleChange()">
+              <option value="modern" data-i18n="tc_font_modern">Modern Bold</option>
+              <option value="editorial" data-i18n="tc_font_editorial">Classic Proverb (Serif)</option>
+              <option value="poetic" data-i18n="tc_font_poetic">Poetic Italic</option>
+              <option value="cyber" data-i18n="tc_font_cyber">Cyber 4D</option>
+            </select>
+            <button type="button" class="copilot-btn tc-toggle-btn" id="btnTcAlignToggle" onclick="toggleTextCardAlign()" data-i18n="tc_align_center">↔️ Center</button>
+            <button type="button" class="copilot-btn tc-toggle-btn active" id="btnTcMotionToggle" onclick="toggleTextCardMotion()" data-i18n="tc_motion_on">✨ Glow On</button>
+          </div>
         </div>
       </div>
 
@@ -1569,12 +1614,14 @@
     <div class="fs-lb-topbar">
       <b id="photoLightboxTitle">📷 PHOTO HD</b>
       <div class="fs-lb-actions">
+        <button type="button" class="btn-cyber" id="photoLightboxDownloadBtn" style="display:none;background:linear-gradient(135deg,#0ea5e9,#6366f1);" onclick="downloadCurrentLightboxTextCardPng()">💾 PNG</button>
         <button type="button" class="btn-cyber btn-gold" id="photoLightboxSaveBtn" onclick="saveCurrentLightboxCard()">🎴 Album 4D</button>
         <button type="button" class="fs-lb-close" onclick="closePhotoLightboxModal()" aria-label="Close">✕</button>
       </div>
     </div>
     <div class="fs-lb-stage">
       <img id="photoLightboxImg" src="" alt="Fullscreen Media">
+      <div id="photoLightboxTextCard" class="fs-lb-textcard" style="display:none;"></div>
     </div>
   </div>
 
@@ -2577,15 +2624,15 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 
   <!-- REMO Modular Engines -->
-  <script src="js/remo-i18n.js?v=116"></script>
-  <script src="js/remo-cities-data.js?v=116"></script>
-  <script src="js/remo-store.js?v=116"></script>
-  <script src="js/remo-card-engine.js?v=116"></script>
-  <script src="js/remo-radar-arena.js?v=116"></script>
-  <script src="js/remo-social-comms.js?v=116"></script>
-  <script src="js/remo-radio-engine.js?v=116"></script>
-  <script src="js/remo-focus-tv.js?v=116"></script>
-  <script src="js/remo-world-blitz.js?v=116"></script>
+  <script src="js/remo-i18n.js?v=117"></script>
+  <script src="js/remo-cities-data.js?v=117"></script>
+  <script src="js/remo-store.js?v=117"></script>
+  <script src="js/remo-card-engine.js?v=117"></script>
+  <script src="js/remo-radar-arena.js?v=117"></script>
+  <script src="js/remo-social-comms.js?v=117"></script>
+  <script src="js/remo-radio-engine.js?v=117"></script>
+  <script src="js/remo-focus-tv.js?v=117"></script>
+  <script src="js/remo-world-blitz.js?v=117"></script>
 
   <noscript>
     <nav aria-label="REMO World Static Directory" style="padding:20px;background:#050816;color:#f8fafc;">

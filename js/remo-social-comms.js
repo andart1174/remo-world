@@ -44,6 +44,13 @@ let pendingPostGpsVerified = false;
 let voiceRecorder = null;
 let voiceChunks = [];
 const _carouselState = {};
+const _textCardStudioState = {
+  theme: 'aurora',
+  align: 'center',
+  motion: 'glow',
+  previewPage: 0,
+  inspireIdx: 0
+};
 
 // WebRTC Peer-to-Peer Calling State
 const REMO_RTC_CFG = {
@@ -1183,6 +1190,9 @@ function isAdminXrayOpen(postId) {
 }
 
 function renderSinglePaneMedia(item, cityObj, lang) {
+  if (item.mediaType === 'text_card' && item.textCard && typeof renderPostTextCardStage === 'function') {
+    return renderPostTextCardStage(item, cityObj, lang, { compact: true });
+  }
   const flt = item.photoFilter || 'flt-none';
   if (item.mediaType === 'html_app' && item.htmlCode) {
     return `<iframe sandbox="allow-scripts" loading="lazy" srcdoc="${escapeSrcDocAttr(item.htmlCode)}"></iframe>`;
@@ -1360,6 +1370,11 @@ function renderPostMediaStage(p, city, lang) {
         </div>
       </div>
     `;
+  }
+
+  // 4B. COLORED PAGINATED TEXT CARD (Proverbs, Wishes, Quotes, Stories)
+  if (p.mediaType === 'text_card' && p.textCard) {
+    return renderPostTextCardStage(p, city, lang);
   }
 
   // 5. SINGLE PHOTO OR PROCEDURAL CITY POSTER
@@ -1649,6 +1664,7 @@ function renderSinglePostCardHtml(p, lang, u, isAdm) {
             </button>
           </div>
 
+          ${(formattedCap || p.mediaType === 'text_card') ? `
           <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-top:6px;">
             <div class="post-caption" style="flex:1;">${formattedCap}</div>
             <button type="button" class="translate-pill-btn ${isDualOpen ? 'active' : ''}" onclick="togglePostAutoTranslate('${p.id}')">${isDualOpen ? t('post_translate_hide') : t('post_translate_btn')}</button>
@@ -1656,7 +1672,7 @@ function renderSinglePostCardHtml(p, lang, u, isAdm) {
           <div class="bilingual-dual-box ${isDualOpen ? 'open' : ''}">
             <div><b style="color:#38bdf8;">🇬🇧 EN:</b> ${escapeHtmlStr(dualPair.en)}</div>
             <div><b style="color:#fbbf24;">🇫🇷 FR:</b> ${escapeHtmlStr(dualPair.fr)}</div>
-          </div>
+          </div>` : ''}
           ${p.isSecretSpot ? `
             <div class="secret-spot-card">
               <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;gap:8px;">
@@ -2005,6 +2021,7 @@ function getFilteredSortedFeedPosts(searchQuery = '') {
     posts = posts.filter((p) =>
       (p.caption_en || '').toLowerCase().includes(q) ||
       (p.caption_fr || '').toLowerCase().includes(q) ||
+      (p.textCard && (p.textCard.raw || '').toLowerCase().includes(q)) ||
       (p.authorName || '').toLowerCase().includes(q) ||
       (p.cityId || '').toLowerCase().includes(q)
     );
@@ -2313,7 +2330,7 @@ async function mintPostAsCityCard(postId) {
   if (p.mintedCard) {
     const postPhotoExisting = ['image', 'carousel', 'before_after'].includes(p.mediaType)
       ? (p.mediaUrl || (Array.isArray(p.mediaUrls) && p.mediaUrls[0]) || '')
-      : '';
+      : (p.mediaType === 'text_card' && typeof renderTextCardToDataUrl === 'function' ? renderTextCardToDataUrl(p, 0) : '');
     const existing =
       (p.mintedCardId && (REMO_STORE.state.droppedCardsPool || []).find((c) => c && c.id === p.mintedCardId)) ||
       (REMO_STORE.state.droppedCardsPool || []).find(
@@ -2385,7 +2402,7 @@ async function mintPostAsCityCard(postId) {
 
   const rawPostPhoto = ['image', 'carousel', 'before_after'].includes(p.mediaType)
     ? (p.mediaUrl || (Array.isArray(p.mediaUrls) && p.mediaUrls[0]) || '')
-    : '';
+    : (p.mediaType === 'text_card' && typeof renderTextCardToDataUrl === 'function' ? renderTextCardToDataUrl(p, 0) : '');
   const card = REMO_STORE.mintCardForUser(u.uid, p.cityId, 'Legendary Gold', !!p.verifiedGps, {
     subtitle: `MOMENT BY ${p.authorName.toUpperCase()}`,
     customPhotoDataUrl: rawPostPhoto
@@ -2605,7 +2622,7 @@ function submitPostComment() {
 
 /* ── 3B. INTERACTIVE FEED POWER-UPS: HTML CODE, REMIX, CAROUSEL, SLIDER, POLLS & CAPSULES ── */
 function handleMediaDoubleTap(ev, postId, wrapEl) {
-  if (ev && ev.target && ['IFRAME', 'INPUT', 'BUTTON'].includes(ev.target.tagName)) return;
+  if (ev && ev.target && (['IFRAME', 'INPUT', 'BUTTON', 'A'].includes(ev.target.tagName) || (ev.target.closest && ev.target.closest('button, a, .carousel-nav-btn, .carousel-dot')))) return;
   const heart = document.createElement('div');
   heart.className = 'dbl-heart-burst';
   heart.textContent = '❤️';
@@ -3371,7 +3388,7 @@ function updateCarouselDom(postId, p) {
   renderSocialFeed();
 }
 
-function initCarouselTouchSwipe(el, postId) {
+function initCarouselTouchSwipe(el, postId, handlerName = 'stepPostCarousel') {
   if (!el || el._hasSwipe) return;
   el._hasSwipe = true;
   let startX = 0;
@@ -3386,16 +3403,667 @@ function initCarouselTouchSwipe(el, postId) {
     const dx = e.changedTouches[0].clientX - startX;
     const dy = e.changedTouches[0].clientY - startY;
     if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy) * 1.4) {
-      if (dx < 0) {
-        stepPostCarousel(postId, 1, e);
-      } else {
-        stepPostCarousel(postId, -1, e);
-      }
+      const fn = typeof window[handlerName] === 'function' ? window[handlerName] : stepPostCarousel;
+      fn(postId, dx < 0 ? 1 : -1, e);
     }
   }, { passive: true });
 }
 window.initCarouselTouchSwipe = initCarouselTouchSwipe;
 window.setPostCarouselIndex = setPostCarouselIndex;
+
+/* ── 3C. REMO TEXT CARD ENGINE (Colored Paginated Proverbs, Wishes, Quotes & Stories) ── */
+const REMO_TEXT_CARD_CHAR_LIMIT = 1800;
+
+const REMO_TEXT_CARD_THEMES = {
+  aurora:    { id: 'aurora',    swatch: 'linear-gradient(135deg,#4f46e5,#db2777)', stops: ['#1e1b4b', '#312e81', '#831843'], textColor: '#ffffff', accent: '#38bdf8' },
+  sunset:    { id: 'sunset',    swatch: 'linear-gradient(135deg,#ea580c,#e11d48)', stops: ['#7c2d12', '#c2410c', '#be123c'], textColor: '#ffffff', accent: '#fde047' },
+  parchment: { id: 'parchment', swatch: 'linear-gradient(135deg,#78350f,#d97706)', stops: ['#27211a', '#443829', '#1c1917'], textColor: '#fef3c7', accent: '#fbbf24' },
+  emerald:   { id: 'emerald',   swatch: 'linear-gradient(135deg,#059669,#0891b2)', stops: ['#064e3b', '#0f3d3e', '#0e7490'], textColor: '#ffffff', accent: '#34d399' },
+  velvet:    { id: 'velvet',    swatch: 'linear-gradient(135deg,#1e1b4b,#7e22ce)', stops: ['#020617', '#1e1b4b', '#3b0764'], textColor: '#ffffff', accent: '#c084fc' },
+  ruby:      { id: 'ruby',      swatch: 'linear-gradient(135deg,#be123c,#581c87)', stops: ['#4c0519', '#9f1239', '#311042'], textColor: '#ffffff', accent: '#fda4af' },
+  ocean:     { id: 'ocean',     swatch: 'linear-gradient(135deg,#0284c7,#312e81)', stops: ['#082f49', '#0369a1', '#1e1b4b'], textColor: '#ffffff', accent: '#7dd3fc' },
+  city:      { id: 'city',      swatch: 'radial-gradient(circle,#38bdf8,#090d1f)',  stops: ['#050816', '#0f172a', '#050816'], textColor: '#ffffff', accent: '#38bdf8' }
+};
+
+const REMO_TEXT_CARD_FONTS = {
+  modern:    { family: '"Outfit", "Inter", sans-serif', weight: '800', style: 'normal' },
+  editorial: { family: 'Georgia, "Times New Roman", serif', weight: '700', style: 'normal' },
+  poetic:    { family: 'Georgia, "Times New Roman", serif', weight: '600', style: 'italic' },
+  cyber:     { family: '"Orbitron", "Outfit", sans-serif', weight: '800', style: 'normal' }
+};
+
+const REMO_TEXT_CARD_BADGE_KEYS = {
+  proverb: 'tc_badge_proverb',
+  wish:    'tc_badge_wish',
+  thought: 'tc_badge_thought',
+  story:   'tc_badge_story'
+};
+
+const REMO_TEXT_CARD_IDEAS = [
+  {
+    badge: 'proverb', theme: 'parchment', font: 'editorial',
+    en: 'He who shares a candle loses nothing of its light, yet brightens the whole city.',
+    fr: 'Celui qui partage sa flamme ne perd rien de sa lumière, mais illumine toute la ville.'
+  },
+  {
+    badge: 'wish', theme: 'sunset', font: 'poetic',
+    en: 'May your morning start with calm, your path stay bright, and a friend across the ocean smile because of you today. ✨💛',
+    fr: 'Que votre matin commence dans la paix, que votre route soit lumineuse et qu’un ami sourie grâce à vous aujourd’hui. ✨💛'
+  },
+  {
+    badge: 'proverb', theme: 'emerald', font: 'modern',
+    en: 'Quiet steps cross every mountain. --- Keep building even on the days nobody claps yet. The view from the summit remembers every step. 🏔️⚡',
+    fr: 'À pas calmes, on traverse toutes les montagnes. --- Continuez de bâtir même les jours sans applaudissements. Le sommet se souvient de chaque pas. 🏔️⚡'
+  },
+  {
+    badge: 'wish', theme: 'aurora', font: 'modern',
+    en: 'Sending good energy from {city} to every corner of the world tonight! Drop your city flag if you see this. 🌍✨',
+    fr: 'J’envoie une belle énergie depuis {city} vers chaque coin du monde ce soir ! Mettez le drapeau de votre ville en commentaire. 🌍✨'
+  },
+  {
+    badge: 'story', theme: 'velvet', font: 'editorial',
+    en: 'Two strangers waited for the same late tram under rain. One shared an umbrella, the other a warm coffee.\n---\nTwo years later, both cities still talk about how one small kindness rewrote two whole lives. ☕🌧️',
+    fr: 'Deux inconnus attendaient le même tram sous la pluie. L’un a partagé son parapluie, l’autre un café chaud.\n---\nDeux ans plus tard, deux villes parlent encore de ce petit geste qui a tout changé. ☕🌧️'
+  }
+];
+
+/**
+ * Splits a Text Card body into balanced readable pages, honoring explicit `---`
+ * breaks and automatically wrapping long sections at paragraph, sentence, or word boundaries.
+ */
+function splitTextCardPages(rawText, maxCharsPerPage = 250, maxLinesPerPage = 6) {
+  const clean = String(rawText || '').replace(/\r\n/g, '\n').trim().slice(0, REMO_TEXT_CARD_CHAR_LIMIT);
+  if (!clean) return [''];
+
+  const manualSections = clean
+    .split(/\n\s*(?:---|===)\s*\n|^\s*(?:---|===)\s*$/gm)
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  const pages = [];
+  const flushChunk = (txt) => { if (txt && txt.trim()) pages.push(txt.trim()); };
+
+  manualSections.forEach((section) => {
+    if (section.length <= maxCharsPerPage && section.split('\n').length <= maxLinesPerPage) {
+      flushChunk(section);
+      return;
+    }
+
+    // Break large sections at paragraphs/lines or sentences first, then word-wrap safely
+    const paragraphs = section.split(/\n+/);
+    let current = '';
+
+    const pushWordSafe = (unit) => {
+      const words = unit.split(/\s+/).filter(Boolean);
+      words.forEach((word) => {
+        const sep = current ? (current.endsWith('\n') ? '' : ' ') : '';
+        const next = current + sep + word;
+        if (next.length > maxCharsPerPage || next.split('\n').length > maxLinesPerPage) {
+          flushChunk(current);
+          current = word.length > maxCharsPerPage ? word.slice(0, maxCharsPerPage) : word;
+        } else {
+          current = next;
+        }
+      });
+    };
+
+    paragraphs.forEach((para, pIdx) => {
+      const pTrim = para.trim();
+      if (!pTrim) return;
+      const sentences = pTrim.match(/[^.!?…]+[.!?…]*(\s|$)/g) || [pTrim];
+      if (pIdx > 0 && current) {
+        if ((current + '\n' + pTrim).length <= maxCharsPerPage && (current + '\n' + pTrim).split('\n').length <= maxLinesPerPage) {
+          current += '\n';
+        } else {
+          flushChunk(current);
+          current = '';
+        }
+      }
+      sentences.forEach((sent) => {
+        const sTrim = sent.trim();
+        if (!sTrim) return;
+        const sep = current ? (current.endsWith('\n') ? '' : ' ') : '';
+        const candidate = current + sep + sTrim;
+        if (candidate.length <= maxCharsPerPage && candidate.split('\n').length <= maxLinesPerPage) {
+          current = candidate;
+        } else if (sTrim.length <= maxCharsPerPage) {
+          flushChunk(current);
+          current = sTrim;
+        } else {
+          pushWordSafe(sTrim);
+        }
+      });
+    });
+    flushChunk(current);
+  });
+
+  return pages.length ? pages.slice(0, 10) : [clean.slice(0, maxCharsPerPage)];
+}
+
+function getTextCardSizeClass(pageText) {
+  const txt = String(pageText || '');
+  const len = txt.length;
+  const lineCount = txt.split('\n').length;
+  if (len <= 85 && lineCount <= 3) return 'tc-size-xl';
+  if (len <= 165 && lineCount <= 4) return 'tc-size-lg';
+  if (len <= 230 && lineCount <= 5) return 'tc-size-md';
+  return 'tc-size-sm';
+}
+
+function _getTextCardSpecPages(spec) {
+  if (!spec) return [''];
+  if (Array.isArray(spec.pages) && spec.pages.length) return spec.pages;
+  return splitTextCardPages(spec.raw || '');
+}
+
+/**
+ * Unified HTML renderer for colored Text Cards across feed, studio live preview,
+ * city duets, and the fullscreen lightbox reader.
+ */
+function renderTextCardMarkup(spec, opts = {}) {
+  const s = spec || {};
+  const lang = opts.lang || REMO_I18N.getLang();
+  const context = opts.context || 'feed';
+  const city = opts.city || getCityById(s.cityId || 'montreal') || { id: 'montreal', flag: '🌍', name_en: 'World', name_fr: 'Monde', themeColor: '#38bdf8' };
+  const theme = REMO_TEXT_CARD_THEMES[s.theme] ? s.theme : 'aurora';
+  const fontStyle = REMO_TEXT_CARD_FONTS[s.fontStyle] ? s.fontStyle : 'modern';
+  const align = s.align === 'left' ? 'left' : 'center';
+  const motion = s.motion === 'still' ? 'still' : 'glow';
+  const badgeKey = REMO_TEXT_CARD_BADGE_KEYS[s.badgeType];
+  const badgeLabel = badgeKey ? t(badgeKey) : '';
+
+  const pages = _getTextCardSpecPages(s);
+  const len = pages.length;
+  const idx = (((Number(opts.pageIdx) || 0) % len) + len) % len;
+  const curText = pages[idx] || opts.emptyHint || '';
+  const sizeCls = getTextCardSizeClass(curText);
+  const mysteryMasked = Boolean(opts.mysteryMasked);
+  const authorHandle = opts.authorName ? `@${escapeHtmlStr(opts.authorName)}` : '';
+  const locText = mysteryMasked
+    ? t('tc_guess_masked_loc')
+    : `${city.flag || '🌍'} ${escapeHtmlStr(getCityName(city, lang))}`;
+
+  const showPager = len > 1 && context !== 'compact';
+  const stepCall = opts.stepCall || ((d) => `stepPostTextCardPage('${opts.postId}', ${d}, event)`);
+  const dotCall = opts.dotCall || ((i) => `setPostTextCardPageIndex('${opts.postId}', ${i}, event)`);
+  const touchAttr = (context === 'feed' && opts.postId && len > 1)
+    ? `ontouchstart="initCarouselTouchSwipe(this, '${opts.postId}', 'stepPostTextCardPage')"`
+    : '';
+  const themeStyle = theme === 'city'
+    ? `style="--tc-city-color:${escapeHtmlStr(city.themeColor || '#38bdf8')};"`
+    : '';
+
+  return `
+    <div class="remo-text-card-stage tc-theme-${theme} tc-font-${fontStyle} ${motion === 'glow' ? 'tc-living-glow' : ''} ${context === 'preview' ? 'is-preview' : ''}" ${themeStyle} ${touchAttr}>
+      <div class="tc-top-row">
+        ${badgeLabel ? `<span class="tc-cat-pill">${escapeHtmlStr(badgeLabel)}</span>` : '<span></span>'}
+        ${len > 1 ? `<span class="tc-page-pill">📖 ${idx + 1}/${len}</span>` : ''}
+      </div>
+
+      <div class="tc-body-scroll">
+        <div class="tc-body-text align-${align} ${sizeCls}">${escapeHtmlStr(curText)}</div>
+      </div>
+
+      <div class="tc-footer-meta">
+        <span>${locText}</span>
+        ${authorHandle ? `<span>${authorHandle}</span>` : ''}
+      </div>
+
+      ${showPager ? `
+        <button type="button" class="carousel-nav-btn prev" onclick="${stepCall(-1)}" title="Prev">‹</button>
+        <button type="button" class="carousel-nav-btn next" onclick="${stepCall(1)}" title="Next">›</button>
+        <div class="carousel-dots">
+          ${pages.map((_, i) => `<span class="carousel-dot ${i === idx ? 'active' : ''}" onclick="${dotCall(i)}"></span>`).join('')}
+        </div>
+      ` : ''}
+    </div>
+  `;
+}
+
+function _isTextCardMysteryMasked(p) {
+  if (!p || !p.mysteryCity) return false;
+  const u = REMO_STORE.getCurrentUser();
+  const isPostOwner = Boolean(u && (
+    (p.uid && u.uid === p.uid) ||
+    (p.authorUid && u.uid === p.authorUid) ||
+    (u.email && p.authorEmail && u.email.toLowerCase() === p.authorEmail.toLowerCase()) ||
+    (u.name && p.authorName && u.name.trim().toLowerCase() === p.authorName.trim().toLowerCase())
+  ));
+  return !isPostOwner && typeof isMysteryCityMaskedForViewer === 'function' && isMysteryCityMaskedForViewer(p, u);
+}
+
+function renderPostTextCardStage(p, city, lang, opts = {}) {
+  const mysteryMasked = _isTextCardMysteryMasked(p);
+  const idx = _carouselState[p.id] || 0;
+  const html = renderTextCardMarkup(p.textCard, {
+    context: opts.compact ? 'compact' : 'feed',
+    postId: p.id,
+    city,
+    authorName: p.authorName || 'Citizen',
+    lang,
+    pageIdx: idx,
+    mysteryMasked
+  });
+  return `<div class="tc-stage-host" data-tc-post-id="${p.id}" style="width:100%;height:100%;">${html}</div>`;
+}
+
+function stepPostTextCardPage(postId, delta, ev) {
+  if (ev) ev.stopPropagation();
+  const p = findFeedPostById(postId);
+  if (!p || !p.textCard) return;
+  const pages = _getTextCardSpecPages(p.textCard);
+  const len = pages.length;
+  _carouselState[postId] = (((_carouselState[postId] || 0) + delta) % len + len) % len;
+  _refreshTextCardStageHost(postId, p);
+}
+
+function setPostTextCardPageIndex(postId, index, ev) {
+  if (ev) ev.stopPropagation();
+  const p = findFeedPostById(postId);
+  if (!p || !p.textCard) return;
+  const pages = _getTextCardSpecPages(p.textCard);
+  _carouselState[postId] = Math.max(0, Math.min(index, pages.length - 1));
+  _refreshTextCardStageHost(postId, p);
+}
+
+function _refreshTextCardStageHost(postId, p) {
+  const box = document.getElementById('post_media_' + postId);
+  const host = box ? box.querySelector('.tc-stage-host') : null;
+  if (host) {
+    const lang = REMO_I18N.getLang();
+    const city = getCityById(p.cityId) || getCityById('montreal');
+    host.outerHTML = renderPostTextCardStage(p, city, lang);
+    RemoAudio.play('click');
+  } else {
+    renderSocialFeed();
+  }
+}
+
+function _wrapCanvasTextLines(ctx, text, maxWidth) {
+  const out = [];
+  String(text || '').replace(/\r\n/g, '\n').split('\n').forEach((para) => {
+    const trimmed = para.trim();
+    if (!trimmed) { out.push(''); return; }
+    const words = trimmed.split(/\s+/);
+    let line = '';
+    words.forEach((word) => {
+      const test = line ? `${line} ${word}` : word;
+      if (ctx.measureText(test).width <= maxWidth) {
+        line = test;
+      } else {
+        if (line) out.push(line);
+        line = word;
+      }
+    });
+    if (line) out.push(line);
+  });
+  return out;
+}
+
+/**
+ * Shared Canvas frame renderer for colored Text Cards (used by PNG download,
+ * 4D Card minting, World Window Story export, and 9:16 Video Reels).
+ */
+function drawTextCardCanvasFrame(ctx, w, h, spec, pageIdx, city, authorName, lang, mysteryMasked = false, tSec = 0) {
+  const s = spec || {};
+  const theme = REMO_TEXT_CARD_THEMES[s.theme] || REMO_TEXT_CARD_THEMES.aurora;
+  const fontSpec = REMO_TEXT_CARD_FONTS[s.fontStyle] || REMO_TEXT_CARD_FONTS.modern;
+  const pages = _getTextCardSpecPages(s);
+  const len = pages.length;
+  const idx = (((Number(pageIdx) || 0) % len) + len) % len;
+  const pageText = pages[idx] || '';
+
+  const cityColor = (city && city.themeColor) || '#38bdf8';
+  const bg = ctx.createLinearGradient(0, 0, w, h);
+  if (theme.id === 'city') {
+    bg.addColorStop(0, '#050816');
+    bg.addColorStop(0.5, cityColor + '55');
+    bg.addColorStop(1, '#050816');
+  } else {
+    bg.addColorStop(0, theme.stops[0]);
+    bg.addColorStop(0.52, theme.stops[1]);
+    bg.addColorStop(1, theme.stops[2]);
+  }
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, w, h);
+
+  // Subtle living aura halo
+  const pulseR = Math.max(w, h) * (0.48 + Math.sin(tSec * 2.4) * 0.04);
+  const halo = ctx.createRadialGradient(w * 0.25, h * 0.22, 10, w * 0.25, h * 0.22, pulseR);
+  halo.addColorStop(0, 'rgba(255,255,255,0.14)');
+  halo.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = halo;
+  ctx.fillRect(0, 0, w, h);
+
+  // Oversized decorative opening quote
+  ctx.save();
+  ctx.font = `900 ${Math.round(w * 0.24)}px Georgia, serif`;
+  ctx.fillStyle = 'rgba(255,255,255,0.08)';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  ctx.fillText('“', Math.round(w * 0.05), Math.round(h * 0.04));
+  ctx.restore();
+
+  // Top category & page pills
+  const padX = Math.round(w * 0.08);
+  const topY = Math.round(h * 0.06);
+  const badgeKey = REMO_TEXT_CARD_BADGE_KEYS[s.badgeType];
+  ctx.save();
+  ctx.textBaseline = 'middle';
+  if (badgeKey) {
+    ctx.font = `900 ${Math.round(w * 0.028)}px "Outfit", sans-serif`;
+    ctx.fillStyle = '#fde68a';
+    ctx.textAlign = 'left';
+    ctx.fillText(t(badgeKey).toUpperCase(), padX, topY);
+  }
+  if (len > 1) {
+    ctx.font = `800 ${Math.round(w * 0.028)}px "Outfit", sans-serif`;
+    ctx.fillStyle = 'rgba(255,255,255,0.82)';
+    ctx.textAlign = 'right';
+    ctx.fillText(`📖 ${idx + 1}/${len}`, w - padX, topY);
+  }
+
+  // Adaptive centered or left-aligned message text
+  const maxTextW = w - padX * 2;
+  const density = pageText.length;
+  const basePx = density <= 85 ? w * 0.068 : density <= 165 ? w * 0.052 : density <= 230 ? w * 0.043 : w * 0.037;
+  const fontPx = Math.round(basePx);
+  const lineH = Math.round(fontPx * 1.38);
+  ctx.font = `${fontSpec.style} ${fontSpec.weight} ${fontPx}px ${fontSpec.family}`;
+  const lines = _wrapCanvasTextLines(ctx, pageText, maxTextW);
+  const totalTextH = lines.length * lineH;
+  const isLeft = s.align === 'left';
+
+  ctx.textAlign = isLeft ? 'left' : 'center';
+  ctx.fillStyle = theme.textColor || '#ffffff';
+  ctx.shadowColor = 'rgba(0,0,0,0.45)';
+  ctx.shadowBlur = 14;
+  const startY = Math.max(Math.round(h * 0.16), Math.round((h - totalTextH) / 2) + Math.round(lineH * 0.35));
+  const textX = isLeft ? padX : Math.round(w / 2);
+
+  lines.forEach((ln, i) => {
+    const ly = startY + i * lineH;
+    if (ly < h * 0.85) ctx.fillText(ln, textX, ly);
+  });
+  ctx.restore();
+
+  // Footer signature + REMO mark
+  ctx.save();
+  ctx.textBaseline = 'bottom';
+  ctx.font = `800 ${Math.round(w * 0.026)}px "Outfit", sans-serif`;
+  ctx.fillStyle = 'rgba(255,255,255,0.82)';
+  ctx.textAlign = 'left';
+  const loc = mysteryMasked ? t('tc_guess_masked_loc') : `${(city && city.flag) || '🌍'} ${getCityName(city || getCityById('montreal'), lang)}`;
+  ctx.fillText(loc, padX, h - Math.round(h * 0.045));
+
+  ctx.textAlign = 'right';
+  ctx.fillStyle = theme.accent || '#38bdf8';
+  ctx.fillText(`${authorName ? '@' + authorName + ' · ' : ''}REMOWORLD.COM`, w - padX, h - Math.round(h * 0.045));
+  ctx.restore();
+}
+
+function renderTextCardToDataUrl(postOrSpec, pageIdx = 0, opts = {}) {
+  try {
+    const isPost = Boolean(postOrSpec && postOrSpec.textCard);
+    const spec = isPost ? postOrSpec.textCard : postOrSpec;
+    if (!spec) return '';
+    const lang = opts.lang || REMO_I18N.getLang();
+    const city = getCityById((isPost ? postOrSpec.cityId : spec.cityId) || 'montreal') || getCityById('montreal');
+    const authorName = (isPost ? postOrSpec.authorName : opts.authorName) || 'Citizen';
+    const cv = document.createElement('canvas');
+    cv.width = opts.width || 720;
+    cv.height = opts.height || 900;
+    const ctx = cv.getContext('2d');
+    drawTextCardCanvasFrame(ctx, cv.width, cv.height, spec, pageIdx, city, authorName, lang, Boolean(opts.mysteryMasked), 0);
+    return cv.toDataURL('image/jpeg', 0.88);
+  } catch (e) {
+    return '';
+  }
+}
+
+function _getStudioTextCardSpecFromDom() {
+  const inp = document.getElementById('createTextCardInp');
+  const raw = (inp ? inp.value : '').trim().slice(0, REMO_TEXT_CARD_CHAR_LIMIT);
+  const badgeType = document.getElementById('createTextCardBadgeSel')?.value || 'proverb';
+  const fontStyle = document.getElementById('createTextCardFontSel')?.value || 'modern';
+  return {
+    raw,
+    pages: splitTextCardPages(raw),
+    theme: _textCardStudioState.theme || 'aurora',
+    fontStyle,
+    badgeType,
+    align: _textCardStudioState.align || 'center',
+    motion: _textCardStudioState.motion || 'glow'
+  };
+}
+
+function renderTextCardThemeSwatches() {
+  const wrap = document.getElementById('tcThemeSwatches');
+  if (!wrap) return;
+  wrap.innerHTML = Object.values(REMO_TEXT_CARD_THEMES).map((th) => `
+    <button type="button" class="tc-swatch-btn ${_textCardStudioState.theme === th.id ? 'active' : ''}"
+      style="background:${th.swatch};" title="${th.id}"
+      onclick="selectTextCardTheme('${th.id}')"></button>
+  `).join('');
+}
+
+function selectTextCardTheme(themeId) {
+  if (!REMO_TEXT_CARD_THEMES[themeId]) return;
+  _textCardStudioState.theme = themeId;
+  renderTextCardThemeSwatches();
+  updateTextCardStudioPreview();
+}
+
+function updateTextCardStudioPreview() {
+  const wrap = document.getElementById('tcStudioPreviewWrap');
+  const inp = document.getElementById('createTextCardInp');
+  const counterEl = document.getElementById('tcCharCounter');
+  const spec = _getStudioTextCardSpecFromDom();
+  const len = (inp ? inp.value : '').length;
+  const pageCount = spec.pages.length;
+
+  if (_textCardStudioState.previewPage >= pageCount) {
+    _textCardStudioState.previewPage = Math.max(0, pageCount - 1);
+  }
+
+  if (counterEl) {
+    counterEl.textContent = `${len} / ${REMO_TEXT_CARD_CHAR_LIMIT} · 📖 ${_textCardStudioState.previewPage + 1}/${pageCount}`;
+    counterEl.classList.toggle('warn', len >= 1400 && len < REMO_TEXT_CARD_CHAR_LIMIT);
+    counterEl.classList.toggle('full', len >= REMO_TEXT_CARD_CHAR_LIMIT);
+  }
+
+  if (!wrap) return;
+  const lang = REMO_I18N.getLang();
+  const cityId = document.getElementById('createCitySelect')?.value || 'montreal';
+  const city = getCityById(cityId);
+  const u = REMO_STORE.getCurrentUser();
+  const mystery = Boolean(document.getElementById('createMysteryCityToggle')?.checked);
+  const placeholderHint = lang === 'fr'
+    ? 'Votre proverbe, bon vœu ou histoire apparaîtra ici en couleurs...'
+    : 'Your proverb, good wish, or short story appears here in color...';
+
+  wrap.innerHTML = renderTextCardMarkup(spec, {
+    context: 'preview',
+    city,
+    authorName: (u && u.name) ? u.name : 'Citizen',
+    lang,
+    pageIdx: _textCardStudioState.previewPage,
+    mysteryMasked: mystery,
+    emptyHint: placeholderHint,
+    stepCall: (d) => `stepStudioTextCardPreview(${d}, event)`,
+    dotCall: (i) => `setStudioTextCardPreviewPage(${i}, event)`
+  });
+}
+
+function handleTextCardInputChange() {
+  updateTextCardStudioPreview();
+}
+
+function handleTextCardStyleChange() {
+  updateTextCardStudioPreview();
+}
+
+function stepStudioTextCardPreview(delta, ev) {
+  if (ev) ev.stopPropagation();
+  const pages = _getStudioTextCardSpecFromDom().pages;
+  _textCardStudioState.previewPage = (((_textCardStudioState.previewPage + delta) % pages.length) + pages.length) % pages.length;
+  updateTextCardStudioPreview();
+}
+
+function setStudioTextCardPreviewPage(idx, ev) {
+  if (ev) ev.stopPropagation();
+  const pages = _getStudioTextCardSpecFromDom().pages;
+  _textCardStudioState.previewPage = Math.max(0, Math.min(idx, pages.length - 1));
+  updateTextCardStudioPreview();
+}
+
+function insertTextCardPageBreak() {
+  const inp = document.getElementById('createTextCardInp');
+  if (!inp) return;
+  const pos = inp.selectionStart ?? inp.value.length;
+  const before = inp.value.slice(0, pos).trimEnd();
+  const after = inp.value.slice(pos).trimStart();
+  const nextVal = (before ? before + '\n---\n' : '---\n') + after;
+  inp.value = nextVal.slice(0, REMO_TEXT_CARD_CHAR_LIMIT);
+  inp.focus();
+  const newPages = splitTextCardPages(inp.value);
+  _textCardStudioState.previewPage = Math.max(0, newPages.length - 1);
+  updateTextCardStudioPreview();
+  RemoAudio.play('click');
+}
+
+function fillTextCardInspiration() {
+  const lang = REMO_I18N.getLang();
+  const cityId = document.getElementById('createCitySelect')?.value || 'montreal';
+  const city = getCityById(cityId);
+  const idea = REMO_TEXT_CARD_IDEAS[_textCardStudioState.inspireIdx % REMO_TEXT_CARD_IDEAS.length];
+  _textCardStudioState.inspireIdx++;
+
+  const txt = (lang === 'fr' ? idea.fr : idea.en).replace(/\{city\}/g, `${city.flag} ${getCityName(city, lang)}`);
+  const inp = document.getElementById('createTextCardInp');
+  if (inp) inp.value = txt.slice(0, REMO_TEXT_CARD_CHAR_LIMIT);
+  const bSel = document.getElementById('createTextCardBadgeSel');
+  if (bSel && idea.badge) bSel.value = idea.badge;
+  const fSel = document.getElementById('createTextCardFontSel');
+  if (fSel && idea.font) fSel.value = idea.font;
+  _textCardStudioState.theme = idea.theme || 'aurora';
+  _textCardStudioState.previewPage = 0;
+
+  renderTextCardThemeSwatches();
+  updateTextCardStudioPreview();
+  RemoAudio.play('coin');
+}
+
+function randomizeTextCardStyle() {
+  const themeKeys = Object.keys(REMO_TEXT_CARD_THEMES);
+  const fontKeys = Object.keys(REMO_TEXT_CARD_FONTS);
+  _textCardStudioState.theme = themeKeys[Math.floor(Math.random() * themeKeys.length)];
+  const fSel = document.getElementById('createTextCardFontSel');
+  if (fSel) fSel.value = fontKeys[Math.floor(Math.random() * fontKeys.length)];
+  renderTextCardThemeSwatches();
+  updateTextCardStudioPreview();
+  RemoAudio.play('click');
+}
+
+function toggleTextCardAlign() {
+  _textCardStudioState.align = _textCardStudioState.align === 'center' ? 'left' : 'center';
+  const btn = document.getElementById('btnTcAlignToggle');
+  if (btn) {
+    btn.textContent = _textCardStudioState.align === 'left' ? t('tc_align_left') : t('tc_align_center');
+    btn.classList.toggle('active', _textCardStudioState.align === 'left');
+  }
+  updateTextCardStudioPreview();
+}
+
+function toggleTextCardMotion() {
+  _textCardStudioState.motion = _textCardStudioState.motion === 'glow' ? 'still' : 'glow';
+  const btn = document.getElementById('btnTcMotionToggle');
+  if (btn) {
+    btn.textContent = _textCardStudioState.motion === 'glow' ? t('tc_motion_on') : t('tc_motion_off');
+    btn.classList.toggle('active', _textCardStudioState.motion === 'glow');
+  }
+  updateTextCardStudioPreview();
+}
+
+function clearTextCardInput() {
+  const inp = document.getElementById('createTextCardInp');
+  if (inp) inp.value = '';
+  _textCardStudioState.previewPage = 0;
+  updateTextCardStudioPreview();
+}
+
+function resetTextCardStudioState() {
+  _textCardStudioState.theme = 'aurora';
+  _textCardStudioState.align = 'center';
+  _textCardStudioState.motion = 'glow';
+  _textCardStudioState.previewPage = 0;
+  const inp = document.getElementById('createTextCardInp');
+  if (inp) inp.value = '';
+  const bSel = document.getElementById('createTextCardBadgeSel');
+  if (bSel) bSel.value = 'proverb';
+  const fSel = document.getElementById('createTextCardFontSel');
+  if (fSel) fSel.value = 'modern';
+  const alignBtn = document.getElementById('btnTcAlignToggle');
+  if (alignBtn) {
+    alignBtn.textContent = t('tc_align_center');
+    alignBtn.classList.remove('active');
+  }
+  const motBtn = document.getElementById('btnTcMotionToggle');
+  if (motBtn) {
+    motBtn.textContent = t('tc_motion_on');
+    motBtn.classList.add('active');
+  }
+  renderTextCardThemeSwatches();
+  updateTextCardStudioPreview();
+}
+
+function downloadTextCardPng(postId, pageIdx = null) {
+  const p = findFeedPostById(postId);
+  if (!p || !p.textCard) return;
+  const idx = pageIdx != null ? pageIdx : (_carouselState[postId] || 0);
+  const url = renderTextCardToDataUrl(p, idx, { width: 900, height: 1125, mysteryMasked: _isTextCardMysteryMasked(p) });
+  if (!url) return;
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `REMO_TextCard_${postId}_p${idx + 1}.jpg`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  RemoAudio.play('coin');
+}
+
+function copyTextCardText(postId) {
+  const p = findFeedPostById(postId);
+  if (!p || !p.textCard) return;
+  const raw = p.textCard.raw || _getTextCardSpecPages(p.textCard).join('\n\n');
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(raw).catch(() => {});
+  }
+  remoToast(t('tc_copied_toast'), 'coin');
+}
+
+function downloadCurrentLightboxTextCardPng() {
+  if (!currentLightboxPostId) return;
+  const idx = _carouselState['lb_' + currentLightboxPostId] ?? (_carouselState[currentLightboxPostId] || 0);
+  downloadTextCardPng(currentLightboxPostId, idx);
+}
+
+window.stepPostTextCardPage = stepPostTextCardPage;
+window.setPostTextCardPageIndex = setPostTextCardPageIndex;
+window.selectTextCardTheme = selectTextCardTheme;
+window.handleTextCardInputChange = handleTextCardInputChange;
+window.handleTextCardStyleChange = handleTextCardStyleChange;
+window.stepStudioTextCardPreview = stepStudioTextCardPreview;
+window.setStudioTextCardPreviewPage = setStudioTextCardPreviewPage;
+window.insertTextCardPageBreak = insertTextCardPageBreak;
+window.fillTextCardInspiration = fillTextCardInspiration;
+window.randomizeTextCardStyle = randomizeTextCardStyle;
+window.toggleTextCardAlign = toggleTextCardAlign;
+window.toggleTextCardMotion = toggleTextCardMotion;
+window.clearTextCardInput = clearTextCardInput;
+window.downloadTextCardPng = downloadTextCardPng;
+window.copyTextCardText = copyTextCardText;
+window.downloadCurrentLightboxTextCardPng = downloadCurrentLightboxTextCardPng;
 
 function updateBeforeAfterSlider(rangeInput) {
   const box = rangeInput.closest('.ba-slider-box');
@@ -3526,6 +4194,17 @@ function switchCreateStudioTab(tabId) {
   document.getElementById('studioPane-' + tabId)?.classList.add('active');
   if (tabId !== 'video') stopActiveCam60Stream();
 
+  const capEl = document.getElementById('createCaptionInp');
+  if (capEl) {
+    capEl.placeholder = tabId === 'textcard' ? t('tc_cap_opt_hint') : t('create_caption_ph');
+  }
+
+  if (tabId === 'textcard') {
+    renderTextCardThemeSwatches();
+    updateTextCardStudioPreview();
+    setTimeout(() => document.getElementById('createTextCardInp')?.focus(), 40);
+  }
+
   if (tabId === 'versus') {
     const leftSel = document.getElementById('createVersusLeftCity');
     const rightSel = document.getElementById('createVersusRightCity');
@@ -3613,8 +4292,25 @@ function openCreatePostModal(prefillTag = '') {
   if (versusTabBtn) versusTabBtn.style.display = isAdm ? 'inline-flex' : 'none';
   const htmlTabBtn = document.getElementById('studioTabHtmlBtn');
   if (htmlTabBtn) htmlTabBtn.style.display = isAdm ? 'inline-flex' : 'none';
+  document.querySelector('#createModal .studio-tabs')?.classList.toggle('has-admin-tabs', isAdm);
   if (!isAdm && (activeCreateStudioTab === 'versus' || activeCreateStudioTab === 'html')) {
     switchCreateStudioTab('photo');
+  }
+
+  // Keep live Text Card preview in sync when City or Guess-My-City changes
+  const citySelHook = document.getElementById('createCitySelect');
+  if (citySelHook && !citySelHook._hasTcHook) {
+    citySelHook._hasTcHook = true;
+    citySelHook.addEventListener('change', () => {
+      if (activeCreateStudioTab === 'textcard') updateTextCardStudioPreview();
+    });
+  }
+  const mysHook = document.getElementById('createMysteryCityToggle');
+  if (mysHook && !mysHook._hasTcHook) {
+    mysHook._hasTcHook = true;
+    mysHook.addEventListener('change', () => {
+      if (activeCreateStudioTab === 'textcard') updateTextCardStudioPreview();
+    });
   }
 
   const htmlArea = document.getElementById('createHtmlCodeArea');
@@ -3661,6 +4357,7 @@ function openCreatePostModal(prefillTag = '') {
   if (winT) winT.checked = Boolean(window._prefillWindowStamp);
   window._prefillWindowStamp = false;
 
+  resetTextCardStudioState();
   document.getElementById('createMediaPreviewStatus').innerHTML = '';
   switchCreateStudioTab('photo');
   document.getElementById('createModal')?.classList.add('open');
@@ -4102,7 +4799,16 @@ async function publishNewRemoPost() {
       : `🔗 Check out this video / link shared from ${getCityName(cObj, 'en')}! #${cObj.code}`;
   }
 
-  if (!cap) {
+  let textCardPayload = null;
+  if (activeCreateStudioTab === 'textcard') {
+    const tcSpec = _getStudioTextCardSpecFromDom();
+    if (!tcSpec.raw) {
+      remoToast(t('tc_empty_err'));
+      document.getElementById('createTextCardInp')?.focus();
+      return;
+    }
+    textCardPayload = tcSpec;
+  } else if (!cap) {
     remoToast(lang === 'fr' ? 'Ajoutez une légende à votre publication !' : 'Please write a caption for your post!');
     return;
   }
@@ -4110,7 +4816,7 @@ async function publishNewRemoPost() {
   const isMysteryCity = Boolean(document.getElementById('createMysteryCityToggle')?.checked) && !pendingDuetParent;
   const wantWindowStamp = Boolean(document.getElementById('createWindowStampToggle')?.checked) && !isMysteryCity;
 
-  let mediaType = 'city_art';
+  let mediaType = textCardPayload ? 'text_card' : 'city_art';
   let mediaUrl = '';
   let mediaUrls = [];
   let htmlCode = '';
@@ -4249,7 +4955,7 @@ async function publishNewRemoPost() {
   const drawerEl = document.getElementById('bilingualCaptionDrawer');
   const enBoxVal = document.getElementById('createCaptionEnBox')?.value.trim();
   const frBoxVal = document.getElementById('createCaptionFrBox')?.value.trim();
-  const autoPair = REMO_TRANSLATOR.makeBilingualPair(cap);
+  const autoPair = cap ? REMO_TRANSLATOR.makeBilingualPair(cap) : { en: '', fr: '' };
   const finalEn = (drawerEl && drawerEl.style.display !== 'none' && enBoxVal) ? enBoxVal : (autoPair.en || cap);
   const finalFr = (drawerEl && drawerEl.style.display !== 'none' && frBoxVal) ? frBoxVal : (autoPair.fr || cap);
   if (drawerEl) drawerEl.style.display = 'none';
@@ -4281,6 +4987,7 @@ async function publishNewRemoPost() {
     enforce60sCap: !!window._pendingEnforce60sCap,
     htmlCode,
     visualHeadline: artHeadline,
+    textCard: textCardPayload,
     remixedFromAuthor: pendingRemixParent ? pendingRemixParent.authorName : '',
     duetOf: pendingDuetParent ? { ...pendingDuetParent } : null,
     poll: pollObj,
@@ -4434,20 +5141,27 @@ async function record1ClickCityVideoReel() {
   };
 
   rec.start();
+  const tcReelSpec = (activeCreateStudioTab === 'textcard') ? _getStudioTextCardSpecFromDom() : null;
+  const tcUser = REMO_STORE.getCurrentUser();
+  const tcMystery = Boolean(document.getElementById('createMysteryCityToggle')?.checked);
   const start = performance.now();
   const drawFrame = (now) => {
     const tSec = (now - start) / 1000;
-    ctx.fillStyle = '#040714';
-    ctx.fillRect(0, 0, 720, 1280);
-    const pulse = 220 + Math.sin(tSec * 4) * 18;
-    drawCityLandmark(ctx, city.id, city.themeColor, 360, 560, pulse);
-    ctx.font = '900 46px "Orbitron", sans-serif';
-    ctx.fillStyle = '#fbbf24';
-    ctx.textAlign = 'center';
-    ctx.fillText(`🌐 REMO · ${city.flag} ${getCityName(city, lang).toUpperCase()}`, 360, 160);
-    ctx.font = '800 28px "Outfit", sans-serif';
-    ctx.fillStyle = '#38bdf8';
-    ctx.fillText(getCityTagline(city, lang), 360, 1020);
+    if (tcReelSpec && tcReelSpec.raw) {
+      drawTextCardCanvasFrame(ctx, 720, 1280, tcReelSpec, _textCardStudioState.previewPage, city, (tcUser && tcUser.name) || 'Citizen', lang, tcMystery, tSec);
+    } else {
+      ctx.fillStyle = '#040714';
+      ctx.fillRect(0, 0, 720, 1280);
+      const pulse = 220 + Math.sin(tSec * 4) * 18;
+      drawCityLandmark(ctx, city.id, city.themeColor, 360, 560, pulse);
+      ctx.font = '900 46px "Orbitron", sans-serif';
+      ctx.fillStyle = '#fbbf24';
+      ctx.textAlign = 'center';
+      ctx.fillText(`🌐 REMO · ${city.flag} ${getCityName(city, lang).toUpperCase()}`, 360, 160);
+      ctx.font = '800 28px "Outfit", sans-serif';
+      ctx.fillStyle = '#38bdf8';
+      ctx.fillText(getCityTagline(city, lang), 360, 1020);
+    }
     if (tSec < 4.0) requestAnimationFrame(drawFrame);
     else rec.stop();
   };
@@ -7054,6 +7768,21 @@ function openPostActionsSheet(postId) {
         </div>
       </button>
 
+      ${(p.mediaType === 'text_card' && p.textCard) ? `
+      <button type="button" class="action-sheet-row" onclick="closePostActionsModal(); downloadTextCardPng('${p.id}');">
+        <span class="as-icon" style="background:rgba(56,189,248,0.15);color:#38bdf8;">💾</span>
+        <div style="text-align:left;flex:1;">
+          <b style="color:#bae6fd;">${escapeHtmlStr(t('tc_download_png'))}</b>
+        </div>
+      </button>
+      <button type="button" class="action-sheet-row" onclick="closePostActionsModal(); copyTextCardText('${p.id}');">
+        <span class="as-icon" style="background:rgba(251,191,36,0.15);color:#fbbf24;">📋</span>
+        <div style="text-align:left;flex:1;">
+          <b style="color:#fef08a;">${escapeHtmlStr(t('tc_copy_text'))}</b>
+        </div>
+      </button>
+      ` : ''}
+
       <button type="button" class="action-sheet-row" onclick="closePostActionsModal(); openDirectChatWithUser('${p.uid || ''}');">
         <span class="as-icon" style="background:rgba(56,189,248,0.15);color:#38bdf8;">💌</span>
         <div style="text-align:left;flex:1;">
@@ -7780,7 +8509,8 @@ function buildPostBilingualPair(p) {
   if (enRaw && frRaw && enRaw !== frRaw) {
     return { en: enRaw, fr: frRaw };
   }
-  return REMO_TRANSLATOR.makeBilingualPair(enRaw || frRaw);
+  const fallback = enRaw || frRaw || (p.textCard && p.textCard.raw) || '';
+  return REMO_TRANSLATOR.makeBilingualPair(fallback);
 }
 
 function togglePostAutoTranslate(postId) {
@@ -8400,6 +9130,7 @@ function startCityDuetFromPost(postId) {
     mediaType: p.mediaType === 'city_duet' ? 'city_art' : p.mediaType,
     mediaUrl: p.mediaUrl || (Array.isArray(p.mediaUrls) && p.mediaUrls[0]) || '',
     htmlCode: p.htmlCode || '',
+    textCard: p.textCard || null,
     visualHeadline: p.visualHeadline || getCityName(origCity, 'en').toUpperCase()
   };
 
@@ -9040,14 +9771,81 @@ function openPostFullscreenMedia(postId) {
   }
 }
 
+function _renderLightboxTextCardDom(p, pageIdx) {
+  const tcEl = document.getElementById('photoLightboxTextCard');
+  if (!tcEl || !p || !p.textCard) return;
+  const lang = REMO_I18N.getLang();
+  const city = (typeof getCityById === 'function') ? (getCityById(p.cityId) || getCityById('montreal')) : { id: 'montreal', flag: '🌍', name_en: 'World', name_fr: 'Monde', themeColor: '#38bdf8' };
+  const mysteryMasked = _isTextCardMysteryMasked(p);
+  tcEl.innerHTML = renderTextCardMarkup(p.textCard, {
+    context: 'lightbox',
+    postId: p.id,
+    city,
+    authorName: p.authorName || 'Citizen',
+    lang,
+    pageIdx,
+    mysteryMasked,
+    stepCall: (d) => `stepLightboxTextCardPage('${p.id}', ${d}, event)`,
+    dotCall: (i) => `setLightboxTextCardPageIndex('${p.id}', ${i}, event)`
+  });
+}
+
+function stepLightboxTextCardPage(postId, delta, ev) {
+  if (ev) ev.stopPropagation();
+  const p = findFeedPostById(postId);
+  if (!p || !p.textCard) return;
+  const pages = _getTextCardSpecPages(p.textCard);
+  const key = 'lb_' + postId;
+  const cur = _carouselState[key] ?? (_carouselState[postId] || 0);
+  _carouselState[key] = (((cur + delta) % pages.length) + pages.length) % pages.length;
+  _renderLightboxTextCardDom(p, _carouselState[key]);
+  RemoAudio.play('click');
+}
+
+function setLightboxTextCardPageIndex(postId, index, ev) {
+  if (ev) ev.stopPropagation();
+  const p = findFeedPostById(postId);
+  if (!p || !p.textCard) return;
+  const pages = _getTextCardSpecPages(p.textCard);
+  const key = 'lb_' + postId;
+  _carouselState[key] = Math.max(0, Math.min(index, pages.length - 1));
+  _renderLightboxTextCardDom(p, _carouselState[key]);
+  RemoAudio.play('click');
+}
+window.stepLightboxTextCardPage = stepLightboxTextCardPage;
+window.setLightboxTextCardPageIndex = setLightboxTextCardPageIndex;
+
 function openPhotoLightboxModal(postId) {
   const p = findFeedPostById(postId);
   if (!p) return;
   currentLightboxPostId = p.id;
   const modal = document.getElementById('photoLightboxModal');
   const img = document.getElementById('photoLightboxImg');
+  const tcBox = document.getElementById('photoLightboxTextCard');
+  const dlBtn = document.getElementById('photoLightboxDownloadBtn');
   const title = document.getElementById('photoLightboxTitle');
   const city = (typeof getCityById === 'function') ? (getCityById(p.cityId) || { flag: '🌍', name: 'World' }) : { flag: '🌍', name: 'World' };
+
+  if (p.mediaType === 'text_card' && p.textCard && tcBox) {
+    if (img) { img.src = ''; img.style.display = 'none'; }
+    tcBox.style.display = 'block';
+    if (dlBtn) dlBtn.style.display = 'inline-flex';
+    const startIdx = _carouselState[p.id] || 0;
+    _carouselState['lb_' + p.id] = startIdx;
+    _renderLightboxTextCardDom(p, startIdx);
+    initCarouselTouchSwipe(tcBox, p.id, 'stepLightboxTextCardPage');
+    if (title) title.textContent = `✍️ @${p.authorName} — REMO TEXT CARD`;
+    if (modal) {
+      modal.classList.add('open');
+      remoEnterNativeFullscreen(modal);
+    }
+    return;
+  }
+
+  if (tcBox) { tcBox.style.display = 'none'; tcBox.innerHTML = ''; }
+  if (dlBtn) dlBtn.style.display = 'none';
+  if (img) img.style.display = 'block';
+
   const rawKey = p.mediaUrl || (Array.isArray(p.mediaUrls) ? p.mediaUrls[0] : '');
   let resolved = '';
   if (rawKey.startsWith('http') || rawKey.startsWith('data:') || rawKey.startsWith('blob:')) {
@@ -9073,7 +9871,11 @@ function closePhotoLightboxModal() {
   const modal = document.getElementById('photoLightboxModal');
   if (modal) modal.classList.remove('open');
   const img = document.getElementById('photoLightboxImg');
-  if (img) img.src = '';
+  if (img) { img.src = ''; img.style.display = 'block'; }
+  const tcBox = document.getElementById('photoLightboxTextCard');
+  if (tcBox) { tcBox.style.display = 'none'; tcBox.innerHTML = ''; }
+  const dlBtn = document.getElementById('photoLightboxDownloadBtn');
+  if (dlBtn) dlBtn.style.display = 'none';
   currentLightboxPostId = null;
 }
 
@@ -11347,7 +12149,7 @@ window.stampPhotoWithLiveCityWindow = stampPhotoWithLiveCityWindow;
 function renderWorldWindowActionsBar(p, lang) {
   if (!p) return '';
   const isDuet = Boolean(p.duetOf && p.duetOf.cityId);
-  const canSyncDuet = !isDuet && ['image', 'carousel', 'city_art'].includes(p.mediaType);
+  const canSyncDuet = !isDuet && ['image', 'carousel', 'city_art', 'text_card'].includes(p.mediaType);
   const showStoryBtn = Boolean(isDuet || p.isWorldWindow);
   if (!canSyncDuet && !showStoryBtn) return '';
 
@@ -11441,12 +12243,18 @@ async function exportWorldWindowStory(postId) {
 
   const rightCity = getCityById(p.cityId);
   const rightWx = REMO_WEATHER.getCityLiveStatus(rightCity);
-  const rightImg = await _loadImageSafeForStory(p.mediaUrl || (p.mediaUrls && p.mediaUrls[0]) || '');
+  const rightImgRaw = (p.mediaType === 'text_card' && p.textCard)
+    ? renderTextCardToDataUrl(p, 0, { width: 972, height: 1360 })
+    : (p.mediaUrl || (p.mediaUrls && p.mediaUrls[0]) || '');
+  const rightImg = await _loadImageSafeForStory(rightImgRaw);
 
   if (p.duetOf && p.duetOf.cityId) {
     const leftCity = getCityById(p.duetOf.cityId);
     const leftWx = REMO_WEATHER.getCityLiveStatus(leftCity);
-    const leftImg = await _loadImageSafeForStory(p.duetOf.mediaUrl || (p.duetOf.mediaUrls && p.duetOf.mediaUrls[0]) || '');
+    const leftImgRaw = (p.duetOf.mediaType === 'text_card' && p.duetOf.textCard)
+      ? renderTextCardToDataUrl({ ...p.duetOf, cityId: leftCity.id }, 0, { width: 972, height: 640 })
+      : (p.duetOf.mediaUrl || (p.duetOf.mediaUrls && p.duetOf.mediaUrls[0]) || '');
+    const leftImg = await _loadImageSafeForStory(leftImgRaw);
 
     // Top Pane (City A)
     _drawCoverPane(ctx, leftImg, leftCity, lang, 54, 150, 972, 640);
