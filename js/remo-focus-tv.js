@@ -61,6 +61,13 @@
     fxVolume: 0.75,
     fxPopoverOpen: false,
     roomPopoverOpen: false,
+    chatPopoverOpen: false,
+    unreadChatCount: 0,
+    chatPeekTimerId: null,
+    _lastSeenChatMsgId: '',
+    _chatSnapshotPrimedKey: '',
+    _lastSelfMsgId: '',
+    _joinedRoomTs: 0,
     zenMode: false,
     zenIntervalId: null,
     lightningAlpha: 0,
@@ -300,6 +307,32 @@
                 </div>
               </div>
             </div>
+            <div class="ftv-chat-wrap" id="ftvChatWrap">
+              <button type="button" class="ftv-hud-btn ftv-chat-toggle-btn" id="ftvChatToggleBtn" onclick="toggleFocusTvChatPopover()" aria-expanded="false" aria-controls="ftvChatPopover">
+                <span class="ftv-chat-btn-lbl" data-i18n="ftv_chat_btn">💬 Chat</span>
+                <span class="ftv-chat-btn-sep">·</span>
+                <span class="ftv-chat-btn-meta ftv-chat-btn-listeners" id="ftvBtnListeners">🎧 12</span>
+                <span class="ftv-chat-btn-sep">·</span>
+                <span class="ftv-chat-btn-meta ftv-chat-btn-coins" id="ftvBtnCoins">🪙 0/30</span>
+                <span class="ftv-chat-unread-badge" id="ftvChatUnreadBadge" hidden></span>
+              </button>
+              <button type="button" class="ftv-chat-peek" id="ftvChatPeekToast" onclick="toggleFocusTvChatPopover(true)" aria-hidden="true"></button>
+              <div class="ftv-chat-popover" id="ftvChatPopover" aria-hidden="true">
+                <div class="ftv-chat-pop-head">
+                  <div class="ftv-chat-pop-title" id="ftvChatPopTitle" data-i18n="ftv_chat_title">💬 Live City Chat</div>
+                  <button type="button" class="ftv-chat-pop-close" onclick="toggleFocusTvChatPopover(false)" aria-label="Close">✕</button>
+                </div>
+                <div class="ftv-chat-header">
+                  <span class="ftv-listeners-chip" id="ftvListenersChip">🎧 18 listening</span>
+                  <span class="ftv-l2e-chip" id="ftvL2eChip">🪙 +5 / 10m</span>
+                </div>
+                <div class="ftv-chat-feed" id="ftvChatFeed"></div>
+                <form class="ftv-chat-form" onsubmit="event.preventDefault(); sendFocusTvChatMessage();">
+                  <input type="text" id="ftvChatInput" class="ftv-chat-input" maxlength="140" data-i18n-placeholder="ftv_chat_ph" placeholder="Say hi or share what you are working on..." />
+                  <button type="submit" class="ftv-chat-send" data-i18n="ftv_chat_send">Send</button>
+                </form>
+              </div>
+            </div>
             <button type="button" class="ftv-hud-btn ftv-mode-btn active" id="ftvVisualModeBtn" onclick="toggleFocusTvVisualMode()" data-i18n="ftv_view_real">
               📷 4D Real
             </button>
@@ -331,21 +364,8 @@
           ✨ Show Controls (Esc)
         </button>
 
-        <!-- BOTTOM CONTROL DECK & DISCREET CHAT -->
+        <!-- BOTTOM CONTROL DECK -->
         <div class="ftv-bottom-dock">
-          <!-- Listener Chat Strip -->
-          <div class="ftv-chat-strip">
-            <div class="ftv-chat-header">
-              <span class="ftv-listeners-chip" id="ftvListenersChip">🎧 18 listening</span>
-              <span class="ftv-l2e-chip" id="ftvL2eChip">🪙 +5 / 10m</span>
-            </div>
-            <div class="ftv-chat-feed" id="ftvChatFeed"></div>
-            <form class="ftv-chat-form" onsubmit="event.preventDefault(); sendFocusTvChatMessage();">
-              <input type="text" id="ftvChatInput" class="ftv-chat-input" maxlength="140" data-i18n-placeholder="ftv_chat_ph" placeholder="Say hi or share what you are working on..." />
-              <button type="submit" class="ftv-chat-send" data-i18n="ftv_chat_send">Send</button>
-            </form>
-          </div>
-
           <!-- Radio + Ambient Controls Bar -->
           <div class="ftv-deck">
             <div class="ftv-station-info">
@@ -410,6 +430,10 @@
       if (state.roomPopoverOpen && e.target && !e.target.closest('#ftvRoomWrap')) {
         state.roomPopoverOpen = false;
         _syncRoomPopoverUI();
+      }
+      if (state.chatPopoverOpen && e.target && !e.target.closest('#ftvChatWrap')) {
+        state.chatPopoverOpen = false;
+        _syncChatPopoverUI();
       }
     });
 
@@ -652,6 +676,12 @@
 
   window.toggleFocusTvFxPopover = function () {
     state.fxPopoverOpen = !state.fxPopoverOpen;
+    if (state.fxPopoverOpen) {
+      state.roomPopoverOpen = false;
+      state.chatPopoverOpen = false;
+      _syncRoomPopoverUI();
+      _syncChatPopoverUI();
+    }
     _syncAmbientButtons();
   };
 
@@ -1512,17 +1542,25 @@
       _updateZenClockDisplay();
     }, 1000);
 
+    state._joinedRoomTs = Date.now();
+    state._chatSnapshotPrimedKey = '';
+    state.unreadChatCount = 0;
     const codeInp = document.getElementById('ftvRoomCodeInput');
     if (codeInp) codeInp.value = cleanId;
     _renderPomodoroBtn();
     _renderChatStrip();
     _syncRoomPopoverUI();
+    _syncChatPopoverUI();
     _updateZenClockDisplay();
   }
 
   window.toggleFocusTvRoomPopover = function () {
     state.roomPopoverOpen = !state.roomPopoverOpen;
-    if (state.roomPopoverOpen) state.fxPopoverOpen = false;
+    if (state.roomPopoverOpen) {
+      state.fxPopoverOpen = false;
+      state.chatPopoverOpen = false;
+      _syncChatPopoverUI();
+    }
     _syncAmbientButtons();
     _syncRoomPopoverUI();
   };
@@ -1656,6 +1694,34 @@
       _setTextIfChanged(l2eEl, `🪙 +5 / ${minsLeft}m (${l2e.coinsToday || 0}/30)`);
     }
 
+    const btnListeners = document.getElementById('ftvBtnListeners');
+    if (btnListeners) {
+      if (state.room && state.room.active) {
+        const peerCountBtn = Math.max(1, (state.room.peers && state.room.peers.size) || 1);
+        _setTextIfChanged(btnListeners, `👥 ${peerCountBtn}`);
+        btnListeners.classList.add('in-room');
+      } else {
+        const lm = listenersEl && (listenersEl.textContent || '').match(/🎧\s*\d+/);
+        _setTextIfChanged(btnListeners, lm ? lm[0] : '🎧 12');
+        btnListeners.classList.remove('in-room');
+      }
+    }
+    const btnCoins = document.getElementById('ftvBtnCoins');
+    if (btnCoins && window.REMO_RADIO && typeof window.REMO_RADIO._loadL2EState === 'function') {
+      const l2eBtn = window.REMO_RADIO._loadL2EState();
+      const minsLeftBtn = Math.max(1, Math.ceil((600 - (l2eBtn.secProgress || 0)) / 60));
+      _setTextIfChanged(btnCoins, `🪙 ${l2eBtn.coinsToday || 0}/30 · ${minsLeftBtn}m`);
+    }
+    const popTitleEl = document.getElementById('ftvChatPopTitle');
+    if (popTitleEl) {
+      const nextPopTitle = state.room && state.room.active
+        ? `👥 ${_t('ftv_chat_room_title')} · #${state.room.id}`
+        : _t('ftv_chat_title');
+      _setTextIfChanged(popTitleEl, nextPopTitle);
+    }
+    const btnLblEl = document.querySelector('#ftvChatToggleBtn .ftv-chat-btn-lbl');
+    if (btnLblEl) _setTextIfChanged(btnLblEl, _t('ftv_chat_btn'));
+
     if (!feed) return;
     const renderMsgLines = (msgs) => msgs.map((m) => `
       <div class="ftv-chat-line">
@@ -1665,8 +1731,10 @@
     `).join('');
 
     let nextHtml = '';
+    let latestRealMsg = null;
     if (state.room.active) {
-      const recentRoomMsgs = state.room.messages.slice(-3);
+      const recentRoomMsgs = state.room.messages.slice(-8);
+      latestRealMsg = recentRoomMsgs.length ? recentRoomMsgs[recentRoomMsgs.length - 1] : null;
       if (!recentRoomMsgs.length) {
         const roomWelcome = _t('ftv_room_welcome', { room: state.room.id, dur: state.room.durMin });
         nextHtml = `<div class="ftv-chat-line ftv-chat-welcome">${_escapeHtml(roomWelcome)}</div>`;
@@ -1678,7 +1746,8 @@
       const cityMsgs = Array.isArray(allRooms[state.cityId]) ? allRooms[state.cityId] : [];
       const globalMsgs = Array.isArray(allRooms.global) ? allRooms.global : [];
       const merged = cityMsgs.length ? cityMsgs : globalMsgs;
-      const recent = merged.slice(-3);
+      const recent = merged.slice(-8);
+      latestRealMsg = recent.length ? recent[recent.length - 1] : null;
 
       if (!recent.length) {
         const fallback = lang === 'fr'
@@ -1690,7 +1759,120 @@
       }
     }
     _setHtmlIfChanged(feed, nextHtml);
+    if (state.chatPopoverOpen) {
+      feed.scrollTop = feed.scrollHeight;
+    }
+
+    const streamKey = (state.room && state.room.active) ? ('room:' + state.room.id) : ('city:' + state.cityId);
+    const latestKey = _getChatMsgKey(latestRealMsg);
+    if (state._chatSnapshotPrimedKey !== streamKey) {
+      state._chatSnapshotPrimedKey = streamKey;
+      state._lastSeenChatMsgId = latestKey;
+    } else if (latestKey && latestKey !== state._lastSeenChatMsgId) {
+      state._lastSeenChatMsgId = latestKey;
+      const isSelf = Boolean(state._lastSelfMsgId && latestRealMsg && latestRealMsg.id === state._lastSelfMsgId);
+      const isFreshInRoom = !(state.room && state.room.active) || !latestRealMsg.ts || Number(latestRealMsg.ts) >= ((state._joinedRoomTs || 0) - 5000);
+      if (!state.chatPopoverOpen && !isSelf && isFreshInRoom) {
+        state.unreadChatCount = (state.unreadChatCount || 0) + 1;
+        _syncChatPopoverUI();
+        _showChatPeekToast(latestRealMsg, city);
+      }
+    }
   }
+
+  function _getChatMsgKey(m) {
+    if (!m) return '';
+    return String(m.id || `${m.author || ''}|${m.ts || ''}|${m.text || ''}`);
+  }
+
+  function _positionChatOverlayEl(el) {
+    if (!el) return;
+    const wrap = document.getElementById('ftvChatWrap');
+    if (!wrap || typeof wrap.getBoundingClientRect !== 'function') return;
+    try {
+      const vw = window.innerWidth || 1280;
+      if (vw <= 600) {
+        el.classList.remove('align-right');
+        return;
+      }
+      const rect = wrap.getBoundingClientRect();
+      const panelW = el.classList.contains('ftv-chat-peek') ? 350 : 390;
+      const alignsRight = (rect.left + panelW > vw - 12) && (rect.right - panelW >= 12);
+      el.classList.toggle('align-right', alignsRight);
+    } catch (e) {}
+  }
+
+  function _hideChatPeekToast() {
+    if (state.chatPeekTimerId) {
+      clearTimeout(state.chatPeekTimerId);
+      state.chatPeekTimerId = null;
+    }
+    const toast = document.getElementById('ftvChatPeekToast');
+    if (toast) {
+      toast.classList.remove('visible');
+      toast.setAttribute('aria-hidden', 'true');
+    }
+  }
+
+  function _showChatPeekToast(msg, city) {
+    if (!msg || !state.isOpen || state.zenMode || state.chatPopoverOpen) return;
+    const toast = document.getElementById('ftvChatPeekToast');
+    if (!toast) return;
+    const author = _escapeHtml(msg.author || (_lang() === 'fr' ? 'Citoyen' : 'Citizen'));
+    const text = _escapeHtml(msg.text || '');
+    const flag = _flagHtml(msg.cityFlag || (city && city.flag) || '🌍', '🌍', 14, 10);
+    toast.innerHTML = `<span class="ftv-chat-peek-dot"></span><span class="ftv-chat-peek-author">${flag} @${author}:</span> <span class="ftv-chat-peek-text">${text}</span>`;
+    _positionChatOverlayEl(toast);
+    toast.classList.add('visible');
+    toast.setAttribute('aria-hidden', 'false');
+    clearTimeout(state.chatPeekTimerId);
+    state.chatPeekTimerId = setTimeout(() => {
+      _hideChatPeekToast();
+    }, 4000);
+  }
+
+  function _syncChatPopoverUI() {
+    const pop = document.getElementById('ftvChatPopover');
+    const btn = document.getElementById('ftvChatToggleBtn');
+    const badge = document.getElementById('ftvChatUnreadBadge');
+    const isOpen = Boolean(state.chatPopoverOpen && !state.zenMode);
+    if (pop) {
+      if (isOpen) _positionChatOverlayEl(pop);
+      pop.classList.toggle('open', isOpen);
+      pop.setAttribute('aria-hidden', isOpen ? 'false' : 'true');
+    }
+    if (btn) {
+      btn.classList.toggle('active', isOpen);
+      btn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+    }
+    if (badge) {
+      const cnt = Math.max(0, Number(state.unreadChatCount || 0));
+      badge.hidden = cnt <= 0 || isOpen;
+      _setTextIfChanged(badge, cnt > 9 ? '9+' : (cnt > 0 ? String(cnt) : ''));
+    }
+  }
+
+  window.toggleFocusTvChatPopover = function (forceVal) {
+    const nextOpen = typeof forceVal === 'boolean' ? forceVal : !state.chatPopoverOpen;
+    state.chatPopoverOpen = nextOpen;
+    if (nextOpen) {
+      state.roomPopoverOpen = false;
+      state.fxPopoverOpen = false;
+      state.unreadChatCount = 0;
+      _hideChatPeekToast();
+      _syncRoomPopoverUI();
+      _syncAmbientButtons();
+    }
+    _syncChatPopoverUI();
+    if (nextOpen) {
+      const feed = document.getElementById('ftvChatFeed');
+      if (feed) feed.scrollTop = feed.scrollHeight;
+      const inp = document.getElementById('ftvChatInput');
+      if (inp && typeof inp.focus === 'function') {
+        try { inp.focus({ preventScroll: true }); } catch (e) {}
+      }
+    }
+  };
 
   window.sendFocusTvChatMessage = function () {
     const inp = document.getElementById('ftvChatInput');
@@ -1711,6 +1893,7 @@
       text: txt,
       ts: Date.now()
     };
+    state._lastSelfMsgId = msgObj.id;
 
     if (state.room.active) {
       state.room.messages.push(msgObj);
@@ -1862,7 +2045,12 @@
     state.zenIntervalId = null;
     if (state.zenMode) {
       state.fxPopoverOpen = false;
+      state.roomPopoverOpen = false;
+      state.chatPopoverOpen = false;
+      _hideChatPeekToast();
       _syncAmbientButtons();
+      _syncRoomPopoverUI();
+      _syncChatPopoverUI();
       _updateZenClockDisplay();
       state.zenIntervalId = setInterval(() => {
         if (state.isOpen && state.zenMode) _updateZenClockDisplay();
@@ -1940,6 +2128,7 @@
     _renderChatStrip();
     _syncAmbientButtons();
     _syncRoomPopoverUI();
+    _syncChatPopoverUI();
   }
   window.syncFocusTvUI = syncFocusTvUI;
 
@@ -1949,6 +2138,9 @@
     if (nextId !== state.cityId) {
       state.prevCityId = state.cityId;
       state.citySwitchTs = Date.now();
+      state.unreadChatCount = 0;
+      _hideChatPeekToast();
+      _syncChatPopoverUI();
     }
     state.cityId = nextId;
     _getCityPhotoImg(_getCity(state.cityId));
@@ -2282,6 +2474,12 @@
 
     state.roomPopoverOpen = false;
     state.fxPopoverOpen = false;
+    state.chatPopoverOpen = false;
+    state.unreadChatCount = 0;
+    state._chatSnapshotPrimedKey = '';
+    state._lastSeenChatMsgId = '';
+    state._lastSelfMsgId = '';
+    _hideChatPeekToast();
     window.toggleFocusTvZenMode(Boolean(opts.zen));
     _renderCitySelectors();
     if (opts.room) {
@@ -2306,6 +2504,10 @@
     state.isOpen = false;
     state.roomPopoverOpen = false;
     state.fxPopoverOpen = false;
+    state.chatPopoverOpen = false;
+    state.unreadChatCount = 0;
+    _hideChatPeekToast();
+    _syncChatPopoverUI();
     window.toggleFocusTvZenMode(false);
     if (overlay) overlay.classList.remove('open');
     document.body.classList.remove('ftv-active');
@@ -2328,6 +2530,13 @@
     if (e.key === 'Escape' && state.isOpen) {
       if (state.zenMode) {
         window.toggleFocusTvZenMode(false);
+      } else if (state.chatPopoverOpen || state.roomPopoverOpen || state.fxPopoverOpen) {
+        state.chatPopoverOpen = false;
+        state.roomPopoverOpen = false;
+        state.fxPopoverOpen = false;
+        _syncChatPopoverUI();
+        _syncRoomPopoverUI();
+        _syncAmbientButtons();
       } else {
         window.closeFocusTvModal();
       }
