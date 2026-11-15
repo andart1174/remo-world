@@ -3899,7 +3899,13 @@ const REMO_STORE = {
     if (!p) return { ok: false, error: 'post_not_found' };
 
     const isAdm = this.isCurrentUserAdmin() || this.isAdminUnlocked();
-    if (p.uid !== u.uid && !isAdm) return { ok: false, error: 'not_post_owner' };
+    const isOwner = Boolean(
+      (p.uid && u.uid === p.uid) ||
+      (p.authorUid && u.uid === p.authorUid) ||
+      (u.email && p.authorEmail && u.email.toLowerCase() === p.authorEmail.toLowerCase()) ||
+      (isAdm && p.uid === 'u_admin_founder')
+    );
+    if (!isOwner) return { ok: false, error: 'not_post_owner' };
 
     this.advanceWorldSpotlightIfNeeded();
     const ws = this.ensureWorldSpotlight();
@@ -5557,6 +5563,15 @@ const REMO_STORE = {
               });
               cp.leaderboard = Array.from(lbMap.values()).sort((a, b) => (b.score || 0) - (a.score || 0)).slice(0, 10);
             }
+            // Smart-merge active Boost 24h status (preserve newer local boost/unboost while async write settles)
+            const lBoostTs = Number(lp.boostedUpdatedAt || lp.boostedAt || 0);
+            const cBoostTs = Number(cp.boostedUpdatedAt || cp.boostedAt || 0);
+            if (lBoostTs > cBoostTs && (now - lBoostTs < 60000 || (lp.boosted && Number(lp.boostedUntil || 0) > now))) {
+              cp.boosted = Boolean(lp.boosted);
+              cp.boostedAt = Number(lp.boostedAt || 0);
+              cp.boostedUntil = Number(lp.boostedUntil || 0);
+              cp.boostedUpdatedAt = lBoostTs;
+            }
           }
           if (!activePosts.some((m) => m.id === cp.id) && (!this.deletedPostIds || !this.deletedPostIds.has(cp.id))) {
             activePosts.push(cp);
@@ -5564,7 +5579,7 @@ const REMO_STORE = {
         });
         isInitialPostsSnap = false;
 
-        const postSig = (p) => `${p.id}_${p.type || ''}_${p.likes?.length || 0}_${p.comments?.length || 0}_${p.tipsTotal || 0}_${Object.keys(p.cityGuesses || {}).length}_${p.leaderboard?.[0]?.score || 0}_${p.pinned ? 1 : 0}_${p.versus ? `${p.versus.leftVotes || 0}:${p.versus.rightVotes || 0}:${p.versus.closed ? 1 : 0}` : ''}_${p.poll ? (p.poll.voters || []).length : 0}`;
+        const postSig = (p) => `${p.id}_${p.type || ''}_${p.likes?.length || 0}_${p.comments?.length || 0}_${p.tipsTotal || 0}_${Object.keys(p.cityGuesses || {}).length}_${p.leaderboard?.[0]?.score || 0}_${p.pinned ? 1 : 0}_${p.boosted ? 1 : 0}_${p.boostedUntil || 0}_${p.boostedAt || 0}_${p.versus ? `${p.versus.leftVotes || 0}:${p.versus.rightVotes || 0}:${p.versus.closed ? 1 : 0}` : ''}_${p.poll ? (p.poll.voters || []).length : 0}`;
         const prevSignature = (this.state.posts || []).map(postSig).join('|');
         const nextSignature = activePosts.map(postSig).join('|');
         const hasContentChanged = prevSignature !== nextSignature;
@@ -5579,11 +5594,17 @@ const REMO_STORE = {
         };
 
         this.state.posts = activePosts;
-        this.state.posts.sort((a, b) =>
-          (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) ||
-          isBoostVal(b) - isBoostVal(a) ||
-          (b.createdAt || 0) - (a.createdAt || 0)
-        );
+        this.state.posts.sort((a, b) => {
+          const pinDiff = (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0);
+          if (pinDiff !== 0) return pinDiff;
+          const bBoost = isBoostVal(b);
+          const aBoost = isBoostVal(a);
+          if (bBoost !== aBoost) return bBoost - aBoost;
+          if (bBoost && aBoost) {
+            return Number(b.boostedAt || b.createdAt || 0) - Number(a.boostedAt || a.createdAt || 0);
+          }
+          return (b.createdAt || 0) - (a.createdAt || 0);
+        });
 
         this.save(false, 'cloud_posts_sync');
         if (hasContentChanged) {

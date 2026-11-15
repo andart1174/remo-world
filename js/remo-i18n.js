@@ -1216,7 +1216,18 @@ const REMO_DICT = {
     wspot_entered_queue: '🎟️ You are #{pos} in the World Spotlight queue! Get ready!',
     wspot_hyped_toast: '🔥 You HYPED the stage (+{sec}s)! Creator earned +5 🪙 & you earned +2 🪙!',
     wspot_next_toast: '⏭️ Voted NEXT on the World Stage!',
-    wspot_gifted_toast: '💎 Gifted {amt} 🪙 to @{name} on the World Spotlight Stage!'
+    wspot_gifted_toast: '💎 Gifted {amt} 🪙 to @{name} on the World Spotlight Stage!',
+    wspot_post_btn: '🌟 World Spotlight #1 (100 🪙)',
+    wspot_post_btn_sub: 'Broadcast your post #1 globally for 45s (Your post only · 1x/Day)',
+    wspot_confirm_this_post: '🚀 Broadcast THIS Post Live (#1) — 100 🪙',
+    wspot_pick_other_link: 'Or pick another one of your posts ↓',
+    wspot_own_post_only: '⚠️ You can only put your own personal posts on the World Spotlight Stage!',
+    wspot_minimize_title: 'Minimize to #1 pill',
+    apps_sec_social_account: '💬 Social, Account & Citizen Tools',
+    apps_add_city_short: '+ Add City (+75 🪙)',
+    apps_ambassador_short: 'City Diploma (+25 🪙)',
+    apps_story_916_short: 'Story 9:16 Export',
+    apps_sign_out: '🚪 Sign Out'
   },
 
   fr: {
@@ -2429,7 +2440,18 @@ const REMO_DICT = {
     wspot_entered_queue: '🎟️ Vous êtes #{pos} dans la file d’attente mondiale ! Préparez-vous !',
     wspot_hyped_toast: '🔥 Scène HYPÉE (+{sec}s) ! Le créateur gagne +5 🪙 et vous +2 🪙 !',
     wspot_next_toast: '⏭️ Vote SUIVANT enregistré sur la Scène Mondiale !',
-    wspot_gifted_toast: '💎 {amt} 🪙 offerts à @{name} sur la Scène Mondiale !'
+    wspot_gifted_toast: '💎 {amt} 🪙 offerts à @{name} sur la Scène Mondiale !',
+    wspot_post_btn: '🌟 Scène Mondiale #1 (100 🪙)',
+    wspot_post_btn_sub: 'Diffusez ce post #1 mondial pendant 45s (Votre post uniquement · 1x/Jour)',
+    wspot_confirm_this_post: '🚀 Diffuser CE Post en Direct (#1) — 100 🪙',
+    wspot_pick_other_link: 'Ou choisir un autre de vos posts ↓',
+    wspot_own_post_only: '⚠️ Vous ne pouvez envoyer que vos propres publications personnelles sur la Scène Mondiale !',
+    wspot_minimize_title: 'Réduire en bouton #1',
+    apps_sec_social_account: '💬 Social, Compte & Outils Citoyen',
+    apps_add_city_short: '+ Ajouter Ville (+75 🪙)',
+    apps_ambassador_short: 'Diplôme Ville (+25 🪙)',
+    apps_story_916_short: 'Export Story 9:16',
+    apps_sign_out: '🚪 Déconnexion'
   }
 };
 

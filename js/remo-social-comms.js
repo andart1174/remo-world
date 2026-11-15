@@ -79,7 +79,7 @@ function switchRemoView(viewId) {
     b.classList.toggle('active', b.getAttribute('data-nav-view') === viewId);
   });
 
-  document.getElementById('mobileHubModal')?.classList.remove('open');
+  document.getElementById('appLauncherModal')?.classList.remove('open');
 
   if (viewId === 'messages') {
     if (!_explicitDmPartnerSelected) {
@@ -193,6 +193,24 @@ function syncHeaderAndSidebars() {
     mbHubAdmOffice.style.display = showAdminControls ? 'inline-flex' : 'none';
   }
 
+  const admTile = document.getElementById('appLauncherAdminPromoTile');
+  if (admTile) admTile.style.display = showAdminControls ? '' : 'none';
+
+  const launcherAdmRow = document.getElementById('appLauncherAdminRow');
+  if (launcherAdmRow) launcherAdmRow.style.display = showAdminControls ? 'grid' : 'none';
+
+  // Dynamically sync "Explore All Apps" count pill on desktop sidebar
+  const launcherTiles = document.querySelectorAll('#appLauncherModal .app-tile');
+  if (launcherTiles.length > 0) {
+    let visibleCount = 0;
+    launcherTiles.forEach((tile) => {
+      if (tile.style.display !== 'none') visibleCount += 1;
+    });
+    document.querySelectorAll('.apps-count-pill').forEach((pill) => {
+      pill.textContent = String(visibleCount);
+    });
+  }
+
   // Admin-Only Radar Controls (Déposer un Géo-Coffre & Placer une Balise Ici)
   const buryVaultBtn = document.getElementById('btnRadarBuryVault');
   if (buryVaultBtn) {
@@ -237,17 +255,23 @@ function syncHeaderAndSidebars() {
   }
 
   const authBtn = document.getElementById('hdrAuthBtn');
-  if (authBtn) {
+  const launcherSignOut = document.getElementById('appLauncherSignOutBtn');
+  if (authBtn || launcherSignOut) {
     const curFb = REMO_STORE.fbAuth && REMO_STORE.fbAuth.currentUser;
     const isFbVerified = Boolean(curFb && REMO_STORE._isFbUserVerified && REMO_STORE._isFbUserVerified(curFb));
     const hasIdentity = Boolean(u && !(typeof REMO_STORE.isFakeOrGuestUser === 'function' && REMO_STORE.isFakeOrGuestUser(u)) && u.role !== 'guest' && u.name && (u.email || u.fbUid || isFbVerified));
-    if (hasIdentity) {
-      const hc = getCityById(u.homeCity) || { flag: '🌐' };
-      authBtn.innerHTML = `${hc.flag} ${escapeHtmlStr(u.name)}`;
-      authBtn.onclick = () => switchRemoView('passport');
-    } else {
-      authBtn.innerHTML = `✨ ${escapeHtmlStr(t('btn_sign_in') || 'Sign In')}`;
-      authBtn.onclick = () => openAuthModal();
+    if (launcherSignOut) {
+      launcherSignOut.style.display = hasIdentity ? 'inline-flex' : 'none';
+    }
+    if (authBtn) {
+      if (hasIdentity) {
+        const hc = getCityById(u.homeCity) || { flag: '🌐' };
+        authBtn.innerHTML = `${hc.flag} ${escapeHtmlStr(u.name)}`;
+        authBtn.onclick = () => switchRemoView('passport');
+      } else {
+        authBtn.innerHTML = `✨ ${escapeHtmlStr(t('btn_sign_in') || 'Sign In')}`;
+        authBtn.onclick = () => openAuthModal();
+      }
     }
   }
 
@@ -2251,6 +2275,11 @@ function renderSinglePostCardHtml(p, lang, u, isAdm) {
             <button type="button" class="pact-btn" onclick="sharePostLink('${p.id}')" title="${lang === 'fr' ? 'Partager le lien' : 'Share link'}">
               🔗
             </button>
+            ${isPostOwner ? `
+            <button type="button" class="pact-btn pact-wspot-btn" onclick="openSpotlightForSpecificPost('${p.id}')" title="${escapeHtmlStr(t('wspot_post_btn_sub'))}">
+              🌟 <span>#1</span>
+            </button>
+            ` : ''}
             <button type="button" class="pact-btn pact-more-btn" onclick="openPostActionsSheet('${p.id}')" title="${lang === 'fr' ? 'Plus d’actions (Duo, Carte, Boost)' : 'More options'}">
               ⋯
             </button>
@@ -2477,9 +2506,8 @@ function openAppLauncherModal() {
   const modal = document.getElementById('appLauncherModal');
   if (!modal) return;
   if (typeof REMO_I18N !== 'undefined' && REMO_I18N.applyDOM) REMO_I18N.applyDOM(modal);
-  const isAdm = REMO_STORE.isAdminUnlocked() || REMO_STORE.isCurrentUserAdmin();
-  const admTile = document.getElementById('appLauncherAdminPromoTile');
-  if (admTile) admTile.style.display = isAdm ? '' : 'none';
+  syncHeaderAndSidebars();
+  if (typeof updateUnreadBadges === 'function') updateUnreadBadges();
   modal.classList.add('open');
 }
 window.openAppLauncherModal = openAppLauncherModal;
@@ -2515,7 +2543,9 @@ function syncWelcomeHeroVisibility() {
   if (!el) return;
   let dismissed = false;
   try { dismissed = localStorage.getItem('remo_hero_strip_dismissed') === '1'; } catch (e) {}
-  el.style.display = dismissed ? 'none' : '';
+  const u = REMO_STORE.getCurrentUser();
+  const isSignedInCitizen = Boolean(u && u.role !== 'guest' && !(typeof REMO_STORE.isFakeOrGuestUser === 'function' && REMO_STORE.isFakeOrGuestUser(u)) && (u.email || u.fbUid));
+  el.style.display = (dismissed || isSignedInCitizen) ? 'none' : '';
 }
 window.syncWelcomeHeroVisibility = syncWelcomeHeroVisibility;
 
@@ -2561,13 +2591,20 @@ function getFilteredSortedFeedPosts(searchQuery = '') {
   const deepId = window._deepLinkedPostId || '';
   const realPosts = (REMO_STORE.state.posts || []).filter((p) => p && p.mediaType !== 'beat_loop');
 
-  // Deep-linked shared post (?post=ID) floats #1 on arrival, then Official Pinned posts, then Boosted posts, then newest
-  realPosts.sort((a, b) =>
-    (deepId && b.id === deepId ? 1 : 0) - (deepId && a.id === deepId ? 1 : 0) ||
-    (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) ||
-    ((isPostBoostActive(b) ? 1 : 0) - (isPostBoostActive(a) ? 1 : 0)) ||
-    (b.createdAt || 0) - (a.createdAt || 0)
-  );
+  // Deep-linked shared post (?post=ID) floats #1 on arrival, then Official Pinned posts, then Boosted posts (most recently boosted first), then newest
+  realPosts.sort((a, b) => {
+    const deepDiff = (deepId && b.id === deepId ? 1 : 0) - (deepId && a.id === deepId ? 1 : 0);
+    if (deepDiff !== 0) return deepDiff;
+    const pinDiff = (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0);
+    if (pinDiff !== 0) return pinDiff;
+    const bBoost = isPostBoostActive(b) ? 1 : 0;
+    const aBoost = isPostBoostActive(a) ? 1 : 0;
+    if (bBoost !== aBoost) return bBoost - aBoost;
+    if (bBoost && aBoost) {
+      return Number(b.boostedAt || b.createdAt || 0) - Number(a.boostedAt || a.createdAt || 0);
+    }
+    return (b.createdAt || 0) - (a.createdAt || 0);
+  });
 
   // Merge Editorial Showcase posts after real user posts only while real feed is sparse (< 6 posts)
   let posts = realPosts.length < 6
@@ -2875,6 +2912,27 @@ function tipPostAuthor(postId) {
   rerenderSinglePostCard(p.id);
 }
 
+function _scrollFeedToBoostedPost(postId) {
+  setTimeout(() => {
+    const grid = document.getElementById('remoPostsGrid');
+    const card = document.getElementById('post_card_' + postId);
+    if (grid && grid.scrollHeight > grid.clientHeight + 20 && window.innerWidth <= 860) {
+      // Mobile TikTok snap-container scrolls inside #remoPostsGrid
+      if (card) {
+        card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } else {
+        grid.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+      return;
+    }
+    if (card) {
+      card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    } else {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }, 60);
+}
+
 function boostPost24h(postId) {
   const lang = REMO_I18N.getLang();
   const isFr = lang === 'fr';
@@ -2913,16 +2971,25 @@ function boostPost24h(postId) {
     REMO_STORE.addCoins(u.uid, -cost, 20);
   }
 
+  const now = Date.now();
   p.boosted = true;
-  p.boostedAt = Date.now();
-  const baseUntil = (p.boostedUntil && Number(p.boostedUntil) > Date.now()) ? Number(p.boostedUntil) : Date.now();
+  p.boostedAt = now;
+  p.boostedUpdatedAt = now;
+  const baseUntil = (p.boostedUntil && Number(p.boostedUntil) > now) ? Number(p.boostedUntil) : now;
   p.boostedUntil = baseUntil + 86400000;
+
+  if (currentFeedMode === 'trending') {
+    currentFeedMode = 'all';
+    document.querySelectorAll('#feedModeChips .fchip, .more-feed-chips-subrow .fchip').forEach((b) => b.classList.remove('active'));
+    document.querySelector('#feedModeChips .fchip')?.classList.add('active');
+  }
 
   REMO_STORE.syncPostToCloud(p);
   REMO_STORE.save(true, 'boost');
   if (cost > 0) spawnRemoCoinsFX(8);
   syncHeaderAndSidebars();
-  renderSocialFeed();
+  renderSocialFeed('', true);
+  _scrollFeedToBoostedPost(p.id);
   remoToast(isFr
     ? '🚀 Publication boostée en tête du fil pendant 24h !'
     : '🚀 Post boosted to top of feed for 24h!',
@@ -2939,20 +3006,28 @@ function adminToggleBoostPostInline(postId) {
   const p = (REMO_STORE.state.posts || []).find((x) => x.id === postId);
   if (!p) return;
 
+  const now = Date.now();
   if (isPostBoostActive(p)) {
     p.boosted = false;
+    p.boostedAt = 0;
     p.boostedUntil = 0;
+    p.boostedUpdatedAt = now;
     REMO_STORE.syncPostToCloud(p);
     REMO_STORE.save(true, 'admin_unboost');
-    renderSocialFeed();
+    renderSocialFeed('', true);
     remoToast(isFr ? '⏸️ Boost annulé par l’Admin.' : '⏸️ Boost cancelled by Admin.');
   } else {
     p.boosted = true;
-    p.boostedAt = Date.now();
-    p.boostedUntil = Date.now() + 86400000;
+    p.boostedAt = now;
+    p.boostedUpdatedAt = now;
+    p.boostedUntil = now + 86400000;
+    if (currentFeedMode === 'trending') {
+      currentFeedMode = 'all';
+    }
     REMO_STORE.syncPostToCloud(p);
     REMO_STORE.save(true, 'admin_boost');
-    renderSocialFeed();
+    renderSocialFeed('', true);
+    _scrollFeedToBoostedPost(p.id);
     remoToast(isFr ? '🚀 Publication boostée 24h par l’Admin !' : '🚀 Post boosted 24h by Admin!', 'fanfare');
   }
 }
@@ -10264,6 +10339,16 @@ function openPostActionsSheet(postId) {
       </button>
       ` : ''}
 
+      ${isPostOwner ? `
+      <button type="button" class="action-sheet-row" style="border-color:rgba(251,191,36,0.38);background:rgba(251,191,36,0.06);" onclick="closePostActionsModal(); openSpotlightForSpecificPost('${p.id}');">
+        <span class="as-icon" style="background:rgba(251,191,36,0.18);color:#fde047;">🌟</span>
+        <div style="text-align:left;flex:1;">
+          <b style="color:#fde047;">${escapeHtmlStr(t('wspot_post_btn'))}</b>
+          <div style="font-size:0.72rem;color:var(--muted);">${escapeHtmlStr(t('wspot_post_btn_sub'))}</div>
+        </div>
+      </button>
+      ` : ''}
+
       <button type="button" class="action-sheet-row" onclick="closePostActionsModal(); saveBookmarkPost('${p.id}');">
         <span class="as-icon" style="background:rgba(168,85,247,0.15);color:#c084fc;">${isBookmarked ? '⭐' : '🔖'}</span>
         <div style="text-align:left;flex:1;">
@@ -14471,8 +14556,20 @@ function challengeFeedFromGamesHub() {
 }
 window.challengeFeedFromGamesHub = challengeFeedFromGamesHub;
 
-/* ── 🌟 STAGE 4: WORLD SPOTLIGHT STAGE CONTROLLER ── */
+/* ── 🌟 STAGE 4: WORLD SPOTLIGHT STAGE CONTROLLER (#1 Pill + Ultra-Compact Live Strip) ── */
 let _wspotTickTimer = null;
+window._wspotLiveMinimized = false;
+
+function _isOwnPersonalPost(p, u) {
+  if (!p || !u) return false;
+  const isAdm = REMO_STORE.isCurrentUserAdmin() || REMO_STORE.isAdminUnlocked();
+  return Boolean(
+    (p.uid && u.uid === p.uid) ||
+    (p.authorUid && u.uid === p.authorUid) ||
+    (u.email && p.authorEmail && u.email.toLowerCase() === p.authorEmail.toLowerCase()) ||
+    (isAdm && p.uid === 'u_admin_founder')
+  );
+}
 
 function _resolveSpotlightThumbHtml(post, entry, isLarge = true) {
   let rawSrc = (post && post.mediaUrl) || (entry && entry.previewImg) || '';
@@ -14494,6 +14591,19 @@ function _resolveSpotlightThumbHtml(post, entry, isLarge = true) {
   }
   const icon = mType === 'html_app' ? '🕹️' : mType === 'before_after' ? '🪞' : mType === 'video' ? '🎬' : '🌟';
   return `<div class="${cls}" ${idbAttr}>${icon}</div>`;
+}
+
+function _syncWspotMiniNum1Btn(ws, secLeft = 0) {
+  const btn = document.getElementById('wspotMiniNum1Btn');
+  const txt = document.getElementById('wspotMiniNum1Txt');
+  const dot = document.getElementById('wspotMiniDot');
+  if (!btn || !txt) return;
+  const isLive = Boolean(ws && ws.activeEntry && !ws.paused);
+  btn.classList.toggle('is-live', isLive);
+  txt.textContent = isLive ? `#1 · ${secLeft}s` : '#1';
+  if (dot) {
+    dot.style.display = (ws && ws.paused && !ws.activeEntry) ? 'none' : 'inline-block';
+  }
 }
 
 function _stopWorldSpotlightTimer() {
@@ -14524,7 +14634,26 @@ function _updateWorldSpotlightCountdownDOM() {
   const fillEl = document.getElementById('wspotTimerFill');
   if (secEl) secEl.textContent = secLeft + 's';
   if (fillEl) fillEl.style.width = pct + '%';
+  _syncWspotMiniNum1Btn(ws, secLeft);
 }
+
+function handleWorldSpotlightMiniClick() {
+  REMO_STORE.advanceWorldSpotlightIfNeeded();
+  const ws = REMO_STORE.ensureWorldSpotlight();
+  if (ws && ws.activeEntry && window._wspotLiveMinimized) {
+    window._wspotLiveMinimized = false;
+    renderWorldSpotlightBar();
+    return;
+  }
+  openSpotlightEnterModal();
+}
+window.handleWorldSpotlightMiniClick = handleWorldSpotlightMiniClick;
+
+function toggleMinimizeWorldSpotlightLive() {
+  window._wspotLiveMinimized = !window._wspotLiveMinimized;
+  renderWorldSpotlightBar();
+}
+window.toggleMinimizeWorldSpotlightLive = toggleMinimizeWorldSpotlightLive;
 
 function renderWorldSpotlightBar() {
   const bar = document.getElementById('worldSpotlightBar');
@@ -14534,82 +14663,68 @@ function renderWorldSpotlightBar() {
   const lang = REMO_I18N.getLang();
   const isFr = lang === 'fr';
   const cur = ws.activeEntry;
-  const star = ws.dailyStarRecord || {};
-  const todayStr = new Date().toISOString().slice(0, 10);
-  const starHtml = (star.date === todayStr && Number(star.durationSec || 0) > 0 && star.name)
-    ? `<span class="wspot-star-pill">${escapeHtmlStr(t('wspot_star_today', { name: star.name, secs: Number(star.durationSec || 0) }))}</span>`
-    : '';
-  const queuePill = ws.queue && ws.queue.length > 0
-    ? `<span style="font-size:0.72rem;color:#93c5fd;font-weight:800;">${escapeHtmlStr(t('wspot_queue_count', { count: ws.queue.length }))}</span>`
-    : '';
 
-  if (cur) {
-    const post = (REMO_STORE.state.posts || []).find((p) => p && p.id === cur.postId);
-    const city = getCityById(cur.authorCityId || 'montreal');
-    const now = Date.now();
-    const remMs = Math.max(0, Number(cur.endsAt || now) - now);
-    const secLeft = Math.max(0, Math.ceil(remMs / 1000));
-    const totalWindowMs = Math.max(45000, Number(cur.endsAt || now) - Number(cur.startedAt || now));
-    const pct = Math.max(0, Math.min(100, Math.round((remMs / totalWindowMs) * 100)));
-    const cap = (isFr ? (cur.caption_fr || cur.caption_en) : (cur.caption_en || cur.caption_fr)) || (city ? getCityName(city, lang) : 'REMO');
-    const hypesCnt = Array.isArray(cur.hypes) ? cur.hypes.length : Number(cur.totalHypes || 0);
-    const nextCnt = Array.isArray(cur.nextVotes) ? cur.nextVotes.length : 0;
+  if (!cur) {
+    _stopWorldSpotlightTimer();
+    window._wspotLiveMinimized = false;
+    bar.style.display = 'none';
+    bar.innerHTML = '';
+    _syncWspotMiniNum1Btn(ws, 0);
+    return;
+  }
 
+  const post = (REMO_STORE.state.posts || []).find((p) => p && p.id === cur.postId);
+  const city = getCityById(cur.authorCityId || 'montreal');
+  const now = Date.now();
+  const remMs = Math.max(0, Number(cur.endsAt || now) - now);
+  const secLeft = Math.max(0, Math.ceil(remMs / 1000));
+  const totalWindowMs = Math.max(45000, Number(cur.endsAt || now) - Number(cur.startedAt || now));
+  const pct = Math.max(0, Math.min(100, Math.round((remMs / totalWindowMs) * 100)));
+  const cap = (isFr ? (cur.caption_fr || cur.caption_en) : (cur.caption_en || cur.caption_fr)) || (city ? getCityName(city, lang) : 'REMO');
+  const hypesCnt = Array.isArray(cur.hypes) ? cur.hypes.length : Number(cur.totalHypes || 0);
+
+  _syncWspotMiniNum1Btn(ws, secLeft);
+
+  if (window._wspotLiveMinimized) {
+    bar.style.display = 'none';
+    bar.innerHTML = '';
+  } else {
+    bar.style.display = 'block';
     bar.innerHTML = `
-      <div class="wspot-header">
-        <div class="wspot-title-wrap">
-          <b style="font-size:0.86rem;color:#fde047;">${escapeHtmlStr(t('wspot_title'))}</b>
-          <span class="wspot-live-pill">${escapeHtmlStr(ws.paused ? t('wspot_paused_lbl') : t('wspot_badge_live'))}</span>
-          ${queuePill}
-        </div>
-        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-          ${starHtml}
-          <button type="button" class="btn-cyber btn-gold" style="font-size:0.71rem;padding:4px 10px;" onclick="openSpotlightEnterModal()">${escapeHtmlStr(t('wspot_queue_btn'))}</button>
-        </div>
-      </div>
-      <div class="wspot-stage-card">
-        <div onclick="openSpotlightPostJump('${escapeHtmlStr(cur.postId)}')">${_resolveSpotlightThumbHtml(post, cur, true)}</div>
-        <div class="wspot-meta">
+      <div class="wspot-compact-live-row">
+        <div onclick="openSpotlightPostJump('${escapeHtmlStr(cur.postId)}')" style="cursor:pointer;flex-shrink:0;">${_resolveSpotlightThumbHtml(post, cur, true)}</div>
+        <div class="wspot-compact-meta" onclick="openSpotlightPostJump('${escapeHtmlStr(cur.postId)}')" style="cursor:pointer;">
           <div class="wspot-author-line">
-            <span>${city ? city.flag : '🌍'} @${escapeHtmlStr(cur.authorName || 'Citizen')} ${Number(cur.giftsTotal || 0) > 0 ? `<span style="color:#7dd3fc;font-size:0.74rem;">· 💎 ${Number(cur.giftsTotal)} 🪙</span>` : ''}</span>
+            <span class="wspot-live-mini-tag">🌟 #1 ${ws.paused ? '⏸️' : 'LIVE'}</span>
+            <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${city ? city.flag : '🌍'} @${escapeHtmlStr(cur.authorName || 'Citizen')}</span>
             <span id="wspotSecsLeft" class="wspot-timer-txt">${secLeft}s</span>
           </div>
-          <div class="wspot-caption">${escapeHtmlStr(cap)}</div>
-          <div class="wspot-timer-bar"><div id="wspotTimerFill" class="wspot-timer-fill" style="width:${pct}%"></div></div>
-          <div class="wspot-actions">
-            <button type="button" class="btn-cyber" style="font-size:0.73rem;padding:5px 10px;background:linear-gradient(135deg,#ea580c,#e11d48);" onclick="hypeSpotlightAction()">${escapeHtmlStr(t('wspot_hype_btn', { count: hypesCnt }))}</button>
-            <button type="button" class="btn-ghost" style="font-size:0.73rem;padding:5px 10px;" onclick="nextSpotlightAction()">${escapeHtmlStr(t('wspot_next_btn', { count: nextCnt }))}</button>
-            <button type="button" class="btn-ghost" style="font-size:0.73rem;padding:5px 10px;border-color:rgba(56,189,248,0.45);color:#7dd3fc;" onclick="giftSpotlightAction()">${escapeHtmlStr(t('wspot_gift_btn'))}</button>
-            <button type="button" class="btn-ghost" style="font-size:0.73rem;padding:5px 10px;" onclick="openSpotlightPostJump('${escapeHtmlStr(cur.postId)}')">${escapeHtmlStr(t('wspot_view_post_btn'))}</button>
-          </div>
+          <div class="wspot-caption-line">${escapeHtmlStr(cap)}</div>
+        </div>
+        <div class="wspot-compact-actions">
+          <button type="button" class="btn-cyber wspot-act-btn" style="background:linear-gradient(135deg,#ea580c,#e11d48);" onclick="hypeSpotlightAction()" title="${escapeHtmlStr(t('wspot_hype_btn', { count: hypesCnt }))}">🔥 <span>${hypesCnt}</span></button>
+          <button type="button" class="btn-ghost wspot-act-btn" style="border-color:rgba(56,189,248,0.45);color:#7dd3fc;" onclick="giftSpotlightAction()" title="${escapeHtmlStr(t('wspot_gift_btn'))}">💎</button>
+          <button type="button" class="btn-ghost wspot-act-btn" onclick="openSpotlightPostJump('${escapeHtmlStr(cur.postId)}')" title="${escapeHtmlStr(t('wspot_view_post_btn'))}">👀</button>
+          <button type="button" class="btn-ghost wspot-act-btn" onclick="toggleMinimizeWorldSpotlightLive()" title="${escapeHtmlStr(t('wspot_minimize_title'))}">⌄</button>
         </div>
       </div>
+      <div class="wspot-timer-bar" style="margin:5px 0 0;height:3px;"><div id="wspotTimerFill" class="wspot-timer-fill" style="width:${pct}%"></div></div>
     `;
-    _stopWorldSpotlightTimer();
-    if (!ws.paused) {
-      _wspotTickTimer = setInterval(_updateWorldSpotlightCountdownDOM, 1000);
-    }
-  } else {
-    _stopWorldSpotlightTimer();
-    bar.innerHTML = `
-      <div class="wspot-header">
-        <div class="wspot-title-wrap">
-          <b style="font-size:0.86rem;color:#fde047;">${escapeHtmlStr(t('wspot_title'))}</b>
-          ${ws.paused ? `<span class="wspot-live-pill">${escapeHtmlStr(t('wspot_paused_lbl'))}</span>` : ''}
-          ${queuePill}
-        </div>
-        ${starHtml}
-      </div>
-      <div class="wspot-empty-row">
-        <span>${escapeHtmlStr(t('wspot_empty_cta'))}</span>
-        <button type="button" class="btn-cyber btn-gold" style="font-size:0.76rem;padding:6px 13px;" onclick="openSpotlightEnterModal()">${escapeHtmlStr(t('wspot_queue_btn'))}</button>
-      </div>
-    `;
+  }
+
+  _stopWorldSpotlightTimer();
+  if (!ws.paused) {
+    _wspotTickTimer = setInterval(_updateWorldSpotlightCountdownDOM, 1000);
   }
 }
 window.renderWorldSpotlightBar = renderWorldSpotlightBar;
 
-function openSpotlightEnterModal() {
+function openSpotlightForSpecificPost(postId) {
+  openSpotlightEnterModal(postId);
+}
+window.openSpotlightForSpecificPost = openSpotlightForSpecificPost;
+
+function openSpotlightEnterModal(preselectedPostId = null) {
   const u = REMO_STORE.getCurrentUser();
   if (!u || u.role === 'guest') {
     openAuthModal();
@@ -14623,42 +14738,81 @@ function openSpotlightEnterModal() {
   const isFr = lang === 'fr';
   const ws = REMO_STORE.ensureWorldSpotlight();
   const todayStr = new Date().toISOString().slice(0, 10);
+  const star = ws.dailyStarRecord || {};
+  const starHtml = (star.date === todayStr && Number(star.durationSec || 0) > 0 && star.name)
+    ? `<div style="margin-bottom:8px;"><span class="wspot-star-pill">${escapeHtmlStr(t('wspot_star_today', { name: star.name, secs: Number(star.durationSec || 0) }))}</span></div>`
+    : '';
+
+  if (preselectedPostId) {
+    const specificPost = findFeedPostById(preselectedPostId);
+    if (!specificPost || !_isOwnPersonalPost(specificPost, u)) {
+      remoToast(t('wspot_own_post_only'));
+      return;
+    }
+  }
 
   if (ws.usedDatesByUid && ws.usedDatesByUid[u.uid] === todayStr) {
-    body.innerHTML = `<div style="padding:14px;border-radius:12px;background:rgba(244,63,94,0.12);border:1px solid rgba(244,63,94,0.4);color:#fda4af;font-size:0.82rem;font-weight:700;">${escapeHtmlStr(t('wspot_daily_used'))}</div>`;
+    body.innerHTML = `${starHtml}<div style="padding:14px;border-radius:12px;background:rgba(244,63,94,0.12);border:1px solid rgba(244,63,94,0.4);color:#fda4af;font-size:0.82rem;font-weight:700;">${escapeHtmlStr(t('wspot_daily_used'))}</div>`;
     modal.classList.add('open');
     return;
   }
 
-  const isAdm = REMO_STORE.isCurrentUserAdmin() || REMO_STORE.isAdminUnlocked();
-  const myPosts = (REMO_STORE.state.posts || []).filter((p) => p && (p.uid === u.uid || (isAdm && p.uid === 'u_admin_founder'))).slice(0, 20);
+  const myPosts = (REMO_STORE.state.posts || []).filter((p) => _isOwnPersonalPost(p, u)).slice(0, 20);
 
   if (!myPosts.length) {
     body.innerHTML = `
+      ${starHtml}
       <div style="text-align:center;padding:16px;color:var(--muted);font-size:0.84rem;">
         <p style="margin:0 0 12px;">${escapeHtmlStr(t('wspot_no_posts'))}</p>
         <button type="button" class="btn-cyber btn-gold" onclick="closeSpotlightEnterModal();openCreatePostModal()">${escapeHtmlStr(t('wspot_create_post_cta'))}</button>
       </div>
     `;
   } else {
+    const prePost = preselectedPostId ? myPosts.find((p) => p.id === preselectedPostId) : null;
+    const otherPosts = prePost ? myPosts.filter((p) => p.id !== prePost.id) : myPosts;
+
+    let focusedHtml = '';
+    if (prePost) {
+      const capPre = (isFr ? (prePost.caption_fr || prePost.caption_en) : (prePost.caption_en || prePost.caption_fr)) || (prePost.mediaType || 'Post');
+      const cPre = getCityById(prePost.cityId || u.homeCity || 'montreal');
+      focusedHtml = `
+        <div style="padding:12px;border-radius:14px;background:rgba(251,191,36,0.1);border:1px solid rgba(251,191,36,0.5);margin-bottom:12px;">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+            ${_resolveSpotlightThumbHtml(prePost, null, false)}
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:0.74rem;color:#fde047;font-weight:800;">${cPre ? cPre.flag : '🌍'} ${cPre ? escapeHtmlStr(getCityName(cPre, lang)) : 'REMO'}</div>
+              <div style="font-size:0.82rem;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtmlStr(capPre)}</div>
+            </div>
+          </div>
+          <button type="button" class="btn-cyber btn-gold" style="width:100%;justify-content:center;padding:10px;font-size:0.84rem;font-weight:900;" onclick="confirmEnterWorldSpotlight('${escapeHtmlStr(prePost.id)}')">
+            ${escapeHtmlStr(t('wspot_confirm_this_post'))}
+          </button>
+        </div>
+      `;
+    }
+
     body.innerHTML = `
-      <div style="font-size:0.78rem;color:#cbd5e1;font-weight:700;margin-bottom:4px;">${escapeHtmlStr(t('wspot_choose_post'))}</div>
-      <div class="wspot-post-pick-list">
-        ${myPosts.map((p) => {
-          const cap = (isFr ? (p.caption_fr || p.caption_en) : (p.caption_en || p.caption_fr)) || (p.mediaType || 'Post');
-          const c = getCityById(p.cityId || u.homeCity || 'montreal');
-          return `
-            <button type="button" class="wspot-post-pick-item" onclick="confirmEnterWorldSpotlight('${escapeHtmlStr(p.id)}')">
-              ${_resolveSpotlightThumbHtml(p, null, false)}
-              <div style="flex:1;min-width:0;">
-                <div style="font-size:0.74rem;color:#fde047;font-weight:800;">${c ? c.flag : '🌍'} ${c ? escapeHtmlStr(getCityName(c, lang)) : 'REMO'}</div>
-                <div style="font-size:0.8rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtmlStr(cap)}</div>
-              </div>
-              <span style="font-size:0.74rem;font-weight:900;color:#fbbf24;">100 🪙 →</span>
-            </button>
-          `;
-        }).join('')}
-      </div>
+      ${starHtml}
+      ${focusedHtml}
+      ${otherPosts.length ? `
+        <div style="font-size:0.76rem;color:#cbd5e1;font-weight:700;margin-bottom:4px;">${escapeHtmlStr(prePost ? t('wspot_pick_other_link') : t('wspot_choose_post'))}</div>
+        <div class="wspot-post-pick-list">
+          ${otherPosts.map((p) => {
+            const cap = (isFr ? (p.caption_fr || p.caption_en) : (p.caption_en || p.caption_fr)) || (p.mediaType || 'Post');
+            const c = getCityById(p.cityId || u.homeCity || 'montreal');
+            return `
+              <button type="button" class="wspot-post-pick-item" onclick="confirmEnterWorldSpotlight('${escapeHtmlStr(p.id)}')">
+                ${_resolveSpotlightThumbHtml(p, null, false)}
+                <div style="flex:1;min-width:0;">
+                  <div style="font-size:0.74rem;color:#fde047;font-weight:800;">${c ? c.flag : '🌍'} ${c ? escapeHtmlStr(getCityName(c, lang)) : 'REMO'}</div>
+                  <div style="font-size:0.8rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtmlStr(cap)}</div>
+                </div>
+                <span style="font-size:0.74rem;font-weight:900;color:#fbbf24;">100 🪙 →</span>
+              </button>
+            `;
+          }).join('')}
+        </div>
+      ` : ''}
     `;
   }
   modal.classList.add('open');
@@ -14677,6 +14831,8 @@ function confirmEnterWorldSpotlight(postId) {
     if (res.error === 'auth_required') {
       closeSpotlightEnterModal();
       openAuthModal();
+    } else if (res.error === 'not_post_owner') {
+      remoToast(t('wspot_own_post_only'));
     } else if (res.error === 'daily_limit_reached') {
       remoToast(t('wspot_daily_used'));
     } else if (res.error === 'insufficient_coins') {
@@ -14684,6 +14840,7 @@ function confirmEnterWorldSpotlight(postId) {
     }
     return;
   }
+  if (res.isLiveNow) window._wspotLiveMinimized = false;
   closeSpotlightEnterModal();
   renderWorldSpotlightBar();
   syncHeaderAndSidebars();

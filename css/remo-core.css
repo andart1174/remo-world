@@ -2209,11 +2209,38 @@ select.remo-input option {
     margin-bottom: 0 !important;
     flex-shrink: 0;
   }
+  #view-feed.active .feed-pulse-num1-row {
+    gap: 5px;
+    margin-bottom: 4px;
+  }
   #view-feed.active .clean-feed-pulse-toggle {
     padding: 4px 9px;
-    margin-bottom: 4px;
+    margin-bottom: 0;
     font-size: 0.68rem;
     border-radius: 10px;
+  }
+  #view-feed.active .wspot-num1-pill {
+    padding: 4px 9px;
+    font-size: 0.68rem;
+    border-radius: 10px;
+  }
+  #view-feed.active .clean-feed-pulse-drawer:not(.open) ~ #feedCitySpotlightBar {
+    display: none !important;
+  }
+  #view-feed.active .versus-stage-topbar {
+    top: 6px;
+    left: 6px;
+    right: 52px;
+    gap: 4px;
+  }
+  #view-feed.active .versus-cat-tag,
+  #view-feed.active .versus-timer-tag {
+    font-size: 0.61rem;
+    padding: 2px 7px;
+    max-width: 48%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   #view-feed.active .filter-row {
     gap: 5px;
@@ -6419,7 +6446,61 @@ select.remo-input option {
   transition: width 0.4s ease;
 }
 
-/* 3. Clean Feed Collapsible Pulse Drawer (Keeps Posts High & Visible!) */
+/* 3. Clean Feed Collapsible Pulse Drawer & Compact #1 World Spotlight Pill */
+.feed-pulse-num1-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 8px;
+}
+.feed-pulse-num1-row .clean-feed-pulse-toggle {
+  flex: 1;
+  min-width: 0;
+  width: auto;
+  margin-bottom: 0;
+}
+.wspot-num1-pill {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 12px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.16), rgba(245, 158, 11, 0.08));
+  border: 1px solid rgba(251, 191, 36, 0.45);
+  color: #fde047;
+  font-size: 0.74rem;
+  font-weight: 900;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: transform 0.15s ease, border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+}
+.wspot-num1-pill:hover {
+  border-color: rgba(251, 191, 36, 0.82);
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.25), rgba(245, 158, 11, 0.14));
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(251, 191, 36, 0.22);
+}
+.wspot-mini-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #fbbf24;
+  box-shadow: 0 0 6px rgba(251, 191, 36, 0.8);
+  flex-shrink: 0;
+}
+.wspot-num1-pill.is-live {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.32), rgba(245, 158, 11, 0.24));
+  border-color: rgba(248, 113, 113, 0.82);
+  color: #fff;
+  box-shadow: 0 0 14px rgba(239, 68, 68, 0.35);
+}
+.wspot-num1-pill.is-live .wspot-mini-dot {
+  background: #ef4444;
+  box-shadow: 0 0 8px #ef4444;
+  animation: pulseBadge 1.2s infinite ease-in-out;
+}
 .clean-feed-pulse-toggle {
   width: 100%;
   display: flex;
@@ -6845,7 +6926,9 @@ select.remo-input option {
 
 /* App Launcher Grid Modal */
 .apps-launcher-modal {
-  max-width: 660px !important;
+  max-width: 680px !important;
+  max-height: 86dvh;
+  overflow-y: auto;
   padding: 20px !important;
   background: radial-gradient(circle at 18% 0%, rgba(56, 189, 248, 0.14), rgba(11, 17, 36, 0.98) 55%) !important;
 }
@@ -6915,6 +6998,35 @@ select.remo-input option {
   font-weight: 900;
   border-radius: 99px;
   padding: 1px 6px;
+}
+@media (max-width: 860px) {
+  .apps-launcher-modal {
+    width: calc(100vw - 16px) !important;
+    max-width: 100% !important;
+    max-height: 88dvh;
+    padding: 14px 12px 18px !important;
+    border-radius: 18px !important;
+  }
+  .apps-sec-label {
+    font-size: 0.64rem;
+    margin: 10px 0 6px;
+  }
+  .apps-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 7px;
+  }
+  .app-tile {
+    padding: 10px 6px;
+    border-radius: 13px;
+    gap: 4px;
+  }
+  .app-tile-ic {
+    font-size: 1.32rem;
+  }
+  .app-tile-lbl {
+    font-size: 0.66rem;
+    line-height: 1.18;
+  }
 }
 
 /* ══ Fullscreen 4D Focus TV Overlay ══ */
@@ -9936,14 +10048,103 @@ select.remo-input option {
   color: #e2e8f0;
 }
 
-/* ── 🌟 STAGE 4: WORLD SPOTLIGHT STAGE ── */
+/* ── 🌟 STAGE 4: WORLD SPOTLIGHT STAGE (COMPACT 1-ROW LIVE STRIP + POST #1 ACTION) ── */
 .world-spotlight-bar {
-  margin: 10px 0 12px;
-  padding: 12px 14px;
-  border-radius: 16px;
-  background: linear-gradient(135deg, rgba(15, 23, 42, 0.94), rgba(67, 20, 7, 0.45), rgba(30, 27, 75, 0.9));
+  margin: 4px 0 8px;
+  padding: 8px 11px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.94), rgba(67, 20, 7, 0.48), rgba(30, 27, 75, 0.92));
   border: 1px solid rgba(251, 191, 36, 0.45);
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.42), 0 0 24px rgba(251, 191, 36, 0.14);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.4), 0 0 18px rgba(251, 191, 36, 0.14);
+}
+.wspot-compact-live-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: nowrap;
+}
+.wspot-compact-live-row .wspot-thumb {
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  font-size: 1.15rem;
+}
+.wspot-compact-meta {
+  flex: 1;
+  min-width: 0;
+  cursor: pointer;
+}
+.wspot-live-mini-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 7px;
+  border-radius: 99px;
+  font-size: 0.6rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  background: linear-gradient(135deg, #ef4444, #f59e0b);
+  color: #fff;
+  flex-shrink: 0;
+  animation: pulseBadge 1.5s infinite ease-in-out;
+}
+.wspot-caption-line {
+  font-size: 0.72rem;
+  color: #cbd5e1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 2px;
+}
+.wspot-compact-actions {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+}
+.wspot-act-btn {
+  padding: 5px 9px !important;
+  font-size: 0.7rem !important;
+  font-weight: 800 !important;
+  border-radius: 10px !important;
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  white-space: nowrap;
+}
+.post-actions-bar .pact-wspot-btn {
+  border: 1px solid rgba(251, 191, 36, 0.45);
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.14), rgba(245, 158, 11, 0.08));
+  color: #fde047;
+  font-weight: 800;
+}
+.post-actions-bar .pact-wspot-btn:hover {
+  border-color: rgba(251, 191, 36, 0.85);
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.25), rgba(245, 158, 11, 0.15));
+}
+@media (max-width: 860px) {
+  #view-feed.active .world-spotlight-bar {
+    margin: 2px 0 4px;
+    padding: 6px 8px;
+    border-radius: 11px;
+  }
+  .wspot-compact-live-row {
+    gap: 7px;
+  }
+  .wspot-compact-live-row .wspot-thumb {
+    width: 34px;
+    height: 34px;
+    font-size: 0.95rem;
+  }
+  .wspot-compact-meta .wspot-author-line {
+    font-size: 0.7rem;
+    gap: 4px;
+  }
+  .wspot-act-btn {
+    padding: 4px 7px !important;
+    font-size: 0.65rem !important;
+    min-height: 25px;
+  }
 }
 .wspot-header {
   display: flex;
