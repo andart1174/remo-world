@@ -144,6 +144,21 @@
     return _escapeHtml(iconOrObj || fallback || '📻');
   }
 
+  function _setTextIfChanged(el, txt) {
+    if (!el) return;
+    const next = String(txt ?? '');
+    if (el.textContent !== next) el.textContent = next;
+  }
+
+  function _setHtmlIfChanged(el, html) {
+    if (!el) return;
+    const next = String(html ?? '');
+    if (el._lastHtmlCache !== next || (next && !el.firstChild)) {
+      el._lastHtmlCache = next;
+      el.innerHTML = next;
+    }
+  }
+
   const _cityPhotoCache = {};
   function _getCityPhotoImg(city) {
     if (!city || !city.id) return null;
@@ -733,6 +748,7 @@
 
       const condLow = String(wx.cond_en || '').toLowerCase();
       const showStorm = Boolean(state.ambient.storm || condLow.includes('thunder') || condLow.includes('storm'));
+      const showLightning = Boolean(state.ambient.storm);
       const showSnow = Boolean(state.ambient.snow || condLow.includes('snow') || Number(wx.tempC) <= 0);
       const showRain = Boolean(state.ambient.rain || showStorm || wx.naturalStorm || condLow.includes('rain') || condLow.includes('drizzle'));
       const showOcean = Boolean(state.ambient.ocean);
@@ -1012,13 +1028,13 @@
         ctx.restore();
       }
 
-      // Periodic lightning flash & thunder pulse during Storm
-      if (showStorm) {
+      // Subtle distant upper-sky lightning glow only when user toggles Storm FX
+      if (showLightning) {
         if (state.lightningCooldown > 0) {
           state.lightningCooldown -= 1;
         } else if (Math.random() < 0.015) {
-          state.lightningAlpha = 0.52;
-          state.lightningCooldown = 135 + Math.floor(Math.random() * 140);
+          state.lightningAlpha = 0.18;
+          state.lightningCooldown = 160 + Math.floor(Math.random() * 160);
           if (state.ambientNodes.storm && state.ambientNodes.storm.rumbleGain && state.audioCtx) {
             const rg = state.ambientNodes.storm.rumbleGain.gain;
             const nowT = state.audioCtx.currentTime;
@@ -1031,11 +1047,17 @@
         }
         if (state.lightningAlpha > 0.01) {
           ctx.save();
-          ctx.fillStyle = `rgba(224, 242, 254, ${state.lightningAlpha.toFixed(3)})`;
-          ctx.fillRect(0, 0, w, h * 0.65);
+          const lg = ctx.createRadialGradient(w * 0.5, 0, 10, w * 0.5, h * 0.14, Math.max(w, h) * 0.58);
+          lg.addColorStop(0, `rgba(186, 230, 253, ${state.lightningAlpha.toFixed(3)})`);
+          lg.addColorStop(0.55, `rgba(147, 197, 253, ${(state.lightningAlpha * 0.35).toFixed(3)})`);
+          lg.addColorStop(1, 'rgba(186, 230, 253, 0)');
+          ctx.fillStyle = lg;
+          ctx.fillRect(0, 0, w, h * 0.5);
           ctx.restore();
           state.lightningAlpha *= 0.85;
         }
+      } else {
+        state.lightningAlpha = 0;
       }
 
       if (showRain || showSnow || showFire || showPetals || showCyber) {
@@ -1601,13 +1623,13 @@
       if (state.room.active) {
         _pruneStalePeers();
         const peerCount = Math.max(1, state.room.peers.size);
-        listenersEl.textContent = `👥 ${peerCount} ${_t('ftv_room_focusing')} · #${state.room.id}`;
+        _setTextIfChanged(listenersEl, `👥 ${peerCount} ${_t('ftv_room_focusing')} · #${state.room.id}`);
         listenersEl.classList.add('in-room');
       } else {
         const onlineCount = (store && typeof store.getOnlineCitizensList === 'function')
           ? Math.max(12, store.getOnlineCitizensList().length + 11)
           : 18;
-        listenersEl.textContent = `🎧 ${onlineCount} ${_t('ftv_listeners_lbl')}`;
+        _setTextIfChanged(listenersEl, `🎧 ${onlineCount} ${_t('ftv_listeners_lbl')}`);
         listenersEl.classList.remove('in-room');
       }
     }
@@ -1615,46 +1637,43 @@
     if (l2eEl && window.REMO_RADIO && typeof window.REMO_RADIO._loadL2EState === 'function') {
       const l2e = window.REMO_RADIO._loadL2EState();
       const minsLeft = Math.max(1, Math.ceil((600 - (l2e.secProgress || 0)) / 60));
-      l2eEl.textContent = `🪙 +5 / ${minsLeft}m (${l2e.coinsToday || 0}/30)`;
+      _setTextIfChanged(l2eEl, `🪙 +5 / ${minsLeft}m (${l2e.coinsToday || 0}/30)`);
     }
 
     if (!feed) return;
-    if (state.room.active) {
-      const recentRoomMsgs = state.room.messages.slice(-3);
-      if (!recentRoomMsgs.length) {
-        const roomWelcome = _t('ftv_room_welcome', { room: state.room.id, dur: state.room.durMin });
-        feed.innerHTML = `<div class="ftv-chat-line ftv-chat-welcome">${_escapeHtml(roomWelcome)}</div>`;
-        return;
-      }
-      feed.innerHTML = recentRoomMsgs.map((m) => `
-        <div class="ftv-chat-line">
-          <span class="ftv-chat-author">${_flagHtml(m.cityFlag || city.flag || '🌍', '🌍', 16, 11)} @${_escapeHtml(m.author || 'Citizen')}:</span>
-          <span class="ftv-chat-text">${_escapeHtml(m.text || '')}</span>
-        </div>
-      `).join('');
-      return;
-    }
-
-    const allRooms = (store && store.state && store.state.chatMessages) || {};
-    const cityMsgs = Array.isArray(allRooms[state.cityId]) ? allRooms[state.cityId] : [];
-    const globalMsgs = Array.isArray(allRooms.global) ? allRooms.global : [];
-    const merged = cityMsgs.length ? cityMsgs : globalMsgs;
-    const recent = merged.slice(-3);
-
-    if (!recent.length) {
-      const fallback = lang === 'fr'
-        ? `Fenêtre ouverte sur ${_cityName(city)} — écoutez en direct et laissez un mot.`
-        : `Tuned into ${_cityName(city)} — enjoy the live atmosphere and drop a hello.`;
-      feed.innerHTML = `<div class="ftv-chat-line ftv-chat-welcome">${_flagHtml(city.flag || '🌍', '🌍', 16, 11)} ${_escapeHtml(fallback)}</div>`;
-      return;
-    }
-
-    feed.innerHTML = recent.map((m) => `
+    const renderMsgLines = (msgs) => msgs.map((m) => `
       <div class="ftv-chat-line">
         <span class="ftv-chat-author">${_flagHtml(m.cityFlag || city.flag || '🌍', '🌍', 16, 11)} @${_escapeHtml(m.author || 'Citizen')}:</span>
         <span class="ftv-chat-text">${_escapeHtml(m.text || '')}</span>
       </div>
     `).join('');
+
+    let nextHtml = '';
+    if (state.room.active) {
+      const recentRoomMsgs = state.room.messages.slice(-3);
+      if (!recentRoomMsgs.length) {
+        const roomWelcome = _t('ftv_room_welcome', { room: state.room.id, dur: state.room.durMin });
+        nextHtml = `<div class="ftv-chat-line ftv-chat-welcome">${_escapeHtml(roomWelcome)}</div>`;
+      } else {
+        nextHtml = renderMsgLines(recentRoomMsgs);
+      }
+    } else {
+      const allRooms = (store && store.state && store.state.chatMessages) || {};
+      const cityMsgs = Array.isArray(allRooms[state.cityId]) ? allRooms[state.cityId] : [];
+      const globalMsgs = Array.isArray(allRooms.global) ? allRooms.global : [];
+      const merged = cityMsgs.length ? cityMsgs : globalMsgs;
+      const recent = merged.slice(-3);
+
+      if (!recent.length) {
+        const fallback = lang === 'fr'
+          ? `Fenêtre ouverte sur ${_cityName(city)} — écoutez en direct et laissez un mot.`
+          : `Tuned into ${_cityName(city)} — enjoy the live atmosphere and drop a hello.`;
+        nextHtml = `<div class="ftv-chat-line ftv-chat-welcome">${_flagHtml(city.flag || '🌍', '🌍', 16, 11)} ${_escapeHtml(fallback)}</div>`;
+      } else {
+        nextHtml = renderMsgLines(recent);
+      }
+    }
+    _setHtmlIfChanged(feed, nextHtml);
   }
 
   window.sendFocusTvChatMessage = function () {
@@ -1754,7 +1773,7 @@
     const wx = _getLiveWx(city);
     const secs = String(new Date().getSeconds()).padStart(2, '0');
     if (timeEl) {
-      timeEl.textContent = `${wx.timeStr || '--:--'}:${secs}`;
+      _setTextIfChanged(timeEl, `${wx.timeStr || '--:--'}:${secs}`);
     }
     if (metaEl) {
       const st = window.REMO_RADIO && window.REMO_RADIO.currentStation;
@@ -1765,7 +1784,7 @@
         const rs = String(state.pomodoroRemainingSec % 60).padStart(2, '0');
         extraRoom = `  ·  👥 #${state.room.id} · ⏱️ ${rm}:${rs}`;
       }
-      metaEl.textContent = `${wx.icon || '🌤️'} ${wx.tempC ?? 20}°C  ·  ${stName}${extraRoom}`;
+      _setTextIfChanged(metaEl, `${wx.icon || '🌤️'} ${wx.tempC ?? 20}°C  ·  ${stName}${extraRoom}`);
     }
   }
 
@@ -1777,21 +1796,21 @@
     const wp = document.getElementById('ftvWeatherPill');
     if (wp) {
       const cond = lang === 'fr' ? (wx.cond_fr || wx.cond_en || '') : (wx.cond_en || '');
-      wp.textContent = `🕒 ${wx.timeStr || '--:--'} · ${wx.icon || '🌤️'} ${wx.tempC ?? 20}°C ${cond}`;
+      _setTextIfChanged(wp, `🕒 ${wx.timeStr || '--:--'} · ${wx.icon || '🌤️'} ${wx.tempC ?? 20}°C ${cond}`);
     }
 
     const heroLabel = document.getElementById('ftvHeroCityLabel');
     const heroName = document.getElementById('ftvHeroCityName');
     const heroSub = document.getElementById('ftvHeroCitySub');
     if (heroLabel) {
-      heroLabel.textContent = _cityName(city).toUpperCase();
+      _setTextIfChanged(heroLabel, _cityName(city).toUpperCase());
     } else if (heroName) {
-      heroName.textContent = _cityName(city).toUpperCase();
+      _setTextIfChanged(heroName, _cityName(city).toUpperCase());
     }
     if (heroSub) {
       const country = _cityCountry(city);
       const tag = lang === 'fr' ? (city.tagline_fr || city.tagline_en || '') : (city.tagline_en || '');
-      heroSub.textContent = country && tag ? `${country} · ${tag}` : (tag || country || '');
+      _setTextIfChanged(heroSub, country && tag ? `${country} · ${tag}` : (tag || country || ''));
     }
     _updateZenClockDisplay();
   }

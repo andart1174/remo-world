@@ -6873,6 +6873,8 @@ select.remo-input option {
   width: 100%;
   height: 100%;
   display: block;
+  transform: translateZ(0);
+  backface-visibility: hidden;
 }
 .ftv-vignette {
   position: absolute;
@@ -7055,6 +7057,8 @@ select.remo-input option {
   margin: 0 auto;
 }
 .ftv-chat-strip {
+  position: relative;
+  z-index: 2;
   background: rgba(6, 10, 26, 0.62);
   backdrop-filter: blur(14px);
   border: 1px solid rgba(255, 255, 255, 0.12);
@@ -7123,6 +7127,8 @@ select.remo-input option {
   cursor: pointer;
 }
 .ftv-deck {
+  position: relative;
+  z-index: 3;
   background: rgba(7, 12, 30, 0.78);
   backdrop-filter: blur(18px);
   border: 1px solid rgba(56, 189, 248, 0.3);
