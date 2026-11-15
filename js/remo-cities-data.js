@@ -908,12 +908,13 @@ function updateRemoCityMedia(cityId, patch = {}) {
   if (idx === -1) return null;
   const target = Object.assign({}, list[idx]);
   let touchedMedia = false;
-  ['imageUrl', 'cardImageUrl', 'radioStreamUrl', 'radioName', 'radioBadge', 'tagline_en', 'tagline_fr'].forEach((k) => {
+  ['imageUrl', 'cardImageUrl', 'radioStreamUrl', 'radioName', 'radioBadge', 'tagline_en', 'tagline_fr', 'flag', 'countryIso', 'country_en', 'country_fr'].forEach((k) => {
     if (patch[k] !== undefined) {
-      const val = String(patch[k] || '').trim();
+      let val = String(patch[k] || '').trim();
+      if (k === 'countryIso' && /^[A-Za-z]{2}$/.test(val)) val = val.toUpperCase();
       if (val) target[k] = val;
       else delete target[k];
-      if (!k.startsWith('tagline_')) touchedMedia = true;
+      if (!k.startsWith('tagline_') && k !== 'country_en' && k !== 'country_fr') touchedMedia = true;
     }
   });
   if (touchedMedia && !patch._preserveTimestamp) {
@@ -933,10 +934,101 @@ function getCustomRemoCitiesPatch() {
   }).slice(-80);
 }
 
+/**
+ * Self-heal custom cities whose flag is empty, generic, raw 2-letter ISO, or stuck on the old Austria default (`🇦🇹`) while belonging to another country.
+ */
+function healCityCountryFlags(options = {}) {
+  const flagsApi = (typeof window !== 'undefined' && window.REMO_FLAGS) || null;
+  if (!flagsApi || typeof flagsApi.resolveCountryNameToIso !== 'function' || typeof flagsApi.isoToFlagEmoji !== 'function') {
+    return false;
+  }
+  const list = getRemoCities();
+  const healedByCityId = new Map();
+  let changed = false;
+
+  for (let i = 0; i < list.length; i++) {
+    const c = list[i];
+    if (!c || !c.id || _REMO_DEFAULT_CITY_IDS.has(c.id)) continue;
+    const rawCountry = c.country_en || c.country_fr || c.country || '';
+    const resolvedIso = flagsApi.resolveCountryNameToIso(rawCountry) ||
+      (c.countryIso && /^[A-Za-z]{2}$/.test(c.countryIso) ? String(c.countryIso).toUpperCase() : '');
+    if (!resolvedIso) continue;
+
+    const expectedFlag = flagsApi.isoToFlagEmoji(resolvedIso);
+    if (!expectedFlag) continue;
+
+    const currentFlag = String(c.flag || '').trim();
+    const isGenericFlag = !currentFlag || currentFlag === '🏙️' || currentFlag === '🌍' || currentFlag === '🏙';
+    const isStaleAustria = currentFlag === '🇦🇹' && resolvedIso !== 'AT';
+    const isRawIso = /^[A-Za-z]{2}$/.test(currentFlag);
+
+    if (isGenericFlag || isStaleAustria || isRawIso) {
+      c.flag = expectedFlag;
+      c.countryIso = resolvedIso;
+      c.mediaUpdatedAt = Math.max(Number(c.mediaUpdatedAt || 0) + 1, Date.now());
+      healedByCityId.set(c.id, expectedFlag);
+      changed = true;
+    } else if (currentFlag === expectedFlag && c.countryIso !== resolvedIso) {
+      c.countryIso = resolvedIso;
+      changed = true;
+    }
+  }
+
+  if (changed) {
+    saveRemoCities(list);
+  }
+
+  let radioChanged = false;
+  if (typeof REMO_RADIO !== 'undefined' && Array.isArray(REMO_RADIO.stations)) {
+    const cityMap = new Map(list.map((c) => [c.id, c]));
+    REMO_RADIO.stations.forEach((st) => {
+      if (!st || !st.cityId) return;
+      const city = cityMap.get(st.cityId);
+      if (!city || !city.flag) return;
+      const shouldSync = healedByCityId.has(st.cityId) ||
+        (!_REMO_DEFAULT_CITY_IDS.has(st.cityId) && flagsApi.isRegionalEmoji(city.flag) && (st.flag !== city.flag || st.icon !== city.flag));
+      if (shouldSync) {
+        st.flag = city.flag;
+        st.icon = city.flag;
+        radioChanged = true;
+      }
+    });
+    if (radioChanged && typeof REMO_RADIO._saveDiscoveredStationsCache === 'function') {
+      REMO_RADIO._saveDiscoveredStationsCache();
+    }
+  }
+
+  if (healedByCityId.size > 0 && typeof REMO_STORE !== 'undefined' && REMO_STORE.state && Array.isArray(REMO_STORE.state.cards)) {
+    REMO_STORE.state.cards.forEach((card) => {
+      if (card && healedByCityId.has(card.cityId) && card.flag && card.flag !== healedByCityId.get(card.cityId)) {
+        card.flag = healedByCityId.get(card.cityId);
+      }
+    });
+  }
+
+  if (changed || radioChanged) {
+    if (!options.silentSync && typeof REMO_STORE !== 'undefined' && typeof REMO_STORE.syncToFirestore === 'function') {
+      REMO_STORE.syncToFirestore('city_flag_heal', false);
+    }
+    if (typeof window !== 'undefined') {
+      if (typeof renderAdminCitiesPanel === 'function') renderAdminCitiesPanel();
+      if (typeof window.syncFocusTvUI === 'function') window.syncFocusTvUI();
+      if (typeof renderSocialFeed === 'function') renderSocialFeed();
+      if (radioChanged) {
+        if (typeof REMO_RADIO !== 'undefined' && typeof REMO_RADIO._updateUI === 'function') REMO_RADIO._updateUI();
+        if (typeof window.renderRadioStationsList === 'function') window.renderRadioStationsList();
+      }
+    }
+  }
+
+  return changed;
+}
+
 const _healedBadPhotoCityIds = new Set();
 let _healBrokenCitiesInFlight = null;
 
 function healBrokenCityPhotos(onUpdated) {
+  healCityCountryFlags();
   if (_healBrokenCitiesInFlight) return _healBrokenCitiesInFlight;
   if (typeof fetch !== 'function') return Promise.resolve(false);
 
@@ -990,6 +1082,8 @@ function mergeCustomRemoCitiesFromCloud(cloudCities) {
   const current = getRemoCities();
   const byId = new Map(current.map((c) => [c.id, c]));
   let changed = false;
+  const MEDIA_KEYS = ['imageUrl', 'cardImageUrl', 'radioStreamUrl', 'radioName', 'radioBadge'];
+  const META_KEYS = ['flag', 'countryIso', 'country_en', 'country_fr'];
 
   cloudCities.forEach((cc) => {
     if (!cc || !cc.id || !cc.name_en) return;
@@ -1006,7 +1100,7 @@ function mergeCustomRemoCitiesFromCloud(cloudCities) {
       const cloudTs = Number(cc.mediaUpdatedAt || 0);
       const localTs = Number(existing.mediaUpdatedAt || 0);
       if (cloudTs > localTs) {
-        ['imageUrl', 'cardImageUrl', 'radioStreamUrl', 'radioName', 'radioBadge'].forEach((k) => {
+        MEDIA_KEYS.forEach((k) => {
           const val = cc[k];
           if (val && !isBadCityStockImageUrl(val)) {
             if (existing[k] !== val) {
@@ -1018,11 +1112,25 @@ function mergeCustomRemoCitiesFromCloud(cloudCities) {
             updated = true;
           }
         });
+        META_KEYS.forEach((k) => {
+          const val = cc[k];
+          if (val && existing[k] !== val) {
+            if (k === 'flag' && val === '🇦🇹' && existing.flag && existing.flag !== '🇦🇹') return;
+            existing[k] = val;
+            updated = true;
+          }
+        });
         existing.mediaUpdatedAt = cloudTs;
         updated = true;
       } else {
-        ['imageUrl', 'cardImageUrl', 'radioStreamUrl', 'radioName', 'radioBadge'].forEach((k) => {
+        MEDIA_KEYS.forEach((k) => {
           if (cc[k] && (!existing[k] || isBadCityStockImageUrl(existing[k])) && !isBadCityStockImageUrl(cc[k])) {
+            existing[k] = cc[k];
+            updated = true;
+          }
+        });
+        META_KEYS.forEach((k) => {
+          if (cc[k] && !existing[k]) {
             existing[k] = cc[k];
             updated = true;
           }
@@ -1035,6 +1143,8 @@ function mergeCustomRemoCitiesFromCloud(cloudCities) {
   if (changed) {
     saveRemoCities(current);
   }
+  const healedFlags = healCityCountryFlags();
+  if (healedFlags) changed = true;
   if (typeof setTimeout === 'function') {
     setTimeout(() => { healBrokenCityPhotos(); }, 60);
   }
@@ -1243,12 +1353,13 @@ window.isBadCityStockImageUrl = isBadCityStockImageUrl;
 window.resolveCityRealPhotoUrl = resolveCityRealPhotoUrl;
 window.fetchCityPhotoFromWikipedia = fetchCityPhotoFromWikipedia;
 window.updateRemoCityMedia = updateRemoCityMedia;
+window.healCityCountryFlags = healCityCountryFlags;
 window.healBrokenCityPhotos = healBrokenCityPhotos;
 window.getCustomRemoCitiesPatch = getCustomRemoCitiesPatch;
 window.mergeCustomRemoCitiesFromCloud = mergeCustomRemoCitiesFromCloud;
 
 if (typeof setTimeout === 'function' && typeof window !== 'undefined') {
-  setTimeout(() => { healBrokenCityPhotos(); }, 900);
+  setTimeout(() => { healCityCountryFlags(); healBrokenCityPhotos(); }, 900);
 }
 window.drawCityCrestWatermark = drawCityCrestWatermark;
 window.getRemoCities = getRemoCities;
@@ -1266,6 +1377,7 @@ window.drawCityLandmark = drawCityLandmark;
   const CITY_COUNTRY_ISO = {
     montreal: 'CA',
     toronto: 'CA',
+    quebec: 'CA',
     paris: 'FR',
     chisinau: 'MD',
     bucharest: 'RO',
@@ -1276,10 +1388,13 @@ window.drawCityLandmark = drawCityLandmark;
     london: 'GB',
     dubai: 'AE',
     barcelona: 'ES',
+    madrid: 'ES',
     rome: 'IT',
+    milan: 'IT',
     monaco: 'MC',
     seoul: 'KR',
     geneva: 'CH',
+    zurich: 'CH',
     singapore: 'SG',
     sydney: 'AU',
     rio: 'BR',
@@ -1287,8 +1402,199 @@ window.drawCityLandmark = drawCityLandmark;
     berlin: 'DE',
     amsterdam: 'NL',
     lisbon: 'PT',
-    cairo: 'EG'
+    cairo: 'EG',
+    moscow: 'RU',
+    vienna: 'AT',
+    kyiv: 'UA',
+    kiev: 'UA',
+    warsaw: 'PL',
+    athens: 'GR',
+    prague: 'CZ',
+    budapest: 'HU',
+    brussels: 'BE',
+    dublin: 'IE',
+    stockholm: 'SE',
+    oslo: 'NO',
+    copenhagen: 'DK',
+    helsinki: 'FI',
+    bangkok: 'TH',
+    beijing: 'CN',
+    shanghai: 'CN',
+    mumbai: 'IN',
+    delhi: 'IN',
+    mexicocity: 'MX',
+    buenosaires: 'AR'
   };
+
+  const COUNTRY_ALIASES = {
+    russia: 'RU', russie: 'RU', 'russian federation': 'RU', 'federation de russie': 'RU', rossiya: 'RU', rf: 'RU',
+    uk: 'GB', 'u k': 'GB', 'united kingdom': 'GB', 'royaume uni': 'GB', 'great britain': 'GB', 'grande bretagne': 'GB',
+    britain: 'GB', england: 'GB', angleterre: 'GB', scotland: 'GB', ecosse: 'GB', wales: 'GB',
+    us: 'US', usa: 'US', 'u s a': 'US', 'united states': 'US', 'united states of america': 'US',
+    'etats unis': 'US', 'etats unis d amerique': 'US', america: 'US',
+    uae: 'AE', 'u a e': 'AE', 'united arab emirates': 'AE', 'emirats arabes unis': 'AE', dubai: 'AE',
+    'south korea': 'KR', 'coree du sud': 'KR', 'republic of korea': 'KR', 'republique de coree': 'KR', korea: 'KR',
+    'north korea': 'KP', 'coree du nord': 'KP',
+    moldova: 'MD', moldavie: 'MD', 'republic of moldova': 'MD', 'republique de moldavie': 'MD',
+    romania: 'RO', roumanie: 'RO',
+    france: 'FR',
+    canada: 'CA', quebec: 'CA',
+    italy: 'IT', italie: 'IT',
+    spain: 'ES', espagne: 'ES',
+    germany: 'DE', allemagne: 'DE', deutschland: 'DE',
+    austria: 'AT', autriche: 'AT', osterreich: 'AT',
+    switzerland: 'CH', suisse: 'CH',
+    netherlands: 'NL', 'the netherlands': 'NL', 'pays bas': 'NL', holland: 'NL', hollande: 'NL',
+    belgium: 'BE', belgique: 'BE',
+    portugal: 'PT',
+    greece: 'GR', grece: 'GR',
+    turkey: 'TR', turkiye: 'TR', turquie: 'TR',
+    ukraine: 'UA',
+    poland: 'PL', pologne: 'PL',
+    'czech republic': 'CZ', czechia: 'CZ', tchequie: 'CZ', 'republique tcheque': 'CZ',
+    hungary: 'HU', hongrie: 'HU',
+    bulgaria: 'BG', bulgarie: 'BG',
+    serbia: 'RS', serbie: 'RS',
+    croatia: 'HR', croatie: 'HR',
+    ireland: 'IE', irlande: 'IE',
+    sweden: 'SE', suede: 'SE',
+    norway: 'NO', norvege: 'NO',
+    denmark: 'DK', danemark: 'DK',
+    finland: 'FI', finlande: 'FI',
+    iceland: 'IS', islande: 'IS',
+    japan: 'JP', japon: 'JP',
+    china: 'CN', chine: 'CN',
+    india: 'IN', inde: 'IN',
+    vietnam: 'VN', 'viet nam': 'VN',
+    thailand: 'TH', thailande: 'TH',
+    indonesia: 'ID', indonesie: 'ID',
+    malaysia: 'MY', malaisie: 'MY',
+    philippines: 'PH',
+    singapore: 'SG', singapour: 'SG',
+    australia: 'AU', australie: 'AU',
+    'new zealand': 'NZ', 'nouvelle zelande': 'NZ',
+    brazil: 'BR', bresil: 'BR',
+    argentina: 'AR', argentine: 'AR',
+    mexico: 'MX', mexique: 'MX',
+    colombia: 'CO', colombie: 'CO',
+    chile: 'CL', chili: 'CL',
+    peru: 'PE', perou: 'PE',
+    egypt: 'EG', egypte: 'EG',
+    morocco: 'MA', maroc: 'MA',
+    tunisia: 'TN', tunisie: 'TN',
+    algeria: 'DZ', algerie: 'DZ',
+    'south africa': 'ZA', 'afrique du sud': 'ZA',
+    nigeria: 'NG',
+    israel: 'IL',
+    'saudi arabia': 'SA', 'arabie saoudite': 'SA',
+    qatar: 'QA',
+    bahrain: 'BH', bahrein: 'BH',
+    georgia: 'GE', georgie: 'GE',
+    armenia: 'AM', armenie: 'AM',
+    azerbaijan: 'AZ', azerbaidjan: 'AZ',
+    kazakhstan: 'KZ',
+    monaco: 'MC',
+    luxembourg: 'LU',
+    'ivory coast': 'CI', 'cote d ivoire': 'CI',
+    taiwan: 'TW',
+    'hong kong': 'HK',
+    belarus: 'BY', bielorussie: 'BY',
+    slovakia: 'SK', slovaquie: 'SK',
+    slovenia: 'SI', slovenie: 'SI',
+    estonia: 'EE', estonie: 'EE',
+    latvia: 'LV', lettonie: 'LV',
+    lithuania: 'LT', lituanie: 'LT',
+    albania: 'AL', albanie: 'AL',
+    cyprus: 'CY', chypre: 'CY',
+    malta: 'MT', malte: 'MT',
+    pakistan: 'PK',
+    bangladesh: 'BD',
+    ecuador: 'EC', equateur: 'EC',
+    'costa rica': 'CR',
+    botswana: 'BW',
+    bolivia: 'BO', bolivie: 'BO',
+    yemen: 'YE',
+    gabon: 'GA',
+    'sierra leone': 'SL',
+    mali: 'ML',
+    guinea: 'GN', guinee: 'GN',
+    chad: 'TD', tchad: 'TD'
+  };
+
+  let _displayCountryMap = null;
+
+  function _normCountryText(str) {
+    return String(str || '')
+      .trim()
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/['’`.\-,()]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  function _getDisplayCountryMap() {
+    if (_displayCountryMap) return _displayCountryMap;
+    _displayCountryMap = Object.create(null);
+    if (typeof Intl === 'undefined' || typeof Intl.DisplayNames !== 'function') {
+      return _displayCountryMap;
+    }
+    const SKIP_CODES = new Set(['EU', 'UN', 'EZ', 'XA', 'XB', 'QO', 'ZZ']);
+    ['en', 'fr'].forEach((loc) => {
+      try {
+        const dn = new Intl.DisplayNames([loc], { type: 'region' });
+        for (let a = 65; a <= 90; a++) {
+          for (let b = 65; b <= 90; b++) {
+            const code = String.fromCharCode(a, b);
+            if (SKIP_CODES.has(code)) continue;
+            const label = dn.of(code);
+            if (label && label !== code) {
+              const norm = _normCountryText(label);
+              if (norm && !_displayCountryMap[norm]) {
+                _displayCountryMap[norm] = code;
+              }
+            }
+          }
+        }
+      } catch (_) {}
+    });
+    return _displayCountryMap;
+  }
+
+  function isoToFlagEmoji(iso) {
+    const clean = String(iso || '').trim().toUpperCase();
+    if (!/^[A-Z]{2}$/.test(clean)) return '';
+    return String.fromCodePoint(0x1f1e6 + clean.charCodeAt(0) - 65) +
+      String.fromCodePoint(0x1f1e6 + clean.charCodeAt(1) - 65);
+  }
+
+  function resolveCountryNameToIso(name) {
+    const raw = String(name || '').trim();
+    if (!raw) return '';
+    const norm = _normCountryText(raw);
+    if (!norm || norm === 'world' || norm === 'monde' || norm === 'global' || norm === 'international' || norm === 'earth' || norm === 'terre' || norm === 'none' || norm === 'unknown') {
+      return '';
+    }
+    if (Object.prototype.hasOwnProperty.call(COUNTRY_ALIASES, norm)) {
+      return COUNTRY_ALIASES[norm];
+    }
+    if (/^[a-z]{2}$/.test(norm)) {
+      const up = norm.toUpperCase();
+      return up === 'UK' ? 'GB' : up;
+    }
+    const dMap = _getDisplayCountryMap();
+    if (dMap[norm]) return dMap[norm];
+    if (/[.,/|]/.test(raw)) {
+      const parts = raw.split(/[.,/|]+/).map((p) => _normCountryText(p)).filter(Boolean);
+      for (let i = parts.length - 1; i >= 0; i--) {
+        const p = parts[i];
+        if (Object.prototype.hasOwnProperty.call(COUNTRY_ALIASES, p)) return COUNTRY_ALIASES[p];
+        if (dMap[p]) return dMap[p];
+      }
+    }
+    return '';
+  }
 
   function isRegionalEmoji(str) {
     if (typeof str !== 'string') return false;
@@ -1312,20 +1618,100 @@ window.drawCityLandmark = drawCityLandmark;
     if (!input) return null;
     if (typeof input === 'string') {
       const s = input.trim();
+      if (!s) return null;
+      if (s.toLowerCase() === 'uk') return 'GB';
       if (/^[A-Za-z]{2}$/.test(s)) return s.toUpperCase();
       const iso = decodeRegionalEmoji(s);
       if (iso) return iso;
       if (CITY_COUNTRY_ISO[s.toLowerCase()]) return CITY_COUNTRY_ISO[s.toLowerCase()];
-      return null;
+      const fromName = resolveCountryNameToIso(s);
+      return fromName || null;
     }
     if (typeof input === 'object') {
-      if (input.countryIso && /^[A-Za-z]{2}$/.test(input.countryIso)) return input.countryIso.toUpperCase();
-      if (input.flag && isRegionalEmoji(input.flag)) return decodeRegionalEmoji(input.flag);
-      if (input.icon && isRegionalEmoji(input.icon)) return decodeRegionalEmoji(input.icon);
+      const nameIso = resolveCountryNameToIso(input.country_en || input.country_fr || input.country || '');
+      const emojiIso = (input.flag && isRegionalEmoji(input.flag))
+        ? decodeRegionalEmoji(input.flag)
+        : ((input.icon && isRegionalEmoji(input.icon)) ? decodeRegionalEmoji(input.icon) : '');
+
+      if (emojiIso === 'AT' && nameIso && nameIso !== 'AT') return nameIso;
+      if (input.countryIso && /^[A-Za-z]{2}$/.test(input.countryIso)) {
+        const cIso = input.countryIso.toUpperCase();
+        return (cIso === 'AT' && nameIso && nameIso !== 'AT') ? nameIso : cIso;
+      }
+      if (emojiIso) return emojiIso;
       if (input.cityId && CITY_COUNTRY_ISO[input.cityId]) return CITY_COUNTRY_ISO[input.cityId];
       if (input.id && CITY_COUNTRY_ISO[input.id]) return CITY_COUNTRY_ISO[input.id];
+      if (nameIso) return nameIso;
     }
     return null;
+  }
+
+  /* ── Shared Declarative Flag Tables (Canvas + SVG use identical definitions) ── */
+  const H3_FLAGS = {
+    RU: ['#FFFFFF', '#0039A6', '#D52B1E'],
+    AT: ['#ED2939', '#FFFFFF', '#ED2939'],
+    DE: ['#000000', '#DD0000', '#FFCC00'],
+    NL: ['#AE1C28', '#FFFFFF', '#21468B'],
+    LU: ['#ED2939', '#FFFFFF', '#00A1DE'],
+    BG: ['#FFFFFF', '#00966E', '#D62612'],
+    HU: ['#CE2939', '#FFFFFF', '#477050'],
+    EE: ['#0072CE', '#000000', '#FFFFFF'],
+    LT: ['#FDB913', '#006A44', '#C1272D'],
+    AM: ['#D90012', '#0033A0', '#F2A800'],
+    YE: ['#CE1126', '#FFFFFF', '#000000'],
+    BO: ['#D52B1E', '#F9E300', '#007934'],
+    GA: ['#009E60', '#FCD116', '#3A75C4'],
+    SL: ['#1EB53A', '#FFFFFF', '#0072C6'],
+    BY: ['#C8313E', '#C8313E', '#4AA657']
+  };
+
+  const H2_FLAGS = {
+    UA: ['#0057B7', '#FFD700'],
+    PL: ['#FFFFFF', '#DC143C'],
+    MC: ['#CE1126', '#FFFFFF'],
+    ID: ['#CE1126', '#FFFFFF']
+  };
+
+  const H_BANDS = {
+    LV: [[0.4, '#9E3039'], [0.2, '#FFFFFF'], [0.4, '#9E3039']],
+    CO: [[0.5, '#FCD116'], [0.25, '#003893'], [0.25, '#CE1126']],
+    EC: [[0.5, '#FFD100'], [0.25, '#0033A0'], [0.25, '#CE1126']],
+    TH: [[0.167, '#A51931'], [0.167, '#F4F5F8'], [0.333, '#2D2A4A'], [0.167, '#F4F5F8'], [0.167, '#A51931']],
+    CR: [[0.167, '#002B7F'], [0.167, '#FFFFFF'], [0.333, '#CE1126'], [0.167, '#FFFFFF'], [0.167, '#002B7F']],
+    BW: [[0.375, '#75AADB'], [0.05, '#FFFFFF'], [0.15, '#000000'], [0.05, '#FFFFFF'], [0.375, '#75AADB']]
+  };
+
+  const V3_FLAGS = {
+    FR: ['#0055A4', '#FFFFFF', '#EF4135'],
+    IT: ['#009246', '#FFFFFF', '#CE2B37'],
+    RO: ['#002B7F', '#FCD116', '#CE1126'],
+    BE: ['#000000', '#FAE042', '#ED2939'],
+    IE: ['#169B62', '#FFFFFF', '#FF883E'],
+    CI: ['#F77F00', '#FFFFFF', '#009E60'],
+    NG: ['#008751', '#FFFFFF', '#008751'],
+    PE: ['#D91023', '#FFFFFF', '#D91023'],
+    ML: ['#14B53A', '#FCD116', '#CE1126'],
+    GN: ['#CE1126', '#FCD116', '#009460'],
+    TD: ['#002664', '#FECB00', '#C60C30']
+  };
+
+  const NORDIC_FLAGS = {
+    SE: { bg: '#006AA7', cross: '#FECC00' },
+    DK: { bg: '#C60C30', cross: '#FFFFFF' },
+    FI: { bg: '#FFFFFF', cross: '#003580' },
+    NO: { bg: '#BA0C2F', cross: '#FFFFFF', inner: '#00205B' },
+    IS: { bg: '#02529C', cross: '#FFFFFF', inner: '#DC1E35' }
+  };
+
+  const SPECIAL_CODES = new Set([
+    'MD', 'CA', 'US', 'JP', 'GB', 'AE', 'ES', 'KR', 'CH', 'SG', 'AU', 'NZ',
+    'BR', 'TR', 'PT', 'EG', 'GR', 'CZ', 'CN', 'IN', 'VN', 'MX', 'AR', 'CL',
+    'IL', 'MA', 'TN', 'DZ', 'SA', 'PK', 'BD', 'ZA', 'GE', 'AZ', 'KZ', 'HR',
+    'RS', 'SK', 'SI', 'QA', 'BH', 'PH', 'TW', 'HK', 'AL', 'CY', 'MT'
+  ]);
+
+  function _hasNativeFlag(iso) {
+    return Boolean(H3_FLAGS[iso] || H2_FLAGS[iso] || H_BANDS[iso] || V3_FLAGS[iso] || NORDIC_FLAGS[iso] || SPECIAL_CODES.has(iso));
   }
 
   function _drawStarC(ctx, cx, cy, outerR, points, innerRatio) {
@@ -1398,23 +1784,54 @@ window.drawCityLandmark = drawCityLandmark;
     const iso = getCountryCode(isoInput) || 'CA';
     ctx.save();
 
-    const v3 = (c1, c2, c3) => {
-      ctx.fillStyle = c1; ctx.fillRect(x, y, w / 3 + 0.5, h);
-      ctx.fillStyle = c2; ctx.fillRect(x + w / 3, y, w / 3 + 0.5, h);
-      ctx.fillStyle = c3; ctx.fillRect(x + (w * 2) / 3, y, w / 3 + 0.5, h);
+    const v3 = (cols) => {
+      ctx.fillStyle = cols[0]; ctx.fillRect(x, y, w / 3 + 0.5, h);
+      ctx.fillStyle = cols[1]; ctx.fillRect(x + w / 3, y, w / 3 + 0.5, h);
+      ctx.fillStyle = cols[2]; ctx.fillRect(x + (w * 2) / 3, y, w / 3 + 0.5, h);
     };
-    const h3 = (c1, c2, c3) => {
-      ctx.fillStyle = c1; ctx.fillRect(x, y, w, h / 3 + 0.5);
-      ctx.fillStyle = c2; ctx.fillRect(x, y + h / 3, w, h / 3 + 0.5);
-      ctx.fillStyle = c3; ctx.fillRect(x, y + (h * 2) / 3, w, h / 3 + 0.5);
+    const h3 = (cols) => {
+      ctx.fillStyle = cols[0]; ctx.fillRect(x, y, w, h / 3 + 0.5);
+      ctx.fillStyle = cols[1]; ctx.fillRect(x, y + h / 3, w, h / 3 + 0.5);
+      ctx.fillStyle = cols[2]; ctx.fillRect(x, y + (h * 2) / 3, w, h / 3 + 0.5);
     };
 
+    if (H3_FLAGS[iso]) { h3(H3_FLAGS[iso]); ctx.restore(); return; }
+    if (H2_FLAGS[iso]) {
+      ctx.fillStyle = H2_FLAGS[iso][0]; ctx.fillRect(x, y, w, h * 0.5 + 0.5);
+      ctx.fillStyle = H2_FLAGS[iso][1]; ctx.fillRect(x, y + h * 0.5, w, h * 0.5 + 0.5);
+      ctx.restore();
+      return;
+    }
+    if (H_BANDS[iso]) {
+      let cy = y;
+      H_BANDS[iso].forEach((b) => {
+        const bh = h * b[0];
+        ctx.fillStyle = b[1];
+        ctx.fillRect(x, cy, w, bh + 0.6);
+        cy += bh;
+      });
+      ctx.restore();
+      return;
+    }
+    if (V3_FLAGS[iso]) { v3(V3_FLAGS[iso]); ctx.restore(); return; }
+    if (NORDIC_FLAGS[iso]) {
+      const n = NORDIC_FLAGS[iso];
+      ctx.fillStyle = n.bg; ctx.fillRect(x, y, w, h);
+      ctx.fillStyle = n.cross;
+      ctx.fillRect(x + w * 0.3, y, w * 0.14, h);
+      ctx.fillRect(x, y + h * 0.4, w, h * 0.2);
+      if (n.inner) {
+        ctx.fillStyle = n.inner;
+        ctx.fillRect(x + w * 0.33, y, w * 0.08, h);
+        ctx.fillRect(x, y + h * 0.44, w, h * 0.12);
+      }
+      ctx.restore();
+      return;
+    }
+
     switch (iso) {
-      case 'FR': v3('#0055A4', '#FFFFFF', '#EF4135'); break;
-      case 'IT': v3('#009246', '#FFFFFF', '#CE2B37'); break;
-      case 'RO': v3('#002B7F', '#FCD116', '#CE1126'); break;
       case 'MD':
-        v3('#0046AE', '#FFD200', '#CC092F');
+        v3(['#0046AE', '#FFD200', '#CC092F']);
         ctx.fillStyle = '#7C4D1E';
         ctx.beginPath();
         ctx.ellipse(x + w * 0.5, y + h * 0.52, w * 0.085, h * 0.21, 0, 0, Math.PI * 2);
@@ -1461,7 +1878,7 @@ window.drawCityLandmark = drawCityLandmark;
         _drawUnionJackC(ctx, x, y, w, h);
         break;
       case 'AE':
-        h3('#00732F', '#FFFFFF', '#000000');
+        h3(['#00732F', '#FFFFFF', '#000000']);
         ctx.fillStyle = '#FF0000';
         ctx.fillRect(x, y, w * 0.26, h);
         break;
@@ -1473,10 +1890,6 @@ window.drawCityLandmark = drawCityLandmark;
         ctx.fillRect(x + w * 0.24, y + h * 0.36, w * 0.1, h * 0.28);
         ctx.fillStyle = '#D97706';
         ctx.fillRect(x + w * 0.255, y + h * 0.31, w * 0.07, h * 0.06);
-        break;
-      case 'MC':
-        ctx.fillStyle = '#CE1126'; ctx.fillRect(x, y, w, h * 0.5 + 0.5);
-        ctx.fillStyle = '#FFFFFF'; ctx.fillRect(x, y + h * 0.5, w, h * 0.5 + 0.5);
         break;
       case 'KR':
         ctx.fillStyle = '#FFFFFF'; ctx.fillRect(x, y, w, h);
@@ -1524,13 +1937,23 @@ window.drawCityLandmark = drawCityLandmark;
         }
         break;
       case 'AU':
-        ctx.fillStyle = '#00008B'; ctx.fillRect(x, y, w, h);
+      case 'NZ':
+        ctx.fillStyle = iso === 'NZ' ? '#00247D' : '#00008B'; ctx.fillRect(x, y, w, h);
         _drawUnionJackC(ctx, x, y, w * 0.48, h * 0.5);
-        ctx.fillStyle = '#FFFFFF';
-        _drawStarC(ctx, x + w * 0.24, y + h * 0.74, h * 0.12, 7, 0.45);
-        [[0.73, 0.22], [0.85, 0.42], [0.62, 0.46], [0.73, 0.78], [0.79, 0.57]].forEach((p, idx) => {
-          _drawStarC(ctx, x + w * p[0], y + h * p[1], idx === 4 ? h * 0.04 : h * 0.06, 5, 0.42);
-        });
+        if (iso === 'AU') {
+          ctx.fillStyle = '#FFFFFF';
+          _drawStarC(ctx, x + w * 0.24, y + h * 0.74, h * 0.12, 7, 0.45);
+          [[0.73, 0.22], [0.85, 0.42], [0.62, 0.46], [0.73, 0.78], [0.79, 0.57]].forEach((p, idx) => {
+            _drawStarC(ctx, x + w * p[0], y + h * p[1], idx === 4 ? h * 0.04 : h * 0.06, 5, 0.42);
+          });
+        } else {
+          [[0.74, 0.2], [0.85, 0.42], [0.64, 0.45], [0.74, 0.78]].forEach((p) => {
+            ctx.fillStyle = '#FFFFFF';
+            _drawStarC(ctx, x + w * p[0], y + h * p[1], h * 0.075, 5, 0.42);
+            ctx.fillStyle = '#CC142B';
+            _drawStarC(ctx, x + w * p[0], y + h * p[1], h * 0.052, 5, 0.42);
+          });
+        }
         break;
       case 'BR':
         ctx.fillStyle = '#009B3A'; ctx.fillRect(x, y, w, h);
@@ -1559,8 +1982,6 @@ window.drawCityLandmark = drawCityLandmark;
         ctx.fillStyle = '#FFFFFF';
         _drawStarC(ctx, x + w * 0.64, y + h * 0.5, h * 0.12, 5, 0.4);
         break;
-      case 'DE': h3('#000000', '#DD0000', '#FFCC00'); break;
-      case 'NL': h3('#AE1C28', '#FFFFFF', '#21468B'); break;
       case 'PT':
         ctx.fillStyle = '#006600'; ctx.fillRect(x, y, w * 0.4, h);
         ctx.fillStyle = '#FF0000'; ctx.fillRect(x + w * 0.398, y, w * 0.602, h);
@@ -1572,20 +1993,247 @@ window.drawCityLandmark = drawCityLandmark;
         ctx.fillRect(x + w * 0.37, y + h * 0.41, w * 0.06, h * 0.18);
         break;
       case 'EG':
-        h3('#CE1126', '#FFFFFF', '#000000');
+        h3(['#CE1126', '#FFFFFF', '#000000']);
         ctx.fillStyle = '#C09300';
         ctx.fillRect(x + w * 0.44, y + h * 0.38, w * 0.12, h * 0.24);
         _drawStarC(ctx, x + w * 0.5, y + h * 0.44, h * 0.08, 4, 0.5);
         break;
-      default:
-        v3('#38BDF8', '#0F172A', '#8B5CF6');
+      case 'GR':
+        for (let i = 0; i < 9; i++) {
+          ctx.fillStyle = i % 2 === 0 ? '#0D5EAF' : '#FFFFFF';
+          ctx.fillRect(x, y + (i * h) / 9, w, h / 9 + 0.5);
+        }
+        ctx.fillStyle = '#0D5EAF';
+        ctx.fillRect(x, y, w * 0.38, h * (5 / 9));
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(x + w * 0.152, y, w * 0.076, h * (5 / 9));
+        ctx.fillRect(x, y + h * (2 / 9), w * 0.38, h * (1 / 9));
         break;
+      case 'CZ':
+        ctx.fillStyle = '#FFFFFF'; ctx.fillRect(x, y, w, h * 0.5 + 0.5);
+        ctx.fillStyle = '#D7141A'; ctx.fillRect(x, y + h * 0.5, w, h * 0.5 + 0.5);
+        ctx.fillStyle = '#11457E';
+        ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + w * 0.48, y + h * 0.5); ctx.lineTo(x, y + h); ctx.closePath(); ctx.fill();
+        break;
+      case 'PH':
+        ctx.fillStyle = '#0038A8'; ctx.fillRect(x, y, w, h * 0.5 + 0.5);
+        ctx.fillStyle = '#CE1126'; ctx.fillRect(x, y + h * 0.5, w, h * 0.5 + 0.5);
+        ctx.fillStyle = '#FFFFFF';
+        ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + w * 0.44, y + h * 0.5); ctx.lineTo(x, y + h); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = '#FCD116';
+        ctx.beginPath(); ctx.arc(x + w * 0.16, y + h * 0.5, h * 0.12, 0, Math.PI * 2); ctx.fill();
+        break;
+      case 'CN':
+        ctx.fillStyle = '#DE2910'; ctx.fillRect(x, y, w, h);
+        ctx.fillStyle = '#FFDE00';
+        _drawStarC(ctx, x + w * 0.17, y + h * 0.27, h * 0.15, 5, 0.4);
+        [[0.31, 0.12], [0.37, 0.24], [0.37, 0.38], [0.31, 0.49]].forEach((p) => {
+          _drawStarC(ctx, x + w * p[0], y + h * p[1], h * 0.052, 5, 0.4);
+        });
+        break;
+      case 'VN':
+        ctx.fillStyle = '#DA251D'; ctx.fillRect(x, y, w, h);
+        ctx.fillStyle = '#FFFF00';
+        _drawStarC(ctx, x + w * 0.5, y + h * 0.5, h * 0.28, 5, 0.4);
+        break;
+      case 'IN':
+        h3(['#FF9933', '#FFFFFF', '#138808']);
+        ctx.strokeStyle = '#000080';
+        ctx.lineWidth = Math.max(1.2, h * 0.045);
+        ctx.beginPath(); ctx.arc(x + w * 0.5, y + h * 0.5, h * 0.13, 0, Math.PI * 2); ctx.stroke();
+        break;
+      case 'AR':
+        h3(['#74ACDF', '#FFFFFF', '#74ACDF']);
+        ctx.fillStyle = '#F6B40E';
+        ctx.beginPath(); ctx.arc(x + w * 0.5, y + h * 0.5, h * 0.12, 0, Math.PI * 2); ctx.fill();
+        break;
+      case 'MX':
+        v3(['#006847', '#FFFFFF', '#CE1126']);
+        ctx.fillStyle = '#8B5A2B';
+        ctx.beginPath(); ctx.arc(x + w * 0.5, y + h * 0.5, h * 0.11, 0, Math.PI * 2); ctx.fill();
+        break;
+      case 'CL':
+        ctx.fillStyle = '#FFFFFF'; ctx.fillRect(x, y, w, h * 0.5 + 0.5);
+        ctx.fillStyle = '#D52B1E'; ctx.fillRect(x, y + h * 0.5, w, h * 0.5 + 0.5);
+        ctx.fillStyle = '#0039A6'; ctx.fillRect(x, y, w * 0.34, h * 0.5 + 0.5);
+        ctx.fillStyle = '#FFFFFF';
+        _drawStarC(ctx, x + w * 0.17, y + h * 0.25, h * 0.14, 5, 0.4);
+        break;
+      case 'IL':
+        ctx.fillStyle = '#FFFFFF'; ctx.fillRect(x, y, w, h);
+        ctx.fillStyle = '#0038B8';
+        ctx.fillRect(x, y + h * 0.14, w, h * 0.14);
+        ctx.fillRect(x, y + h * 0.72, w, h * 0.14);
+        ctx.strokeStyle = '#0038B8';
+        ctx.lineWidth = Math.max(1, h * 0.045);
+        ctx.beginPath();
+        ctx.moveTo(x + w * 0.5, y + h * 0.33); ctx.lineTo(x + w * 0.61, y + h * 0.58); ctx.lineTo(x + w * 0.39, y + h * 0.58); ctx.closePath();
+        ctx.moveTo(x + w * 0.5, y + h * 0.67); ctx.lineTo(x + w * 0.61, y + h * 0.42); ctx.lineTo(x + w * 0.39, y + h * 0.42); ctx.closePath();
+        ctx.stroke();
+        break;
+      case 'MA':
+        ctx.fillStyle = '#C1272D'; ctx.fillRect(x, y, w, h);
+        ctx.strokeStyle = '#006233'; ctx.lineWidth = Math.max(1.4, h * 0.055);
+        ctx.beginPath();
+        for (let i = 0; i < 6; i++) {
+          const a = -Math.PI / 2 + (i * 4 * Math.PI) / 5;
+          const px = x + w * 0.5 + Math.cos(a) * h * 0.24;
+          const py = y + h * 0.5 + Math.sin(a) * h * 0.24;
+          if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+        }
+        ctx.stroke();
+        break;
+      case 'TN':
+        ctx.fillStyle = '#E70013'; ctx.fillRect(x, y, w, h);
+        ctx.fillStyle = '#FFFFFF'; ctx.beginPath(); ctx.arc(x + w * 0.5, y + h * 0.5, h * 0.25, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#E70013';
+        ctx.beginPath(); ctx.arc(x + w * 0.5, y + h * 0.5, h * 0.16, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#FFFFFF';
+        ctx.beginPath(); ctx.arc(x + w * 0.54, y + h * 0.5, h * 0.13, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#E70013';
+        _drawStarC(ctx, x + w * 0.57, y + h * 0.5, h * 0.08, 5, 0.4);
+        break;
+      case 'DZ':
+        ctx.fillStyle = '#006233'; ctx.fillRect(x, y, w * 0.5, h);
+        ctx.fillStyle = '#FFFFFF'; ctx.fillRect(x + w * 0.5, y, w * 0.5, h);
+        ctx.fillStyle = '#D21034';
+        ctx.beginPath(); ctx.arc(x + w * 0.5, y + h * 0.5, h * 0.24, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#FFFFFF';
+        ctx.beginPath(); ctx.arc(x + w * 0.55, y + h * 0.5, h * 0.19, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#D21034';
+        _drawStarC(ctx, x + w * 0.59, y + h * 0.5, h * 0.09, 5, 0.4);
+        break;
+      case 'SA':
+        ctx.fillStyle = '#006C35'; ctx.fillRect(x, y, w, h);
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(x + w * 0.24, y + h * 0.34, w * 0.52, h * 0.16);
+        ctx.fillRect(x + w * 0.24, y + h * 0.62, w * 0.5, h * 0.07);
+        break;
+      case 'PK':
+        ctx.fillStyle = '#FFFFFF'; ctx.fillRect(x, y, w * 0.26, h);
+        ctx.fillStyle = '#01411C'; ctx.fillRect(x + w * 0.258, y, w * 0.742, h);
+        ctx.fillStyle = '#FFFFFF';
+        ctx.beginPath(); ctx.arc(x + w * 0.62, y + h * 0.5, h * 0.24, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#01411C';
+        ctx.beginPath(); ctx.arc(x + w * 0.67, y + h * 0.45, h * 0.2, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#FFFFFF';
+        _drawStarC(ctx, x + w * 0.71, y + h * 0.4, h * 0.09, 5, 0.4);
+        break;
+      case 'BD':
+        ctx.fillStyle = '#006A4E'; ctx.fillRect(x, y, w, h);
+        ctx.fillStyle = '#F42A41';
+        ctx.beginPath(); ctx.arc(x + w * 0.45, y + h * 0.5, h * 0.28, 0, Math.PI * 2); ctx.fill();
+        break;
+      case 'ZA':
+        ctx.fillStyle = '#001489'; ctx.fillRect(x, y, w, h);
+        ctx.fillStyle = '#E03C31'; ctx.fillRect(x, y, w, h * 0.42);
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(x, y + h * 0.34, w, h * 0.32);
+        ctx.fillStyle = '#007749';
+        ctx.fillRect(x, y + h * 0.39, w, h * 0.22);
+        ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + w * 0.48, y + h * 0.5); ctx.lineTo(x, y + h); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = '#FFB81C';
+        ctx.beginPath(); ctx.moveTo(x, y + h * 0.12); ctx.lineTo(x + w * 0.35, y + h * 0.5); ctx.lineTo(x, y + h * 0.88); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = '#000000';
+        ctx.beginPath(); ctx.moveTo(x, y + h * 0.2); ctx.lineTo(x + w * 0.27, y + h * 0.5); ctx.lineTo(x, y + h * 0.8); ctx.closePath(); ctx.fill();
+        break;
+      case 'GE':
+        ctx.fillStyle = '#FFFFFF'; ctx.fillRect(x, y, w, h);
+        ctx.fillStyle = '#FF0000';
+        ctx.fillRect(x + w * 0.42, y, w * 0.16, h);
+        ctx.fillRect(x, y + h * 0.38, w, h * 0.24);
+        [[0.21, 0.2], [0.79, 0.2], [0.21, 0.8], [0.79, 0.8]].forEach((p) => {
+          ctx.fillRect(x + w * p[0] - h * 0.08, y + h * p[1] - h * 0.025, h * 0.16, h * 0.05);
+          ctx.fillRect(x + w * p[0] - h * 0.025, y + h * p[1] - h * 0.08, h * 0.05, h * 0.16);
+        });
+        break;
+      case 'AZ':
+        h3(['#00B5E2', '#EF3340', '#509E2F']);
+        ctx.fillStyle = '#FFFFFF';
+        ctx.beginPath(); ctx.arc(x + w * 0.48, y + h * 0.5, h * 0.13, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#EF3340';
+        ctx.beginPath(); ctx.arc(x + w * 0.51, y + h * 0.5, h * 0.1, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#FFFFFF';
+        _drawStarC(ctx, x + w * 0.57, y + h * 0.5, h * 0.06, 8, 0.45);
+        break;
+      case 'KZ':
+        ctx.fillStyle = '#00AFCA'; ctx.fillRect(x, y, w, h);
+        ctx.fillStyle = '#FEC50C';
+        ctx.beginPath(); ctx.arc(x + w * 0.52, y + h * 0.48, h * 0.18, 0, Math.PI * 2); ctx.fill();
+        ctx.fillRect(x + w * 0.06, y + h * 0.08, w * 0.04, h * 0.84);
+        break;
+      case 'HR':
+        h3(['#FF0000', '#FFFFFF', '#171796']);
+        ctx.fillStyle = '#FF0000';
+        ctx.fillRect(x + w * 0.42, y + h * 0.3, w * 0.16, h * 0.36);
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(x + w * 0.46, y + h * 0.36, w * 0.08, h * 0.1);
+        break;
+      case 'RS':
+        h3(['#C6363C', '#0C4076', '#FFFFFF']);
+        ctx.fillStyle = '#FACC15';
+        ctx.fillRect(x + w * 0.28, y + h * 0.3, w * 0.12, h * 0.34);
+        break;
+      case 'SK':
+        h3(['#FFFFFF', '#0B4EA2', '#EE1C25']);
+        ctx.fillStyle = '#EE1C25';
+        ctx.fillRect(x + w * 0.25, y + h * 0.3, w * 0.14, h * 0.38);
+        break;
+      case 'SI':
+        h3(['#FFFFFF', '#003DA5', '#ED1C24']);
+        ctx.fillStyle = '#003DA5';
+        ctx.fillRect(x + w * 0.24, y + h * 0.24, w * 0.12, h * 0.24);
+        break;
+      case 'QA':
+      case 'BH':
+        ctx.fillStyle = '#FFFFFF'; ctx.fillRect(x, y, w * 0.32, h);
+        ctx.fillStyle = iso === 'QA' ? '#8D1B3D' : '#CE1126'; ctx.fillRect(x + w * 0.3, y, w * 0.7, h);
+        break;
+      case 'TW':
+        ctx.fillStyle = '#FE0000'; ctx.fillRect(x, y, w, h);
+        ctx.fillStyle = '#000095'; ctx.fillRect(x, y, w * 0.48, h * 0.5);
+        ctx.fillStyle = '#FFFFFF'; _drawStarC(ctx, x + w * 0.24, y + h * 0.25, h * 0.15, 12, 0.52);
+        break;
+      case 'HK':
+        ctx.fillStyle = '#DE2910'; ctx.fillRect(x, y, w, h);
+        ctx.fillStyle = '#FFFFFF'; _drawStarC(ctx, x + w * 0.5, y + h * 0.5, h * 0.22, 5, 0.38);
+        break;
+      case 'AL':
+        ctx.fillStyle = '#E41E20'; ctx.fillRect(x, y, w, h);
+        ctx.fillStyle = '#000000';
+        ctx.beginPath(); ctx.ellipse(x + w * 0.5, y + h * 0.5, w * 0.14, h * 0.26, 0, 0, Math.PI * 2); ctx.fill();
+        break;
+      case 'CY':
+        ctx.fillStyle = '#FFFFFF'; ctx.fillRect(x, y, w, h);
+        ctx.fillStyle = '#D57800';
+        ctx.beginPath(); ctx.ellipse(x + w * 0.5, y + h * 0.45, w * 0.18, h * 0.16, -0.2, 0, Math.PI * 2); ctx.fill();
+        break;
+      case 'MT':
+        ctx.fillStyle = '#FFFFFF'; ctx.fillRect(x, y, w * 0.5, h);
+        ctx.fillStyle = '#CF142B'; ctx.fillRect(x + w * 0.5, y, w * 0.5, h);
+        ctx.fillStyle = '#CBD5E1'; ctx.fillRect(x + w * 0.08, y + h * 0.1, w * 0.1, h * 0.16);
+        break;
+      default: {
+        // Clean dark-navy & gold ISO crest fallback for rarer countries until CDN PNG loads
+        ctx.fillStyle = '#0F172A'; ctx.fillRect(x, y, w, h);
+        ctx.fillStyle = '#1E293B'; ctx.fillRect(x + w * 0.04, y + h * 0.06, w * 0.92, h * 0.88);
+        ctx.strokeStyle = '#FBBF24';
+        ctx.lineWidth = Math.max(1.5, h * 0.045);
+        ctx.strokeRect(x + w * 0.04, y + h * 0.06, w * 0.92, h * 0.88);
+        ctx.fillStyle = '#F8FAFC';
+        ctx.font = `800 ${Math.max(10, Math.round(h * 0.42))}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(iso, x + w * 0.5, y + h * 0.52);
+        break;
+      }
     }
 
     ctx.restore();
   }
 
   const _flatFlagCache = {};
+  const _cdnLoadedOrPending = new Set();
 
   function _getFlatFlagCanvas(iso) {
     if (typeof document === 'undefined') return null;
@@ -1597,6 +2245,22 @@ window.drawCityLandmark = drawCityLandmark;
     if (!fctx) return null;
     drawFlagToCanvas(fctx, iso, 0, 0, c.width, c.height);
     _flatFlagCache[iso] = c;
+
+    if (!_hasNativeFlag(iso) && !_cdnLoadedOrPending.has(iso) && typeof Image === 'function') {
+      _cdnLoadedOrPending.add(iso);
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        try {
+          fctx.clearRect(0, 0, c.width, c.height);
+          fctx.drawImage(img, 0, 0, c.width, c.height);
+          fctx.getImageData(0, 0, 1, 1);
+        } catch (_) {
+          drawFlagToCanvas(fctx, iso, 0, 0, c.width, c.height);
+        }
+      };
+      img.src = `https://flagcdn.com/w160/${iso.toLowerCase()}.png`;
+    }
     return c;
   }
 
@@ -1669,10 +2333,10 @@ window.drawCityLandmark = drawCityLandmark;
   }
 
   function _svgFlagBody(iso) {
-    const v3 = (a, b, c) =>
-      `<rect x="0" y="0" width="10.2" height="20" fill="${a}"/><rect x="10" y="0" width="10.2" height="20" fill="${b}"/><rect x="20" y="0" width="10" height="20" fill="${c}"/>`;
-    const h3 = (a, b, c) =>
-      `<rect x="0" y="0" width="30" height="6.8" fill="${a}"/><rect x="0" y="6.66" width="30" height="6.8" fill="${b}"/><rect x="0" y="13.33" width="30" height="6.8" fill="${c}"/>`;
+    const v3 = (c) =>
+      `<rect x="0" y="0" width="10.2" height="20" fill="${c[0]}"/><rect x="10" y="0" width="10.2" height="20" fill="${c[1]}"/><rect x="20" y="0" width="10" height="20" fill="${c[2]}"/>`;
+    const h3 = (c) =>
+      `<rect x="0" y="0" width="30" height="6.8" fill="${c[0]}"/><rect x="0" y="6.66" width="30" height="6.8" fill="${c[1]}"/><rect x="0" y="13.33" width="30" height="6.8" fill="${c[2]}"/>`;
     const uj = (w, h) => {
       const mx = (w / 2).toFixed(1);
       const my = (h / 2).toFixed(1);
@@ -1687,11 +2351,27 @@ window.drawCityLandmark = drawCityLandmark;
         `<rect x="0" y="${(my - h * 0.1).toFixed(1)}" width="${w}" height="${(h * 0.2).toFixed(1)}" fill="#C8102E"/>`;
     };
 
+    if (H3_FLAGS[iso]) return h3(H3_FLAGS[iso]);
+    if (H2_FLAGS[iso]) return `<rect x="0" y="0" width="30" height="10.2" fill="${H2_FLAGS[iso][0]}"/><rect x="0" y="10" width="30" height="10" fill="${H2_FLAGS[iso][1]}"/>`;
+    if (H_BANDS[iso]) {
+      let yAcc = 0;
+      return H_BANDS[iso].map((b) => {
+        const bh = 20 * b[0];
+        const rect = `<rect x="0" y="${yAcc.toFixed(2)}" width="30" height="${(bh + 0.3).toFixed(2)}" fill="${b[1]}"/>`;
+        yAcc += bh;
+        return rect;
+      }).join('');
+    }
+    if (V3_FLAGS[iso]) return v3(V3_FLAGS[iso]);
+    if (NORDIC_FLAGS[iso]) {
+      const n = NORDIC_FLAGS[iso];
+      return `<rect x="0" y="0" width="30" height="20" fill="${n.bg}"/>` +
+        `<rect x="9" y="0" width="4.2" height="20" fill="${n.cross}"/><rect x="0" y="8" width="30" height="4" fill="${n.cross}"/>` +
+        (n.inner ? `<rect x="10" y="0" width="2.2" height="20" fill="${n.inner}"/><rect x="0" y="9" width="30" height="2" fill="${n.inner}"/>` : '');
+    }
+
     switch (iso) {
-      case 'FR': return v3('#0055A4', '#FFFFFF', '#EF4135');
-      case 'IT': return v3('#009246', '#FFFFFF', '#CE2B37');
-      case 'RO': return v3('#002B7F', '#FCD116', '#CE1126');
-      case 'MD': return v3('#0046AE', '#FFD200', '#CC092F') +
+      case 'MD': return v3(['#0046AE', '#FFD200', '#CC092F']) +
         `<ellipse cx="15" cy="10.4" rx="2.5" ry="4.2" fill="#7C4D1E"/><rect x="13.8" y="8.6" width="2.4" height="3.2" fill="#B91C1C"/>${_svgStar(15, 5.2, 1.3, '#FACC15')}`;
       case 'CA': return `<rect x="0" y="0" width="7.5" height="20" fill="#D80621"/><rect x="7.4" y="0" width="15.2" height="20" fill="#FFFFFF"/><rect x="22.5" y="0" width="7.5" height="20" fill="#D80621"/><polygon points="15,4.2 16.3,7.3 18.2,6.5 17.3,9.2 20.8,8.2 19.8,10.2 21.2,11.4 17.6,12.2 17.9,14 15.6,13.1 15.6,16.5 14.4,16.5 14.4,13.1 12.1,14 12.4,12.2 8.8,11.4 10.2,10.2 9.2,8.2 12.7,9.2 11.8,6.5 13.7,7.3" fill="#D80621"/>`;
       case 'US': {
@@ -1703,20 +2383,52 @@ window.drawCityLandmark = drawCityLandmark;
       }
       case 'JP': return `<rect x="0" y="0" width="30" height="20" fill="#FFFFFF"/><circle cx="15" cy="10" r="6" fill="#BC002D"/>`;
       case 'GB': return uj(30, 20);
-      case 'AE': return h3('#00732F', '#FFFFFF', '#000000') + `<rect x="0" y="0" width="8" height="20" fill="#FF0000"/>`;
+      case 'AE': return h3(['#00732F', '#FFFFFF', '#000000']) + `<rect x="0" y="0" width="8" height="20" fill="#FF0000"/>`;
       case 'ES': return `<rect x="0" y="0" width="30" height="5" fill="#AA151B"/><rect x="0" y="5" width="30" height="10" fill="#F1BF00"/><rect x="0" y="15" width="30" height="5" fill="#AA151B"/><rect x="7.5" y="7" width="3.4" height="6" rx="1" fill="#991B1B"/><rect x="8.1" y="5.8" width="2.2" height="1.4" fill="#D97706"/>`;
-      case 'MC': return `<rect x="0" y="0" width="30" height="10.2" fill="#CE1126"/><rect x="0" y="10" width="30" height="10" fill="#FFFFFF"/>`;
       case 'KR': return `<rect x="0" y="0" width="30" height="20" fill="#FFFFFF"/><circle cx="15" cy="10" r="4.8" fill="#CD2E3A"/><path d="M10.2,10 A4.8,4.8 0 0,0 19.8,10 A2.4,2.4 0 0,0 15,10 A2.4,2.4 0 0,1 10.2,10 Z" fill="#0047A0"/><g stroke="#111827" stroke-width="1.2"><line x1="4.5" y1="5.5" x2="7.5" y2="3"/><line x1="22.5" y1="3" x2="25.5" y2="5.5"/><line x1="4.5" y1="14.5" x2="7.5" y2="17"/><line x1="22.5" y1="17" x2="25.5" y2="14.5"/></g>`;
       case 'CH': return `<rect x="0" y="0" width="30" height="20" fill="#D52B1E"/><rect x="12.6" y="4" width="4.8" height="12" fill="#FFFFFF"/><rect x="9" y="7.6" width="12" height="4.8" fill="#FFFFFF"/>`;
       case 'SG': return `<rect x="0" y="0" width="30" height="10.2" fill="#EF3340"/><rect x="0" y="10" width="30" height="10" fill="#FFFFFF"/><circle cx="6.2" cy="5" r="3.2" fill="#FFFFFF"/><circle cx="7.4" cy="5" r="2.9" fill="#EF3340"/>${_svgStar(9.5, 3.6, 0.9, '#fff')}${_svgStar(10.6, 5.5, 0.9, '#fff')}${_svgStar(8.8, 6.8, 0.9, '#fff')}`;
       case 'AU': return `<rect x="0" y="0" width="30" height="20" fill="#00008B"/>${uj(14.5, 10)}${_svgStar(7.2, 15, 2.3, '#fff')}${_svgStar(22, 4.5, 1.3, '#fff')}${_svgStar(25.5, 8.5, 1.3, '#fff')}${_svgStar(18.5, 9.2, 1.3, '#fff')}${_svgStar(22, 15.5, 1.3, '#fff')}`;
+      case 'NZ': return `<rect x="0" y="0" width="30" height="20" fill="#00247D"/>${uj(14.5, 10)}${_svgStar(22, 4, 1.4, '#CC142B')}${_svgStar(25.5, 8.5, 1.4, '#CC142B')}${_svgStar(19, 9, 1.4, '#CC142B')}${_svgStar(22, 15.5, 1.4, '#CC142B')}`;
       case 'BR': return `<rect x="0" y="0" width="30" height="20" fill="#009B3A"/><polygon points="15,2.8 26,10 15,17.2 4,10" fill="#FEDF00"/><circle cx="15" cy="10" r="4.4" fill="#002776"/><path d="M10.8,9.8 Q15,8 19.2,10.8" fill="none" stroke="#FFFFFF" stroke-width="1"/>`;
       case 'TR': return `<rect x="0" y="0" width="30" height="20" fill="#E30A17"/><circle cx="12" cy="10" r="5" fill="#FFFFFF"/><circle cx="13.7" cy="10" r="4" fill="#E30A17"/>${_svgStar(19.2, 10, 2.4, '#FFFFFF')}`;
-      case 'DE': return h3('#000000', '#DD0000', '#FFCC00');
-      case 'NL': return h3('#AE1C28', '#FFFFFF', '#21468B');
       case 'PT': return `<rect x="0" y="0" width="12" height="20" fill="#006600"/><rect x="11.9" y="0" width="18.1" height="20" fill="#FF0000"/><circle cx="12" cy="10" r="4.3" fill="#FFCC00"/><rect x="10.4" y="7.8" width="3.2" height="4.4" rx="0.6" fill="#DC2626"/><rect x="11" y="8.4" width="2" height="3.2" fill="#fff"/>`;
-      case 'EG': return h3('#CE1126', '#FFFFFF', '#000000') + `<rect x="13.4" y="7.6" width="3.2" height="4.8" fill="#C09300"/>`;
-      default: return v3('#38BDF8', '#0F172A', '#8B5CF6');
+      case 'EG': return h3(['#CE1126', '#FFFFFF', '#000000']) + `<rect x="13.4" y="7.6" width="3.2" height="4.8" fill="#C09300"/>`;
+      case 'GR': {
+        let out = '';
+        for (let i = 0; i < 9; i++) out += `<rect x="0" y="${(i * 20 / 9).toFixed(2)}" width="30" height="2.4" fill="${i % 2 === 0 ? '#0D5EAF' : '#FFFFFF'}"/>`;
+        return out + `<rect x="0" y="0" width="11.2" height="11.1" fill="#0D5EAF"/><rect x="4.5" y="0" width="2.2" height="11.1" fill="#fff"/><rect x="0" y="4.4" width="11.2" height="2.2" fill="#fff"/>`;
+      }
+      case 'CZ': return `<rect x="0" y="0" width="30" height="10.2" fill="#FFFFFF"/><rect x="0" y="10" width="30" height="10" fill="#D7141A"/><polygon points="0,0 14.5,10 0,20" fill="#11457E"/>`;
+      case 'PH': return `<rect x="0" y="0" width="30" height="10.2" fill="#0038A8"/><rect x="0" y="10" width="30" height="10" fill="#CE1126"/><polygon points="0,0 13,10 0,20" fill="#FFFFFF"/><circle cx="4.8" cy="10" r="2.2" fill="#FCD116"/>`;
+      case 'CN': return `<rect x="0" y="0" width="30" height="20" fill="#DE2910"/>${_svgStar(5, 5.4, 2.8, '#FFDE00')}${_svgStar(9.5, 2.4, 1, '#FFDE00')}${_svgStar(11.2, 4.8, 1, '#FFDE00')}${_svgStar(11.2, 7.6, 1, '#FFDE00')}${_svgStar(9.5, 9.8, 1, '#FFDE00')}`;
+      case 'VN': return `<rect x="0" y="0" width="30" height="20" fill="#DA251D"/>${_svgStar(15, 10, 5.4, '#FFFF00')}`;
+      case 'IN': return h3(['#FF9933', '#FFFFFF', '#138808']) + `<circle cx="15" cy="10" r="2.5" fill="none" stroke="#000080" stroke-width="0.9"/>`;
+      case 'AR': return h3(['#74ACDF', '#FFFFFF', '#74ACDF']) + `<circle cx="15" cy="10" r="2.3" fill="#F6B40E"/>`;
+      case 'MX': return v3(['#006847', '#FFFFFF', '#CE1126']) + `<circle cx="15" cy="10" r="2.1" fill="#8B5A2B"/>`;
+      case 'CL': return `<rect x="0" y="0" width="30" height="10.2" fill="#FFFFFF"/><rect x="0" y="10" width="30" height="10" fill="#D52B1E"/><rect x="0" y="0" width="10.2" height="10.2" fill="#0039A6"/>${_svgStar(5.1, 5.1, 2.5, '#FFFFFF')}`;
+      case 'IL': return `<rect x="0" y="0" width="30" height="20" fill="#FFFFFF"/><rect x="0" y="2.8" width="30" height="2.8" fill="#0038B8"/><rect x="0" y="14.4" width="30" height="2.8" fill="#0038B8"/><polygon points="15,6.5 18.2,11.6 11.8,11.6" fill="none" stroke="#0038B8" stroke-width="0.9"/><polygon points="15,13.5 18.2,8.4 11.8,8.4" fill="none" stroke="#0038B8" stroke-width="0.9"/>`;
+      case 'MA': return `<rect x="0" y="0" width="30" height="20" fill="#C1272D"/>${_svgStar(15, 10, 4.4, '#006233')}`;
+      case 'TN': return `<rect x="0" y="0" width="30" height="20" fill="#E70013"/><circle cx="15" cy="10" r="5" fill="#fff"/><circle cx="14.8" cy="10" r="3.2" fill="#E70013"/><circle cx="15.8" cy="10" r="2.6" fill="#fff"/>${_svgStar(16.8, 10, 1.5, '#E70013')}`;
+      case 'DZ': return `<rect x="0" y="0" width="15" height="20" fill="#006233"/><rect x="15" y="0" width="15" height="20" fill="#fff"/><circle cx="15" cy="10" r="4.6" fill="#D21034"/><circle cx="16.4" cy="10" r="3.7" fill="#fff"/>${_svgStar(17.2, 10, 1.7, '#D21034')}`;
+      case 'SA': return `<rect x="0" y="0" width="30" height="20" fill="#006C35"/><rect x="7.5" y="7" width="15" height="3" rx="0.8" fill="#fff"/><rect x="7.5" y="12.2" width="14.5" height="1.3" fill="#fff"/>`;
+      case 'PK': return `<rect x="0" y="0" width="8" height="20" fill="#FFFFFF"/><rect x="7.9" y="0" width="22.1" height="20" fill="#01411C"/><circle cx="18.6" cy="10" r="4.8" fill="#fff"/><circle cx="20.1" cy="9" r="4" fill="#01411C"/>${_svgStar(21.2, 8.1, 1.8, '#fff')}`;
+      case 'BD': return `<rect x="0" y="0" width="30" height="20" fill="#006A4E"/><circle cx="13.5" cy="10" r="5.5" fill="#F42A41"/>`;
+      case 'ZA': return `<rect x="0" y="0" width="30" height="20" fill="#001489"/><rect x="0" y="0" width="30" height="8.4" fill="#E03C31"/><rect x="0" y="6.8" width="30" height="6.4" fill="#fff"/><rect x="0" y="7.8" width="30" height="4.4" fill="#007749"/><polygon points="0,0 14,10 0,20" fill="#007749"/><polygon points="0,2.5 10.5,10 0,17.5" fill="#FFB81C"/><polygon points="0,4.2 8.2,10 0,15.8" fill="#000"/>`;
+      case 'GE': return `<rect x="0" y="0" width="30" height="20" fill="#FFFFFF"/><rect x="12.6" y="0" width="4.8" height="20" fill="#FF0000"/><rect x="0" y="7.6" width="30" height="4.8" fill="#FF0000"/>`;
+      case 'AZ': return h3(['#00B5E2', '#EF3340', '#509E2F']) + `<circle cx="14.4" cy="10" r="2.5" fill="#fff"/><circle cx="15.2" cy="10" r="2" fill="#EF3340"/>${_svgStar(17, 10, 1.2, '#fff')}`;
+      case 'KZ': return `<rect x="0" y="0" width="30" height="20" fill="#00AFCA"/><circle cx="15.5" cy="9.5" r="3.4" fill="#FEC50C"/><rect x="1.8" y="1.6" width="1.2" height="16.8" fill="#FEC50C"/>`;
+      case 'HR': return h3(['#FF0000', '#FFFFFF', '#171796']) + `<rect x="12.5" y="6" width="5" height="7" fill="#FF0000"/>`;
+      case 'RS': return h3(['#C6363C', '#0C4076', '#FFFFFF']) + `<rect x="8.5" y="6" width="3.5" height="6.5" fill="#FACC15"/>`;
+      case 'SK': return h3(['#FFFFFF', '#0B4EA2', '#EE1C25']) + `<rect x="7.5" y="6" width="4.2" height="7.4" fill="#EE1C25"/>`;
+      case 'SI': return h3(['#FFFFFF', '#003DA5', '#ED1C24']) + `<rect x="7.2" y="4.8" width="3.6" height="4.8" fill="#003DA5"/>`;
+      case 'QA': case 'BH': return `<rect x="0" y="0" width="9.5" height="20" fill="#FFFFFF"/><rect x="9.3" y="0" width="20.7" height="20" fill="${iso === 'QA' ? '#8D1B3D' : '#CE1126'}"/>`;
+      case 'TW': return `<rect x="0" y="0" width="30" height="20" fill="#FE0000"/><rect x="0" y="0" width="14.4" height="10" fill="#000095"/><circle cx="7.2" cy="5" r="2.8" fill="#FFFFFF"/>`;
+      case 'HK': return `<rect x="0" y="0" width="30" height="20" fill="#DE2910"/>${_svgStar(15, 10, 4.2, '#FFFFFF')}`;
+      case 'AL': return `<rect x="0" y="0" width="30" height="20" fill="#E41E20"/><ellipse cx="15" cy="10" rx="4.2" ry="5" fill="#000"/>`;
+      case 'CY': return `<rect x="0" y="0" width="30" height="20" fill="#FFFFFF"/><ellipse cx="15" cy="9" rx="5.2" ry="3.1" fill="#D57800"/>`;
+      case 'MT': return `<rect x="0" y="0" width="15" height="20" fill="#FFFFFF"/><rect x="15" y="0" width="15" height="20" fill="#CF142B"/><rect x="2.4" y="2" width="3" height="3.2" fill="#CBD5E1"/>`;
+      default: return `<rect x="0" y="0" width="30" height="20" fill="#0F172A"/><rect x="1" y="1" width="28" height="18" rx="1.5" fill="#1E293B" stroke="#FBBF24" stroke-width="1"/><text x="15" y="13.2" text-anchor="middle" font-family="sans-serif" font-size="8.5" font-weight="800" fill="#F8FAFC">${iso}</text>`;
     }
   }
 
@@ -1742,11 +2454,10 @@ window.drawCityLandmark = drawCityLandmark;
       return esc(trimmed);
     }
     if (typeof iconOrObj === 'object') {
-      const rawFlag = iconOrObj.flag || iconOrObj.icon || '';
-      if (rawFlag && isRegionalEmoji(rawFlag)) return renderFlagSvg(rawFlag, w, h);
-      if (rawFlag) return esc(rawFlag);
       const iso = getCountryCode(iconOrObj);
       if (iso) return renderFlagSvg(iso, w, h);
+      const rawFlag = iconOrObj.flag || iconOrObj.icon || '';
+      if (rawFlag) return esc(rawFlag);
     }
     return esc(fallback || '📻');
   }
@@ -1755,10 +2466,16 @@ window.drawCityLandmark = drawCityLandmark;
     CITY_COUNTRY_ISO,
     isRegionalEmoji,
     decodeRegionalEmoji,
+    isoToFlagEmoji,
+    resolveCountryNameToIso,
     getCountryCode,
     drawFlagToCanvas,
     drawWavingFlag,
     renderFlagSvg,
     renderFlagOrIconHtml
   };
+
+  if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+    healCityCountryFlags({ silentSync: true });
+  }
 })();

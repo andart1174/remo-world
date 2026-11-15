@@ -801,14 +801,43 @@ function adminEditCityMediaPrompt(cityId) {
     : `✅ Media saved for ${getCityName(c, lang)}!`);
 }
 
+/**
+ * Auto-populate #newCityFlag from Country name when Admin hasn't manually overridden the emblem.
+ */
+function adminAutoSyncNewCityFlag() {
+  const flagEl = document.getElementById('newCityFlag');
+  const countryEl = document.getElementById('newCityCountry');
+  if (!flagEl || !countryEl) return;
+  if (flagEl.dataset && flagEl.dataset.manual === '1' && flagEl.value.trim()) return;
+  const rawCountry = countryEl.value.trim();
+  if (!rawCountry) {
+    if (!flagEl.dataset || flagEl.dataset.manual !== '1') flagEl.value = '';
+    return;
+  }
+  const flagsApi = window.REMO_FLAGS;
+  if (flagsApi && typeof flagsApi.resolveCountryNameToIso === 'function' && typeof flagsApi.isoToFlagEmoji === 'function') {
+    const iso = flagsApi.resolveCountryNameToIso(rawCountry);
+    const emoji = iso ? flagsApi.isoToFlagEmoji(iso) : '';
+    if (emoji) {
+      flagEl.value = emoji;
+      if (flagEl.dataset) delete flagEl.dataset.manual;
+    }
+  }
+}
+
 function adminAddNewCity(ev) {
   if (ev) ev.preventDefault();
   const lang = REMO_I18N.getLang();
-  const nameEn = document.getElementById('newCityNameEn')?.value.trim();
-  const nameFr = document.getElementById('newCityNameFr')?.value.trim() || nameEn;
-  const code = (document.getElementById('newCityCode')?.value.trim() || 'CTY').toUpperCase().slice(0, 4);
-  const flag = document.getElementById('newCityFlag')?.value.trim() || '🏙️';
-  const country = document.getElementById('newCityCountry')?.value.trim() || 'World';
+  const nameEnEl = document.getElementById('newCityNameEn');
+  const nameFrEl = document.getElementById('newCityNameFr');
+  const codeEl = document.getElementById('newCityCode');
+  const flagEl = document.getElementById('newCityFlag');
+  const countryEl = document.getElementById('newCityCountry');
+  const nameEn = nameEnEl?.value.trim();
+  const nameFr = nameFrEl?.value.trim() || nameEn;
+  const code = (codeEl?.value.trim() || 'CTY').toUpperCase().slice(0, 4);
+  let rawFlag = flagEl?.value.trim() || '';
+  const country = countryEl?.value.trim() || 'World';
   const lat = Number(document.getElementById('newCityLat')?.value || 45.0);
   const lng = Number(document.getElementById('newCityLng')?.value || 0.0);
   const color = document.getElementById('newCityColor')?.value || '#38bdf8';
@@ -816,6 +845,26 @@ function adminAddNewCity(ev) {
   const rawRadioUrl = (document.getElementById('newCityRadioUrl')?.value || '').trim();
 
   if (!nameEn) return;
+
+  const flagsApi = window.REMO_FLAGS;
+  let countryIso = '';
+  if (flagsApi && typeof flagsApi.resolveCountryNameToIso === 'function') {
+    countryIso = flagsApi.resolveCountryNameToIso(country);
+  }
+  if (/^[A-Za-z]{2}$/.test(rawFlag) && flagsApi && typeof flagsApi.isoToFlagEmoji === 'function') {
+    const isoFromTyped = flagsApi.getCountryCode(rawFlag) || rawFlag.toUpperCase();
+    rawFlag = flagsApi.isoToFlagEmoji(isoFromTyped) || rawFlag;
+  }
+  const autoEmoji = (countryIso && flagsApi && typeof flagsApi.isoToFlagEmoji === 'function')
+    ? flagsApi.isoToFlagEmoji(countryIso)
+    : '';
+  const flag = (autoEmoji && (!rawFlag || rawFlag === '🏙️' || (rawFlag === '🇦🇹' && countryIso !== 'AT')))
+    ? autoEmoji
+    : (rawFlag || autoEmoji || '🏙️');
+  if (!countryIso && flagsApi && typeof flagsApi.decodeRegionalEmoji === 'function') {
+    countryIso = flagsApi.decodeRegionalEmoji(flag) || '';
+  }
+
   const safeImg = /^https:\/\//i.test(rawImageUrl) ? rawImageUrl : '';
   const safeRadio = /^https:\/\//i.test(rawRadioUrl) ? rawRadioUrl : '';
   const id = nameEn.toLowerCase().replace(/[^a-z0-9]/g, '') + '_' + Date.now().toString(36).slice(-3);
@@ -832,6 +881,7 @@ function adminAddNewCity(ev) {
     element: 'neon', rarity: 'Legendary Gold', baseValue: 8800,
     stats: { culture: 90, nightlife: 90, tech: 90, gastronomy: 90 }
   };
+  if (countryIso) newCityObj.countryIso = countryIso;
   if (safeImg) {
     newCityObj.imageUrl = safeImg;
     newCityObj.cardImageUrl = safeImg;
@@ -843,6 +893,14 @@ function adminAddNewCity(ev) {
   }
   cities.push(newCityObj);
   saveRemoCities(cities);
+  if (nameEnEl) nameEnEl.value = '';
+  if (nameFrEl) nameFrEl.value = '';
+  if (codeEl) codeEl.value = '';
+  if (flagEl) {
+    flagEl.value = '';
+    if (flagEl.dataset) delete flagEl.dataset.manual;
+  }
+  if (countryEl) countryEl.value = '';
   if (document.getElementById('newCityImageUrl')) document.getElementById('newCityImageUrl').value = '';
   if (document.getElementById('newCityRadioUrl')) document.getElementById('newCityRadioUrl').value = '';
   REMO_STORE.state.cityScores[id] = 1500;

@@ -354,8 +354,8 @@
               <div class="adm-field"><label>City Name (English)</label><input type="text" id="newCityNameEn" class="adm-inp" placeholder="e.g. Vienna" required></div>
               <div class="adm-field"><label>City Name (French)</label><input type="text" id="newCityNameFr" class="adm-inp" placeholder="e.g. Vienne"></div>
               <div class="adm-field"><label>3-Letter Code</label><input type="text" id="newCityCode" class="adm-inp" placeholder="VIE" maxlength="4"></div>
-              <div class="adm-field"><label>Flag / Emblem Emoji</label><input type="text" id="newCityFlag" class="adm-inp" value="🇦🇹"></div>
-              <div class="adm-field"><label>Country</label><input type="text" id="newCityCountry" class="adm-inp" placeholder="Austria"></div>
+              <div class="adm-field"><label>Flag / Emblem Emoji</label><input type="text" id="newCityFlag" class="adm-inp" placeholder="Auto (e.g. 🇷🇺)" oninput="this.dataset.manual=this.value.trim()?'1':''"></div>
+              <div class="adm-field"><label>Country</label><input type="text" id="newCityCountry" class="adm-inp" placeholder="e.g. Russia, Austria, France" oninput="if(typeof adminAutoSyncNewCityFlag==='function')adminAutoSyncNewCityFlag()"></div>
               <div class="adm-field"><label>Theme Hex Color</label><input type="color" id="newCityColor" class="adm-inp" value="#fbbf24" style="height:40px;"></div>
               <div class="adm-field"><label>GPS Latitude</label><input type="number" step="0.0001" id="newCityLat" class="adm-inp" value="48.2082"></div>
               <div class="adm-field"><label>GPS Longitude</label><input type="number" step="0.0001" id="newCityLng" class="adm-inp" value="16.3738"></div>
@@ -1105,10 +1105,10 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js" integrity="sha384-oFrOL1TiREYNET0lsYF3LjQuyi2gL7vhjH1X8vFr+umcmzAdPELopeSgbcrv4uRm" crossorigin="anonymous"></script>
 
   <!-- Shared REMO Core + Admin Controller -->
-  <script src="js/remo-i18n.js?v=132"></script>
-  <script src="js/remo-cities-data.js?v=132"></script>
-  <script src="js/remo-store.js?v=132"></script>
-  <script src="js/remo-card-engine.js?v=132"></script>
-  <script src="js/remo-admin.js?v=132"></script>
+  <script src="js/remo-i18n.js?v=133"></script>
+  <script src="js/remo-cities-data.js?v=133"></script>
+  <script src="js/remo-store.js?v=133"></script>
+  <script src="js/remo-card-engine.js?v=133"></script>
+  <script src="js/remo-admin.js?v=133"></script>
 </body>
 </html>
