@@ -124,7 +124,7 @@
   <noscript><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha384-sHL9NAb7lN7rfvG5lfHpm643Xkcjzp4jFvuavGOndn6pjVqS6ny56CAt3nsEVT4H" crossorigin="anonymous"></noscript>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha384-cxOPjt7s7Iz04uaHJceBmS+qpjv2JkIHNVcuOrM+YHwZOmJGBXI00mdUXEq65HTH" crossorigin="anonymous" defer></script>
 
-  <link rel="stylesheet" href="css/remo-core.css?v=134">
+  <link rel="stylesheet" href="css/remo-core.css?v=135">
 </head>
 <body>
 
@@ -247,7 +247,7 @@
               <span class="nav-ic">⊞</span>
               <span data-i18n="nav_explore_apps">Explore All Apps</span>
             </span>
-            <span class="apps-count-pill">17</span>
+            <span class="apps-count-pill">18</span>
           </button>
 
           <!-- Legal & Support Footer -->
@@ -346,6 +346,7 @@
             </div>
           </div>
 
+          <div id="worldSpotlightBar" class="world-spotlight-bar"></div>
           <div id="feedCitySpotlightBar" class="feed-city-spotlight-bar" style="display:none;"></div>
         </div>
 
@@ -1266,6 +1267,7 @@
       <!-- Studio Mode Tabs -->
       <div class="studio-tabs">
         <button type="button" class="studio-tab-btn active" data-studio-tab="photo" onclick="switchCreateStudioTab('photo')" data-i18n="create_tab_photo">📷 Photo Studio</button>
+        <button type="button" class="studio-tab-btn" data-studio-tab="beforeafter" onclick="switchCreateStudioTab('beforeafter')" data-i18n="create_tab_beforeafter">🪞 Before / After</button>
         <button type="button" class="studio-tab-btn" data-studio-tab="video" onclick="switchCreateStudioTab('video')" data-i18n="create_tab_video">🎬 Video &amp; Link</button>
         <button type="button" class="studio-tab-btn" data-studio-tab="html" id="studioTabHtmlBtn" style="display:none;" onclick="switchCreateStudioTab('html')" data-i18n="create_tab_html">💻 Live HTML Code</button>
         <button type="button" class="studio-tab-btn" data-studio-tab="art" onclick="switchCreateStudioTab('art')" data-i18n="create_tab_art">🏙️ City Poster</button>
@@ -1334,6 +1336,72 @@
             <option value="city_radio" data-i18n="sound_city_radio">📻 Live City Radio Stream</option>
           </select>
         </div>
+      </div>
+
+      <!-- TAB 1B: INTERACTIVE BEFORE / AFTER GLOW-UP STUDIO -->
+      <div class="studio-pane" id="studioPane-beforeafter">
+        <div class="ba-studio-preview-stage" id="baStudioPreviewStage">
+          <div class="ba-studio-placeholder" data-i18n="ba_preview_hint">Upload Photo 1 (Before) and Photo 2 (After) to test the interactive wipe slider!</div>
+        </div>
+
+        <div class="ba-slots-grid">
+          <div class="ba-slot-card before-slot">
+            <div class="ba-slot-hdr" style="color:#38bdf8;" data-i18n="ba_slot_before">⏮️ Photo 1 — BEFORE</div>
+            <div class="ba-slot-thumb" id="baBeforeThumb">⏮️</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;">
+              <label class="btn-cyber" style="cursor:pointer;justify-content:center;padding:5px 6px;font-size:0.71rem;">
+                <span data-i18n="ba_upload_btn">📷 Upload</span>
+                <input type="file" id="baBeforeFileInp" accept="image/*" style="display:none;" onchange="handleBeforeAfterSlotSelect('before', event)">
+              </label>
+              <label class="btn-ghost" style="cursor:pointer;justify-content:center;padding:5px 6px;font-size:0.71rem;">
+                <span data-i18n="ba_selfie_btn">🤳 Selfie</span>
+                <input type="file" id="baBeforeCamInp" accept="image/*" capture="user" style="display:none;" onchange="handleBeforeAfterSlotSelect('before', event)">
+              </label>
+            </div>
+            <select id="baBeforeFilterSel" class="remo-input" style="padding:5px 8px;font-size:0.74rem;" onchange="setBeforeAfterSlotFilter('before', this.value)">
+              <option value="flt-none">✨ Original</option>
+              <option value="flt-neon">🌆 Cyber Neon</option>
+              <option value="flt-gold">🌅 Golden Hour</option>
+              <option value="flt-matrix">🟢 Tokyo Matrix</option>
+              <option value="flt-arctic">❄️ Arctic Crystal</option>
+              <option value="flt-noir">🎞️ Noir</option>
+            </select>
+            <input type="text" id="baBeforeLabelInp" maxlength="16" class="remo-input" style="padding:5px 8px;font-size:0.74rem;" oninput="renderBeforeAfterStudioPreview()" data-i18n-placeholder="ba_label_before_ph" placeholder="Label (default: BEFORE)">
+          </div>
+
+          <div class="ba-swap-mid">
+            <button type="button" class="ba-swap-btn" onclick="swapBeforeAfterSlots()" data-i18n="ba_swap_btn">⇄ Swap</button>
+          </div>
+
+          <div class="ba-slot-card after-slot">
+            <div class="ba-slot-hdr" style="color:#fbbf24;" data-i18n="ba_slot_after">⏭️ Photo 2 — AFTER</div>
+            <div class="ba-slot-thumb" id="baAfterThumb">⏭️</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;">
+              <label class="btn-cyber btn-gold" style="cursor:pointer;justify-content:center;padding:5px 6px;font-size:0.71rem;">
+                <span data-i18n="ba_upload_btn">📷 Upload</span>
+                <input type="file" id="baAfterFileInp" accept="image/*" style="display:none;" onchange="handleBeforeAfterSlotSelect('after', event)">
+              </label>
+              <label class="btn-ghost" style="cursor:pointer;justify-content:center;padding:5px 6px;font-size:0.71rem;">
+                <span data-i18n="ba_selfie_btn">🤳 Selfie</span>
+                <input type="file" id="baAfterCamInp" accept="image/*" capture="user" style="display:none;" onchange="handleBeforeAfterSlotSelect('after', event)">
+              </label>
+            </div>
+            <select id="baAfterFilterSel" class="remo-input" style="padding:5px 8px;font-size:0.74rem;" onchange="setBeforeAfterSlotFilter('after', this.value)">
+              <option value="flt-none">✨ Original</option>
+              <option value="flt-neon">🌆 Cyber Neon</option>
+              <option value="flt-gold">🌅 Golden Hour</option>
+              <option value="flt-matrix">🟢 Tokyo Matrix</option>
+              <option value="flt-arctic">❄️ Arctic Crystal</option>
+              <option value="flt-noir">🎞️ Noir</option>
+            </select>
+            <input type="text" id="baAfterLabelInp" maxlength="16" class="remo-input" style="padding:5px 8px;font-size:0.74rem;" oninput="renderBeforeAfterStudioPreview()" data-i18n-placeholder="ba_label_after_ph" placeholder="Label (default: AFTER)">
+          </div>
+        </div>
+
+        <label style="display:flex;align-items:center;gap:8px;font-size:0.78rem;color:#38bdf8;font-weight:800;margin-bottom:8px;cursor:pointer;">
+          <input type="checkbox" id="createBaLookRatingToggle" checked>
+          <span data-i18n="ba_rating_toggle">✨ Enable 3-Bar Look &amp; Glow-Up Rating (🔥 Style · ⚡ Vibe · 👑 City Icon)</span>
+        </label>
       </div>
 
       <!-- TAB 2: VIDEO & EXTERNAL LINK STUDIO (60s File Upload / Camera OR Unlimited Video / Web Link) -->
@@ -1542,8 +1610,25 @@
         </div>
       </div>
 
-      <!-- GENIUS VIRAL POWER-UPS (Live Poll + VIP Secret Capsule + Spark Voice + GPS) -->
+      <!-- GENIUS VIRAL POWER-UPS (Mystery Box + Live Poll + VIP Secret Capsule + Spark Voice + GPS) -->
       <div style="background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:14px;padding:10px 12px;margin-bottom:12px;display:flex;flex-direction:column;gap:8px;">
+        <label style="display:flex;align-items:center;gap:8px;font-size:0.8rem;font-weight:800;color:#fde047;cursor:pointer;">
+          <input type="checkbox" id="createMysteryBoxToggle" onchange="document.getElementById('createMysteryBoxFields').style.display=this.checked?'grid':'none'">
+          <span data-i18n="mbox_toggle_lbl">🎁 Wrap as Mystery Blind-Box (Scratch or 3-Tap to Reveal!)</span>
+        </label>
+        <div id="createMysteryBoxFields" style="display:none;grid-template-columns:1fr 1fr;gap:7px;">
+          <select id="createMysteryBoxTheme" class="remo-input">
+            <option value="silver" data-i18n="mbox_theme_silver">🪙 Cyber Silver Foil</option>
+            <option value="gold" data-i18n="mbox_theme_gold">👑 24K Gold Luxury</option>
+            <option value="neon" data-i18n="mbox_theme_neon">⚡ Neon Hologram</option>
+            <option value="gift" data-i18n="mbox_theme_gift">🎁 Scarlet Surprise Gift</option>
+          </select>
+          <input type="text" id="createMysteryBoxTeaser" class="remo-input" maxlength="80" data-i18n-placeholder="mbox_teaser_ph" placeholder="Teaser shown on box (e.g. Guess what just dropped in town!)">
+          <input type="text" id="createMysteryBoxGuessQ" class="remo-input" style="grid-column:1/-1;" maxlength="90" data-i18n-placeholder="mbox_guess_q_ph" placeholder="Optional mini-guess before opening (e.g. Real flex or joke?)">
+          <input type="text" id="createMysteryBoxOptA" class="remo-input" maxlength="40" data-i18n-placeholder="mbox_guess_a_ph" placeholder="Guess A (e.g. Real Upgrade 🔥)">
+          <input type="text" id="createMysteryBoxOptB" class="remo-input" maxlength="40" data-i18n-placeholder="mbox_guess_b_ph" placeholder="Guess B (e.g. Just Kidding 😂)">
+        </div>
+
         <label style="display:flex;align-items:center;gap:8px;font-size:0.8rem;font-weight:800;color:#a5b4fc;cursor:pointer;">
           <input type="checkbox" id="createPollToggle" onchange="document.getElementById('createPollFields').style.display=this.checked?'grid':'none'">
           <span data-i18n="create_poll_toggle">📊 Add Interactive Live Poll (+5 🪙 per vote)</span>
@@ -2608,6 +2693,11 @@
 
       <div class="apps-sec-label" data-i18n="apps_sec_play">⚔️ Games, Arena &amp; Contests</div>
       <div class="apps-grid">
+        <button type="button" class="app-tile" id="appLauncherGamesHubTile" style="border-color:rgba(56,189,248,0.65);background:linear-gradient(135deg,rgba(14,165,233,0.16),rgba(139,92,246,0.14));" onclick="closeAppLauncherModal();openGamesHubModal()">
+          <span class="app-tile-badge" style="background:linear-gradient(135deg,#38bdf8,#a855f7);" data-i18n="games_hub_badge">NEW</span>
+          <span class="app-tile-ic">🕹️</span>
+          <span class="app-tile-lbl" data-i18n="nav_games_hub">REMO Games Hub</span>
+        </button>
         <button type="button" class="app-tile emerald" id="appLauncherBlitzTile" onclick="closeAppLauncherModal();openWorldBlitzModal()">
           <span class="app-tile-badge" id="appLauncherBlitzBadge" data-i18n="blitz_badge_daily">DAILY</span>
           <span class="app-tile-ic">🧠</span>
@@ -2677,6 +2767,37 @@
     </div>
   </div>
 
+  <!-- MODAL: 🕹️ REMO GAMES HUB (Play Arcade Games + Post Beat-My-Score Feed Challenges) -->
+  <div class="remo-modal-backdrop" id="gamesHubModal" onclick="if(event.target===this) closeGamesHubModal()">
+    <div class="remo-modal games-hub-modal-box">
+      <div class="modal-hdr">
+        <div>
+          <b style="font-family:'Orbitron',sans-serif;font-size:1rem;color:#38bdf8;" data-i18n="games_hub_title">🕹️ REMO Games Hub — Play &amp; Challenge</b>
+          <div style="font-size:0.74rem;color:var(--muted);margin-top:2px;" data-i18n="games_hub_sub">Play exclusive REMO arcade mini-games, climb the City Leaderboard, or drop a "Beat My Score" challenge straight into the global Feed!</div>
+        </div>
+        <button type="button" class="modal-close" onclick="closeGamesHubModal()">✕</button>
+      </div>
+      <div id="gamesHubBody" style="overflow-y:auto;flex:1;padding-right:2px;"></div>
+    </div>
+  </div>
+
+  <!-- 🌟 WORLD SPOTLIGHT QUEUE MODAL -->
+  <div class="remo-modal-backdrop" id="spotlightEnterModal" onclick="if(event.target===this) closeSpotlightEnterModal()">
+    <div class="remo-modal" style="max-width:520px;border-color:rgba(251,191,36,0.5);">
+      <div class="modal-hdr">
+        <div>
+          <b style="font-family:'Orbitron',sans-serif;font-size:1rem;color:#fde047;" data-i18n="wspot_modal_title">🌟 Enter World Spotlight Stage</b>
+          <div style="font-size:0.74rem;color:var(--muted);margin-top:2px;" data-i18n="wspot_modal_sub">Broadcast one of your posts globally at the top of everyone’s Feed for 45 seconds (+5s per 🔥 HYPE up to 180s)!</div>
+        </div>
+        <button type="button" class="modal-close" onclick="closeSpotlightEnterModal()">✕</button>
+      </div>
+      <div style="padding:8px 10px;border-radius:10px;background:rgba(251,191,36,0.1);border:1px solid rgba(251,191,36,0.35);font-size:0.76rem;color:#fde047;font-weight:800;margin-bottom:10px;" data-i18n="wspot_cost_rule">
+        ⚡ Rules: Costs 100 🪙 · Strictly 1 entry per citizen per day.
+      </div>
+      <div id="spotlightEnterBody"></div>
+    </div>
+  </div>
+
   <!-- MODAL: EMBEDDABLE LIVE CITY WIDGET STUDIO (Notion / Blogs / Sites) -->
   <div class="remo-modal-backdrop" id="widgetEmbedModal" onclick="if(event.target===this) closeWidgetEmbedModal()">
     <div class="remo-modal" style="max-width:560px;">
@@ -2737,15 +2858,15 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js" integrity="sha384-oFrOL1TiREYNET0lsYF3LjQuyi2gL7vhjH1X8vFr+umcmzAdPELopeSgbcrv4uRm" crossorigin="anonymous"></script>
 
   <!-- REMO Modular Engines -->
-  <script src="js/remo-i18n.js?v=134"></script>
-  <script src="js/remo-cities-data.js?v=134"></script>
-  <script src="js/remo-store.js?v=134"></script>
-  <script src="js/remo-card-engine.js?v=134"></script>
-  <script src="js/remo-radar-arena.js?v=134"></script>
-  <script src="js/remo-social-comms.js?v=134"></script>
-  <script src="js/remo-radio-engine.js?v=134"></script>
-  <script src="js/remo-focus-tv.js?v=134"></script>
-  <script src="js/remo-world-blitz.js?v=134"></script>
+  <script src="js/remo-i18n.js?v=135"></script>
+  <script src="js/remo-cities-data.js?v=135"></script>
+  <script src="js/remo-store.js?v=135"></script>
+  <script src="js/remo-card-engine.js?v=135"></script>
+  <script src="js/remo-radar-arena.js?v=135"></script>
+  <script src="js/remo-social-comms.js?v=135"></script>
+  <script src="js/remo-radio-engine.js?v=135"></script>
+  <script src="js/remo-focus-tv.js?v=135"></script>
+  <script src="js/remo-world-blitz.js?v=135"></script>
 
   <noscript>
     <nav aria-label="REMO World Static Directory" style="padding:20px;background:#050816;color:#f8fafc;">

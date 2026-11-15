@@ -16,6 +16,12 @@ let activeCreateStudioTab = 'photo';
 let pendingStudioPhotoBlobs = [];
 let pendingStudioPhotoPreviewUrls = [];
 let pendingStudioPhotoFilter = 'flt-none';
+let pendingBaBeforeBlob = null;
+let pendingBaBeforePreviewUrl = '';
+let pendingBaBeforeFilter = 'flt-none';
+let pendingBaAfterBlob = null;
+let pendingBaAfterPreviewUrl = '';
+let pendingBaAfterFilter = 'flt-none';
 let pendingStudioVideoBlob = null;
 let pendingStudioVideoDuration = 0;
 let pendingRawLongVideoFile = null;
@@ -1376,6 +1382,53 @@ function renderPostPollWidget(p, lang, u) {
   `;
 }
 
+const BA_LOOK_CRITERIA = [
+  { key: 'style', i18n: 'ba_crit_style' },
+  { key: 'vibe', i18n: 'ba_crit_vibe' },
+  { key: 'icon', i18n: 'ba_crit_icon' }
+];
+
+function renderLookRatingWidget(p, lang, u) {
+  if (p.mediaType !== 'before_after') return '';
+  if (p.lookRating && p.lookRating.enabled === false) return '';
+  const lr = p.lookRating || {};
+  const voters = lr.voters && typeof lr.voters === 'object' ? lr.voters : {};
+  const myVotes = (u && voters[u.uid]) ? voters[u.uid] : {};
+  const totalVoters = Object.keys(voters).length;
+  const cityTag = escapeJsSingleArg(`#GlowUp #${p.cityId || 'world'}`);
+
+  return `
+    <div class="ba-look-rating-card">
+      <div class="ba-look-hdr">
+        <span class="ba-look-title">${escapeHtmlStr(t('ba_rating_title'))}</span>
+        <span class="ba-look-total">${escapeHtmlStr(t('ba_votes_count', { n: totalVoters }))}${totalVoters === 0 ? ' · +5 🪙' : ''}</span>
+      </div>
+      ${BA_LOOK_CRITERIA.map((c) => {
+        const bucket = lr[c.key] || { sum: 0, count: 0 };
+        const cnt = Number(bucket.count) || 0;
+        const avg10 = cnt > 0 ? ((Number(bucket.sum) || 0) / cnt) * 2 : 0;
+        const fillPct = Math.round((avg10 / 10) * 100);
+        const myScore = Number(myVotes[c.key]) || 0;
+        return `
+          <div class="ba-crit-row">
+            <div class="ba-crit-top">
+              <span>${escapeHtmlStr(t(c.i18n))}</span>
+              <span class="ba-crit-score">${cnt > 0 ? `${avg10.toFixed(1)}/10` : '—/10'}</span>
+            </div>
+            <div class="ba-crit-controls">
+              <div class="ba-crit-bar-track"><div class="ba-crit-bar-fill" style="width:${fillPct}%;"></div></div>
+              <div class="ba-stars-row">
+                ${[1, 2, 3, 4, 5].map((st) => `<button type="button" class="ba-star-btn ${myScore === st ? 'active' : ''}" onclick="rateBeforeAfterLook('${escapeJsSingleArg(p.id)}', '${c.key}', ${st})">${st}★</button>`).join('')}
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('')}
+      <button type="button" class="btn-cyber ba-chain-btn" onclick="openCreateBeforeAfterModal('${cityTag}')">${escapeHtmlStr(t('ba_post_mine_btn'))}</button>
+    </div>
+  `;
+}
+
 function renderSecretCapsuleWidget(p, lang, u) {
   if (!p.secretCapsule) return '';
   const sc = p.secretCapsule;
@@ -1415,6 +1468,34 @@ function isAdminXrayOpen(postId) {
   return Boolean(REMO_STORE.isAdminUnlocked() && window._adminXrayCapsules && window._adminXrayCapsules[postId]);
 }
 
+function renderInteractiveBeforeAfterBox({
+  url1,
+  url2,
+  key1 = '',
+  key2 = '',
+  flt1 = 'flt-none',
+  flt2 = 'flt-none',
+  lbl1 = 'BEFORE',
+  lbl2 = 'AFTER',
+  isLightbox = false
+}) {
+  const idb1 = key1 && String(key1).startsWith('idb://') ? `data-idb-src="${key1}"` : '';
+  const idb2 = key2 && String(key2).startsWith('idb://') ? `data-idb-src="${key2}"` : '';
+  return `
+    <div class="ba-slider-box">
+      <img src="${sanitizeSafeMediaUrl(url1)}" ${idb1} class="${escapeHtmlStr(flt1 || 'flt-none')}" loading="lazy" decoding="async" alt="${escapeHtmlStr(lbl1)}">
+      <div class="ba-after-layer">
+        <img src="${sanitizeSafeMediaUrl(url2)}" ${idb2} class="${escapeHtmlStr(flt2 || 'flt-none')}" loading="lazy" decoding="async" alt="${escapeHtmlStr(lbl2)}">
+      </div>
+      <span class="ba-corner-badge ba-badge-before">${escapeHtmlStr(lbl1)}</span>
+      <span class="ba-corner-badge ba-badge-after">${escapeHtmlStr(lbl2)}</span>
+      <button type="button" class="ba-autoslide-btn" onclick="event.stopPropagation();toggleBeforeAfterAutoSlide(this)">${escapeHtmlStr(t('ba_autoslide_btn'))}</button>
+      <div class="ba-divider-line"><div class="ba-knob">◀ ▶</div></div>
+      <input type="range" min="3" max="97" value="50" class="ba-range-input" onpointerdown="stopBeforeAfterAutoSlide(this)" oninput="updateBeforeAfterSlider(this)" onclick="event.stopPropagation()" aria-label="${isLightbox ? 'Fullscreen comparison slider' : 'Before and After slider'}">
+    </div>
+  `;
+}
+
 function renderSinglePaneMedia(item, cityObj, lang) {
   if (item.mediaType === 'text_card' && item.textCard && typeof renderPostTextCardStage === 'function') {
     return renderPostTextCardStage(item, cityObj, lang, { compact: true });
@@ -1443,7 +1524,259 @@ function renderSinglePaneMedia(item, cityObj, lang) {
   return `<img src="${sanitizeSafeMediaUrl(src)}" ${idbTag} class="${flt}" loading="lazy" decoding="async" alt="${escapeHtmlStr(getCityName(cityObj, lang))}">`;
 }
 
+const _sessionUnboxedBoxes = new Set();
+const _sessionBoxTaps = {};
+
+function isPostMysteryBoxLocked(p, u) {
+  if (!p || !p.mysteryBox || !p.mysteryBox.enabled) return false;
+  if (isPostCapsuleSealed(p)) return false;
+  if (isAdminXrayOpen(p.id)) return false;
+  if (_sessionUnboxedBoxes.has(p.id)) return false;
+  const unboxedBy = Array.isArray(p.mysteryBox.unboxedBy) ? p.mysteryBox.unboxedBy : [];
+  if (u && u.uid && unboxedBy.includes(u.uid)) return false;
+  return true;
+}
+
+function _renderMysteryBoxOverlay(p, innerHtml, lang) {
+  const mb = p.mysteryBox || {};
+  const u = REMO_STORE.getCurrentUser();
+  const theme = mb.theme || 'silver';
+  const teaserRaw = lang === 'fr'
+    ? (mb.teaser_fr || mb.teaser_en || '')
+    : (mb.teaser_en || mb.teaser_fr || '');
+  const teaserTxt = teaserRaw || t('mbox_default_teaser', { name: p.authorName || 'Citizen' });
+  const taps = _sessionBoxTaps[p.id] || 0;
+  const opts = Array.isArray(mb.guessOptions) ? mb.guessOptions : [];
+  const voterKey = (u && u.uid) ? u.uid : (localStorage.getItem('remo_guest_vid') || 'guest');
+  const myGuess = (mb.guessVoters && mb.guessVoters[voterKey] !== undefined) ? mb.guessVoters[voterKey] : -1;
+  const themeIcon = theme === 'gold' ? '👑' : theme === 'neon' ? '⚡' : theme === 'gift' ? '🎁' : '📦';
+
+  return `
+    <div class="mbox-overlay-stage" id="mbox_stage_${p.id}" ondblclick="event.stopPropagation()" ontouchstart="event.stopPropagation()">
+      <div class="mbox-under-blur">${innerHtml}</div>
+      <canvas class="mbox-scratch-canvas" data-mbox-post="${p.id}" data-mbox-theme="${escapeHtmlStr(theme)}"></canvas>
+      <div class="mbox-center-emblem">
+        <div class="mbox-box-emoji">${themeIcon}</div>
+        <div class="mbox-teaser-pill">🔒 ${escapeHtmlStr(teaserTxt)}</div>
+        <div class="mbox-sub-hint">${escapeHtmlStr(t('mbox_scratch_hint'))}</div>
+        ${opts.length >= 2 ? `
+          <div class="mbox-guess-box" onclick="event.stopPropagation()">
+            ${mb.guessQuestion ? `<div class="mbox-guess-q">🔮 ${escapeHtmlStr(mb.guessQuestion)}</div>` : ''}
+            <div class="mbox-guess-opts">
+              ${opts.map((o, idx) => `<button type="button" class="mbox-guess-btn ${myGuess === idx ? 'voted' : ''}" onclick="voteMysteryBoxGuess('${escapeJsSingleArg(p.id)}', ${idx}, event)">${escapeHtmlStr(o.label)} (${o.votes || 0})</button>`).join('')}
+            </div>
+          </div>
+        ` : ''}
+        <button type="button" class="mbox-tap-btn" onclick="tapMysteryBoxPost('${escapeJsSingleArg(p.id)}', event)">${escapeHtmlStr(t('mbox_tap_btn', { n: taps }))}</button>
+      </div>
+    </div>
+  `;
+}
+
+function voteMysteryBoxGuess(postId, optIdx, ev) {
+  if (ev) ev.stopPropagation();
+  const p = findFeedPostById(postId);
+  if (!p || !p.mysteryBox || !Array.isArray(p.mysteryBox.guessOptions) || !p.mysteryBox.guessOptions[optIdx]) return;
+  const u = REMO_STORE.getCurrentUser();
+  const voterKey = (u && u.uid) ? u.uid : (localStorage.getItem('remo_guest_vid') || 'guest');
+  if (!p.mysteryBox.guessVoters || typeof p.mysteryBox.guessVoters !== 'object') {
+    p.mysteryBox.guessVoters = {};
+  }
+  const prevIdx = p.mysteryBox.guessVoters[voterKey];
+  if (prevIdx !== undefined && p.mysteryBox.guessOptions[prevIdx]) {
+    p.mysteryBox.guessOptions[prevIdx].votes = Math.max(0, (p.mysteryBox.guessOptions[prevIdx].votes || 0) - 1);
+  }
+  p.mysteryBox.guessVoters[voterKey] = optIdx;
+  p.mysteryBox.guessOptions[optIdx].votes = (p.mysteryBox.guessOptions[optIdx].votes || 0) + 1;
+  REMO_STORE.syncPostToCloud(p);
+  REMO_STORE.save(true, 'mbox_guess');
+  if (typeof RemoAudio !== 'undefined' && RemoAudio.play) RemoAudio.play('click');
+  remoToast(t('mbox_guess_saved_toast'));
+  rerenderSinglePostCard(p.id);
+}
+
+function tapMysteryBoxPost(postId, ev) {
+  if (ev) ev.stopPropagation();
+  const next = (_sessionBoxTaps[postId] || 0) + 1;
+  _sessionBoxTaps[postId] = next;
+  if (typeof RemoAudio !== 'undefined' && RemoAudio.play) RemoAudio.play('click');
+  const stage = document.getElementById('mbox_stage_' + postId);
+  if (stage) {
+    stage.classList.remove('cracking');
+    void stage.offsetWidth;
+    stage.classList.add('cracking');
+    const btn = stage.querySelector('.mbox-tap-btn');
+    if (btn) btn.textContent = t('mbox_tap_btn', { n: Math.min(3, next) });
+  }
+  if (next >= 3) {
+    unlockMysteryBoxPost(postId, 'tap');
+  }
+}
+
+function unlockMysteryBoxPost(postId, reason = 'scratch') {
+  const p = findFeedPostById(postId);
+  if (!p || !p.mysteryBox) return;
+  if (_sessionUnboxedBoxes.has(postId)) return;
+  _sessionUnboxedBoxes.add(postId);
+  delete _sessionBoxTaps[postId];
+
+  const u = REMO_STORE.getCurrentUser();
+  p.mysteryBox.unboxedBy = Array.isArray(p.mysteryBox.unboxedBy) ? p.mysteryBox.unboxedBy : [];
+  const uidKey = u?.uid || ('guest_' + (localStorage.getItem('remo_guest_vid') || 'visitor'));
+  const isOwner = Boolean(u && p.uid && u.uid === p.uid);
+  const firstViewerUnbox = !p.mysteryBox.unboxedBy.includes(uidKey);
+  if (firstViewerUnbox) {
+    p.mysteryBox.unboxedBy.push(uidKey);
+    if (!isOwner && p.uid) {
+      REMO_STORE.addCoins(p.uid, 2, 2);
+    }
+  }
+
+  let gotDailyBonus = false;
+  if (u && !isOwner && u.homeCity !== p.cityId) {
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const bonusKey = `remo_mbox_bonus_day_${u.uid}`;
+    if (localStorage.getItem(bonusKey) !== todayStr) {
+      localStorage.setItem(bonusKey, todayStr);
+      REMO_STORE.addCoins(u.uid, 5, 5);
+      gotDailyBonus = true;
+    }
+  }
+
+  if (typeof spawnRemoCoinsFX === 'function') spawnRemoCoinsFX(gotDailyBonus ? 8 : 4);
+  if (typeof RemoAudio !== 'undefined' && RemoAudio.play) RemoAudio.play('fanfare');
+  remoToast(
+    gotDailyBonus
+      ? t('mbox_unboxed_bonus_toast')
+      : t('mbox_unboxed_toast', { n: p.mysteryBox.unboxedBy.length }),
+    gotDailyBonus ? 'coin' : 'fanfare'
+  );
+  REMO_STORE.syncPostToCloud(p);
+  REMO_STORE.save(true, 'mbox_unbox');
+  rerenderSinglePostCard(p.id);
+  syncHeaderAndSidebars();
+}
+
+function _initSingleMysteryBoxCanvas(canvas) {
+  if (!canvas || canvas._mboxReady) return;
+  canvas._mboxReady = true;
+  const postId = canvas.getAttribute('data-mbox-post');
+  const theme = canvas.getAttribute('data-mbox-theme') || 'silver';
+  const rect = canvas.getBoundingClientRect();
+  const w = Math.max(260, Math.round(rect.width || 320));
+  const h = Math.max(260, Math.round(rect.height || 300));
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+
+  const grad = ctx.createLinearGradient(0, 0, w, h);
+  if (theme === 'gold') {
+    grad.addColorStop(0, '#fde047');
+    grad.addColorStop(0.5, '#d97706');
+    grad.addColorStop(1, '#78350f');
+  } else if (theme === 'neon') {
+    grad.addColorStop(0, '#0ea5e9');
+    grad.addColorStop(0.5, '#9333ea');
+    grad.addColorStop(1, '#ec4899');
+  } else if (theme === 'gift') {
+    grad.addColorStop(0, '#f43f5e');
+    grad.addColorStop(0.5, '#be123c');
+    grad.addColorStop(1, '#4c0519');
+  } else {
+    grad.addColorStop(0, '#cbd5e1');
+    grad.addColorStop(0.5, '#64748b');
+    grad.addColorStop(1, '#1e293b');
+  }
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, w, h);
+
+  // Foil crosshatch sheen lines
+  ctx.strokeStyle = 'rgba(255,255,255,0.16)';
+  ctx.lineWidth = 2;
+  for (let i = -h; i < w + h; i += 22) {
+    ctx.beginPath();
+    ctx.moveTo(i, 0);
+    ctx.lineTo(i + h * 0.45, h);
+    ctx.stroke();
+  }
+
+  const COLS = 12;
+  const ROWS = 10;
+  const clearedCells = new Set();
+  let scratching = false;
+
+  const scratchAt = (clientX, clientY) => {
+    const r = canvas.getBoundingClientRect();
+    if (!r.width || !r.height) return;
+    const x = ((clientX - r.left) / r.width) * w;
+    const y = ((clientY - r.top) / r.height) * h;
+    ctx.save();
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.beginPath();
+    ctx.arc(x, y, Math.max(20, w * 0.085), 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    const gx = Math.min(COLS - 1, Math.max(0, Math.floor((x / w) * COLS)));
+    const gy = Math.min(ROWS - 1, Math.max(0, Math.floor((y / h) * ROWS)));
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dy = -1; dy <= 1; dy++) {
+        const cx = gx + dx;
+        const cy = gy + dy;
+        if (cx >= 0 && cx < COLS && cy >= 0 && cy < ROWS) {
+          clearedCells.add(`${cx}:${cy}`);
+        }
+      }
+    }
+    if (clearedCells.size >= Math.ceil(COLS * ROWS * 0.42)) {
+      unlockMysteryBoxPost(postId, 'scratch');
+    }
+  };
+
+  canvas.addEventListener('pointerdown', (e) => {
+    e.stopPropagation();
+    scratching = true;
+    canvas.style.touchAction = 'none';
+    scratchAt(e.clientX, e.clientY);
+  });
+  canvas.addEventListener('pointermove', (e) => {
+    if (!scratching) return;
+    e.stopPropagation();
+    scratchAt(e.clientX, e.clientY);
+  });
+  const endScratch = () => {
+    scratching = false;
+    canvas.style.touchAction = 'pan-y';
+  };
+  canvas.addEventListener('pointerup', endScratch);
+  canvas.addEventListener('pointercancel', endScratch);
+}
+
+function initAllMysteryBoxCanvases(rootEl = document) {
+  const scope = rootEl || document;
+  scope.querySelectorAll('.mbox-scratch-canvas[data-mbox-post]').forEach((cv) => {
+    _initSingleMysteryBoxCanvas(cv);
+  });
+}
+
+window.tapMysteryBoxPost = tapMysteryBoxPost;
+window.voteMysteryBoxGuess = voteMysteryBoxGuess;
+window.unlockMysteryBoxPost = unlockMysteryBoxPost;
+window.initAllMysteryBoxCanvases = initAllMysteryBoxCanvases;
+
 function renderPostMediaStage(p, city, lang) {
+  if (isPostCapsuleSealed(p) && !isAdminXrayOpen(p.id)) {
+    return _renderPostMediaStageInner(p, city, lang);
+  }
+  const innerHtml = _renderPostMediaStageInner(p, city, lang);
+  if (isPostMysteryBoxLocked(p, REMO_STORE.getCurrentUser())) {
+    return _renderMysteryBoxOverlay(p, innerHtml, lang);
+  }
+  return innerHtml;
+}
+
+function _renderPostMediaStageInner(p, city, lang) {
   const flt = p.photoFilter || 'flt-none';
 
   // 0. ⏳ SEALED 4D TIME-CAPSULE MYSTERY VAULT (Unless Admin X-Ray Preview is toggled ON)
@@ -1561,16 +1894,16 @@ function renderPostMediaStage(p, city, lang) {
     const k1 = p.mediaUrls[0], k2 = p.mediaUrls[1];
     const u1 = RemoMediaDB.resolveSyncOrPlaceholder(k1);
     const u2 = RemoMediaDB.resolveSyncOrPlaceholder(k2);
-    return `
-      <div class="ba-slider-box">
-        <img src="${sanitizeSafeMediaUrl(u1)}" ${String(k1).startsWith('idb://') ? `data-idb-src="${k1}"` : ''} class="${flt}" loading="lazy" decoding="async" alt="Before">
-        <div class="ba-after-layer">
-          <img src="${sanitizeSafeMediaUrl(u2)}" ${String(k2).startsWith('idb://') ? `data-idb-src="${k2}"` : ''} class="${flt}" loading="lazy" decoding="async" alt="After">
-        </div>
-        <div class="ba-divider-line"><div class="ba-knob">◀ ▶</div></div>
-        <input type="range" min="3" max="97" value="50" class="ba-range-input" oninput="updateBeforeAfterSlider(this)">
-      </div>
-    `;
+    return renderInteractiveBeforeAfterBox({
+      url1: u1,
+      url2: u2,
+      key1: k1,
+      key2: k2,
+      flt1: p.beforeFilter || flt,
+      flt2: p.afterFilter || flt,
+      lbl1: p.beforeLabel || t('ba_badge_before'),
+      lbl2: p.afterLabel || t('ba_badge_after')
+    });
   }
 
   // 4. MULTI-PHOTO CAROUSEL (2–4 PHOTOS)
@@ -1767,9 +2100,12 @@ function computePostRenderSig(p, u, lang) {
   const pollSig = p.poll ? `${(p.poll.voters || []).length}:${(p.poll.options || []).map((o) => o.votes || 0).join(',')}` : '';
   const btySig = p.bounty ? `${p.bounty.claimed ? 1 : 0}` : '';
   const capSig = p.secretCapsule ? `${(p.secretCapsule.unlockedBy || []).length}` : '';
+  const lookSig = p.lookRating ? `${p.lookRating.style?.sum || 0}:${p.lookRating.vibe?.sum || 0}:${p.lookRating.icon?.sum || 0}:${Object.keys(p.lookRating.voters || {}).length}` : '';
+  const mboxSig = p.mysteryBox?.enabled ? `${isPostMysteryBoxLocked(p, u) ? 1 : 0}:${(p.mysteryBox.unboxedBy || []).length}:${(p.mysteryBox.guessOptions || []).map((o) => o.votes || 0).join(',')}` : '';
+  const chSig = p.gameChallenge ? `${p.gameChallenge.targetScore || 0}:${p.gameChallenge.holderUid || ''}:${p.gameChallenge.crownSteals || 0}` : '';
   const liked = (u && (p.likes || []).includes(u.uid)) ? 1 : 0;
   const boostMins = isPostBoostActive(p) ? Math.floor(Math.max(0, Number(p.boostedUntil) - Date.now()) / 60000) : 0;
-  return `${p.id}_${lang}_${(p.likes || []).length}_${liked}_${(p.comments || []).length}_${p.tipsTotal || 0}_${p.pinned ? 1 : 0}_${boostMins}_${p.founderAward ? 1 : 0}_${p.mintedCard ? 1 : 0}_${dualOpen}_${vSig}_${pollSig}_${btySig}_${capSig}_${Object.keys(p.cityGuesses || {}).length}_${p.leaderboard?.[0]?.score || 0}_${isPostCapsuleSealed(p) ? 1 : 0}_${isAdminXrayOpen(p.id) ? 1 : 0}`;
+  return `${p.id}_${lang}_${(p.likes || []).length}_${liked}_${(p.comments || []).length}_${p.tipsTotal || 0}_${p.pinned ? 1 : 0}_${boostMins}_${p.founderAward ? 1 : 0}_${p.mintedCard ? 1 : 0}_${dualOpen}_${vSig}_${pollSig}_${btySig}_${capSig}_${lookSig}_${mboxSig}_${chSig}_${Object.keys(p.cityGuesses || {}).length}_${p.leaderboard?.[0]?.score || 0}_${isPostCapsuleSealed(p) ? 1 : 0}_${isAdminXrayOpen(p.id) ? 1 : 0}`;
 }
 
 function renderSinglePostCardHtml(p, lang, u, isAdm) {
@@ -1787,6 +2123,7 @@ function renderSinglePostCardHtml(p, lang, u, isAdm) {
     const sealed = isPostCapsuleSealed(p);
     const xray = isAdminXrayOpen(p.id);
     const hiddenByCapsule = sealed && !xray;
+    const mboxLocked = isPostMysteryBoxLocked(p, u);
     const teaserTxt = lang === 'fr'
       ? (p.capsuleTeaser_fr || p.capsuleTeaser_en || 'Capsule mystère scellée...')
       : (p.capsuleTeaser_en || p.capsuleTeaser_fr || 'Mystery capsule sealed...');
@@ -1795,7 +2132,7 @@ function renderSinglePostCardHtml(p, lang, u, isAdm) {
       : String((lang === 'fr' ? (p.caption_fr || p.caption_en) : (p.caption_en || p.caption_fr)) || '').replace(/^(?:🇬🇧|🇫🇷)\s+/u, '');
     const formattedCap = escapeHtmlStr(rawCap || '').replace(/#([\w\u00C0-\u024F]+)/g, `<span class="hashtag" onclick="renderSocialFeed('#$1', true)">#$1</span>`);
     const liked = Boolean(u && (p.likes || []).includes(u.uid));
-    const interactiveNoTilt = hiddenByCapsule || p.mediaType === 'html_app' || p.mediaType === 'before_after' || p.mediaType === 'video_link' || Boolean(p.externalUrl);
+    const interactiveNoTilt = hiddenByCapsule || mboxLocked || p.mediaType === 'html_app' || p.mediaType === 'before_after' || p.mediaType === 'video_link' || Boolean(p.externalUrl);
     const voiceResolved = p.voiceUrl ? RemoMediaDB.resolveSyncOrPlaceholder(p.voiceUrl) : '';
     const voiceIdbAttr = p.voiceUrl && String(p.voiceUrl).startsWith('idb://') ? `data-idb-src="${p.voiceUrl}"` : '';
     const cityMayor = (REMO_STORE && REMO_STORE.getCityMayor) ? REMO_STORE.getCityMayor(p.cityId) : null;
@@ -1858,6 +2195,7 @@ function renderSinglePostCardHtml(p, lang, u, isAdm) {
               <div class="post-face-front">
                 <div class="post-badges-top">
                   ${sealed ? `<span class="pbadge capsule">${t('capsule_locked_badge')}${xray ? ' · 👁️ X-RAY' : ''}</span>` : (p.wasTimeCapsule ? `<span class="pbadge unsealed">${t('capsule_unsealed_badge')}</span>` : '')}
+                  ${!hiddenByCapsule && mboxLocked ? `<span class="pbadge mbox">${t('mbox_badge_locked')}</span>` : (!hiddenByCapsule && p.mysteryBox?.enabled ? `<span class="pbadge unboxed">${t('mbox_badge_unboxed', { n: (p.mysteryBox.unboxedBy || []).length })}</span>` : '')}
                   ${p.duetOf ? `<span class="pbadge duet">${t('post_duet_badge')}</span>` : ''}
                   ${p.isWorldWindow || (p.duetOf && p.duetOf.isWorldWindow) ? `<span class="window-live-badge">${t('win_badge_live')}</span>` : ''}
                   ${p.isShowcase ? `<span class="pbadge showcase-guide">${t('showcase_badge')}</span>` : ''}
@@ -1946,6 +2284,7 @@ function renderSinglePostCardHtml(p, lang, u, isAdm) {
             </div>
           ` : ''}
           ${renderFeedBountyWidget(p, lang)}
+          ${hiddenByCapsule ? '' : renderLookRatingWidget(p, lang, u)}
           ${hiddenByCapsule ? '' : renderPostPollWidget(p, lang, u)}
           ${hiddenByCapsule ? '' : renderSecretCapsuleWidget(p, lang, u)}
           ${hiddenByCapsule ? '' : renderViralGoalWidget(p, lang, isAdm)}
@@ -2210,6 +2549,7 @@ function rerenderSinglePostCard(postId) {
       updatedEl.querySelector('.post-flip-inner')?.classList.add('flipped');
     }
     RemoMediaDB.hydrateDom(updatedEl);
+    initAllMysteryBoxCanvases(updatedEl);
   }
   // Keep feed signature synchronized so subsequent cloud snapshots don't trigger a redundant full rebuild
   window._lastRenderedFeedSignature = computeVisibleFeedSignature('');
@@ -2345,6 +2685,9 @@ window.loadMoreFeedPosts = loadMoreFeedPosts;
 
 function renderSocialFeed(searchQuery = '', forceFull = false) {
   renderStoriesAndBanners();
+  if (typeof renderWorldSpotlightBar === 'function') {
+    renderWorldSpotlightBar();
+  }
   if (typeof renderFeedCitySpotlightBar === 'function') {
     renderFeedCitySpotlightBar();
   }
@@ -2396,6 +2739,7 @@ function renderSocialFeed(searchQuery = '', forceFull = false) {
 
   // Asynchronously attach any IndexedDB video/photo/audio Blobs
   RemoMediaDB.hydrateDom(grid);
+  initAllMysteryBoxCanvases(grid);
 }
 
 function applyHoloTilt(e, cardEl) {
@@ -5586,15 +5930,116 @@ window.downloadTextCardPng = downloadTextCardPng;
 window.copyTextCardText = copyTextCardText;
 window.downloadCurrentLightboxTextCardPng = downloadCurrentLightboxTextCardPng;
 
-function updateBeforeAfterSlider(rangeInput) {
-  const box = rangeInput.closest('.ba-slider-box');
+function _applyBeforeAfterSliderPct(box, pct) {
   if (!box) return;
-  const pct = Number(rangeInput.value) || 50;
+  const clamped = Math.max(3, Math.min(97, Number(pct) || 50));
   const afterLayer = box.querySelector('.ba-after-layer');
   const divider = box.querySelector('.ba-divider-line');
-  if (afterLayer) afterLayer.style.clipPath = `inset(0 0 0 ${pct}%)`;
-  if (divider) divider.style.left = `${pct}%`;
+  const bBadge = box.querySelector('.ba-badge-before');
+  const aBadge = box.querySelector('.ba-badge-after');
+  const inp = box.querySelector('.ba-range-input');
+  if (afterLayer) afterLayer.style.clipPath = `inset(0 0 0 ${clamped}%)`;
+  if (divider) divider.style.left = `${clamped}%`;
+  if (bBadge) bBadge.style.opacity = clamped < 17 ? '0.2' : '1';
+  if (aBadge) aBadge.style.opacity = clamped > 83 ? '0.2' : '1';
+  if (inp && Number(inp.value) !== Math.round(clamped)) inp.value = String(Math.round(clamped));
 }
+
+function updateBeforeAfterSlider(rangeInput) {
+  const box = rangeInput?.closest?.('.ba-slider-box');
+  if (!box) return;
+  _applyBeforeAfterSliderPct(box, rangeInput.value);
+}
+
+function stopBeforeAfterAutoSlide(el) {
+  const box = el?.classList?.contains('ba-slider-box') ? el : el?.closest?.('.ba-slider-box');
+  if (!box) return;
+  if (box._baAnimId) {
+    cancelAnimationFrame(box._baAnimId);
+    box._baAnimId = 0;
+  }
+  const btn = box.querySelector('.ba-autoslide-btn');
+  if (btn) {
+    btn.classList.remove('playing');
+    btn.textContent = t('ba_autoslide_btn');
+  }
+}
+
+function toggleBeforeAfterAutoSlide(btn) {
+  const box = btn?.closest?.('.ba-slider-box');
+  if (!box) return;
+  if (box._baAnimId) {
+    stopBeforeAfterAutoSlide(box);
+    return;
+  }
+  btn.classList.add('playing');
+  btn.textContent = t('ba_stop_btn');
+  const t0 = performance.now();
+  const step = (now) => {
+    if (!box.isConnected || !box._baAnimId) {
+      box._baAnimId = 0;
+      return;
+    }
+    const elapsed = (now - t0) % 3600;
+    const wave = 50 - 38 * Math.sin((elapsed / 3600) * Math.PI * 2);
+    _applyBeforeAfterSliderPct(box, wave);
+    box._baAnimId = requestAnimationFrame(step);
+  };
+  box._baAnimId = requestAnimationFrame(step);
+}
+
+function rateBeforeAfterLook(postId, criterion, stars) {
+  const score = Math.max(1, Math.min(5, Math.round(Number(stars) || 5)));
+  if (!BA_LOOK_CRITERIA.some((c) => c.key === criterion)) return;
+  const u = REMO_STORE.getCurrentUser() || REMO_STORE.ensureGuestOrCitizen('Citizen', '', 'montreal');
+  const p = findFeedPostById(postId);
+  if (!p) return;
+
+  if (!p.lookRating || typeof p.lookRating !== 'object') {
+    p.lookRating = { enabled: true };
+  }
+  p.lookRating.enabled = true;
+  if (!p.lookRating.voters || typeof p.lookRating.voters !== 'object') {
+    p.lookRating.voters = {};
+  }
+  const hadRatedBefore = Boolean(p.lookRating.voters[u.uid]);
+  const prevEntry = p.lookRating.voters[u.uid] || {};
+  p.lookRating.voters[u.uid] = { ...prevEntry, [criterion]: score };
+
+  BA_LOOK_CRITERIA.forEach((c) => {
+    let sum = 0;
+    let count = 0;
+    Object.values(p.lookRating.voters).forEach((v) => {
+      const val = Number(v?.[c.key]);
+      if (val >= 1 && val <= 5) {
+        sum += val;
+        count += 1;
+      }
+    });
+    p.lookRating[c.key] = { sum, count };
+  });
+
+  const isOwner = p.uid && p.uid === u.uid;
+  if (!hadRatedBefore && !isOwner) {
+    REMO_STORE.addCoins(u.uid, 5, 5);
+    if (p.uid) REMO_STORE.addCoins(p.uid, 2, 2);
+    if (typeof spawnRemoCoinsFX === 'function') spawnRemoCoinsFX(4);
+    remoToast(t('ba_rate_reward_toast'), 'coin');
+  } else {
+    remoToast(t('ba_rate_saved_toast'));
+  }
+
+  if (typeof RemoAudio !== 'undefined' && RemoAudio.play) RemoAudio.play('click');
+  REMO_STORE.syncPostToCloud(p);
+  REMO_STORE.save(true, 'look_rating');
+  rerenderSinglePostCard(p.id);
+  syncHeaderAndSidebars();
+}
+
+window.updateBeforeAfterSlider = updateBeforeAfterSlider;
+window.stopBeforeAfterAutoSlide = stopBeforeAfterAutoSlide;
+window.toggleBeforeAfterAutoSlide = toggleBeforeAfterAutoSlide;
+window.rateBeforeAfterLook = rateBeforeAfterLook;
 
 function voteOnPostPoll(postId, optIdx) {
   const lang = REMO_I18N.getLang();
@@ -5690,6 +6135,7 @@ function stopActiveCam60Stream() {
 
 function closeCreatePostModal() {
   stopActiveCam60Stream();
+  stopBeforeAfterAutoSlide(document.querySelector('#baStudioPreviewStage .ba-slider-box'));
   if (window.RemoAudio) {
     if (window.RemoAudio.activeSoundtrackPostId === 'studio_preview') window.RemoAudio.stopSoundtrackLoop();
     if (window.RemoAudio.activeBeatTargetId === 'studio_preview') window.RemoAudio.stopBeatPattern();
@@ -5718,6 +6164,10 @@ function switchCreateStudioTab(tabId) {
   const capEl = document.getElementById('createCaptionInp');
   if (capEl) {
     capEl.placeholder = tabId === 'textcard' ? t('tc_cap_opt_hint') : t('create_caption_ph');
+  }
+
+  if (tabId === 'beforeafter') {
+    renderBeforeAfterStudioPreview();
   }
 
   if (tabId === 'textcard') {
@@ -5751,6 +6201,7 @@ function openCreatePostModal(prefillTag = '') {
   pendingStudioPhotoPreviewUrls.forEach((u) => URL.revokeObjectURL(u));
   pendingStudioPhotoPreviewUrls = [];
   pendingStudioPhotoFilter = 'flt-none';
+  resetBeforeAfterStudioState();
   pendingStudioVideoBlob = null;
   pendingStudioVideoDuration = 0;
   pendingRawLongVideoFile = null;
@@ -5849,7 +6300,18 @@ function openCreatePostModal(prefillTag = '') {
     }
   }
 
-  // Reset Poll, Secret Capsule & Viral Goal toggles
+  // Reset Mystery Box, Poll, Secret Capsule & Viral Goal toggles
+  const mboxT = document.getElementById('createMysteryBoxToggle');
+  if (mboxT) mboxT.checked = false;
+  const mboxF = document.getElementById('createMysteryBoxFields');
+  if (mboxF) mboxF.style.display = 'none';
+  ['createMysteryBoxTeaser', 'createMysteryBoxGuessQ', 'createMysteryBoxOptA', 'createMysteryBoxOptB'].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  const mboxSel = document.getElementById('createMysteryBoxTheme');
+  if (mboxSel) mboxSel.value = 'silver';
+
   const pollT = document.getElementById('createPollToggle');
   if (pollT) pollT.checked = false;
   const pollF = document.getElementById('createPollFields');
@@ -5972,6 +6434,123 @@ function setStudioPhotoFilter(fltClass, btnEl) {
   if (btnEl) btnEl.classList.add('active');
   renderStudioPhotoThumbnails();
 }
+
+/* ── TAB 1B: Interactive Before / After Glow-Up Studio Handlers ── */
+function resetBeforeAfterStudioState() {
+  stopBeforeAfterAutoSlide(document.querySelector('#baStudioPreviewStage .ba-slider-box'));
+  if (pendingBaBeforePreviewUrl) {
+    try { URL.revokeObjectURL(pendingBaBeforePreviewUrl); } catch (e) {}
+  }
+  if (pendingBaAfterPreviewUrl) {
+    try { URL.revokeObjectURL(pendingBaAfterPreviewUrl); } catch (e) {}
+  }
+  pendingBaBeforeBlob = null;
+  pendingBaBeforePreviewUrl = '';
+  pendingBaBeforeFilter = 'flt-none';
+  pendingBaAfterBlob = null;
+  pendingBaAfterPreviewUrl = '';
+  pendingBaAfterFilter = 'flt-none';
+  ['baBeforeFileInp', 'baBeforeCamInp', 'baAfterFileInp', 'baAfterCamInp', 'baBeforeLabelInp', 'baAfterLabelInp'].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  ['baBeforeFilterSel', 'baAfterFilterSel'].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.value = 'flt-none';
+  });
+  const ratChk = document.getElementById('createBaLookRatingToggle');
+  if (ratChk) ratChk.checked = true;
+  renderBeforeAfterStudioPreview();
+}
+
+function handleBeforeAfterSlotSelect(slot, ev) {
+  const file = ev?.target?.files?.[0];
+  if (!file) return;
+  const previewUrl = URL.createObjectURL(file);
+  if (slot === 'after') {
+    if (pendingBaAfterPreviewUrl) {
+      try { URL.revokeObjectURL(pendingBaAfterPreviewUrl); } catch (e) {}
+    }
+    pendingBaAfterBlob = file;
+    pendingBaAfterPreviewUrl = previewUrl;
+  } else {
+    if (pendingBaBeforePreviewUrl) {
+      try { URL.revokeObjectURL(pendingBaBeforePreviewUrl); } catch (e) {}
+    }
+    pendingBaBeforeBlob = file;
+    pendingBaBeforePreviewUrl = previewUrl;
+  }
+  if (ev?.target) ev.target.value = '';
+  renderBeforeAfterStudioPreview();
+}
+
+function swapBeforeAfterSlots() {
+  [pendingBaBeforeBlob, pendingBaAfterBlob] = [pendingBaAfterBlob, pendingBaBeforeBlob];
+  [pendingBaBeforePreviewUrl, pendingBaAfterPreviewUrl] = [pendingBaAfterPreviewUrl, pendingBaBeforePreviewUrl];
+  [pendingBaBeforeFilter, pendingBaAfterFilter] = [pendingBaAfterFilter, pendingBaBeforeFilter];
+  const selB = document.getElementById('baBeforeFilterSel');
+  const selA = document.getElementById('baAfterFilterSel');
+  if (selB) selB.value = pendingBaBeforeFilter;
+  if (selA) selA.value = pendingBaAfterFilter;
+  const lblB = document.getElementById('baBeforeLabelInp');
+  const lblA = document.getElementById('baAfterLabelInp');
+  if (lblB && lblA) {
+    const tmp = lblB.value;
+    lblB.value = lblA.value;
+    lblA.value = tmp;
+  }
+  renderBeforeAfterStudioPreview();
+  if (typeof RemoAudio !== 'undefined' && RemoAudio.play) RemoAudio.play('click');
+}
+
+function setBeforeAfterSlotFilter(slot, fltClass) {
+  if (slot === 'after') pendingBaAfterFilter = fltClass || 'flt-none';
+  else pendingBaBeforeFilter = fltClass || 'flt-none';
+  renderBeforeAfterStudioPreview();
+}
+
+function renderBeforeAfterStudioPreview() {
+  const bThumb = document.getElementById('baBeforeThumb');
+  const aThumb = document.getElementById('baAfterThumb');
+  if (bThumb) {
+    bThumb.innerHTML = pendingBaBeforePreviewUrl
+      ? `<img src="${pendingBaBeforePreviewUrl}" class="${escapeHtmlStr(pendingBaBeforeFilter)}" alt="Before">`
+      : '⏮️';
+  }
+  if (aThumb) {
+    aThumb.innerHTML = pendingBaAfterPreviewUrl
+      ? `<img src="${pendingBaAfterPreviewUrl}" class="${escapeHtmlStr(pendingBaAfterFilter)}" alt="After">`
+      : '⏭️';
+  }
+  const stage = document.getElementById('baStudioPreviewStage');
+  if (!stage) return;
+  stopBeforeAfterAutoSlide(stage.querySelector('.ba-slider-box'));
+  if (pendingBaBeforePreviewUrl && pendingBaAfterPreviewUrl) {
+    const lbl1 = document.getElementById('baBeforeLabelInp')?.value.trim() || t('ba_badge_before');
+    const lbl2 = document.getElementById('baAfterLabelInp')?.value.trim() || t('ba_badge_after');
+    stage.innerHTML = renderInteractiveBeforeAfterBox({
+      url1: pendingBaBeforePreviewUrl,
+      url2: pendingBaAfterPreviewUrl,
+      flt1: pendingBaBeforeFilter,
+      flt2: pendingBaAfterFilter,
+      lbl1,
+      lbl2
+    });
+  } else {
+    stage.innerHTML = `<div class="ba-studio-placeholder"><span style="font-size:1.7rem;">🪞</span><span>${escapeHtmlStr(t('ba_preview_hint'))}</span></div>`;
+  }
+}
+
+function openCreateBeforeAfterModal(prefillTag = '#GlowUp #BeforeAfter') {
+  openCreatePostModal(prefillTag);
+  switchCreateStudioTab('beforeafter');
+}
+
+window.handleBeforeAfterSlotSelect = handleBeforeAfterSlotSelect;
+window.swapBeforeAfterSlots = swapBeforeAfterSlots;
+window.setBeforeAfterSlotFilter = setBeforeAfterSlotFilter;
+window.renderBeforeAfterStudioPreview = renderBeforeAfterStudioPreview;
+window.openCreateBeforeAfterModal = openCreateBeforeAfterModal;
 
 /* ── TAB 2: Video & External Link Studio Handlers (60s File/Cam + Unlimited Video/Web Link) ── */
 function parseExternalVideoUrl(rawUrl) {
@@ -6329,6 +6908,16 @@ async function publishNewRemoPost() {
       ? `🔗 Découvrez cette vidéo / ce lien partagé depuis ${getCityName(cObj, 'fr')} ! #${cObj.code}`
       : `🔗 Check out this video / link shared from ${getCityName(cObj, 'en')}! #${cObj.code}`;
   }
+  if (activeCreateStudioTab === 'beforeafter' && (!pendingBaBeforeBlob || !pendingBaAfterBlob)) {
+    remoToast(t('ba_need_two_err'));
+    return;
+  }
+  if (!cap && activeCreateStudioTab === 'beforeafter') {
+    const cObj = getCityById(cityId);
+    cap = lang === 'fr'
+      ? `🪞 Avant / Après à ${getCityName(cObj, 'fr')} ! Faites glisser pour comparer ✨ #AvantApres #GlowUp`
+      : `🪞 Before / After in ${getCityName(cObj, 'en')}! Slide to compare ✨ #BeforeAfter #GlowUp`;
+  }
 
   let textCardPayload = null;
   if (activeCreateStudioTab === 'textcard') {
@@ -6354,8 +6943,28 @@ async function publishNewRemoPost() {
   let videoDuration = 0;
   let externalUrl = '';
   let soundtrackId = '';
+  let baMeta = null;
 
-  if (activeCreateStudioTab === 'photo') {
+  if (activeCreateStudioTab === 'beforeafter') {
+    soundtrackId = document.getElementById('createPhotoSoundSelect')?.value || '';
+    for (const rawBlob of [pendingBaBeforeBlob, pendingBaAfterBlob]) {
+      const blob = (wantWindowStamp && typeof stampPhotoWithLiveCityWindow === 'function')
+        ? await stampPhotoWithLiveCityWindow(rawBlob, cityId, lang)
+        : rawBlob;
+      const url = await uploadMediaToCloudOrDataUrl(blob, 'posts');
+      mediaUrls.push(url);
+    }
+    mediaType = 'before_after';
+    mediaUrl = mediaUrls[0];
+    const wantLookMeter = document.getElementById('createBaLookRatingToggle')?.checked !== false;
+    baMeta = {
+      beforeFilter: pendingBaBeforeFilter || 'flt-none',
+      afterFilter: pendingBaAfterFilter || 'flt-none',
+      beforeLabel: document.getElementById('baBeforeLabelInp')?.value.trim() || '',
+      afterLabel: document.getElementById('baAfterLabelInp')?.value.trim() || '',
+      lookRating: { enabled: wantLookMeter, style: { sum: 0, count: 0 }, vibe: { sum: 0, count: 0 }, icon: { sum: 0, count: 0 }, voters: {} }
+    };
+  } else if (activeCreateStudioTab === 'photo') {
     soundtrackId = document.getElementById('createPhotoSoundSelect')?.value || '';
     if (pendingStudioPhotoBlobs.length > 0) {
       for (const rawBlob of pendingStudioPhotoBlobs) {
@@ -6423,6 +7032,28 @@ async function publishNewRemoPost() {
   let voiceKey = pendingPostVoiceDataUrl || '';
   if (pendingPostVoiceBlob) {
     voiceKey = await RemoMediaDB.saveBlob(pendingPostVoiceBlob, 'voice');
+  }
+
+  // Optional 🎁 Mystery Blind-Box Scratch/3-Tap Wrapper
+  let mysteryBoxObj = null;
+  if (document.getElementById('createMysteryBoxToggle')?.checked) {
+    const mbTheme = document.getElementById('createMysteryBoxTheme')?.value || 'silver';
+    const rawMbTeaser = document.getElementById('createMysteryBoxTeaser')?.value.trim() || '';
+    const mbPair = rawMbTeaser ? REMO_TRANSLATOR.makeBilingualPair(rawMbTeaser) : { en: '', fr: '' };
+    const mbGuessQ = document.getElementById('createMysteryBoxGuessQ')?.value.trim() || '';
+    const mbOptA = document.getElementById('createMysteryBoxOptA')?.value.trim() || '';
+    const mbOptB = document.getElementById('createMysteryBoxOptB')?.value.trim() || '';
+    const mbOpts = [mbOptA, mbOptB].filter(Boolean).map((lbl) => ({ label: lbl, votes: 0 }));
+    mysteryBoxObj = {
+      enabled: true,
+      theme: mbTheme,
+      teaser_en: mbPair.en || rawMbTeaser,
+      teaser_fr: mbPair.fr || rawMbTeaser,
+      guessQuestion: mbOpts.length >= 2 ? mbGuessQ : '',
+      guessOptions: mbOpts.length >= 2 ? mbOpts : [],
+      guessVoters: {},
+      unboxedBy: []
+    };
   }
 
   // Optional Interactive Live Poll
@@ -6513,6 +7144,11 @@ async function publishNewRemoPost() {
     mediaUrls,
     externalUrl: externalUrl || '',
     photoFilter: pendingStudioPhotoFilter || 'flt-none',
+    beforeFilter: baMeta ? baMeta.beforeFilter : (pendingStudioPhotoFilter || 'flt-none'),
+    afterFilter: baMeta ? baMeta.afterFilter : (pendingStudioPhotoFilter || 'flt-none'),
+    beforeLabel: baMeta ? baMeta.beforeLabel : '',
+    afterLabel: baMeta ? baMeta.afterLabel : '',
+    lookRating: baMeta ? baMeta.lookRating : (mediaType === 'before_after' ? { enabled: true, style: { sum: 0, count: 0 }, vibe: { sum: 0, count: 0 }, icon: { sum: 0, count: 0 }, voters: {} } : null),
     soundtrackId: soundtrackId || '',
     videoDuration,
     enforce60sCap: !!window._pendingEnforce60sCap,
@@ -6536,6 +7172,7 @@ async function publishNewRemoPost() {
     capsuleTeaser_en: capsuleTeaserEn,
     capsuleTeaser_fr: capsuleTeaserFr,
     capsuleWatchers: wasTimeCapsule ? [u.uid] : [],
+    mysteryBox: mysteryBoxObj,
     reactions: {},
     voiceUrl: voiceKey,
     verifiedGps: pendingPostGpsVerified,
@@ -10477,37 +11114,56 @@ function copilotAutoTranslateStudio() {
 
 let _cityArcadeCycleIdx = 0;
 
-function copilotGenerateCityHtmlGame(forcedGenre = '') {
-  if (!REMO_STORE.isAdminUnlocked() && !REMO_STORE.isCurrentUserAdmin()) {
-    remoToast(REMO_I18N.getLang() === 'fr' ? 'La génération de jeux arcade est réservée aux administrateurs.' : 'Arcade game generation is admin only.');
-    return;
+function _buildArcadeHtmlByGenre(genre, col = '#38bdf8', flag = '🌍', cName = 'REMO') {
+  if (genre === 'gyro_coins') {
+    return `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>
+html,body{margin:0;height:100%;overflow:hidden;background:radial-gradient(circle at 50% 25%,#1e1b4b,#040714);font-family:system-ui,sans-serif;user-select:none;touch-action:none;color:#fff;}
+canvas{display:block;width:100%;height:100%;cursor:grab;}
+.hud{position:fixed;top:12px;left:10px;right:10px;display:flex;justify-content:space-between;pointer-events:none;font-weight:900;font-size:12px;}
+.pill{background:rgba(8,14,34,0.88);border:1px solid #fbbf24;padding:4px 10px;border-radius:99px;}
+</style></head><body>
+<div class="hud"><span class="pill">🪙 ${flag} ${cName} COIN CATCHER</span><span class="pill" id="sc">🪙 0 · ❤️ 3</span></div>
+<canvas id="c"></canvas><script>
+const cv=document.getElementById('c'),x=cv.getContext('2d');
+let w,h,px=160,sc=0,lives=3,items=[],tilt=0,over=false,fr=0;
+function rs(){w=cv.width=innerWidth;h=cv.height=innerHeight;px=w/2;}addEventListener('resize',rs);rs();
+addEventListener('message',e=>{if(e.data&&e.data.type==='REMO_GYRO_TILT')tilt=Number(e.data.gamma||0);});
+addEventListener('deviceorientation',e=>{if(typeof e.gamma==='number')tilt=Math.max(-35,Math.min(35,e.gamma));});
+cv.addEventListener('pointermove',e=>{if(e.buttons||e.pointerType!=='mouse')px=Math.max(26,Math.min(w-26,e.clientX));});
+cv.addEventListener('pointerdown',e=>{if(over){sc=0;lives=3;items=[];over=false;document.getElementById('sc').textContent='🪙 0 · ❤️ 3';return;}px=Math.max(26,Math.min(w-26,e.clientX));});
+function loop(){
+  x.fillStyle='rgba(4,7,20,0.4)';x.fillRect(0,0,w,h);fr++;
+  if(!over){
+    if(Math.abs(tilt)>1.5)px=Math.max(26,Math.min(w-26,px+tilt*0.24));
+    if(fr%26===0)items.push({x:20+Math.random()*(w-40),y:-18,vy:2.6+Math.random()*2.1+sc*0.008,bomb:Math.random()>0.78});
+    for(let i=items.length-1;i>=0;i--){
+      const o=items[i];o.y+=o.vy;
+      x.fillStyle=o.bomb?'#f43f5e':'#fbbf24';
+      x.beginPath();x.arc(o.x,o.y,o.bomb?12:11,0,6.28);x.fill();
+      if(o.bomb){x.fillStyle='#fff';x.font='900 11px sans-serif';x.textAlign='center';x.fillText('💣',o.x,o.y+4);}
+      if(Math.abs(o.x-px)<32&&o.y>h-68&&o.y<h-26){
+        if(o.bomb){lives=Math.max(0,lives-1);if(lives<=0)over=true;}
+        else{sc+=15;if(window.remoSubmitScore)window.remoSubmitScore(sc);}
+        document.getElementById('sc').textContent='🪙 '+sc+' · ❤️ '+lives;
+        items.splice(i,1);continue;
+      }
+      if(o.y>h+20)items.splice(i,1);
+    }
   }
-  const lang = REMO_I18N.getLang();
-  const cityId = document.getElementById('createCitySelect')?.value || 'chisinau';
-  const city = getCityById(cityId);
-  const col = city.themeColor || '#38bdf8';
-  const cName = city.name_en.toUpperCase();
-  switchCreateStudioTab('html');
-
-  const genres = ['defense', 'stacker', 'drone', 'metro', 'rhythm', 'beat'];
-  const genre = forcedGenre && genres.includes(forcedGenre)
-    ? forcedGenre
-    : genres[(_cityArcadeCycleIdx++) % genres.length];
-
-  let code = '';
-  let gameTitleEn = '';
-  let gameTitleFr = '';
-
+  x.shadowColor='${col}';x.shadowBlur=14;x.fillStyle='${col}';
+  x.fillRect(px-30,h-48,60,14);x.shadowBlur=0;
+  if(over){x.fillStyle='#fde047';x.font='900 17px sans-serif';x.textAlign='center';x.fillText('🏆 SCORE: '+sc+' — TAP TO RETRY',w/2,h/2);}
+  requestAnimationFrame(loop);
+}loop();<\/script></body></html>`;
+  }
   if (genre === 'defense') {
-    gameTitleEn = 'Skyline Laser Defense';
-    gameTitleFr = 'Défense Laser Skyline';
-    code = `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>
+    return `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>
 html,body{margin:0;height:100%;overflow:hidden;background:#040714;font-family:system-ui,sans-serif;user-select:none;touch-action:none;color:#fff;}
 canvas{display:block;width:100%;height:100%;cursor:crosshair;}
 .hud{position:fixed;top:40px;left:10px;right:10px;display:flex;justify-content:space-between;pointer-events:none;font-weight:900;font-size:12px;}
 .pill{background:rgba(8,14,34,0.88);border:1px solid ${col};padding:4px 10px;border-radius:99px;}
 </style></head><body>
-<div class="hud"><span class="pill">🏙️ ${city.flag} ${cName} LASER DEFENSE</span><span class="pill" id="st">🛡️ 100% · 🪙 0</span></div>
+<div class="hud"><span class="pill">🏙️ ${flag} ${cName} LASER DEFENSE</span><span class="pill" id="st">🛡️ 100% · 🪙 0</span></div>
 <canvas id="c"></canvas><script>
 const cv=document.getElementById('c'),x=cv.getContext('2d');
 let w,h,sc=0,hp=100,meteors=[],lasers=[],sparks=[],ac=null;
@@ -10520,7 +11176,7 @@ cv.addEventListener('pointerdown',e=>{
   for(let i=meteors.length-1;i>=0;i--){
     const m=meteors[i];
     if(Math.hypot(e.clientX-m.x,e.clientY-m.y)<m.r+34){
-      sc+=m.boss?40:15;sfx(260,55,0.22);
+      sc+=m.boss?40:15;if(window.remoSubmitScore)window.remoSubmitScore(sc);sfx(260,55,0.22);
       for(let k=0;k<18;k++){const a=Math.random()*6.28,s=1.5+Math.random()*4;sparks.push({x:m.x,y:m.y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:1,c:m.boss?'#fbbf24':'${col}'});}
       meteors.splice(i,1);
     }
@@ -10529,7 +11185,6 @@ cv.addEventListener('pointerdown',e=>{
 });
 function draw(){
   x.fillStyle='rgba(4,7,20,0.32)';x.fillRect(0,0,w,h);
-  // Illuminated City Skyline
   for(let i=0;i<11;i++){
     const bw=w/11,bh=38+((i*29)%58)+(i===5?28:0),bx=i*bw+2;
     x.fillStyle=i===5?'${col}44':'#0d1633';x.strokeStyle=i===5?'#fbbf24':'${col}66';
@@ -10548,16 +11203,15 @@ function draw(){
   if(hp<=0){x.fillStyle='#fbbf24';x.font='900 18px sans-serif';x.textAlign='center';x.fillText('💥 TAP TO REBUILD ${cName} (SCORE: '+sc+')',w/2,h/2);}
   requestAnimationFrame(draw);
 }draw();<\/script></body></html>`;
-  } else if (genre === 'stacker') {
-    gameTitleEn = '4D Skyscraper Builder';
-    gameTitleFr = 'Constructeur Gratte-Ciel 4D';
-    code = `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>
+  }
+  if (genre === 'stacker') {
+    return `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>
 html,body{margin:0;height:100%;overflow:hidden;background:linear-gradient(#040716,#131b3a);font-family:system-ui,sans-serif;user-select:none;touch-action:none;color:#fff;}
 canvas{display:block;width:100%;height:100%;cursor:pointer;}
 .hud{position:fixed;top:40px;left:10px;right:10px;display:flex;justify-content:space-between;pointer-events:none;font-weight:900;font-size:12px;}
 .pill{background:rgba(8,14,34,0.88);border:1px solid #fbbf24;padding:4px 10px;border-radius:99px;}
 </style></head><body>
-<div class="hud"><span class="pill">🏗️ ${city.flag} ${cName} TOWER STACKER</span><span class="pill" id="fl">FLOOR: 1</span></div>
+<div class="hud"><span class="pill">🏗️ ${flag} ${cName} TOWER STACKER</span><span class="pill" id="fl">FLOOR: 1</span></div>
 <canvas id="c"></canvas><script>
 const cv=document.getElementById('c'),x=cv.getContext('2d');
 let w,h,stack=[],cur=null,camY=0,over=false,ac=null;
@@ -10572,6 +11226,7 @@ cv.addEventListener('pointerdown',()=>{
   if(nw<=8){over=true;return;}
   stack.push({x:left,w:nw,c:stack.length%2?'#fbbf24':'${col}'});
   note(stack.length);document.getElementById('fl').textContent='FLOOR: '+stack.length+' 🏙️';
+  if(window.remoSubmitScore)window.remoSubmitScore(stack.length*10);
   spawn();
 });
 rs();
@@ -10593,16 +11248,15 @@ function loop(){
   if(over){x.fillStyle='#fbbf24';x.font='900 17px sans-serif';x.textAlign='center';x.fillText('🏆 '+stack.length+' FLOORS IN ${cName}! TAP TO PLAY AGAIN',w/2,h/2);}
   requestAnimationFrame(loop);
 }loop();<\/script></body></html>`;
-  } else if (genre === 'drone') {
-    gameTitleEn = 'Cyber Drone City Flier';
-    gameTitleFr = 'Vol de Drone Cyber';
-    code = `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>
+  }
+  if (genre === 'drone') {
+    return `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>
 html,body{margin:0;height:100%;overflow:hidden;background:#050816;font-family:system-ui,sans-serif;user-select:none;touch-action:none;color:#fff;}
 canvas{display:block;width:100%;height:100%;cursor:pointer;}
 .hud{position:fixed;top:40px;left:10px;right:10px;display:flex;justify-content:space-between;pointer-events:none;font-weight:900;font-size:12px;}
 .pill{background:rgba(8,14,34,0.88);border:1px solid ${col};padding:4px 10px;border-radius:99px;}
 </style></head><body>
-<div class="hud"><span class="pill">🛸 ${city.flag} ${cName} DRONE FLIER</span><span class="pill" id="sc">🪙 0</span></div>
+<div class="hud"><span class="pill">🛸 ${flag} ${cName} DRONE FLIER</span><span class="pill" id="sc">🪙 0</span></div>
 <canvas id="c"></canvas><script>
 const cv=document.getElementById('c'),x=cv.getContext('2d');
 let w,h,dy=180,vy=0,gates=[],sc=0,dead=false,frame=0;
@@ -10618,38 +11272,35 @@ function loop(){
   for(let i=gates.length-1;i>=0;i--){
     const g=gates[i];if(!dead)g.x-=2.8;
     x.fillStyle='${col}';x.fillRect(g.x,0,26,g.gapY);x.fillRect(g.x,g.gapY+g.gapH,26,h);
-    if(!g.passed&&g.x<76){g.passed=true;sc+=10;document.getElementById('sc').textContent='🪙 '+sc;}
+    if(!g.passed&&g.x<76){g.passed=true;sc+=10;if(window.remoSubmitScore)window.remoSubmitScore(sc);document.getElementById('sc').textContent='🪙 '+sc;}
     if(78>g.x&&58<g.x+26&&(dy-12<g.gapY||dy+12>g.gapY+g.gapH))dead=true;
     if(g.x<-40)gates.splice(i,1);
   }
-  // Neon Drone
   x.shadowColor='#fbbf24';x.shadowBlur=16;x.fillStyle='#fbbf24';
   x.beginPath();x.ellipse(68,dy,18,10,0,0,6.28);x.fill();x.shadowBlur=0;
   if(dead){x.fillStyle='#fff';x.font='900 17px sans-serif';x.textAlign='center';x.fillText('⚡ SCORE '+sc+' — TAP TO FLY OVER ${cName}!',w/2,h/2);}
   requestAnimationFrame(loop);
 }loop();<\/script></body></html>`;
-  } else if (genre === 'metro') {
-    gameTitleEn = '3D Neon Street Dash';
-    gameTitleFr = 'Course Néon 3 Voies';
-    code = `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>
+  }
+  if (genre === 'metro') {
+    return `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>
 html,body{margin:0;height:100%;overflow:hidden;background:#050714;font-family:system-ui,sans-serif;user-select:none;touch-action:none;color:#fff;}
 canvas{display:block;width:100%;height:100%;cursor:pointer;}
 .hud{position:fixed;top:40px;left:10px;right:10px;display:flex;justify-content:space-between;pointer-events:none;font-weight:900;font-size:12px;}
 .pill{background:rgba(8,14,34,0.88);border:1px solid #10b981;padding:4px 10px;border-radius:99px;}
 </style></head><body>
-<div class="hud"><span class="pill">🚇 ${city.flag} ${cName} 3-LANE DASH</span><span class="pill" id="sc">🪙 0</span></div>
+<div class="hud"><span class="pill">🚇 ${flag} ${cName} 3-LANE DASH</span><span class="pill" id="sc">🪙 0</span></div>
 <canvas id="c"></canvas><script>
 const cv=document.getElementById('c'),x=cv.getContext('2d');
 let w,h,lane=1,sc=0,objs=[],t=0;
 function rs(){w=cv.width=innerWidth;h=cv.height=innerHeight;}addEventListener('resize',rs);rs();
+addEventListener('message',e=>{if(e.data&&e.data.type==='REMO_GYRO_TILT'){const g=Number(e.data.gamma||0);lane=g<-8?0:g>8?2:1;}});
 cv.addEventListener('pointerdown',e=>{lane=e.clientX<w*0.35?0:e.clientX>w*0.65?2:1;});
 setInterval(()=>{objs.push({l:Math.floor(Math.random()*3),z:0.05,coin:Math.random()>0.38});},480);
 function loop(){
   x.fillStyle='#050714';x.fillRect(0,0,w,h);t=(t+0.04)%1;
   const hy=h*0.32;
-  // Horizon City Silhouette
   x.fillStyle='${col}44';for(let i=0;i<14;i++){const bh=22+((i*19)%45);x.fillRect(i*(w/14),hy-bh,(w/14)-3,bh);}
-  // 3D Perspective Road
   x.strokeStyle='${col}';x.lineWidth=2;
   [-1.5,-0.5,0.5,1.5].forEach(k=>{x.beginPath();x.moveTo(w/2+k*24,hy);x.lineTo(w/2+k*(w*0.3),h);x.stroke();});
   for(let i=objs.length-1;i>=0;i--){
@@ -10659,7 +11310,7 @@ function loop(){
     if(o.coin){x.beginPath();x.arc(px,py,sz*0.6,0,6.28);x.fill();}
     else x.fillRect(px-sz,py-sz*0.4,sz*2,sz*0.8);
     if(o.z>0.82&&o.z<0.95&&o.l===lane){
-      sc=o.coin?sc+20:Math.max(0,sc-25);document.getElementById('sc').textContent='🪙 '+sc;objs.splice(i,1);continue;
+      sc=o.coin?sc+20:Math.max(0,sc-25);if(window.remoSubmitScore)window.remoSubmitScore(sc);document.getElementById('sc').textContent='🪙 '+sc;objs.splice(i,1);continue;
     }
     if(o.z>1.05)objs.splice(i,1);
   }
@@ -10668,19 +11319,17 @@ function loop(){
   x.beginPath();x.moveTo(carX,h-64);x.lineTo(carX-22,h-26);x.lineTo(carX+22,h-26);x.closePath();x.fill();x.shadowBlur=0;
   requestAnimationFrame(loop);
 }loop();<\/script></body></html>`;
-  } else if (genre === 'rhythm') {
-    gameTitleEn = 'City Rhythm Synth Piano';
-    gameTitleFr = 'Piano Rythmique Néon';
-    code = `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>
+  }
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>
 html,body{margin:0;height:100%;overflow:hidden;background:#050816;font-family:system-ui,sans-serif;user-select:none;touch-action:none;color:#fff;}
 canvas{display:block;width:100%;height:100%;cursor:pointer;}
 .hud{position:fixed;top:40px;left:10px;right:10px;display:flex;justify-content:space-between;pointer-events:none;font-weight:900;font-size:12px;}
 .pill{background:rgba(8,14,34,0.88);border:1px solid #ec4899;padding:4px 10px;border-radius:99px;}
 </style></head><body>
-<div class="hud"><span class="pill">🎹 ${city.flag} ${cName} RHYTHM PIANO</span><span class="pill" id="sc">🎵 COMBO: 0</span></div>
+<div class="hud"><span class="pill">🎹 ${flag} ${cName} RHYTHM PIANO</span><span class="pill" id="sc">🎵 SCORE: 0</span></div>
 <canvas id="c"></canvas><script>
 const cv=document.getElementById('c'),x=cv.getContext('2d');
-let w,h,tiles=[],combo=0,ac=null;
+let w,h,tiles=[],combo=0,sc=0,ac=null;
 const notes=[261.6,329.6,392.0,523.25],cols=['#38bdf8','#ec4899','#fbbf24','#10b981'];
 function rs(){w=cv.width=innerWidth;h=cv.height=innerHeight;}addEventListener('resize',rs);rs();
 setInterval(()=>{tiles.push({col:Math.floor(Math.random()*4),y:-70,hit:false});},460);
@@ -10690,8 +11339,9 @@ cv.addEventListener('pointerdown',e=>{
   for(let i=0;i<tiles.length;i++){
     const tl=tiles[i];
     if(!tl.hit&&tl.col===lane&&tl.y>h-190&&tl.y<h-20){
-      tl.hit=true;combo++;play(notes[lane]);
-      document.getElementById('sc').textContent='🎵 COMBO: '+combo+' 🔥';break;
+      tl.hit=true;combo++;sc+=10*Math.min(5,combo);play(notes[lane]);
+      if(window.remoSubmitScore)window.remoSubmitScore(sc);
+      document.getElementById('sc').textContent='🎵 SCORE: '+sc+' ('+combo+'x)';break;
     }
   }
 });
@@ -10709,7 +11359,35 @@ function loop(){
   }
   requestAnimationFrame(loop);
 }loop();<\/script></body></html>`;
+}
+
+function copilotGenerateCityHtmlGame(forcedGenre = '') {
+  if (!REMO_STORE.isAdminUnlocked() && !REMO_STORE.isCurrentUserAdmin()) {
+    remoToast(REMO_I18N.getLang() === 'fr' ? 'La génération de jeux arcade est réservée aux administrateurs.' : 'Arcade game generation is admin only.');
+    return;
   }
+  const lang = REMO_I18N.getLang();
+  const cityId = document.getElementById('createCitySelect')?.value || 'chisinau';
+  const city = getCityById(cityId);
+  const col = city.themeColor || '#38bdf8';
+  const cName = city.name_en.toUpperCase();
+  switchCreateStudioTab('html');
+
+  const metaByGenre = {
+    defense: ['Skyline Laser Defense', 'Défense Laser Skyline'],
+    stacker: ['4D Skyscraper Builder', 'Constructeur Gratte-Ciel 4D'],
+    drone: ['Cyber Drone City Flier', 'Vol de Drone Cyber'],
+    metro: ['3D Neon Street Dash', 'Course Néon 3 Voies'],
+    rhythm: ['City Rhythm Synth Piano', 'Piano Rythmique Néon'],
+    gyro_coins: ['Cyber Coin Catcher', 'Attrape-Pièces Cyber']
+  };
+  const genres = Object.keys(metaByGenre);
+  const genre = forcedGenre && metaByGenre[forcedGenre]
+    ? forcedGenre
+    : genres[(_cityArcadeCycleIdx++) % genres.length];
+
+  const [gameTitleEn, gameTitleFr] = metaByGenre[genre];
+  const code = _buildArcadeHtmlByGenre(genre, col, city.flag, cName);
 
   const area = document.getElementById('createHtmlCodeArea');
   if (area) area.value = code;
@@ -11649,6 +12327,10 @@ function openPostFullscreenMedia(postId) {
     console.warn('Post not found for fullscreen:', postId);
     return;
   }
+  if (isPostMysteryBoxLocked(p, REMO_STORE.getCurrentUser())) {
+    remoToast(t('mbox_unlock_first_toast'));
+    return;
+  }
   if (p.mediaType === 'html_app' && p.htmlCode) {
     if (typeof openHtmlFullscreenModal === 'function') {
       openHtmlFullscreenModal(p.id);
@@ -11738,6 +12420,33 @@ function openPhotoLightboxModal(postId) {
     return;
   }
 
+  if (p.mediaType === 'before_after' && Array.isArray(p.mediaUrls) && p.mediaUrls.length >= 2 && tcBox) {
+    if (img) { img.src = ''; img.style.display = 'none'; }
+    if (dlBtn) dlBtn.style.display = 'none';
+    const k1 = p.mediaUrls[0], k2 = p.mediaUrls[1];
+    const u1 = RemoMediaDB.resolveSyncOrPlaceholder(k1);
+    const u2 = RemoMediaDB.resolveSyncOrPlaceholder(k2);
+    const flt = p.photoFilter || 'flt-none';
+    tcBox.style.display = 'block';
+    tcBox.innerHTML = `<div class="fs-lb-ba-wrap">${renderInteractiveBeforeAfterBox({
+      url1: u1,
+      url2: u2,
+      key1: k1,
+      key2: k2,
+      flt1: p.beforeFilter || flt,
+      flt2: p.afterFilter || flt,
+      lbl1: p.beforeLabel || t('ba_badge_before'),
+      lbl2: p.afterLabel || t('ba_badge_after'),
+      isLightbox: true
+    })}</div>`;
+    if (title) title.textContent = `${city.flag || '🪞'} @${p.authorName} — ${t('post_slider_badge')}`;
+    if (modal) {
+      modal.classList.add('open');
+      remoEnterNativeFullscreen(modal);
+    }
+    return;
+  }
+
   if (tcBox) { tcBox.style.display = 'none'; tcBox.innerHTML = ''; }
   if (dlBtn) dlBtn.style.display = 'none';
   if (img) img.style.display = 'block';
@@ -11769,7 +12478,11 @@ function closePhotoLightboxModal() {
   const img = document.getElementById('photoLightboxImg');
   if (img) { img.src = ''; img.style.display = 'block'; }
   const tcBox = document.getElementById('photoLightboxTextCard');
-  if (tcBox) { tcBox.style.display = 'none'; tcBox.innerHTML = ''; }
+  if (tcBox) {
+    stopBeforeAfterAutoSlide(tcBox.querySelector('.ba-slider-box'));
+    tcBox.style.display = 'none';
+    tcBox.innerHTML = '';
+  }
   const dlBtn = document.getElementById('photoLightboxDownloadBtn');
   if (dlBtn) dlBtn.style.display = 'none';
   currentLightboxPostId = null;
@@ -11989,7 +12702,14 @@ function formatNotificationDesc(n, langOverride) {
       ? '🤝 Connexion Planétaire complétée ! +15 🪙 gagnés chacun !'
       : '🤝 Daily World Match unlocked! +15 🪙 earned each!';
   }
-  return n.text || '';
+  if (n.type === 'crown_steal') {
+    return (isFr ? (n.text_fr || n.text_en) : (n.text_en || n.text_fr))
+      || (isFr ? '👑 Quelqu’un a volé votre Couronne Arcade ! Prenez votre revanche !' : '👑 Someone stole your Arcade Crown! Take revenge!');
+  }
+  if (n.type === 'spotlight_hype' || n.type === 'spotlight_gift') {
+    return (isFr ? (n.text_fr || n.text_en) : (n.text_en || n.text_fr)) || n.text || '';
+  }
+  return (isFr ? (n.text_fr || n.text_en) : (n.text_en || n.text_fr)) || n.text || '';
 }
 window.formatNotificationDesc = formatNotificationDesc;
 
@@ -12421,6 +13141,8 @@ function renderNotificationsList(filterTab = currentNotifFilter) {
     else if (n.type === 'follow') { icon = '🌟'; iconBg = 'rgba(99, 102, 241, 0.24)'; }
     else if (n.type === 'mystery_solved') { icon = '🕵️'; iconBg = 'rgba(168, 85, 247, 0.24)'; }
     else if (n.type === 'daily_match') { icon = '🤝'; iconBg = 'rgba(16, 185, 129, 0.25)'; }
+    else if (n.type === 'crown_steal') { icon = '👑'; iconBg = 'rgba(251, 191, 36, 0.28)'; }
+    else if (n.type === 'spotlight_hype' || n.type === 'spotlight_gift') { icon = '🌟'; iconBg = 'rgba(234, 179, 8, 0.26)'; }
 
     const canWaveBack = n.type === 'wave' && n.fromUid && !n.groupedCount;
 
@@ -12501,7 +13223,7 @@ function handleNotificationClick(notifId) {
     openDirectChatWithUser(item.fromUid);
   } else if ((item.type === 'wave' || item.type === 'follow') && item.fromUid) {
     openCitizenProfileModal(item.fromUid, item.fromName || '');
-  } else if ((item.type === 'comment' || item.type === 'like' || item.type === 'reaction' || item.type === 'tip' || item.type === 'mystery_solved') && item.postId) {
+  } else if ((item.type === 'comment' || item.type === 'like' || item.type === 'reaction' || item.type === 'tip' || item.type === 'mystery_solved' || item.type === 'crown_steal' || item.type === 'spotlight_hype' || item.type === 'spotlight_gift') && item.postId) {
     jumpToPostFromNotification(item.postId, item.type === 'comment');
   }
 }
@@ -13290,6 +14012,13 @@ function renderHtmlGameLeaderboardWidget(p, lang, u) {
   const lb = Array.isArray(p.leaderboard) ? p.leaderboard.slice(0, 3) : [];
   const sessScore = Number(_sessionGameScores[p.id] || 0);
   const medals = ['🥇', '🥈', '🥉'];
+  const gc = p.gameChallenge || null;
+  const crownBannerHtml = gc ? `
+    <div class="crown-steal-banner">
+      <div class="crown-steal-holder">${escapeHtmlStr(t('games_hub_crown_holder', { name: gc.holderName || 'Champion', score: Number(gc.targetScore || 0).toLocaleString() }))}</div>
+      <div class="crown-steal-sub">${escapeHtmlStr(t('games_hub_steal_hint', { score: Number(gc.targetScore || 0).toLocaleString(), steals: Number(gc.crownSteals || 0) }))}</div>
+    </div>
+  ` : '';
 
   return `
     <div class="game-leaderboard-box" id="glbBox_${p.id}">
@@ -13297,6 +14026,7 @@ function renderHtmlGameLeaderboardWidget(p, lang, u) {
         <span class="glb-title">${escapeHtmlStr(t('game_lb_title'))}</span>
         ${lb.length > 0 ? `<span style="font-size:0.7rem;color:#34d399;font-weight:800;">#1 · ${Number(lb[0].score || 0).toLocaleString()} pts</span>` : ''}
       </div>
+      ${crownBannerHtml}
       ${lb.length === 0 ? `
         <div style="font-size:0.75rem;color:var(--muted);padding:3px 0;">${escapeHtmlStr(t('game_lb_empty'))}</div>
       ` : lb.map((entry, idx) => {
@@ -13358,6 +14088,19 @@ window.addEventListener('message', (ev) => {
   const score = Math.floor(Number(d.score || 0));
   if (!Number.isFinite(score) || score <= 0 || score > 10000000) return;
 
+  if (pid.startsWith('hub_')) {
+    const gid = pid.slice(4);
+    if (!_hubActiveGameId || _hubActiveGameId !== gid) return;
+    if (score <= _hubSessionBestScore) return;
+    _hubSessionBestScore = score;
+    const saveBtn = document.getElementById('gamesHubSaveScoreBtn');
+    if (saveBtn) {
+      saveBtn.style.display = 'inline-flex';
+      saveBtn.textContent = t('games_hub_save_btn', { score: score.toLocaleString() });
+    }
+    return;
+  }
+
   const prev = Number(_sessionGameScores[d.postId] || 0);
   if (score <= prev) return;
   _sessionGameScores[d.postId] = score;
@@ -13399,7 +14142,16 @@ function saveHtmlGameScoreAction(postId) {
 
   const res = REMO_STORE.submitHtmlGameScore(postId, score);
   if (res.ok) {
-    if (res.isNewRecord) {
+    if (res.stoleCrown) {
+      RemoAudio.play('fanfare');
+      spawnRemoCoinsFX(16);
+      remoToast(
+        isFr
+          ? `👑 Couronne volée à @${res.prevHolderName} avec ${score.toLocaleString()} pts !`
+          : `👑 Crown stolen from @${res.prevHolderName} with ${score.toLocaleString()} pts!`,
+        'fanfare'
+      );
+    } else if (res.isNewRecord) {
       RemoAudio.play('fanfare');
       spawnRemoCoinsFX(12);
       remoToast(t('game_new_record_toast', { score: score.toLocaleString() }), 'fanfare');
@@ -13408,7 +14160,11 @@ function saveHtmlGameScoreAction(postId) {
       remoToast(t('game_score_saved_toast', { score: score.toLocaleString() }), 'coin');
     }
     syncHeaderAndSidebars();
-    refreshSingleGameLeaderboardDOM(postId);
+    if (res.stoleCrown && typeof rerenderSinglePostCard === 'function') {
+      rerenderSinglePostCard(postId);
+    } else {
+      refreshSingleGameLeaderboardDOM(postId);
+    }
   } else if (res.reason === 'not_higher') {
     remoToast(
       isFr
@@ -13427,6 +14183,568 @@ function flushPendingGuestGameScore() {
   saveHtmlGameScoreAction(postId);
 }
 window.flushPendingGuestGameScore = flushPendingGuestGameScore;
+
+/* ── 🕹️ REMO GAMES HUB CONTROLLER ── */
+let _hubActiveGameId = '';
+let _hubSessionBestScore = 0;
+let _hubGyroEnabled = false;
+let _hubGyroListener = null;
+
+function _hubGenreFromGameId(id) {
+  const map = {
+    g_gyro_coins: 'gyro_coins',
+    g_laser_defense: 'defense',
+    g_tower_stacker: 'stacker',
+    g_cyber_drone: 'drone',
+    g_neon_dash: 'metro',
+    g_rhythm_piano: 'rhythm'
+  };
+  return map[id] || 'gyro_coins';
+}
+
+function _getHubGameHtml(game) {
+  if (!game) return '';
+  if (!game.isBuiltin && game.customHtml) return String(game.customHtml);
+  const u = REMO_STORE.getCurrentUser();
+  const city = getCityById((u && u.homeCity) || 'montreal');
+  const col = (city && city.themeColor) || '#38bdf8';
+  const flag = (city && city.flag) || '🌍';
+  const cName = (city && (city.name_en || city.name_fr)) || 'REMO';
+  return _buildArcadeHtmlByGenre(_hubGenreFromGameId(game.id), col, flag, cName);
+}
+
+function _stopHubGyro() {
+  _hubGyroEnabled = false;
+  if (_hubGyroListener && typeof window !== 'undefined') {
+    window.removeEventListener('deviceorientation', _hubGyroListener);
+  }
+  _hubGyroListener = null;
+}
+
+function openGamesHubModal() {
+  REMO_STORE.ensureGamesHub();
+  _hubActiveGameId = '';
+  _hubSessionBestScore = 0;
+  _stopHubGyro();
+  document.getElementById('gamesHubModal')?.classList.add('open');
+  renderGamesHubContent();
+  if (typeof RemoAudio !== 'undefined' && RemoAudio.play) RemoAudio.play('click');
+}
+window.openGamesHubModal = openGamesHubModal;
+
+function closeGamesHubModal() {
+  _stopHubGyro();
+  _hubActiveGameId = '';
+  _hubSessionBestScore = 0;
+  const body = document.getElementById('gamesHubBody');
+  if (body) body.innerHTML = '';
+  document.getElementById('gamesHubModal')?.classList.remove('open');
+}
+window.closeGamesHubModal = closeGamesHubModal;
+
+function playGamesHubItem(gameId) {
+  const hub = REMO_STORE.ensureGamesHub();
+  const game = (hub.games || []).find((g) => g && g.id === gameId && g.enabled !== false);
+  if (!game) return;
+  _stopHubGyro();
+  _hubActiveGameId = gameId;
+  _hubSessionBestScore = 0;
+  renderGamesHubContent();
+  if (typeof RemoAudio !== 'undefined' && RemoAudio.play) RemoAudio.play('click');
+}
+window.playGamesHubItem = playGamesHubItem;
+
+function backToGamesHubGrid() {
+  _stopHubGyro();
+  _hubActiveGameId = '';
+  _hubSessionBestScore = 0;
+  renderGamesHubContent();
+}
+window.backToGamesHubGrid = backToGamesHubGrid;
+
+async function toggleGamesHubGyro() {
+  if (_hubGyroEnabled) {
+    _stopHubGyro();
+  } else {
+    try {
+      if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+        const perm = await DeviceOrientationEvent.requestPermission();
+        if (perm !== 'granted') return;
+      }
+    } catch (e) {}
+    _hubGyroEnabled = true;
+    _hubGyroListener = (ev) => {
+      const fr = document.getElementById('gamesHubIframe');
+      if (!fr || !fr.contentWindow || typeof ev.gamma !== 'number') return;
+      const g = Math.max(-35, Math.min(35, ev.gamma));
+      fr.contentWindow.postMessage({ type: 'REMO_GYRO_TILT', gamma: g }, '*');
+    };
+    window.addEventListener('deviceorientation', _hubGyroListener);
+  }
+  const btn = document.getElementById('gamesHubGyroBtn');
+  if (btn) btn.textContent = _hubGyroEnabled ? t('games_hub_gyro_on') : t('games_hub_gyro_off');
+}
+window.toggleGamesHubGyro = toggleGamesHubGyro;
+
+function renderGamesHubContent() {
+  const modal = document.getElementById('gamesHubModal');
+  const body = document.getElementById('gamesHubBody');
+  if (!body) return;
+  if (modal && !modal.classList.contains('open')) return;
+
+  const lang = REMO_I18N.getLang();
+  const isFr = lang === 'fr';
+  const hub = REMO_STORE.ensureGamesHub();
+  const enabledGames = (hub.games || []).filter((g) => g && g.enabled !== false);
+
+  if (_hubActiveGameId) {
+    const active = enabledGames.find((g) => g.id === _hubActiveGameId);
+    if (!active) {
+      _hubActiveGameId = '';
+    } else {
+      const title = isFr ? (active.title_fr || active.title_en) : (active.title_en || active.title_fr);
+      const isFeat = hub.featuredGameId === active.id;
+      const topLb = Array.isArray(active.leaderboard) ? active.leaderboard.slice(0, 3) : [];
+      const existingFrame = document.getElementById('gamesHubIframe');
+      if (existingFrame && existingFrame.getAttribute('data-post-id') === ('hub_' + active.id)) {
+        return;
+      }
+      body.innerHTML = `
+        <div class="game-hub-play-stage">
+          <div class="game-hub-toolbar">
+            <button type="button" class="btn-ghost" onclick="backToGamesHubGrid()">${escapeHtmlStr(t('games_hub_back'))}</button>
+            <strong style="font-size:0.9rem;color:#fff;">${escapeHtmlStr(active.icon || '🎮')} ${escapeHtmlStr(title)} ${isFeat ? `<span class="game-hub-2x-pill">${escapeHtmlStr(t('games_hub_featured_2x'))}</span>` : ''}</strong>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;">
+              <button type="button" id="gamesHubGyroBtn" class="btn-ghost" style="font-size:0.75rem;" onclick="toggleGamesHubGyro()">${escapeHtmlStr(_hubGyroEnabled ? t('games_hub_gyro_on') : t('games_hub_gyro_off'))}</button>
+              <button type="button" id="gamesHubSaveScoreBtn" class="btn-cyber btn-gold" style="font-size:0.75rem;${_hubSessionBestScore > 0 ? '' : 'display:none;'}" onclick="submitCurrentHubScore()">${escapeHtmlStr(t('games_hub_save_btn', { score: _hubSessionBestScore.toLocaleString() }))}</button>
+              <button type="button" class="btn-cyber" style="font-size:0.75rem;background:linear-gradient(135deg,#0284c7,#7c3aed);" onclick="challengeFeedFromGamesHub()">${escapeHtmlStr(t('games_hub_challenge_btn'))}</button>
+            </div>
+          </div>
+          ${topLb.length ? `
+            <div style="display:flex;gap:10px;flex-wrap:wrap;font-size:0.74rem;padding:6px 10px;border-radius:10px;background:rgba(15,23,42,0.7);border:1px solid rgba(56,189,248,0.2);">
+              ${topLb.map((e, i) => {
+                const c = getCityById(e.cityId || 'montreal');
+                const med = ['🥇', '🥈', '🥉'][i] || '🎮';
+                return `<span>${med} ${c ? c.flag : '🌍'} @${escapeHtmlStr(e.name || 'Citizen')} · <b>${Number(e.score || 0).toLocaleString()}</b></span>`;
+              }).join('')}
+            </div>
+          ` : ''}
+          <div class="game-hub-iframe-wrap">
+            <iframe id="gamesHubIframe" class="game-hub-iframe" data-post-id="${escapeHtmlStr('hub_' + active.id)}" sandbox="allow-scripts allow-same-origin"></iframe>
+          </div>
+        </div>
+      `;
+      const iframe = document.getElementById('gamesHubIframe');
+      if (iframe) {
+        iframe.srcdoc = buildFittedHtmlSrcdoc(_getHubGameHtml(active), 'hub_' + active.id);
+      }
+      return;
+    }
+  }
+
+  const ordered = enabledGames.slice().sort((a, b) => (b.id === hub.featuredGameId ? 1 : 0) - (a.id === hub.featuredGameId ? 1 : 0));
+  body.innerHTML = `
+    ${ordered.length === 0 ? `<div style="padding:24px;text-align:center;color:var(--muted);">${escapeHtmlStr(t('games_hub_empty'))}</div>` : `
+      <div class="games-hub-grid">
+        ${ordered.map((g) => {
+          const isFeat = hub.featuredGameId === g.id;
+          const title = isFr ? (g.title_fr || g.title_en) : (g.title_en || g.title_fr);
+          const desc = isFr ? (g.desc_fr || g.desc_en) : (g.desc_en || g.desc_fr);
+          const rec = Array.isArray(g.leaderboard) && g.leaderboard[0] ? g.leaderboard[0] : null;
+          return `
+            <button type="button" class="game-hub-card ${isFeat ? 'featured-2x' : ''}" onclick="playGamesHubItem('${escapeHtmlStr(g.id)}')" style="text-align:left;">
+              <div class="game-hub-card-top">
+                <span class="game-hub-icon">${escapeHtmlStr(g.icon || '🎮')}</span>
+                ${isFeat ? `<span class="game-hub-2x-pill">${escapeHtmlStr(t('games_hub_featured_2x'))}</span>` : ''}
+              </div>
+              <div class="game-hub-card-title">${escapeHtmlStr(title)}</div>
+              <div class="game-hub-card-desc">${escapeHtmlStr(desc)}</div>
+              <div class="game-hub-card-rec">
+                <span>${escapeHtmlStr(t('games_hub_record_lbl'))}</span>
+                <b>${rec ? `${Number(rec.score || 0).toLocaleString()} · @${escapeHtmlStr(rec.name || 'Champion')}` : escapeHtmlStr(t('games_hub_no_record'))}</b>
+              </div>
+            </button>
+          `;
+        }).join('')}
+      </div>
+    `}
+  `;
+}
+window.renderGamesHubContent = renderGamesHubContent;
+
+function submitCurrentHubScore() {
+  if (!_hubActiveGameId || _hubSessionBestScore <= 0) return;
+  const u = REMO_STORE.getCurrentUser();
+  if (!u) {
+    openAuthModal();
+    return;
+  }
+  const res = REMO_STORE.submitGamesHubScore(_hubActiveGameId, _hubSessionBestScore);
+  if (!res.ok) return;
+  if (res.dailyBonus) {
+    RemoAudio.play('fanfare');
+    spawnRemoCoinsFX(res.isFeatured2x ? 14 : 8);
+    remoToast(t(res.isFeatured2x ? 'games_hub_daily_2x_bonus' : 'games_hub_daily_bonus'), 'fanfare');
+  } else if (res.isNewRecord) {
+    RemoAudio.play('fanfare');
+    spawnRemoCoinsFX(12);
+    remoToast(t('game_new_record_toast', { score: _hubSessionBestScore.toLocaleString() }), 'fanfare');
+  } else {
+    RemoAudio.play('coin');
+    remoToast(t('game_score_saved_toast', { score: _hubSessionBestScore.toLocaleString() }), 'coin');
+  }
+  syncHeaderAndSidebars();
+}
+window.submitCurrentHubScore = submitCurrentHubScore;
+
+function challengeFeedFromGamesHub() {
+  if (!_hubActiveGameId) return;
+  if (_hubSessionBestScore <= 0) {
+    remoToast(t('games_hub_score_first'));
+    return;
+  }
+  const u = REMO_STORE.getCurrentUser();
+  if (!u) {
+    openAuthModal();
+    return;
+  }
+  const hub = REMO_STORE.ensureGamesHub();
+  const game = (hub.games || []).find((g) => g && g.id === _hubActiveGameId);
+  if (!game) return;
+
+  REMO_STORE.submitGamesHubScore(_hubActiveGameId, _hubSessionBestScore);
+  const myScore = _hubSessionBestScore;
+  const htmlCode = _getHubGameHtml(game);
+  const cityId = u.homeCity || 'montreal';
+  const city = getCityById(cityId);
+  const gEn = game.title_en || 'REMO Arcade';
+  const gFr = game.title_fr || gEn;
+  const newPost = {
+    id: 'post_' + Date.now(),
+    uid: u.uid,
+    authorUid: u.uid,
+    authorName: u.name,
+    authorAvatar: u.avatarUrl || '',
+    authorEmail: u.email || '',
+    authorVerified: true,
+    authorPassport: u.passportNum,
+    cityId,
+    vibe: '🔥',
+    caption_en: `${game.icon || '🎮'} @${u.name} scored ${myScore.toLocaleString()} pts in "${gEn}" for ${city ? city.name_en : 'REMO'}! Beat my score in the Feed to steal the Crown 👑! #RemoGamesHub #BeatMyScore`,
+    caption_fr: `${game.icon || '🎮'} @${u.name} a marqué ${myScore.toLocaleString()} pts à « ${gFr} » pour ${city ? (city.name_fr || city.name_en) : 'REMO'} ! Battez ce score pour voler la Couronne 👑 ! #RemoGamesHub #DefiScore`,
+    mediaType: 'html_app',
+    mediaUrl: '',
+    mediaUrls: [],
+    htmlCode,
+    leaderboard: [{ uid: u.uid, name: u.name, cityId, score: myScore, ts: Date.now() }],
+    gameChallenge: {
+      gameId: game.id,
+      title_en: gEn,
+      title_fr: gFr,
+      holderUid: u.uid,
+      holderName: u.name,
+      holderCityId: cityId,
+      targetScore: myScore,
+      crownSteals: 0
+    },
+    externalUrl: '',
+    photoFilter: 'flt-none',
+    soundtrackId: '',
+    likes: [],
+    tipsTotal: 0,
+    comments: [],
+    reactions: {},
+    createdAt: Date.now()
+  };
+
+  REMO_STORE.state.posts.unshift(newPost);
+  REMO_STORE.addCoins(u.uid, 15, 10);
+  REMO_STORE.syncPostToCloud(newPost);
+  REMO_STORE.save(true, 'hub_feed_challenge');
+  closeGamesHubModal();
+  if (typeof switchRemoView === 'function') switchRemoView('feed');
+  else renderSocialFeed('', true);
+  syncHeaderAndSidebars();
+  if (typeof RemoAudio !== 'undefined' && RemoAudio.play) RemoAudio.play('fanfare');
+  spawnRemoCoinsFX(12);
+  remoToast(t('games_hub_challenge_posted'), 'fanfare');
+}
+window.challengeFeedFromGamesHub = challengeFeedFromGamesHub;
+
+/* ── 🌟 STAGE 4: WORLD SPOTLIGHT STAGE CONTROLLER ── */
+let _wspotTickTimer = null;
+
+function _resolveSpotlightThumbHtml(post, entry, isLarge = true) {
+  let rawSrc = (post && post.mediaUrl) || (entry && entry.previewImg) || '';
+  if (!rawSrc && post && Array.isArray(post.mediaUrls) && post.mediaUrls.length > 0) {
+    rawSrc = post.mediaUrls[0] || '';
+  }
+  const mType = post ? post.mediaType : '';
+  let resolved = rawSrc;
+  let idbAttr = '';
+  if (rawSrc && String(rawSrc).startsWith('idb://')) {
+    idbAttr = `data-idb-src="${escapeHtmlStr(rawSrc)}"`;
+    if (typeof RemoMediaDB !== 'undefined' && RemoMediaDB.resolveSyncOrPlaceholder) {
+      resolved = RemoMediaDB.resolveSyncOrPlaceholder(rawSrc);
+    }
+  }
+  const cls = isLarge ? 'wspot-thumb' : 'wspot-post-pick-thumb';
+  if (resolved && !String(resolved).startsWith('idb://') && !String(resolved).startsWith('data:image/svg')) {
+    return `<div class="${cls}" ${idbAttr}><img src="${escapeHtmlStr(resolved)}" alt=""></div>`;
+  }
+  const icon = mType === 'html_app' ? '🕹️' : mType === 'before_after' ? '🪞' : mType === 'video' ? '🎬' : '🌟';
+  return `<div class="${cls}" ${idbAttr}>${icon}</div>`;
+}
+
+function _stopWorldSpotlightTimer() {
+  if (_wspotTickTimer) {
+    clearInterval(_wspotTickTimer);
+    _wspotTickTimer = null;
+  }
+}
+
+function _updateWorldSpotlightCountdownDOM() {
+  const ws = REMO_STORE.ensureWorldSpotlight();
+  const cur = ws && ws.activeEntry;
+  if (!cur || ws.paused) {
+    _stopWorldSpotlightTimer();
+    return;
+  }
+  const now = Date.now();
+  const remMs = Number(cur.endsAt || 0) - now;
+  if (remMs <= 0) {
+    _stopWorldSpotlightTimer();
+    renderWorldSpotlightBar();
+    return;
+  }
+  const secLeft = Math.max(0, Math.ceil(remMs / 1000));
+  const totalWindowMs = Math.max(45000, Number(cur.endsAt || 0) - Number(cur.startedAt || now));
+  const pct = Math.max(0, Math.min(100, Math.round((remMs / totalWindowMs) * 100)));
+  const secEl = document.getElementById('wspotSecsLeft');
+  const fillEl = document.getElementById('wspotTimerFill');
+  if (secEl) secEl.textContent = secLeft + 's';
+  if (fillEl) fillEl.style.width = pct + '%';
+}
+
+function renderWorldSpotlightBar() {
+  const bar = document.getElementById('worldSpotlightBar');
+  if (!bar) return;
+  REMO_STORE.advanceWorldSpotlightIfNeeded();
+  const ws = REMO_STORE.ensureWorldSpotlight();
+  const lang = REMO_I18N.getLang();
+  const isFr = lang === 'fr';
+  const cur = ws.activeEntry;
+  const star = ws.dailyStarRecord || {};
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const starHtml = (star.date === todayStr && Number(star.durationSec || 0) > 0 && star.name)
+    ? `<span class="wspot-star-pill">${escapeHtmlStr(t('wspot_star_today', { name: star.name, secs: Number(star.durationSec || 0) }))}</span>`
+    : '';
+  const queuePill = ws.queue && ws.queue.length > 0
+    ? `<span style="font-size:0.72rem;color:#93c5fd;font-weight:800;">${escapeHtmlStr(t('wspot_queue_count', { count: ws.queue.length }))}</span>`
+    : '';
+
+  if (cur) {
+    const post = (REMO_STORE.state.posts || []).find((p) => p && p.id === cur.postId);
+    const city = getCityById(cur.authorCityId || 'montreal');
+    const now = Date.now();
+    const remMs = Math.max(0, Number(cur.endsAt || now) - now);
+    const secLeft = Math.max(0, Math.ceil(remMs / 1000));
+    const totalWindowMs = Math.max(45000, Number(cur.endsAt || now) - Number(cur.startedAt || now));
+    const pct = Math.max(0, Math.min(100, Math.round((remMs / totalWindowMs) * 100)));
+    const cap = (isFr ? (cur.caption_fr || cur.caption_en) : (cur.caption_en || cur.caption_fr)) || (city ? getCityName(city, lang) : 'REMO');
+    const hypesCnt = Array.isArray(cur.hypes) ? cur.hypes.length : Number(cur.totalHypes || 0);
+    const nextCnt = Array.isArray(cur.nextVotes) ? cur.nextVotes.length : 0;
+
+    bar.innerHTML = `
+      <div class="wspot-header">
+        <div class="wspot-title-wrap">
+          <b style="font-size:0.86rem;color:#fde047;">${escapeHtmlStr(t('wspot_title'))}</b>
+          <span class="wspot-live-pill">${escapeHtmlStr(ws.paused ? t('wspot_paused_lbl') : t('wspot_badge_live'))}</span>
+          ${queuePill}
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          ${starHtml}
+          <button type="button" class="btn-cyber btn-gold" style="font-size:0.71rem;padding:4px 10px;" onclick="openSpotlightEnterModal()">${escapeHtmlStr(t('wspot_queue_btn'))}</button>
+        </div>
+      </div>
+      <div class="wspot-stage-card">
+        <div onclick="openSpotlightPostJump('${escapeHtmlStr(cur.postId)}')">${_resolveSpotlightThumbHtml(post, cur, true)}</div>
+        <div class="wspot-meta">
+          <div class="wspot-author-line">
+            <span>${city ? city.flag : '🌍'} @${escapeHtmlStr(cur.authorName || 'Citizen')} ${Number(cur.giftsTotal || 0) > 0 ? `<span style="color:#7dd3fc;font-size:0.74rem;">· 💎 ${Number(cur.giftsTotal)} 🪙</span>` : ''}</span>
+            <span id="wspotSecsLeft" class="wspot-timer-txt">${secLeft}s</span>
+          </div>
+          <div class="wspot-caption">${escapeHtmlStr(cap)}</div>
+          <div class="wspot-timer-bar"><div id="wspotTimerFill" class="wspot-timer-fill" style="width:${pct}%"></div></div>
+          <div class="wspot-actions">
+            <button type="button" class="btn-cyber" style="font-size:0.73rem;padding:5px 10px;background:linear-gradient(135deg,#ea580c,#e11d48);" onclick="hypeSpotlightAction()">${escapeHtmlStr(t('wspot_hype_btn', { count: hypesCnt }))}</button>
+            <button type="button" class="btn-ghost" style="font-size:0.73rem;padding:5px 10px;" onclick="nextSpotlightAction()">${escapeHtmlStr(t('wspot_next_btn', { count: nextCnt }))}</button>
+            <button type="button" class="btn-ghost" style="font-size:0.73rem;padding:5px 10px;border-color:rgba(56,189,248,0.45);color:#7dd3fc;" onclick="giftSpotlightAction()">${escapeHtmlStr(t('wspot_gift_btn'))}</button>
+            <button type="button" class="btn-ghost" style="font-size:0.73rem;padding:5px 10px;" onclick="openSpotlightPostJump('${escapeHtmlStr(cur.postId)}')">${escapeHtmlStr(t('wspot_view_post_btn'))}</button>
+          </div>
+        </div>
+      </div>
+    `;
+    _stopWorldSpotlightTimer();
+    if (!ws.paused) {
+      _wspotTickTimer = setInterval(_updateWorldSpotlightCountdownDOM, 1000);
+    }
+  } else {
+    _stopWorldSpotlightTimer();
+    bar.innerHTML = `
+      <div class="wspot-header">
+        <div class="wspot-title-wrap">
+          <b style="font-size:0.86rem;color:#fde047;">${escapeHtmlStr(t('wspot_title'))}</b>
+          ${ws.paused ? `<span class="wspot-live-pill">${escapeHtmlStr(t('wspot_paused_lbl'))}</span>` : ''}
+          ${queuePill}
+        </div>
+        ${starHtml}
+      </div>
+      <div class="wspot-empty-row">
+        <span>${escapeHtmlStr(t('wspot_empty_cta'))}</span>
+        <button type="button" class="btn-cyber btn-gold" style="font-size:0.76rem;padding:6px 13px;" onclick="openSpotlightEnterModal()">${escapeHtmlStr(t('wspot_queue_btn'))}</button>
+      </div>
+    `;
+  }
+}
+window.renderWorldSpotlightBar = renderWorldSpotlightBar;
+
+function openSpotlightEnterModal() {
+  const u = REMO_STORE.getCurrentUser();
+  if (!u || u.role === 'guest') {
+    openAuthModal();
+    return;
+  }
+  const modal = document.getElementById('spotlightEnterModal');
+  const body = document.getElementById('spotlightEnterBody');
+  if (!modal || !body) return;
+
+  const lang = REMO_I18N.getLang();
+  const isFr = lang === 'fr';
+  const ws = REMO_STORE.ensureWorldSpotlight();
+  const todayStr = new Date().toISOString().slice(0, 10);
+
+  if (ws.usedDatesByUid && ws.usedDatesByUid[u.uid] === todayStr) {
+    body.innerHTML = `<div style="padding:14px;border-radius:12px;background:rgba(244,63,94,0.12);border:1px solid rgba(244,63,94,0.4);color:#fda4af;font-size:0.82rem;font-weight:700;">${escapeHtmlStr(t('wspot_daily_used'))}</div>`;
+    modal.classList.add('open');
+    return;
+  }
+
+  const isAdm = REMO_STORE.isCurrentUserAdmin() || REMO_STORE.isAdminUnlocked();
+  const myPosts = (REMO_STORE.state.posts || []).filter((p) => p && (p.uid === u.uid || (isAdm && p.uid === 'u_admin_founder'))).slice(0, 20);
+
+  if (!myPosts.length) {
+    body.innerHTML = `
+      <div style="text-align:center;padding:16px;color:var(--muted);font-size:0.84rem;">
+        <p style="margin:0 0 12px;">${escapeHtmlStr(t('wspot_no_posts'))}</p>
+        <button type="button" class="btn-cyber btn-gold" onclick="closeSpotlightEnterModal();openCreatePostModal()">${escapeHtmlStr(t('wspot_create_post_cta'))}</button>
+      </div>
+    `;
+  } else {
+    body.innerHTML = `
+      <div style="font-size:0.78rem;color:#cbd5e1;font-weight:700;margin-bottom:4px;">${escapeHtmlStr(t('wspot_choose_post'))}</div>
+      <div class="wspot-post-pick-list">
+        ${myPosts.map((p) => {
+          const cap = (isFr ? (p.caption_fr || p.caption_en) : (p.caption_en || p.caption_fr)) || (p.mediaType || 'Post');
+          const c = getCityById(p.cityId || u.homeCity || 'montreal');
+          return `
+            <button type="button" class="wspot-post-pick-item" onclick="confirmEnterWorldSpotlight('${escapeHtmlStr(p.id)}')">
+              ${_resolveSpotlightThumbHtml(p, null, false)}
+              <div style="flex:1;min-width:0;">
+                <div style="font-size:0.74rem;color:#fde047;font-weight:800;">${c ? c.flag : '🌍'} ${c ? escapeHtmlStr(getCityName(c, lang)) : 'REMO'}</div>
+                <div style="font-size:0.8rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtmlStr(cap)}</div>
+              </div>
+              <span style="font-size:0.74rem;font-weight:900;color:#fbbf24;">100 🪙 →</span>
+            </button>
+          `;
+        }).join('')}
+      </div>
+    `;
+  }
+  modal.classList.add('open');
+  if (typeof RemoAudio !== 'undefined' && RemoAudio.play) RemoAudio.play('click');
+}
+window.openSpotlightEnterModal = openSpotlightEnterModal;
+
+function closeSpotlightEnterModal() {
+  document.getElementById('spotlightEnterModal')?.classList.remove('open');
+}
+window.closeSpotlightEnterModal = closeSpotlightEnterModal;
+
+function confirmEnterWorldSpotlight(postId) {
+  const res = REMO_STORE.enterWorldSpotlightQueue(postId);
+  if (!res.ok) {
+    if (res.error === 'auth_required') {
+      closeSpotlightEnterModal();
+      openAuthModal();
+    } else if (res.error === 'daily_limit_reached') {
+      remoToast(t('wspot_daily_used'));
+    } else if (res.error === 'insufficient_coins') {
+      remoToast(t('wspot_need_coins', { needed: res.needed || 100, have: res.have || 0 }));
+    }
+    return;
+  }
+  closeSpotlightEnterModal();
+  renderWorldSpotlightBar();
+  syncHeaderAndSidebars();
+  if (typeof RemoAudio !== 'undefined' && RemoAudio.play) RemoAudio.play('fanfare');
+  spawnRemoCoinsFX(12);
+  remoToast(res.isLiveNow ? t('wspot_entered_live') : t('wspot_entered_queue', { pos: res.queuePos || 1 }), 'fanfare');
+}
+window.confirmEnterWorldSpotlight = confirmEnterWorldSpotlight;
+
+function hypeSpotlightAction() {
+  const res = REMO_STORE.hypeCurrentSpotlight();
+  if (!res.ok) {
+    if (res.needAuth) openAuthModal();
+    else if (res.error === 'cannot_hype_self') remoToast(REMO_I18N.getLang() === 'fr' ? 'Vous ne pouvez pas hyper votre propre passage !' : 'You cannot hype your own Spotlight turn!');
+    else if (res.error === 'already_hyped') remoToast(REMO_I18N.getLang() === 'fr' ? 'Vous avez déjà hypé ce créateur !' : 'You already hyped this Spotlight turn!');
+    return;
+  }
+  RemoAudio.play('coin');
+  spawnRemoCoinsFX(6);
+  renderWorldSpotlightBar();
+  syncHeaderAndSidebars();
+  remoToast(t('wspot_hyped_toast', { sec: res.addedSec || 5 }), 'fanfare');
+}
+window.hypeSpotlightAction = hypeSpotlightAction;
+
+function nextSpotlightAction() {
+  const res = REMO_STORE.voteNextSpotlight();
+  if (!res.ok) {
+    if (res.needAuth) openAuthModal();
+    else if (res.error === 'already_voted_next') remoToast(REMO_I18N.getLang() === 'fr' ? 'Vote Suivant déjà pris en compte !' : 'NEXT vote already counted!');
+    return;
+  }
+  RemoAudio.play('click');
+  renderWorldSpotlightBar();
+  remoToast(t('wspot_next_toast'));
+}
+window.nextSpotlightAction = nextSpotlightAction;
+
+function giftSpotlightAction() {
+  const res = REMO_STORE.giftCurrentSpotlight(25);
+  if (!res.ok) {
+    if (res.needAuth) openAuthModal();
+    else if (res.error === 'cannot_gift_self') remoToast(REMO_I18N.getLang() === 'fr' ? 'Impossible de vous envoyer un cadeau à vous-même !' : 'You cannot gift yourself!');
+    else if (res.error === 'insufficient_coins') remoToast(t('wspot_need_coins', { needed: res.needed || 25, have: res.have || 0 }));
+    return;
+  }
+  RemoAudio.play('fanfare');
+  spawnRemoCoinsFX(10);
+  renderWorldSpotlightBar();
+  syncHeaderAndSidebars();
+  remoToast(t('wspot_gifted_toast', { amt: res.giftAmt || 25, name: res.creatorName || 'Champion' }), 'fanfare');
+}
+window.giftSpotlightAction = giftSpotlightAction;
+
+function openSpotlightPostJump(postId) {
+  if (!postId) return;
+  if (typeof jumpToPostFromNotification === 'function') {
+    jumpToPostFromNotification(postId, false);
+  }
+}
+window.openSpotlightPostJump = openSpotlightPostJump;
 
 function challengeFriendOnGame(postId) {
   const lang = REMO_I18N.getLang();

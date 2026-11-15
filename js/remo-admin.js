@@ -172,6 +172,12 @@ function refreshAllAdminPanels() {
   if (typeof renderAdminContestsPanel === 'function') {
     renderAdminContestsPanel();
   }
+  if (typeof renderAdminGamesHubPanel === 'function') {
+    renderAdminGamesHubPanel();
+  }
+  if (typeof renderAdminSpotlightPanel === 'function') {
+    renderAdminSpotlightPanel();
+  }
 }
 
 function saveAdminMegaphone() {
@@ -2962,11 +2968,199 @@ window.adminReplySupportTicketFromOffice = adminReplySupportTicketFromOffice;
 window.adminDeleteSupportTicketFromOffice = adminDeleteSupportTicketFromOffice;
 window.adminReplyDmFromOffice = adminReplyDmFromOffice;
 
+/* ── 🕹️ ADMIN REMO GAMES HUB MANAGER ── */
+function renderAdminGamesHubPanel() {
+  const tbody = document.getElementById('admGamesHubTable');
+  if (!tbody || typeof REMO_STORE.ensureGamesHub !== 'function') return;
+  const lang = REMO_I18N.getLang();
+  const isFr = lang === 'fr';
+  const hub = REMO_STORE.ensureGamesHub();
+  const games = Array.isArray(hub.games) ? hub.games : [];
+
+  tbody.innerHTML = games.map((g) => {
+    const isFeat = hub.featuredGameId === g.id;
+    const isOn = g.enabled !== false;
+    const rec = Array.isArray(g.leaderboard) && g.leaderboard[0] ? g.leaderboard[0] : null;
+    const title = isFr ? (g.title_fr || g.title_en) : (g.title_en || g.title_fr);
+    return `
+      <tr>
+        <td>
+          <b>${escapeHtmlStr(g.icon || '🎮')} ${escapeHtmlStr(title || g.id)}</b>
+          ${isFeat ? ' <span style="background:rgba(251,191,36,0.2);color:#fde047;border:1px solid #fbbf24;border-radius:99px;padding:1px 7px;font-size:0.68rem;font-weight:900;">⚡ 2X TODAY</span>' : ''}
+        </td>
+        <td>
+          <span style="font-size:0.74rem;color:${g.isBuiltin ? '#7dd3fc' : '#c084fc'};font-weight:800;">${g.isBuiltin ? 'BUILTIN' : 'CUSTOM'}</span>
+          ·
+          <span style="font-size:0.74rem;color:${isOn ? '#34d399' : '#f87171'};font-weight:800;">${isOn ? 'ENABLED' : 'HIDDEN'}</span>
+        </td>
+        <td style="font-size:0.78rem;">
+          ${rec ? `<b>${Number(rec.score || 0).toLocaleString()}</b> · @${escapeHtmlStr(rec.name || 'Champion')}` : '—'}
+        </td>
+        <td style="display:flex;gap:6px;flex-wrap:wrap;">
+          <button type="button" class="adm-btn ${isOn ? 'rose' : 'emerald'}" style="padding:4px 9px;font-size:0.72rem;" onclick="adminToggleHubGameFromOffice('${escapeHtmlStr(g.id)}', ${isOn ? 'false' : 'true'})">
+            ${isOn ? '🙈 Hide' : '👁️ Enable'}
+          </button>
+          <button type="button" class="adm-btn gold" style="padding:4px 9px;font-size:0.72rem;" onclick="adminFeatureHubGameFromOffice('${escapeHtmlStr(g.id)}')">
+            ⚡ Set 2X
+          </button>
+          ${!g.isBuiltin ? `
+            <button type="button" class="adm-btn rose" style="padding:4px 9px;font-size:0.72rem;" onclick="adminDeleteHubGameFromOffice('${escapeHtmlStr(g.id)}')">
+              🗑️ Delete
+            </button>
+          ` : ''}
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function adminAddCustomHubGameFromOffice() {
+  const lang = REMO_I18N.getLang();
+  const icon = document.getElementById('admHubGameIcon')?.value.trim() || '🕹️';
+  const title_en = document.getElementById('admHubGameTitleEn')?.value.trim() || '';
+  const title_fr = document.getElementById('admHubGameTitleFr')?.value.trim() || '';
+  const desc_en = document.getElementById('admHubGameDescEn')?.value.trim() || '';
+  const desc_fr = document.getElementById('admHubGameDescFr')?.value.trim() || '';
+  const customHtml = document.getElementById('admHubGameHtml')?.value.trim() || '';
+
+  if (!title_en || !customHtml) {
+    admToast(lang === 'fr' ? '⚠️ Ajoutez un titre EN et le code HTML5.' : '⚠️ Please provide an English title and HTML5 code.');
+    return;
+  }
+  const res = REMO_STORE.adminAddCustomHubGame({ icon, title_en, title_fr: title_fr || title_en, desc_en, desc_fr, customHtml });
+  if (!res.ok) {
+    admToast(res.error === 'invalid_html'
+      ? (lang === 'fr' ? '⚠️ HTML invalide ou trop lourd (> 36 KB).' : '⚠️ HTML invalid or exceeds 36 KB.')
+      : '⚠️ Admin access required.');
+    return;
+  }
+  ['admHubGameTitleEn', 'admHubGameTitleFr', 'admHubGameDescEn', 'admHubGameDescFr', 'admHubGameHtml'].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  RemoAudio.play('fanfare');
+  admToast(lang === 'fr' ? '🕹️ Nouveau jeu publié dans REMO Games Hub !' : '🕹️ New game published to REMO Games Hub!');
+  renderAdminGamesHubPanel();
+}
+
+function adminToggleHubGameFromOffice(gameId, enabled) {
+  const res = REMO_STORE.adminToggleHubGame(gameId, enabled);
+  if (!res.ok) return;
+  admToast(enabled ? '👁️ Game enabled in REMO Games Hub.' : '🙈 Game hidden from REMO Games Hub.');
+  renderAdminGamesHubPanel();
+}
+
+function adminFeatureHubGameFromOffice(gameId) {
+  const res = REMO_STORE.adminSetFeatured2xHubGame(gameId);
+  if (!res.ok) return;
+  RemoAudio.play('fanfare');
+  admToast('⚡ Featured 2X Coins Game updated!');
+  renderAdminGamesHubPanel();
+}
+
+function adminDeleteHubGameFromOffice(gameId) {
+  const res = REMO_STORE.adminDeleteHubGame(gameId);
+  if (!res.ok) return;
+  admToast('🗑️ Custom game deleted.');
+  renderAdminGamesHubPanel();
+}
+
+window.renderAdminGamesHubPanel = renderAdminGamesHubPanel;
+window.adminAddCustomHubGameFromOffice = adminAddCustomHubGameFromOffice;
+window.adminToggleHubGameFromOffice = adminToggleHubGameFromOffice;
+window.adminFeatureHubGameFromOffice = adminFeatureHubGameFromOffice;
+window.adminDeleteHubGameFromOffice = adminDeleteHubGameFromOffice;
+
+/* ── 🌟 ADMIN WORLD SPOTLIGHT STAGE MANAGER ── */
+function renderAdminSpotlightPanel() {
+  const el = document.getElementById('admSpotlightSection');
+  if (!el || typeof REMO_STORE.ensureWorldSpotlight !== 'function') return;
+  REMO_STORE.advanceWorldSpotlightIfNeeded();
+  const ws = REMO_STORE.ensureWorldSpotlight();
+  const cur = ws.activeEntry;
+  const star = ws.dailyStarRecord || {};
+  const queue = Array.isArray(ws.queue) ? ws.queue : [];
+  const posts = (REMO_STORE.state.posts || []).slice(0, 25);
+
+  const remSec = cur ? Math.max(0, Math.ceil((Number(cur.endsAt || 0) - Date.now()) / 1000)) : 0;
+  el.innerHTML = `
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;">
+      <div style="flex:1;min-width:220px;padding:10px 12px;border-radius:10px;background:rgba(0,0,0,0.35);border:1px solid rgba(251,191,36,0.35);">
+        <div style="font-size:0.75rem;color:#94a3b8;font-weight:800;">LIVE STAGE STATUS</div>
+        ${cur ? `
+          <div style="margin-top:4px;font-weight:900;color:#fff;">🟢 @${escapeHtmlStr(cur.authorName || 'Citizen')} · <span style="color:#fde047;">${remSec}s left</span></div>
+          <div style="font-size:0.75rem;color:#cbd5e1;margin-top:3px;">🔥 Hypes: <b>${Number(cur.totalHypes || 0)}</b> · ⏭️ Next: <b>${Array.isArray(cur.nextVotes) ? cur.nextVotes.length : 0}</b> · 💎 Gifts: <b>${Number(cur.giftsTotal || 0)} 🪙</b></div>
+        ` : `<div style="margin-top:4px;color:#cbd5e1;">⚪ Idle (${ws.paused ? 'PAUSED' : 'Open Stage'})</div>`}
+      </div>
+      <div style="flex:1;min-width:220px;padding:10px 12px;border-radius:10px;background:rgba(0,0,0,0.35);border:1px solid rgba(56,189,248,0.3);">
+        <div style="font-size:0.75rem;color:#94a3b8;font-weight:800;">TODAY'S STAR RECORD</div>
+        <div style="margin-top:4px;font-weight:900;color:#fde047;">
+          ${star.name ? `👑 @${escapeHtmlStr(star.name)} · ${Number(star.durationSec || 0)}s` : '— No record today yet'}
+        </div>
+        <div style="font-size:0.74rem;color:#94a3b8;margin-top:3px;">Queue waiting: <b>${queue.length}</b> · Daily entries used today: <b>${Object.keys(ws.usedDatesByUid || {}).length}</b></div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+      <button type="button" class="adm-btn gold" onclick="adminSpotlightCommand('skip')">⏭️ Skip / Finalize Stage</button>
+      <button type="button" class="adm-btn ${ws.paused ? 'emerald' : 'rose'}" onclick="adminSpotlightCommand('toggle_pause')">${ws.paused ? '▶️ Resume Stage' : '⏸️ Pause Stage'}</button>
+      <button type="button" class="adm-btn rose" onclick="adminSpotlightCommand('clear_queue')">🗑️ Clear Queue (${queue.length})</button>
+    </div>
+
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px;">
+      <select id="admSpotFeaturePostSel" class="adm-inp" style="flex:1;min-width:220px;">
+        ${posts.map((p) => `<option value="${escapeHtmlStr(p.id)}">@${escapeHtmlStr(p.authorName || 'Citizen')} — ${escapeHtmlStr(String(p.caption_en || p.caption_fr || p.mediaType || p.id).slice(0, 50))}</option>`).join('')}
+      </select>
+      <button type="button" class="adm-btn indigo" onclick="adminFeatureSelectedSpotlightPost()">🌟 Push Selected Post Live (45s)</button>
+    </div>
+
+    ${queue.length > 0 ? `
+      <table class="adm-table">
+        <tbody>
+          ${queue.map((q, idx) => `
+            <tr>
+              <td>#${idx + 1} · <b>@${escapeHtmlStr(q.authorName || 'Citizen')}</b></td>
+              <td style="font-size:0.76rem;color:#cbd5e1;">${escapeHtmlStr(String(q.caption_en || q.caption_fr || '').slice(0, 60))}</td>
+              <td><button type="button" class="adm-btn rose" style="padding:3px 8px;font-size:0.72rem;" onclick="adminSpotlightCommand('remove_queue','${escapeHtmlStr(q.id)}')">✖ Remove</button></td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    ` : '<div style="font-size:0.76rem;color:#94a3b8;">Spotlight queue is empty.</div>'}
+  `;
+}
+
+function adminSpotlightCommand(action, payload) {
+  const res = REMO_STORE.adminSpotlightAction(action, payload);
+  if (!res.ok) return;
+  RemoAudio.play('click');
+  admToast('🌟 World Spotlight updated!');
+  renderAdminSpotlightPanel();
+}
+
+function adminFeatureSelectedSpotlightPost() {
+  const pid = document.getElementById('admSpotFeaturePostSel')?.value || '';
+  if (!pid) return;
+  const res = REMO_STORE.adminSpotlightAction('feature_post', pid);
+  if (!res.ok) return;
+  RemoAudio.play('fanfare');
+  admToast('🌟 Selected post pushed LIVE to World Spotlight Stage!');
+  renderAdminSpotlightPanel();
+}
+
+window.renderAdminSpotlightPanel = renderAdminSpotlightPanel;
+window.adminSpotlightCommand = adminSpotlightCommand;
+window.adminFeatureSelectedSpotlightPost = adminFeatureSelectedSpotlightPost;
+
 if (typeof window !== 'undefined' && typeof document !== 'undefined' && !window._admContestTickTimer) {
   window._admContestTickTimer = setInterval(() => {
     const panel = document.getElementById('adm-panel-contests');
     if (panel && panel.classList.contains('active')) {
       renderAdminContestsPanel();
+    }
+    const gPanel = document.getElementById('adm-panel-games_spotlight');
+    if (gPanel && gPanel.classList.contains('active')) {
+      renderAdminSpotlightPanel();
     }
   }, 30000);
 }

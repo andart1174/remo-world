@@ -1277,8 +1277,102 @@ function createDefaultState() {
     cityPredictions: getDefaultCityPredictions(now),
     viralContests: getDefaultViralContests(),
     worldSystems: getDefaultUniqueWorldSystems(),
+    gamesHub: getDefaultGamesHub(),
+    worldSpotlight: getDefaultWorldSpotlight(),
     supportTickets: [],
     notifications: []
+  };
+}
+
+function getDefaultWorldSpotlight() {
+  return {
+    activeEntry: null,
+    queue: [],
+    usedDatesByUid: {},
+    dailyStarRecord: { date: '', uid: '', name: '', cityId: '', postId: '', durationSec: 0, hypes: 0 },
+    paused: false,
+    updatedAt: 0
+  };
+}
+
+function getDefaultGamesHub() {
+  return {
+    featuredGameId: 'g_gyro_coins',
+    games: [
+      {
+        id: 'g_gyro_coins',
+        icon: '🪙',
+        title_en: 'Cyber Coin Catcher (Gyro + Touch)',
+        title_fr: 'Attrape-Pièces Cyber (Gyro + Tactile)',
+        desc_en: 'Tilt your phone or drag to catch gold coins & dodge cyber bombs!',
+        desc_fr: 'Inclinez le mobile ou glissez pour attraper l’or et éviter les bombes !',
+        enabled: true,
+        isBuiltin: true,
+        customHtml: '',
+        leaderboard: []
+      },
+      {
+        id: 'g_laser_defense',
+        icon: '🛡️',
+        title_en: 'Skyline Laser Defense',
+        title_fr: 'Défense Laser Skyline',
+        desc_en: 'Blast incoming meteors before they strike your city skyline!',
+        desc_fr: 'Détruisez les météores avant qu’ils ne frappent votre ville !',
+        enabled: true,
+        isBuiltin: true,
+        customHtml: '',
+        leaderboard: []
+      },
+      {
+        id: 'g_tower_stacker',
+        icon: '🏗️',
+        title_en: '4D Skyscraper Builder',
+        title_fr: 'Constructeur Gratte-Ciel 4D',
+        desc_en: 'Drop neon skyscraper floors with pinpoint timing!',
+        desc_fr: 'Empilez les étages néon avec une précision millimétrée !',
+        enabled: true,
+        isBuiltin: true,
+        customHtml: '',
+        leaderboard: []
+      },
+      {
+        id: 'g_cyber_drone',
+        icon: '🛸',
+        title_en: 'Cyber Drone City Flier',
+        title_fr: 'Vol de Drone Cyber',
+        desc_en: 'Fly through neon sky gates high above the city!',
+        desc_fr: 'Traversez les portails lumineux au-dessus des toits !',
+        enabled: true,
+        isBuiltin: true,
+        customHtml: '',
+        leaderboard: []
+      },
+      {
+        id: 'g_neon_dash',
+        icon: '🚇',
+        title_en: '3D Neon Street Dash',
+        title_fr: 'Course Néon 3 Voies',
+        desc_en: 'Switch 3 hyper-lanes to grab coins & avoid hazards!',
+        desc_fr: 'Changez de voie à grande vitesse et récoltez les pièces !',
+        enabled: true,
+        isBuiltin: true,
+        customHtml: '',
+        leaderboard: []
+      },
+      {
+        id: 'g_rhythm_piano',
+        icon: '🎹',
+        title_en: 'City Rhythm Synth Piano',
+        title_fr: 'Piano Rythmique Néon',
+        desc_en: 'Tap glowing synth tiles on the beat for massive combos!',
+        desc_fr: 'Tapez les touches lumineuses en rythme pour enchaîner les combos !',
+        enabled: true,
+        isBuiltin: true,
+        customHtml: '',
+        leaderboard: []
+      }
+    ],
+    updatedAt: 0
   };
 }
 
@@ -2308,6 +2402,35 @@ function upgradeEcosystemState(st) {
         st.worldSystems[k] = Object.assign({}, defSystems[k], st.worldSystems[k]);
       }
     });
+  }
+
+  const defHub = getDefaultGamesHub();
+  if (!st.gamesHub || typeof st.gamesHub !== 'object') {
+    st.gamesHub = defHub;
+  } else {
+    if (!Array.isArray(st.gamesHub.games) || st.gamesHub.games.length === 0) {
+      st.gamesHub.games = defHub.games;
+    } else {
+      defHub.games.forEach((dg) => {
+        if (!st.gamesHub.games.some((g) => g && g.id === dg.id)) {
+          st.gamesHub.games.push(dg);
+        }
+      });
+    }
+    if (!st.gamesHub.featuredGameId) st.gamesHub.featuredGameId = defHub.featuredGameId;
+  }
+
+  const defSpot = getDefaultWorldSpotlight();
+  if (!st.worldSpotlight || typeof st.worldSpotlight !== 'object') {
+    st.worldSpotlight = defSpot;
+  } else {
+    if (!Array.isArray(st.worldSpotlight.queue)) st.worldSpotlight.queue = [];
+    if (!st.worldSpotlight.usedDatesByUid || typeof st.worldSpotlight.usedDatesByUid !== 'object') {
+      st.worldSpotlight.usedDatesByUid = {};
+    }
+    if (!st.worldSpotlight.dailyStarRecord || typeof st.worldSpotlight.dailyStarRecord !== 'object') {
+      st.worldSpotlight.dailyStarRecord = defSpot.dailyStarRecord;
+    }
   }
 
   // Upgrade every citizen with Referral Codes & VIP Cosmetics
@@ -3487,9 +3610,509 @@ const REMO_STORE = {
     if (isNewRecord) {
       this.addCoins(u.uid, 15, 10);
     }
+
+    let stoleCrown = false;
+    let prevHolderName = '';
+    if (p.gameChallenge && score > Number(p.gameChallenge.targetScore || 0)) {
+      const oldUid = p.gameChallenge.holderUid;
+      prevHolderName = p.gameChallenge.holderName || 'Champion';
+      if (oldUid && oldUid !== u.uid) {
+        stoleCrown = true;
+        this.addNotification({
+          id: 'notif_crown_' + Date.now(),
+          toUid: oldUid,
+          fromUid: u.uid,
+          fromName: u.name,
+          fromCity: u.homeCity || 'montreal',
+          type: 'crown_steal',
+          postId: p.id,
+          text_en: `👑 @${u.name} just stole your Beat-My-Score Crown (${score.toLocaleString()} pts)! Take revenge!`,
+          text_fr: `👑 @${u.name} vient de voler votre Couronne (${score.toLocaleString()} pts) ! Prenez votre revanche !`,
+          ts: Date.now()
+        });
+      }
+      p.gameChallenge.holderUid = u.uid;
+      p.gameChallenge.holderName = u.name;
+      p.gameChallenge.holderCityId = u.homeCity || 'montreal';
+      p.gameChallenge.targetScore = score;
+      p.gameChallenge.crownSteals = (Number(p.gameChallenge.crownSteals) || 0) + (oldUid && oldUid !== u.uid ? 1 : 0);
+    }
+
     this.syncPostToCloud(p);
     this.save(true, 'game_score');
-    return { ok: true, isNewRecord, score };
+    return { ok: true, isNewRecord, stoleCrown, prevHolderName, score };
+  },
+
+  ensureGamesHub() {
+    const defHub = getDefaultGamesHub();
+    if (!this.state.gamesHub || typeof this.state.gamesHub !== 'object') {
+      this.state.gamesHub = defHub;
+    }
+    if (!Array.isArray(this.state.gamesHub.games) || !this.state.gamesHub.games.length) {
+      this.state.gamesHub.games = defHub.games;
+    } else {
+      defHub.games.forEach((dg) => {
+        if (!this.state.gamesHub.games.some((g) => g && g.id === dg.id)) {
+          this.state.gamesHub.games.push(dg);
+        }
+      });
+    }
+    if (!this.state.gamesHub.featuredGameId) {
+      this.state.gamesHub.featuredGameId = defHub.featuredGameId;
+    }
+    return this.state.gamesHub;
+  },
+
+  _mergeLeaderboardEntries(localArr = [], cloudArr = []) {
+    const map = new Map();
+    [...(Array.isArray(localArr) ? localArr : []), ...(Array.isArray(cloudArr) ? cloudArr : [])].forEach((e) => {
+      if (!e || !e.uid) return;
+      const prev = map.get(e.uid);
+      if (!prev || Number(e.score || 0) > Number(prev.score || 0)) {
+        map.set(e.uid, {
+          uid: e.uid,
+          name: e.name || 'Citizen',
+          cityId: e.cityId || 'montreal',
+          score: Number(e.score || 0),
+          ts: Number(e.ts || Date.now())
+        });
+      }
+    });
+    return Array.from(map.values()).sort((a, b) => (b.score || 0) - (a.score || 0)).slice(0, 10);
+  },
+
+  submitGamesHubScore(gameId, rawScore) {
+    const score = Math.floor(Number(rawScore || 0));
+    if (!gameId || !Number.isFinite(score) || score <= 0) return { ok: false };
+    const u = this.getCurrentUser();
+    if (!u) return { ok: false, needAuth: true, score };
+    const hub = this.ensureGamesHub();
+    const game = hub.games.find((g) => g && g.id === gameId);
+    if (!game) return { ok: false };
+
+    if (!Array.isArray(game.leaderboard)) game.leaderboard = [];
+    const prevTop = game.leaderboard.length > 0 ? Number(game.leaderboard[0].score || 0) : 0;
+    const existing = game.leaderboard.find((e) => e && e.uid === u.uid);
+    const prevPersonal = existing ? Number(existing.score || 0) : 0;
+
+    if (score > prevPersonal) {
+      if (existing) {
+        existing.score = score;
+        existing.name = u.name;
+        existing.cityId = u.homeCity || 'montreal';
+        existing.ts = Date.now();
+      } else {
+        game.leaderboard.push({
+          uid: u.uid,
+          name: u.name,
+          cityId: u.homeCity || 'montreal',
+          score,
+          ts: Date.now()
+        });
+      }
+      game.leaderboard.sort((a, b) => (b.score || 0) - (a.score || 0));
+      if (game.leaderboard.length > 10) game.leaderboard = game.leaderboard.slice(0, 10);
+    }
+
+    const isNewRecord = score > prevTop;
+    if (isNewRecord) this.addCoins(u.uid, 15, 15);
+
+    let dailyBonus = 0;
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const dailyKey = `remo_hub_daily_${u.uid}`;
+    const isFeatured2x = hub.featuredGameId === gameId;
+    if (typeof localStorage !== 'undefined' && localStorage.getItem(dailyKey) !== todayStr) {
+      localStorage.setItem(dailyKey, todayStr);
+      dailyBonus = isFeatured2x ? 20 : 10;
+      this.addCoins(u.uid, dailyBonus, dailyBonus);
+    }
+
+    hub.updatedAt = Date.now();
+    this.save(true, 'games_hub_score');
+    return {
+      ok: true,
+      improved: score > prevPersonal,
+      isNewRecord,
+      dailyBonus,
+      isFeatured2x,
+      best: Math.max(score, prevPersonal),
+      score
+    };
+  },
+
+  adminAddCustomHubGame(opts = {}) {
+    if (!this.isAdminUnlocked() && !this.isCurrentUserAdmin()) {
+      return { ok: false, error: 'admin_only' };
+    }
+    const html = String(opts.customHtml || '').trim();
+    if (!html || html.length > 36000) {
+      return { ok: false, error: 'invalid_html' };
+    }
+    const hub = this.ensureGamesHub();
+    const id = 'g_custom_' + Date.now();
+    const titleEn = String(opts.title_en || 'Custom Arcade Game').trim();
+    const titleFr = String(opts.title_fr || titleEn).trim();
+    const game = {
+      id,
+      icon: String(opts.icon || '🎮').trim() || '🎮',
+      title_en: titleEn,
+      title_fr: titleFr,
+      desc_en: String(opts.desc_en || 'Exclusive Admin Arcade Challenge!').trim(),
+      desc_fr: String(opts.desc_fr || 'Défi Arcade Exclusif Admin !').trim(),
+      enabled: true,
+      isBuiltin: false,
+      customHtml: html,
+      leaderboard: []
+    };
+    hub.games.unshift(game);
+    hub.updatedAt = Date.now();
+    this.save(true, 'admin_hub_add');
+    return { ok: true, game };
+  },
+
+  adminToggleHubGame(gameId, enabled) {
+    if (!this.isAdminUnlocked() && !this.isCurrentUserAdmin()) {
+      return { ok: false, error: 'admin_only' };
+    }
+    const hub = this.ensureGamesHub();
+    const g = hub.games.find((x) => x && x.id === gameId);
+    if (!g) return { ok: false };
+    g.enabled = Boolean(enabled);
+    hub.updatedAt = Date.now();
+    this.save(true, 'admin_hub_toggle');
+    return { ok: true };
+  },
+
+  adminSetFeatured2xHubGame(gameId) {
+    if (!this.isAdminUnlocked() && !this.isCurrentUserAdmin()) {
+      return { ok: false, error: 'admin_only' };
+    }
+    const hub = this.ensureGamesHub();
+    if (!hub.games.some((x) => x && x.id === gameId)) return { ok: false };
+    hub.featuredGameId = gameId;
+    hub.updatedAt = Date.now();
+    this.save(true, 'admin_hub_feature');
+    return { ok: true };
+  },
+
+  adminDeleteHubGame(gameId) {
+    if (!this.isAdminUnlocked() && !this.isCurrentUserAdmin()) {
+      return { ok: false, error: 'admin_only' };
+    }
+    const hub = this.ensureGamesHub();
+    const target = hub.games.find((x) => x && x.id === gameId);
+    if (!target || target.isBuiltin) return { ok: false, error: 'cannot_delete_builtin' };
+    hub.games = hub.games.filter((x) => x && x.id !== gameId);
+    if (hub.featuredGameId === gameId) {
+      hub.featuredGameId = hub.games[0]?.id || 'g_gyro_coins';
+    }
+    hub.updatedAt = Date.now();
+    this.save(true, 'admin_hub_delete');
+    return { ok: true };
+  },
+
+  /* ── 🌟 STAGE 4: WORLD SPOTLIGHT STAGE (1x/DAY, 100 COINS, 45s + HYPE) ── */
+  ensureWorldSpotlight() {
+    const def = getDefaultWorldSpotlight();
+    if (!this.state.worldSpotlight || typeof this.state.worldSpotlight !== 'object') {
+      this.state.worldSpotlight = def;
+    }
+    const ws = this.state.worldSpotlight;
+    if (!Array.isArray(ws.queue)) ws.queue = [];
+    if (!ws.usedDatesByUid || typeof ws.usedDatesByUid !== 'object') ws.usedDatesByUid = {};
+    if (!ws.dailyStarRecord || typeof ws.dailyStarRecord !== 'object') ws.dailyStarRecord = def.dailyStarRecord;
+
+    const now = Date.now();
+    const todayStr = new Date(now).toISOString().slice(0, 10);
+    const yestStr = new Date(now - 86400000).toISOString().slice(0, 10);
+    Object.keys(ws.usedDatesByUid).forEach((uidKey) => {
+      const d = ws.usedDatesByUid[uidKey];
+      if (d !== todayStr && d !== yestStr) {
+        delete ws.usedDatesByUid[uidKey];
+      }
+    });
+    if (ws.dailyStarRecord.date && ws.dailyStarRecord.date !== todayStr) {
+      ws.dailyStarRecord = { date: todayStr, uid: '', name: '', cityId: '', postId: '', durationSec: 0, hypes: 0 };
+    }
+    return ws;
+  },
+
+  _finalizeSpotlightEntry(ws, cur, endTs) {
+    if (!cur) return;
+    const todayStr = new Date(endTs || Date.now()).toISOString().slice(0, 10);
+    const durSec = Math.min(180, Math.max(1, Math.round((Math.min(endTs || Date.now(), Number(cur.endsAt || endTs || Date.now())) - Number(cur.startedAt || Date.now())) / 1000)));
+    const rec = ws.dailyStarRecord || { date: todayStr, durationSec: 0 };
+    if (rec.date !== todayStr || durSec > Number(rec.durationSec || 0)) {
+      ws.dailyStarRecord = {
+        date: todayStr,
+        uid: cur.uid,
+        name: cur.authorName || 'Citizen',
+        cityId: cur.authorCityId || 'montreal',
+        postId: cur.postId || '',
+        durationSec: durSec,
+        hypes: Number(cur.totalHypes || (Array.isArray(cur.hypes) ? cur.hypes.length : 0))
+      };
+      if (cur.uid) {
+        this.addCoins(cur.uid, 50, 30);
+      }
+    }
+  },
+
+  advanceWorldSpotlightIfNeeded() {
+    const ws = this.ensureWorldSpotlight();
+    if (ws.paused) return { changed: false, ws };
+    const now = Date.now();
+    let changed = false;
+
+    if (ws.activeEntry && now >= Number(ws.activeEntry.endsAt || 0)) {
+      this._finalizeSpotlightEntry(ws, ws.activeEntry, ws.activeEntry.endsAt);
+      ws.activeEntry = null;
+      changed = true;
+    }
+
+    if (!ws.activeEntry && ws.queue.length > 0) {
+      const nextItem = ws.queue.shift();
+      ws.activeEntry = Object.assign({}, nextItem, {
+        startedAt: now,
+        endsAt: now + 45000,
+        hypes: [],
+        nextVotes: [],
+        totalHypes: 0,
+        giftsTotal: 0
+      });
+      changed = true;
+    }
+
+    if (changed) {
+      ws.updatedAt = now;
+      this.save(true, 'spotlight_advance');
+    }
+    return { changed, ws };
+  },
+
+  enterWorldSpotlightQueue(postId) {
+    const COST = 100;
+    const u = this.getCurrentUser();
+    if (!u || u.role === 'guest') return { ok: false, error: 'auth_required' };
+
+    const p = (this.state.posts || []).find((x) => x && x.id === postId);
+    if (!p) return { ok: false, error: 'post_not_found' };
+
+    const isAdm = this.isCurrentUserAdmin() || this.isAdminUnlocked();
+    if (p.uid !== u.uid && !isAdm) return { ok: false, error: 'not_post_owner' };
+
+    this.advanceWorldSpotlightIfNeeded();
+    const ws = this.ensureWorldSpotlight();
+    const todayStr = new Date().toISOString().slice(0, 10);
+
+    if (ws.usedDatesByUid[u.uid] === todayStr) {
+      return { ok: false, error: 'daily_limit_reached' };
+    }
+    if ((ws.activeEntry && ws.activeEntry.uid === u.uid) || ws.queue.some((q) => q && q.uid === u.uid)) {
+      return { ok: false, error: 'daily_limit_reached' };
+    }
+    if (Number(u.coins || 0) < COST) {
+      return { ok: false, error: 'insufficient_coins', needed: COST, have: Number(u.coins || 0) };
+    }
+
+    const paid = this.addCoins(u.uid, -COST, 0);
+    if (!paid) {
+      return { ok: false, error: 'insufficient_coins', needed: COST, have: Number(u.coins || 0) };
+    }
+
+    ws.usedDatesByUid[u.uid] = todayStr;
+    const now = Date.now();
+    const previewImg = (p.mediaUrl && /^https?:\/\//i.test(p.mediaUrl) && p.mediaUrl.length < 350) ? p.mediaUrl : '';
+    const entry = {
+      id: 'spot_' + now + '_' + Math.random().toString(36).slice(2, 5),
+      postId: p.id,
+      uid: u.uid,
+      authorName: p.authorName || u.name,
+      authorCityId: p.cityId || u.homeCity || 'montreal',
+      caption_en: String(p.caption_en || p.caption_fr || '').slice(0, 160),
+      caption_fr: String(p.caption_fr || p.caption_en || '').slice(0, 160),
+      previewImg,
+      queuedAt: now
+    };
+
+    let isLiveNow = false;
+    if (!ws.activeEntry && !ws.paused) {
+      ws.activeEntry = Object.assign({}, entry, {
+        startedAt: now,
+        endsAt: now + 45000,
+        hypes: [],
+        nextVotes: [],
+        totalHypes: 0,
+        giftsTotal: 0
+      });
+      isLiveNow = true;
+    } else {
+      ws.queue.push(entry);
+    }
+
+    ws.updatedAt = now;
+    this.save(true, 'spotlight_enter');
+    return {
+      ok: true,
+      isLiveNow,
+      queuePos: isLiveNow ? 0 : ws.queue.length,
+      cost: COST,
+      entry
+    };
+  },
+
+  hypeCurrentSpotlight() {
+    const u = this.getCurrentUser();
+    if (!u || u.role === 'guest') return { ok: false, needAuth: true };
+
+    this.advanceWorldSpotlightIfNeeded();
+    const ws = this.ensureWorldSpotlight();
+    const cur = ws.activeEntry;
+    if (!cur) return { ok: false, error: 'no_active' };
+    if (cur.uid === u.uid) return { ok: false, error: 'cannot_hype_self' };
+    if (!Array.isArray(cur.hypes)) cur.hypes = [];
+    if (cur.hypes.includes(u.uid)) return { ok: false, error: 'already_hyped' };
+
+    cur.hypes.push(u.uid);
+    cur.totalHypes = cur.hypes.length;
+    const maxEndsAt = Number(cur.startedAt || Date.now()) + 180000;
+    const prevEnds = Number(cur.endsAt || (Number(cur.startedAt || Date.now()) + 45000));
+    cur.endsAt = Math.min(maxEndsAt, prevEnds + 5000);
+    const addedSec = Math.round((cur.endsAt - prevEnds) / 1000);
+
+    if (cur.uid && cur.uid !== u.uid) {
+      this.addCoins(cur.uid, 5, 5);
+      this.addNotification({
+        id: 'notif_whype_' + Date.now(),
+        toUid: cur.uid,
+        fromUid: u.uid,
+        fromName: u.name,
+        fromCity: u.homeCity || 'montreal',
+        type: 'spotlight_hype',
+        postId: cur.postId,
+        text_en: `🔥 @${u.name} HYPED your World Spotlight (+${addedSec}s & +5 🪙)!`,
+        text_fr: `🔥 @${u.name} a HYPÉ votre Scène Mondiale (+${addedSec}s & +5 🪙) !`,
+        ts: Date.now()
+      });
+    }
+    this.addCoins(u.uid, 2, 2);
+
+    ws.updatedAt = Date.now();
+    this.save(true, 'spotlight_hype');
+    return { ok: true, addedSec, endsAt: cur.endsAt, totalHypes: cur.totalHypes };
+  },
+
+  voteNextSpotlight() {
+    const u = this.getCurrentUser();
+    if (!u || u.role === 'guest') return { ok: false, needAuth: true };
+
+    this.advanceWorldSpotlightIfNeeded();
+    const ws = this.ensureWorldSpotlight();
+    const cur = ws.activeEntry;
+    if (!cur) return { ok: false, error: 'no_active' };
+    if (!Array.isArray(cur.nextVotes)) cur.nextVotes = [];
+    if (cur.nextVotes.includes(u.uid)) return { ok: false, error: 'already_voted_next' };
+
+    cur.nextVotes.push(u.uid);
+    const now = Date.now();
+    const hypesCount = Array.isArray(cur.hypes) ? cur.hypes.length : 0;
+    if (cur.nextVotes.length >= 3 && cur.nextVotes.length > hypesCount && (now - Number(cur.startedAt || 0)) >= 10000) {
+      cur.endsAt = now;
+      this.advanceWorldSpotlightIfNeeded();
+      return { ok: true, skipped: true, nextCount: cur.nextVotes.length };
+    }
+
+    cur.endsAt = Math.max(now + 3000, Number(cur.endsAt || now) - 8000);
+    ws.updatedAt = now;
+    this.save(true, 'spotlight_next');
+    return { ok: true, skipped: false, nextCount: cur.nextVotes.length, endsAt: cur.endsAt };
+  },
+
+  giftCurrentSpotlight(amount = 25) {
+    const u = this.getCurrentUser();
+    if (!u || u.role === 'guest') return { ok: false, needAuth: true };
+
+    const giftAmt = Math.max(10, Math.min(500, Math.floor(Number(amount || 25))));
+    this.advanceWorldSpotlightIfNeeded();
+    const ws = this.ensureWorldSpotlight();
+    const cur = ws.activeEntry;
+    if (!cur) return { ok: false, error: 'no_active' };
+    if (cur.uid === u.uid) return { ok: false, error: 'cannot_gift_self' };
+    if (Number(u.coins || 0) < giftAmt) {
+      return { ok: false, error: 'insufficient_coins', needed: giftAmt, have: Number(u.coins || 0) };
+    }
+
+    if (!this.addCoins(u.uid, -giftAmt, 0)) {
+      return { ok: false, error: 'insufficient_coins', needed: giftAmt, have: Number(u.coins || 0) };
+    }
+    this.addCoins(cur.uid, giftAmt, 20);
+    cur.giftsTotal = (Number(cur.giftsTotal) || 0) + giftAmt;
+
+    this.addNotification({
+      id: 'notif_wgift_' + Date.now(),
+      toUid: cur.uid,
+      fromUid: u.uid,
+      fromName: u.name,
+      fromCity: u.homeCity || 'montreal',
+      type: 'spotlight_gift',
+      postId: cur.postId,
+      text_en: `💎 @${u.name} gifted ${giftAmt} 🪙 to your World Spotlight!`,
+      text_fr: `💎 @${u.name} vous a offert ${giftAmt} 🪙 sur la Scène Mondiale !`,
+      ts: Date.now()
+    });
+
+    ws.updatedAt = Date.now();
+    this.save(true, 'spotlight_gift');
+    return { ok: true, giftAmt, giftsTotal: cur.giftsTotal, creatorName: cur.authorName };
+  },
+
+  adminSpotlightAction(action, payload) {
+    if (!this.isAdminUnlocked() && !this.isCurrentUserAdmin()) {
+      return { ok: false, error: 'admin_only' };
+    }
+    const ws = this.ensureWorldSpotlight();
+    const now = Date.now();
+    if (action === 'skip') {
+      if (ws.activeEntry) this._finalizeSpotlightEntry(ws, ws.activeEntry, now);
+      ws.activeEntry = null;
+      this.advanceWorldSpotlightIfNeeded();
+    } else if (action === 'toggle_pause') {
+      ws.paused = !ws.paused;
+    } else if (action === 'clear_queue') {
+      ws.queue = [];
+    } else if (action === 'remove_queue' && payload) {
+      ws.queue = ws.queue.filter((q) => q && q.id !== payload);
+    } else if (action === 'feature_post' && payload) {
+      const p = (this.state.posts || []).find((x) => x && x.id === payload);
+      if (!p) return { ok: false, error: 'post_not_found' };
+      const previewImg = (p.mediaUrl && /^https?:\/\//i.test(p.mediaUrl) && p.mediaUrl.length < 350) ? p.mediaUrl : '';
+      ws.paused = false;
+      ws.activeEntry = {
+        id: 'spot_' + now + '_adm',
+        postId: p.id,
+        uid: p.uid || '',
+        authorName: p.authorName || 'Citizen',
+        authorCityId: p.cityId || 'montreal',
+        caption_en: String(p.caption_en || p.caption_fr || '').slice(0, 160),
+        caption_fr: String(p.caption_fr || p.caption_en || '').slice(0, 160),
+        previewImg,
+        queuedAt: now,
+        startedAt: now,
+        endsAt: now + 45000,
+        hypes: [],
+        nextVotes: [],
+        totalHypes: 0,
+        giftsTotal: 0
+      };
+    } else if (action === 'reset_daily_limit') {
+      if (payload) delete ws.usedDatesByUid[payload];
+      else ws.usedDatesByUid = {};
+    } else {
+      return { ok: false };
+    }
+    ws.updatedAt = now;
+    this.save(true, 'admin_spotlight_' + action);
+    return { ok: true, ws };
   },
 
   async deleteUserFromCloud(uid) {
@@ -5152,6 +5775,61 @@ const REMO_STORE = {
           if (typeof renderViralContestsView === 'function') renderViralContestsView();
           if (typeof renderFeedActiveContestsBanner === 'function') renderFeedActiveContestsBanner();
         }
+        if (data.gamesHub && typeof data.gamesHub === 'object') {
+          const localHub = this.ensureGamesHub();
+          const cHub = data.gamesHub;
+          const cGames = Array.isArray(cHub.games) ? cHub.games : [];
+          const localMap = new Map(localHub.games.map((g) => [g.id, g]));
+          const cloudUpdated = Number(cHub.updatedAt || 0);
+          const localUpdated = Number(localHub.updatedAt || 0);
+          const mergedGames = [];
+          const seen = new Set();
+
+          const baseOrder = cloudUpdated >= localUpdated ? cGames : localHub.games;
+          const altOrder = cloudUpdated >= localUpdated ? localHub.games : cGames;
+          [...baseOrder, ...altOrder].forEach((g) => {
+            if (!g || !g.id || seen.has(g.id)) return;
+            seen.add(g.id);
+            const lg = localMap.get(g.id);
+            const cg = cGames.find((x) => x && x.id === g.id);
+            const base = (cloudUpdated >= localUpdated && cg) ? cg : (lg || cg);
+            mergedGames.push(Object.assign({}, base, {
+              leaderboard: this._mergeLeaderboardEntries(lg?.leaderboard, cg?.leaderboard)
+            }));
+          });
+          localHub.games = mergedGames;
+          if (cloudUpdated >= localUpdated && cHub.featuredGameId) {
+            localHub.featuredGameId = cHub.featuredGameId;
+          }
+          localHub.updatedAt = Math.max(cloudUpdated, localUpdated);
+          if (typeof renderGamesHubContent === 'function') renderGamesHubContent();
+        }
+        if (data.worldSpotlight && typeof data.worldSpotlight === 'object') {
+          const localWs = this.ensureWorldSpotlight();
+          const cWs = data.worldSpotlight;
+          const cloudUpdated = Number(cWs.updatedAt || 0);
+          const localUpdated = Number(localWs.updatedAt || 0);
+          const mergedDates = Object.assign({}, cWs.usedDatesByUid || {}, localWs.usedDatesByUid || {});
+          const todayStr = new Date().toISOString().slice(0, 10);
+          const mergedStar = (cWs.dailyStarRecord && cWs.dailyStarRecord.date === todayStr && Number(cWs.dailyStarRecord.durationSec || 0) >= Number(localWs.dailyStarRecord?.durationSec || 0))
+            ? cWs.dailyStarRecord
+            : localWs.dailyStarRecord;
+
+          if (cloudUpdated >= localUpdated) {
+            this.state.worldSpotlight = {
+              activeEntry: cWs.activeEntry || null,
+              queue: Array.isArray(cWs.queue) ? cWs.queue : [],
+              usedDatesByUid: mergedDates,
+              dailyStarRecord: mergedStar || getDefaultWorldSpotlight().dailyStarRecord,
+              paused: Boolean(cWs.paused),
+              updatedAt: cloudUpdated
+            };
+          } else {
+            localWs.usedDatesByUid = mergedDates;
+            localWs.dailyStarRecord = mergedStar || localWs.dailyStarRecord;
+          }
+          if (typeof renderWorldSpotlightBar === 'function') renderWorldSpotlightBar();
+        }
         if (Array.isArray(data.customCities) && typeof mergeCustomRemoCitiesFromCloud === 'function') {
           const citiesChanged = mergeCustomRemoCitiesFromCloud(data.customCities);
           if (citiesChanged) {
@@ -5176,6 +5854,8 @@ const REMO_STORE = {
             customCities: typeof getCustomRemoCitiesPatch === 'function' ? getCustomRemoCitiesPatch() : [],
             viralContests: this.state.viralContests || getDefaultViralContests(),
             worldSystems: this.state.worldSystems || getDefaultUniqueWorldSystems(),
+            gamesHub: this.ensureGamesHub(),
+            worldSpotlight: this.ensureWorldSpotlight(),
             deletedPostIds: [...(this.deletedPostIds || [])].slice(-100),
             deletedUserIds: [...(this.deletedUserIds || [])].slice(-100),
             deletedDuelIds: [...(this.deletedDuelIds || [])].slice(-100),
@@ -7490,6 +8170,8 @@ const REMO_STORE = {
             .slice(0, 15),
           viralContests: this.state.viralContests || getDefaultViralContests(),
           worldSystems: this.state.worldSystems || getDefaultUniqueWorldSystems(),
+          gamesHub: this.ensureGamesHub(),
+          worldSpotlight: this.ensureWorldSpotlight(),
           deletedPostIds: [...(this.deletedPostIds || [])].slice(-100),
           deletedUserIds: [...(this.deletedUserIds || [])].slice(-100),
           deletedDuelIds: [...(this.deletedDuelIds || [])].slice(-100),

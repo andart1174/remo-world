@@ -71,6 +71,7 @@
       <button class="adm-tab-btn" data-adm-tab="cities" onclick="switchAdminTab('cities')" data-i18n="adm_tab_cities">🌍 Cities &amp; Radar</button>
       <button class="adm-tab-btn" data-adm-tab="wars" onclick="switchAdminTab('wars')" data-i18n="adm_tab_wars">⚔️ Wars &amp; Pulse</button>
       <button class="adm-tab-btn" data-adm-tab="contests" onclick="switchAdminTab('contests')" style="border-color:rgba(251,191,36,0.5);color:#fde047;" data-i18n="adm_tab_contests">🏆 REMO Contests</button>
+      <button class="adm-tab-btn" data-adm-tab="games_spotlight" onclick="switchAdminTab('games_spotlight')" style="border-color:rgba(56,189,248,0.5);color:#7dd3fc;" data-i18n="adm_tab_games_spotlight">🕹️ Games Hub &amp; Spotlight</button>
       <button class="adm-tab-btn" data-adm-tab="economy" onclick="switchAdminTab('economy')" data-i18n="adm_tab_economy">🪙 Bank &amp; Auctions</button>
       <button class="adm-tab-btn" data-adm-tab="moderation" onclick="switchAdminTab('moderation')" data-i18n="adm_tab_moderation">🛡️ Users &amp; Posts</button>
       <button class="adm-tab-btn" data-adm-tab="cloud" onclick="switchAdminTab('cloud')" data-i18n="adm_tab_cloud">☁️ Firebase &amp; Settings</button>
@@ -1080,6 +1081,52 @@
         </div>
       </section>
 
+      <!-- ══ TAB 9: 🕹️ REMO GAMES HUB & 🌟 WORLD SPOTLIGHT ══ -->
+      <section class="adm-panel" id="adm-panel-games_spotlight">
+        <div class="exec-card" style="border-color:#38bdf8;background:linear-gradient(135deg,rgba(15,23,42,0.95),rgba(17,24,62,0.8));">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
+            <h3 style="color:#38bdf8;margin:0;">🕹️ REMO Games Hub Manager (Admin Only)</h3>
+            <span style="font-size:0.75rem;color:#94a3b8;">Only Admin can add custom HTML5 games, toggle availability, or assign today’s ⚡ 2X Coins Featured Game.</span>
+          </div>
+
+          <div style="padding:12px;border-radius:12px;background:rgba(0,0,0,0.35);border:1px solid rgba(56,189,248,0.3);margin-bottom:14px;">
+            <div style="font-weight:800;font-size:0.82rem;color:#7dd3fc;margin-bottom:8px;">➕ Add New Custom HTML5 Game to REMO Games Hub</div>
+            <div class="adm-row-2" style="margin-bottom:8px;">
+              <div class="adm-field"><label>Icon Emoji</label><input type="text" id="admHubGameIcon" class="adm-inp" value="🕹️" maxlength="6"></div>
+              <div class="adm-field"><label>Game Title (EN)</label><input type="text" id="admHubGameTitleEn" class="adm-inp" placeholder="e.g. Cyber City Pinball"></div>
+              <div class="adm-field"><label>Game Title (FR)</label><input type="text" id="admHubGameTitleFr" class="adm-inp" placeholder="e.g. Flipper Cyber Urbain"></div>
+              <div class="adm-field"><label>Description (EN)</label><input type="text" id="admHubGameDescEn" class="adm-inp" placeholder="Short English pitch..."></div>
+              <div class="adm-field"><label>Description (FR)</label><input type="text" id="admHubGameDescFr" class="adm-inp" placeholder="Courte description en français..."></div>
+            </div>
+            <div class="adm-field" style="margin-bottom:10px;">
+              <label>Standalone HTML5 Game Code (Max 36 KB — uses #score or window.remoSubmitScore)</label>
+              <textarea id="admHubGameHtml" class="adm-inp" rows="4" placeholder="<!DOCTYPE html>..."></textarea>
+            </div>
+            <button type="button" class="adm-btn indigo" onclick="adminAddCustomHubGameFromOffice()">➕ Publish Game to REMO Games Hub</button>
+          </div>
+
+          <table class="adm-table">
+            <thead>
+              <tr>
+                <th>Game</th>
+                <th>Type / Status</th>
+                <th>Top Score</th>
+                <th>Admin Controls</th>
+              </tr>
+            </thead>
+            <tbody id="admGamesHubTable"></tbody>
+          </table>
+        </div>
+
+        <div class="exec-card" id="admSpotlightCard" style="border-color:#fbbf24;background:linear-gradient(135deg,rgba(15,23,42,0.95),rgba(55,34,12,0.65));">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
+            <h3 style="color:#fde047;margin:0;">🌟 World Spotlight Stage Manager</h3>
+            <span style="font-size:0.75rem;color:#94a3b8;">Max 1 queue entry per citizen/day · 100 🪙 entry · 45s base + 5s Hype</span>
+          </div>
+          <div id="admSpotlightSection" style="font-size:0.82rem;color:#cbd5e1;">World Spotlight controls load automatically once active.</div>
+        </div>
+      </section>
+
     </main>
   </div>
 
@@ -1105,10 +1152,10 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js" integrity="sha384-oFrOL1TiREYNET0lsYF3LjQuyi2gL7vhjH1X8vFr+umcmzAdPELopeSgbcrv4uRm" crossorigin="anonymous"></script>
 
   <!-- Shared REMO Core + Admin Controller -->
-  <script src="js/remo-i18n.js?v=134"></script>
-  <script src="js/remo-cities-data.js?v=134"></script>
-  <script src="js/remo-store.js?v=134"></script>
-  <script src="js/remo-card-engine.js?v=134"></script>
-  <script src="js/remo-admin.js?v=134"></script>
+  <script src="js/remo-i18n.js?v=135"></script>
+  <script src="js/remo-cities-data.js?v=135"></script>
+  <script src="js/remo-store.js?v=135"></script>
+  <script src="js/remo-card-engine.js?v=135"></script>
+  <script src="js/remo-admin.js?v=135"></script>
 </body>
 </html>
