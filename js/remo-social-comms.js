@@ -3796,6 +3796,7 @@ const REMO_SHARE_HUB = (function () {
   };
 })();
 window.REMO_SHARE_HUB = REMO_SHARE_HUB;
+window.drawQrOnCanvas = REMO_SHARE_HUB.drawQrOnCanvas;
 
 window._viralShareFormat = '9:16';
 window._viralShareShowQr = true;
@@ -4253,7 +4254,12 @@ function drawViralPostStoryCanvas(postId, animT = 0) {
     if (showQr) {
       const qrX = ctaX + ctaW - qrSize - 12;
       const qrY = ctaY + Math.round((ctaH - qrSize) / 2);
-      drawQrOnCanvas(ctx, url, qrX, qrY, qrSize);
+      const drawQrFn = (window.REMO_SHARE_HUB && typeof window.REMO_SHARE_HUB.drawQrOnCanvas === 'function')
+        ? window.REMO_SHARE_HUB.drawQrOnCanvas
+        : (typeof window.drawQrOnCanvas === 'function' ? window.drawQrOnCanvas : null);
+      if (drawQrFn) {
+        try { drawQrFn(ctx, url, qrX, qrY, qrSize); } catch (qrErr) {}
+      }
       if (fmt === '9:16' || fmt === '16:9') {
         ctx.fillStyle = '#7dd3fc';
         ctx.font = '800 9px Orbitron, sans-serif';
@@ -4328,22 +4334,70 @@ function drawViralPostStoryCanvas(postId, animT = 0) {
     return;
   }
 
-  const domCard = postId ? document.getElementById('post_card_' + postId) : null;
-  const domImgEl = domCard ? domCard.querySelector('.post-media img') : null;
-  const domVidEl = domCard ? domCard.querySelector('.post-media video') : null;
-  const readyDomMedia = (domImgEl && domImgEl.complete && domImgEl.naturalWidth > 0)
-    ? domImgEl
-    : ((domVidEl && domVidEl.readyState >= 2) ? domVidEl : null);
+  const renderGen = (window._viralStoryRenderGen = (window._viralStoryRenderGen || 0) + 1);
+  const skipDom = Boolean(window._viralStoryCleanExportOnly);
+  const domCard = (!skipDom && postId) ? document.getElementById('post_card_' + postId) : null;
+  const domWrap = domCard ? (domCard.querySelector('.post-media-wrap') || domCard.querySelector('.post-media') || domCard) : null;
+  const isReadyImg = (el) => Boolean(el && el.tagName === 'IMG' && el.complete && (el.naturalWidth || 0) > 0);
+  const isReadyVid = (el) => Boolean(el && el.tagName === 'VIDEO' && (el.readyState || 0) >= 2);
+  const isVideoSrc = (u) => /\.(mp4|webm|mov|m4v|m3u8)(\?|#|$)/i.test(String(u || '')) || /^data:video\//i.test(String(u || ''));
 
-  window._viralStoryLastImgs = { left: post && !post.versus ? readyDomMedia : null, right: null };
-  window._viralStoryFrameRenderer = (t) => renderFrame(window._viralStoryLastImgs.left, window._viralStoryLastImgs.right, t);
+  let domLeftImg = null;
+  let domRightImg = null;
+  let domVidEl = null;
+  if (domWrap) {
+    if (post && post.versus) {
+      domLeftImg = domWrap.querySelector('.versus-pane.left img') || domWrap.querySelectorAll('img')[0] || null;
+      domRightImg = domWrap.querySelector('.versus-pane.right img') || domWrap.querySelectorAll('img')[1] || null;
+    } else if (post && post.mediaType === 'carousel') {
+      const slides = domWrap.querySelectorAll('.carousel-slide-img');
+      const carouselMap = (typeof _carouselState !== 'undefined' ? _carouselState : window._carouselState) || {};
+      const rawIdx = post.id && carouselMap[post.id] != null ? Number(carouselMap[post.id]) || 0 : 0;
+      const safeIdx = slides.length ? Math.max(0, Math.min(slides.length - 1, rawIdx)) : 0;
+      domLeftImg = slides[safeIdx] || domWrap.querySelector('.carousel-slide-img, .post-face-front > img, img');
+    } else {
+      domLeftImg = domWrap.querySelector('.post-face-front > img, .ba-slider-box img, .duet-pane img, .carousel-slide-img, img');
+      domVidEl = domWrap.querySelector('video');
+    }
+  }
 
-  renderFrame(window._viralStoryLastImgs.left, null, animT);
+  let readyLeftDom = isReadyImg(domLeftImg) ? domLeftImg : (isReadyVid(domVidEl) ? domVidEl : null);
+  let readyRightDom = (post && post.versus && isReadyImg(domRightImg)) ? domRightImg : null;
+  if (!skipDom && window._viralStoryLastPostId === postId && window._viralStoryLastImgs) {
+    if (!readyLeftDom && window._viralStoryLastImgs.left) readyLeftDom = window._viralStoryLastImgs.left;
+    if (post && post.versus && !readyRightDom && window._viralStoryLastImgs.right) readyRightDom = window._viralStoryLastImgs.right;
+  }
 
-  // Load images asynchronously with CORS-clean proxy fallback so PNG export keeps the real photo 100% of the time
+  if (!skipDom) {
+    window._viralStoryLastPostId = postId;
+    window._viralStoryLastImgs = { left: readyLeftDom, right: post && post.versus ? readyRightDom : null };
+    window._viralStoryFrameRenderer = (t) => renderFrame(window._viralStoryLastImgs.left, window._viralStoryLastImgs.right, t);
+  }
+
+  renderFrame(readyLeftDom, post && post.versus ? readyRightDom : null, animT);
+
+  const resolveMediaSource = async (raw) => {
+    if (!raw) return '';
+    const str = String(raw);
+    if (str.startsWith('idb://') && typeof RemoMediaDB !== 'undefined') {
+      try {
+        const syncVal = RemoMediaDB.resolveSyncOrPlaceholder ? RemoMediaDB.resolveSyncOrPlaceholder(str) : '';
+        if (syncVal && !String(syncVal).startsWith('idb://')) return String(syncVal);
+        if (RemoMediaDB.getObjectUrl) {
+          const asyncVal = await RemoMediaDB.getObjectUrl(str);
+          if (asyncVal && !String(asyncVal).startsWith('idb://')) return String(asyncVal);
+        }
+      } catch (e) {}
+      return '';
+    }
+    return str;
+  };
+
+  // Load images asynchronously with CORS-clean fallback so preview & PNG export keep the real photo
   const loadImg = (src, fallbackEl = null) => new Promise((resolve) => {
     if (!src) return resolve(fallbackEl);
     const strSrc = String(src);
+    if (isVideoSrc(strSrc)) return resolve(fallbackEl);
     const isDataOrBlob = strSrc.startsWith('data:') || strSrc.startsWith('blob:');
     const im = new Image();
     if (!isDataOrBlob) {
@@ -4351,7 +4405,7 @@ function drawViralPostStoryCanvas(postId, animT = 0) {
     }
     im.onload = () => resolve(im);
     im.onerror = () => {
-      if (isDataOrBlob) return resolve(fallbackEl);
+      if (isDataOrBlob || skipDom) return resolve(fallbackEl);
       const imNoCors = new Image();
       imNoCors.onload = () => resolve(imNoCors);
       imNoCors.onerror = () => resolve(fallbackEl);
@@ -4364,35 +4418,64 @@ function drawViralPostStoryCanvas(postId, animT = 0) {
     const v = post.versus;
     const cA = getCityById(v.leftCityId || 'montreal');
     const cB = getCityById(v.rightCityId || 'paris');
-    const srcA = v.leftMedia || resolveCityFallbackArtUrl(cA);
-    const srcB = v.rightMedia || resolveCityFallbackArtUrl(cB);
-    window._viralStoryRenderPromise = Promise.all([loadImg(srcA), loadImg(srcB)]).then(([imA, imB]) => {
-      window._viralStoryLastImgs = { left: imA, right: imB };
-      renderFrame(imA, imB, animT);
-    });
+    const artA = resolveCityFallbackArtUrl(cA);
+    const artB = resolveCityFallbackArtUrl(cB);
+    window._viralStoryRenderPromise = (async () => {
+      const [resA, resB] = await Promise.all([
+        resolveMediaSource(v.leftMedia),
+        resolveMediaSource(v.rightMedia)
+      ]);
+      const domSrcA = (!skipDom && domLeftImg) ? (domLeftImg.currentSrc || domLeftImg.src || '') : '';
+      const domSrcB = (!skipDom && domRightImg) ? (domRightImg.currentSrc || domRightImg.src || '') : '';
+      const srcA = resA || domSrcA || artA;
+      const srcB = resB || domSrcB || artB;
+      let [imA, imB] = await Promise.all([
+        loadImg(srcA, readyLeftDom),
+        loadImg(srcB, readyRightDom)
+      ]);
+      if (!imA && srcA !== artA) imA = await loadImg(artA, readyLeftDom);
+      if (!imB && srcB !== artB) imB = await loadImg(artB, readyRightDom);
+      if (renderGen !== window._viralStoryRenderGen) return;
+      const finalLeft = imA || readyLeftDom || null;
+      const finalRight = imB || readyRightDom || null;
+      if (!skipDom) window._viralStoryLastImgs = { left: finalLeft, right: finalRight };
+      renderFrame(finalLeft, finalRight, animT);
+    })();
   } else if (post) {
     const city = getCityById(post.cityId || 'montreal');
-    let rawSrc = post.mediaUrl || (Array.isArray(post.mediaUrls) && post.mediaUrls[0]) || post.thumbnailUrl || '';
-    if (rawSrc && String(rawSrc).startsWith('idb://') && typeof RemoMediaDB !== 'undefined') {
-      const syncResolved = RemoMediaDB.resolveSyncOrPlaceholder(rawSrc);
-      rawSrc = (syncResolved && !String(syncResolved).startsWith('idb://')) ? syncResolved : '';
-    }
-    if ((!rawSrc || post.mediaType === 'video' || post.mediaType === 'video_link') && domImgEl && domImgEl.src) {
-      rawSrc = domImgEl.src;
-    }
     const fallbackArt = resolveCityFallbackArtUrl(city, post.visualHeadline || '', post.visualSub || '');
-    const src = rawSrc || fallbackArt;
-    window._viralStoryRenderPromise = loadImg(src, readyDomMedia).then((im) => {
-      if (im) {
-        window._viralStoryLastImgs = { left: im, right: null };
-        renderFrame(im, null, animT);
+    window._viralStoryRenderPromise = (async () => {
+      let rawSrc = '';
+      if (post.mediaType === 'carousel' && Array.isArray(post.mediaUrls) && post.mediaUrls.length) {
+        const carouselMap = (typeof _carouselState !== 'undefined' ? _carouselState : window._carouselState) || {};
+        const rawIdx = post.id && carouselMap[post.id] != null ? Number(carouselMap[post.id]) || 0 : 0;
+        const safeIdx = Math.max(0, Math.min(post.mediaUrls.length - 1, rawIdx));
+        rawSrc = post.mediaUrls[safeIdx] || post.mediaUrls[0] || post.mediaUrl || post.thumbnailUrl || '';
+      } else if (post.mediaType === 'video' || post.mediaType === 'video_link') {
+        rawSrc = post.thumbnailUrl || (post.mediaUrl && !isVideoSrc(post.mediaUrl) ? post.mediaUrl : '') || '';
       } else {
-        return loadImg(fallbackArt).then((artIm) => {
-          window._viralStoryLastImgs = { left: artIm, right: null };
-          renderFrame(artIm, null, animT);
-        });
+        rawSrc = post.mediaUrl || (Array.isArray(post.mediaUrls) && post.mediaUrls[0]) || post.thumbnailUrl || '';
       }
-    });
+      let resolvedSrc = await resolveMediaSource(rawSrc);
+      if (!resolvedSrc && !skipDom && domLeftImg) {
+        resolvedSrc = domLeftImg.currentSrc || domLeftImg.src || '';
+      }
+      if (!resolvedSrc && post.mediaType === 'video' && isReadyVid(readyLeftDom)) {
+        if (renderGen !== window._viralStoryRenderGen) return;
+        if (!skipDom) window._viralStoryLastImgs = { left: readyLeftDom, right: null };
+        renderFrame(readyLeftDom, null, animT);
+        return;
+      }
+      const src = resolvedSrc || fallbackArt;
+      let im = await loadImg(src, readyLeftDom);
+      if (!im && src !== fallbackArt) {
+        im = await loadImg(fallbackArt);
+      }
+      if (renderGen !== window._viralStoryRenderGen) return;
+      const finalLeft = im || readyLeftDom || null;
+      if (!skipDom) window._viralStoryLastImgs = { left: finalLeft, right: null };
+      renderFrame(finalLeft, null, animT);
+    })();
   }
 }
 
@@ -4406,33 +4489,98 @@ async function exportViralStoryCanvasDataUrl(postId) {
     return cv.toDataURL('image/png');
   } catch (secErr) {
     const { post } = getViralPostShareData(postId);
-    if (post && !post.versus) {
-      const city = getCityById(post.cityId || 'montreal');
-      const cleanFallbackArt = resolveCityFallbackArtUrl(city, post.visualHeadline || '', post.visualSub || '');
-      const dims = getViralStoryDims(window._viralShareFormat);
-      const cleanCv = document.createElement('canvas');
-      cleanCv.width = dims.W;
-      cleanCv.height = dims.H;
-      const origId = cv.id;
-      cv.id = 'viralPostStoryCanvas_orig';
-      cleanCv.id = 'viralPostStoryCanvas';
-      cleanCv.style.display = 'none';
-      document.body.appendChild(cleanCv);
-      const savedMediaUrl = post.mediaUrl;
-      post.mediaUrl = cleanFallbackArt;
+    if (!post) return '';
+    const getCleanExportFallbackUrl = (cityObj, headline, subline) => {
+      const c = cityObj || { id: 'montreal', name: 'REMO' };
+      const cid = String(c.id || '').toLowerCase();
+      if (typeof REMO_BUNDLED_CITY_IMAGE_IDS !== 'undefined' && REMO_BUNDLED_CITY_IMAGE_IDS.has(cid) && typeof getDefaultCityCardImageUrl === 'function') {
+        const localUrl = getDefaultCityCardImageUrl(cid);
+        if (localUrl) return localUrl;
+      }
+      if (typeof generateCityPostVisualDataUrl === 'function') {
+        const genUrl = generateCityPostVisualDataUrl(c.id || 'montreal', headline || (c.name || 'REMO').toUpperCase(), subline || 'REMOWORLD.COM');
+        if (genUrl) return genUrl;
+      }
+      return resolveCityFallbackArtUrl(c, headline || '', subline || '');
+    };
+
+    const dims = getViralStoryDims(window._viralShareFormat);
+    const cleanCv = document.createElement('canvas');
+    cleanCv.width = dims.W;
+    cleanCv.height = dims.H;
+    const origId = cv.id;
+    cv.id = 'viralPostStoryCanvas_orig';
+    cleanCv.id = 'viralPostStoryCanvas';
+    cleanCv.style.display = 'none';
+    document.body.appendChild(cleanCv);
+
+    const savedLastImgs = window._viralStoryLastImgs;
+    const savedLastPostId = window._viralStoryLastPostId;
+    const savedRenderGen = window._viralStoryRenderGen;
+    const savedRenderPromise = window._viralStoryRenderPromise;
+    const savedFrameRenderer = window._viralStoryFrameRenderer;
+
+    let out = '';
+    if (post.versus) {
+      const v = post.versus;
+      const savedLeft = v.leftMedia;
+      const savedRight = v.rightMedia;
+      const cA = getCityById(v.leftCityId || 'montreal');
+      const cB = getCityById(v.rightCityId || 'paris');
+      try {
+        window._viralStoryCleanExportOnly = true;
+        v.leftMedia = getCleanExportFallbackUrl(cA);
+        v.rightMedia = getCleanExportFallbackUrl(cB);
+        drawViralPostStoryCanvas(postId);
+        if (window._viralStoryRenderPromise) {
+          try { await window._viralStoryRenderPromise; } catch (e) {}
+        }
+        await new Promise((r) => setTimeout(r, 80));
+        try { out = cleanCv.toDataURL('image/png'); } catch (e) {}
+      } finally {
+        window._viralStoryCleanExportOnly = false;
+        v.leftMedia = savedLeft;
+        v.rightMedia = savedRight;
+        if (cleanCv.parentNode) cleanCv.parentNode.removeChild(cleanCv);
+        cv.id = origId;
+        window._viralStoryLastImgs = savedLastImgs;
+        window._viralStoryLastPostId = savedLastPostId;
+        window._viralStoryRenderGen = savedRenderGen;
+        window._viralStoryRenderPromise = savedRenderPromise;
+        window._viralStoryFrameRenderer = savedFrameRenderer;
+      }
+      return out;
+    }
+
+    const city = getCityById(post.cityId || 'montreal');
+    const savedMediaUrl = post.mediaUrl;
+    const savedMediaUrls = post.mediaUrls;
+    const savedThumbUrl = post.thumbnailUrl;
+    try {
+      window._viralStoryCleanExportOnly = true;
+      post.mediaUrl = getCleanExportFallbackUrl(city, post.visualHeadline || '', post.visualSub || '');
+      post.mediaUrls = null;
+      post.thumbnailUrl = '';
       drawViralPostStoryCanvas(postId);
       if (window._viralStoryRenderPromise) {
         try { await window._viralStoryRenderPromise; } catch (e) {}
       }
       await new Promise((r) => setTimeout(r, 80));
-      let out = '';
       try { out = cleanCv.toDataURL('image/png'); } catch (e) {}
+    } finally {
+      window._viralStoryCleanExportOnly = false;
       post.mediaUrl = savedMediaUrl;
-      document.body.removeChild(cleanCv);
+      post.mediaUrls = savedMediaUrls;
+      post.thumbnailUrl = savedThumbUrl;
+      if (cleanCv.parentNode) cleanCv.parentNode.removeChild(cleanCv);
       cv.id = origId;
-      return out;
+      window._viralStoryLastImgs = savedLastImgs;
+      window._viralStoryLastPostId = savedLastPostId;
+      window._viralStoryRenderGen = savedRenderGen;
+      window._viralStoryRenderPromise = savedRenderPromise;
+      window._viralStoryFrameRenderer = savedFrameRenderer;
     }
-    return '';
+    return out;
   }
 }
 
@@ -13916,18 +14064,37 @@ function renderWorldWindowActionsBar(p, lang) {
 }
 window.renderWorldWindowActionsBar = renderWorldWindowActionsBar;
 
-function _loadImageSafeForStory(srcUrl) {
-  return new Promise((resolve) => {
-    if (!srcUrl) { resolve(null); return; }
-    let resolvedSrc = srcUrl;
-    if (String(srcUrl).startsWith('idb://') && typeof RemoMediaDB !== 'undefined') {
-      resolvedSrc = RemoMediaDB.resolveSyncOrPlaceholder(srcUrl) || '';
+async function _loadImageSafeForStory(srcUrl) {
+  if (!srcUrl) return null;
+  let resolvedSrc = String(srcUrl);
+  if (resolvedSrc.startsWith('idb://') && typeof RemoMediaDB !== 'undefined') {
+    const syncVal = RemoMediaDB.resolveSyncOrPlaceholder ? RemoMediaDB.resolveSyncOrPlaceholder(resolvedSrc) : '';
+    if (syncVal && !String(syncVal).startsWith('idb://')) {
+      resolvedSrc = String(syncVal);
+    } else if (RemoMediaDB.getObjectUrl) {
+      try {
+        const asyncVal = await RemoMediaDB.getObjectUrl(resolvedSrc);
+        resolvedSrc = (asyncVal && !String(asyncVal).startsWith('idb://')) ? String(asyncVal) : '';
+      } catch (e) {
+        resolvedSrc = '';
+      }
+    } else {
+      resolvedSrc = '';
     }
-    if (!resolvedSrc) { resolve(null); return; }
+  }
+  if (!resolvedSrc) return null;
+  return new Promise((resolve) => {
     const img = new Image();
-    if (/^https?:/i.test(resolvedSrc)) img.crossOrigin = 'anonymous';
+    const isHttp = /^https?:/i.test(resolvedSrc);
+    if (isHttp) img.crossOrigin = 'anonymous';
     img.onload = () => resolve(img);
-    img.onerror = () => resolve(null);
+    img.onerror = () => {
+      if (!isHttp) { resolve(null); return; }
+      const imgNoCors = new Image();
+      imgNoCors.onload = () => resolve(imgNoCors);
+      imgNoCors.onerror = () => resolve(null);
+      imgNoCors.src = resolvedSrc;
+    };
     img.src = resolvedSrc;
   });
 }
