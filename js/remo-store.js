@@ -5132,6 +5132,15 @@ const REMO_STORE = {
           if (typeof renderViralContestsView === 'function') renderViralContestsView();
           if (typeof renderFeedActiveContestsBanner === 'function') renderFeedActiveContestsBanner();
         }
+        if (Array.isArray(data.customCities) && typeof mergeCustomRemoCitiesFromCloud === 'function') {
+          const citiesChanged = mergeCustomRemoCitiesFromCloud(data.customCities);
+          if (citiesChanged) {
+            if (typeof refreshAllCitySelectDropdowns === 'function') refreshAllCitySelectDropdowns();
+            if (typeof window.syncFocusTvUI === 'function') window.syncFocusTvUI();
+            if (typeof renderAdminCitiesPanel === 'function') renderAdminCitiesPanel();
+            if (typeof renderSocialFeed === 'function') renderSocialFeed();
+          }
+        }
       };
       
       docRef.get().then((snap) => {
@@ -5175,9 +5184,6 @@ const REMO_STORE = {
             if (Array.isArray(data.geoVaults)) {
               this.state.geoVaults = data.geoVaults;
               if (typeof refreshRadarMarkers === 'function') refreshRadarMarkers();
-            }
-            if (Array.isArray(data.customCities) && typeof mergeCustomRemoCitiesFromCloud === 'function') {
-              mergeCustomRemoCitiesFromCloud(data.customCities);
             }
             if (Array.isArray(data.deletedPostIds)) {
               if (!this.deletedPostIds) this.deletedPostIds = new Set();

@@ -562,6 +562,7 @@ function renderAdminCitiesPanel() {
   }
 
   if (tbody) {
+    if (typeof healBrokenCityPhotos === 'function') healBrokenCityPhotos();
     tbody.innerHTML = cities.map((c) => {
       const pts = REMO_STORE.state.cityScores[c.id] || 1000;
       const wx = typeof REMO_WEATHER !== 'undefined' ? REMO_WEATHER.getCityLiveStatus(c) : null;

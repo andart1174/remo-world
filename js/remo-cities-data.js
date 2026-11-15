@@ -803,16 +803,35 @@ function getDefaultCityCardImageUrl(cityId) {
   return prefix + id + '.jpg';
 }
 
+function isBadCityStockImageUrl(url) {
+  const u = String(url || '').trim();
+  if (!u) return false;
+  return /(\.(svg|pdf)(\?|$)|\.svg\.png(\?|$)|\/svg\/|flag_of_|drapeau_|coat_of_arms|blason|armoiries|seal_of_|locator_map|location_map|map_of_|blank_map|wikimedia-logo|commons-logo)/i.test(u);
+}
+
 function resolveCityRealPhotoUrl(cityOrId) {
   const city = (cityOrId && typeof cityOrId === 'object') ? cityOrId : getCityById(cityOrId);
   const cid = String((city && city.id) || (typeof cityOrId === 'string' ? cityOrId : '') || '').trim().toLowerCase();
   if (city) {
     const custom = city.cardImageUrl || city.imageUrl || city.photoUrl || '';
-    if (custom && typeof custom === 'string' && !custom.startsWith('data:image/svg')) {
+    if (custom && typeof custom === 'string' && !custom.startsWith('data:image/svg') && !isBadCityStockImageUrl(custom)) {
       return custom;
     }
   }
   return cid ? getDefaultCityCardImageUrl(cid) : '';
+}
+
+function _pickValidWikiThumb(pages) {
+  if (!pages || typeof pages !== 'object') return '';
+  const list = Object.values(pages).sort((a, b) => Number(a?.index || 999) - Number(b?.index || 999));
+  for (let i = 0; i < list.length; i++) {
+    const pg = list[i];
+    const src = pg && pg.thumbnail && pg.thumbnail.source ? String(pg.thumbnail.source) : '';
+    if (src && /^https:\/\//i.test(src) && !isBadCityStockImageUrl(src)) {
+      return src;
+    }
+  }
+  return '';
 }
 
 async function fetchCityPhotoFromWikipedia(cityName, countryName) {
@@ -820,41 +839,63 @@ async function fetchCityPhotoFromWikipedia(cityName, countryName) {
   const cleanCity = String(cityName || '').trim();
   const cleanCountry = String(countryName || '').trim();
   if (!cleanCity) return '';
+  const hasCountry = Boolean(cleanCountry && cleanCountry.toLowerCase() !== 'world');
+  const hasCityWord = /\b(city|ville)\b/i.test(cleanCity);
 
-  const candidates = [];
-  if (cleanCountry && cleanCountry.toLowerCase() !== 'world') {
-    candidates.push(`${cleanCity}, ${cleanCountry}`);
-  }
-  candidates.push(cleanCity);
-
-  const hosts = ['en.wikipedia.org', 'fr.wikipedia.org'];
-  for (let hIdx = 0; hIdx < hosts.length; hIdx++) {
-    const host = hosts[hIdx];
-    for (let cIdx = 0; cIdx < candidates.length; cIdx++) {
-      const title = candidates[cIdx];
-      let timer = null;
-      try {
-        const ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
-        if (ctrl) timer = setTimeout(() => { try { ctrl.abort(); } catch (e) {} }, 5000);
-        const url = `https://${host}/w/api.php?action=query&prop=pageimages&piprop=thumbnail&pithumbsize=960&redirects=1&format=json&origin=*&titles=${encodeURIComponent(title)}`;
-        const resp = await fetch(url, ctrl ? { signal: ctrl.signal } : undefined);
-        if (!resp || !resp.ok) continue;
-        const json = await resp.json();
-        const pages = json && json.query && json.query.pages;
-        if (!pages || typeof pages !== 'object') continue;
-        const pageIds = Object.keys(pages);
-        for (let pIdx = 0; pIdx < pageIds.length; pIdx++) {
-          const pg = pages[pageIds[pIdx]];
-          const src = pg && pg.thumbnail && pg.thumbnail.source ? String(pg.thumbnail.source) : '';
-          if (src && /^https:\/\//i.test(src) && !/\.(svg|pdf)(\?|$)/i.test(src)) {
-            return src;
-          }
-        }
-      } catch (e) {
-      } finally {
-        if (timer) clearTimeout(timer);
-      }
+  const hosts = [
+    {
+      host: 'en.wikipedia.org',
+      titles: [
+        ...(hasCountry ? [`${cleanCity}, ${cleanCountry}`] : []),
+        ...(!hasCityWord && hasCountry ? [`${cleanCity} City, ${cleanCountry}`] : []),
+        ...(!hasCityWord ? [`${cleanCity} City`, `${cleanCity} (city)`] : []),
+        cleanCity
+      ],
+      searchQuery: `${cleanCity}${hasCountry ? ' ' + cleanCountry : ''} city`
+    },
+    {
+      host: 'fr.wikipedia.org',
+      titles: [
+        ...(!hasCityWord ? [`${cleanCity} (ville)`, `Ville de ${cleanCity}`] : []),
+        ...(hasCountry ? [`${cleanCity}, ${cleanCountry}`] : []),
+        cleanCity
+      ],
+      searchQuery: `${cleanCity}${hasCountry ? ' ' + cleanCountry : ''} ville`
     }
+  ];
+
+  const fetchWikiJson = async (url) => {
+    let timer = null;
+    try {
+      const ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+      if (ctrl) timer = setTimeout(() => { try { ctrl.abort(); } catch (e) {} }, 5000);
+      const resp = await fetch(url, ctrl ? { signal: ctrl.signal } : undefined);
+      if (!resp || !resp.ok) return null;
+      return await resp.json();
+    } catch (e) {
+      return null;
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  };
+
+  for (let hIdx = 0; hIdx < hosts.length; hIdx++) {
+    const spec = hosts[hIdx];
+    const seen = new Set();
+    for (let tIdx = 0; tIdx < spec.titles.length; tIdx++) {
+      const title = String(spec.titles[tIdx] || '').trim();
+      if (!title || seen.has(title.toLowerCase())) continue;
+      seen.add(title.toLowerCase());
+      const url = `https://${spec.host}/w/api.php?action=query&prop=pageimages&piprop=thumbnail&pithumbsize=960&redirects=1&format=json&origin=*&titles=${encodeURIComponent(title)}`;
+      const json = await fetchWikiJson(url);
+      const found = _pickValidWikiThumb(json && json.query && json.query.pages);
+      if (found) return found;
+    }
+
+    const searchUrl = `https://${spec.host}/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(spec.searchQuery)}&gsrlimit=4&prop=pageimages&piprop=thumbnail&pithumbsize=960&format=json&origin=*`;
+    const searchJson = await fetchWikiJson(searchUrl);
+    const searchFound = _pickValidWikiThumb(searchJson && searchJson.query && searchJson.query.pages);
+    if (searchFound) return searchFound;
   }
   return '';
 }
@@ -866,13 +907,18 @@ function updateRemoCityMedia(cityId, patch = {}) {
   const idx = list.findIndex((c) => c && String(c.id).toLowerCase() === cid);
   if (idx === -1) return null;
   const target = Object.assign({}, list[idx]);
+  let touchedMedia = false;
   ['imageUrl', 'cardImageUrl', 'radioStreamUrl', 'radioName', 'radioBadge', 'tagline_en', 'tagline_fr'].forEach((k) => {
     if (patch[k] !== undefined) {
       const val = String(patch[k] || '').trim();
       if (val) target[k] = val;
       else delete target[k];
+      if (!k.startsWith('tagline_')) touchedMedia = true;
     }
   });
+  if (touchedMedia && !patch._preserveTimestamp) {
+    target.mediaUpdatedAt = Date.now();
+  }
   list[idx] = target;
   saveRemoCities(list);
   return target;
@@ -883,8 +929,60 @@ function getCustomRemoCitiesPatch() {
   return getRemoCities().filter((c) => {
     if (!c || !c.id) return false;
     if (!_REMO_DEFAULT_CITY_IDS.has(c.id)) return true;
-    return Boolean(c.imageUrl || c.cardImageUrl || c.radioStreamUrl);
+    return Boolean(c.imageUrl || c.cardImageUrl || c.radioStreamUrl || c.mediaUpdatedAt);
   }).slice(-80);
+}
+
+const _healedBadPhotoCityIds = new Set();
+let _healBrokenCitiesInFlight = null;
+
+function healBrokenCityPhotos(onUpdated) {
+  if (_healBrokenCitiesInFlight) return _healBrokenCitiesInFlight;
+  if (typeof fetch !== 'function') return Promise.resolve(false);
+
+  const list = getRemoCities();
+  const targets = list.filter((c) => {
+    if (!c || !c.id || _healedBadPhotoCityIds.has(c.id)) return false;
+    return isBadCityStockImageUrl(c.imageUrl) || isBadCityStockImageUrl(c.cardImageUrl);
+  });
+  if (!targets.length) return Promise.resolve(false);
+
+  _healBrokenCitiesInFlight = (async () => {
+    let anyHealed = false;
+    for (let i = 0; i < targets.length; i++) {
+      const c = targets[i];
+      _healedBadPhotoCityIds.add(c.id);
+      const freshUrl = await fetchCityPhotoFromWikipedia(
+        c.name_en || c.name_fr || c.id,
+        typeof getCityCountry === 'function' ? getCityCountry(c, 'en') : (c.country_en || c.country || '')
+      );
+      updateRemoCityMedia(c.id, {
+        imageUrl: freshUrl || '',
+        cardImageUrl: freshUrl || ''
+      });
+      if (freshUrl && typeof REMO_STORE !== 'undefined' && REMO_STORE.state && Array.isArray(REMO_STORE.state.cards)) {
+        REMO_STORE.state.cards.forEach((card) => {
+          if (card && card.cityId === c.id && isBadCityStockImageUrl(card.imageUrl)) {
+            card.imageUrl = freshUrl;
+          }
+        });
+      }
+      anyHealed = true;
+    }
+    if (anyHealed) {
+      if (typeof REMO_STORE !== 'undefined' && typeof REMO_STORE.syncToFirestore === 'function') {
+        REMO_STORE.syncToFirestore('city_media_heal', false);
+      }
+      if (typeof renderAdminCitiesPanel === 'function') renderAdminCitiesPanel();
+      if (typeof window.syncFocusTvUI === 'function') window.syncFocusTvUI();
+      if (typeof renderSocialFeed === 'function') renderSocialFeed();
+      if (typeof onUpdated === 'function') onUpdated();
+    }
+    return anyHealed;
+  })().catch(() => false).finally(() => {
+    _healBrokenCitiesInFlight = null;
+  });
+  return _healBrokenCitiesInFlight;
 }
 
 function mergeCustomRemoCitiesFromCloud(cloudCities) {
@@ -897,23 +995,48 @@ function mergeCustomRemoCitiesFromCloud(cloudCities) {
     if (!cc || !cc.id || !cc.name_en) return;
     const existing = byId.get(cc.id);
     if (!existing) {
-      current.push(cc);
-      byId.set(cc.id, cc);
+      const cloned = Object.assign({}, cc);
+      if (isBadCityStockImageUrl(cloned.imageUrl)) delete cloned.imageUrl;
+      if (isBadCityStockImageUrl(cloned.cardImageUrl)) delete cloned.cardImageUrl;
+      current.push(cloned);
+      byId.set(cloned.id, cloned);
       changed = true;
     } else {
       let updated = false;
-      ['imageUrl', 'cardImageUrl', 'radioStreamUrl', 'radioName', 'radioBadge'].forEach((k) => {
-        if (cc[k] && !existing[k]) {
-          existing[k] = cc[k];
-          updated = true;
-        }
-      });
+      const cloudTs = Number(cc.mediaUpdatedAt || 0);
+      const localTs = Number(existing.mediaUpdatedAt || 0);
+      if (cloudTs > localTs) {
+        ['imageUrl', 'cardImageUrl', 'radioStreamUrl', 'radioName', 'radioBadge'].forEach((k) => {
+          const val = cc[k];
+          if (val && !isBadCityStockImageUrl(val)) {
+            if (existing[k] !== val) {
+              existing[k] = val;
+              updated = true;
+            }
+          } else if (existing[k]) {
+            delete existing[k];
+            updated = true;
+          }
+        });
+        existing.mediaUpdatedAt = cloudTs;
+        updated = true;
+      } else {
+        ['imageUrl', 'cardImageUrl', 'radioStreamUrl', 'radioName', 'radioBadge'].forEach((k) => {
+          if (cc[k] && (!existing[k] || isBadCityStockImageUrl(existing[k])) && !isBadCityStockImageUrl(cc[k])) {
+            existing[k] = cc[k];
+            updated = true;
+          }
+        });
+      }
       if (updated) changed = true;
     }
   });
 
   if (changed) {
     saveRemoCities(current);
+  }
+  if (typeof setTimeout === 'function') {
+    setTimeout(() => { healBrokenCityPhotos(); }, 60);
   }
   return changed;
 }
@@ -1116,11 +1239,17 @@ window.REMO_DEFAULT_CITIES = REMO_DEFAULT_CITIES;
 window.REMO_ELEMENTS = REMO_ELEMENTS;
 window.REMO_BUNDLED_CITY_IMAGE_IDS = REMO_BUNDLED_CITY_IMAGE_IDS;
 window.getDefaultCityCardImageUrl = getDefaultCityCardImageUrl;
+window.isBadCityStockImageUrl = isBadCityStockImageUrl;
 window.resolveCityRealPhotoUrl = resolveCityRealPhotoUrl;
 window.fetchCityPhotoFromWikipedia = fetchCityPhotoFromWikipedia;
 window.updateRemoCityMedia = updateRemoCityMedia;
+window.healBrokenCityPhotos = healBrokenCityPhotos;
 window.getCustomRemoCitiesPatch = getCustomRemoCitiesPatch;
 window.mergeCustomRemoCitiesFromCloud = mergeCustomRemoCitiesFromCloud;
+
+if (typeof setTimeout === 'function' && typeof window !== 'undefined') {
+  setTimeout(() => { healBrokenCityPhotos(); }, 900);
+}
 window.drawCityCrestWatermark = drawCityCrestWatermark;
 window.getRemoCities = getRemoCities;
 window.saveRemoCities = saveRemoCities;
