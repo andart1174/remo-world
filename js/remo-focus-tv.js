@@ -163,20 +163,36 @@
   function _getCityPhotoImg(city) {
     if (!city || !city.id) return null;
     const cid = String(city.id).toLowerCase();
-    if (_cityPhotoCache[cid]) return _cityPhotoCache[cid];
+    let src = '';
+    if (typeof window.resolveCityRealPhotoUrl === 'function') {
+      src = window.resolveCityRealPhotoUrl(city);
+    } else {
+      src = city.cardImageUrl || city.imageUrl || '';
+      if (!src && typeof window.getDefaultCityCardImageUrl === 'function') {
+        src = window.getDefaultCityCardImageUrl(cid);
+      } else if (!src && window.REMO_BUNDLED_CITY_IMAGE_IDS && typeof window.REMO_BUNDLED_CITY_IMAGE_IDS.has === 'function' && window.REMO_BUNDLED_CITY_IMAGE_IDS.has(cid)) {
+        src = `./img/cities/${cid}.jpg`;
+      }
+    }
+    if (!src || src.startsWith('data:image/svg')) return null;
+
+    const cached = _cityPhotoCache[cid];
+    if (cached && cached._requestedSrc === src) return cached;
     if (typeof Image === 'undefined') return null;
 
-    let src = city.cardImageUrl || city.imageUrl || '';
-    if (!src && typeof window.getDefaultCityCardImageUrl === 'function') {
-      src = window.getDefaultCityCardImageUrl(cid);
-    } else if (!src && window.REMO_BUNDLED_CITY_IMAGE_IDS && typeof window.REMO_BUNDLED_CITY_IMAGE_IDS.has === 'function' && window.REMO_BUNDLED_CITY_IMAGE_IDS.has(cid)) {
-      src = `./img/cities/${cid}.jpg`;
-    }
-    if (!src || src.startsWith('data:')) return null;
-
     const img = new Image();
+    img._requestedSrc = src;
     img.crossOrigin = 'anonymous';
     img.decoding = 'async';
+    img.onerror = () => {
+      if (img.crossOrigin && !img._retriedNoCors && /^https?:\/\//i.test(src)) {
+        img._retriedNoCors = true;
+        img._taintedNoCors = true;
+        img.removeAttribute('crossorigin');
+        img.crossOrigin = null;
+        img.src = src;
+      }
+    };
     img.src = src;
     _cityPhotoCache[cid] = img;
     return img;

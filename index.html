@@ -124,7 +124,7 @@
   <noscript><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha384-sHL9NAb7lN7rfvG5lfHpm643Xkcjzp4jFvuavGOndn6pjVqS6ny56CAt3nsEVT4H" crossorigin="anonymous"></noscript>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha384-cxOPjt7s7Iz04uaHJceBmS+qpjv2JkIHNVcuOrM+YHwZOmJGBXI00mdUXEq65HTH" crossorigin="anonymous" defer></script>
 
-  <link rel="stylesheet" href="css/remo-core.css?v=128">
+  <link rel="stylesheet" href="css/remo-core.css?v=129">
 </head>
 <body>
 
@@ -1494,7 +1494,7 @@
           <!-- Left City -->
           <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(56,189,248,0.3);border-radius:12px;padding:10px;">
             <label style="font-size:0.75rem;font-weight:800;color:#38bdf8;margin-bottom:4px;display:block;" data-i18n="versus_left_city">City A (Left)</label>
-            <select id="createVersusLeftCity" class="remo-input" style="margin-bottom:8px;"></select>
+            <select id="createVersusLeftCity" class="remo-input" style="margin-bottom:8px;" onchange="if(typeof updateVersusAutoPreviews==='function')updateVersusAutoPreviews()"></select>
             <label class="btn-cyber" style="cursor:pointer;justify-content:center;font-size:0.75rem;padding:6px;width:100%;">
               <span>📸 Media A</span>
               <input type="file" id="createVersusLeftFile" accept="image/*,video/*" style="display:none;" onchange="handleVersusMediaSelect('left', event)">
@@ -1504,7 +1504,7 @@
           <!-- Right City -->
           <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(236,72,153,0.3);border-radius:12px;padding:10px;">
             <label style="font-size:0.75rem;font-weight:800;color:#f472b6;margin-bottom:4px;display:block;" data-i18n="versus_right_city">City B (Right)</label>
-            <select id="createVersusRightCity" class="remo-input" style="margin-bottom:8px;"></select>
+            <select id="createVersusRightCity" class="remo-input" style="margin-bottom:8px;" onchange="if(typeof updateVersusAutoPreviews==='function')updateVersusAutoPreviews()"></select>
             <label class="btn-cyber" style="cursor:pointer;justify-content:center;font-size:0.75rem;padding:6px;background:linear-gradient(135deg,#ec4899,#8b5cf6);width:100%;">
               <span>📸 Media B</span>
               <input type="file" id="createVersusRightFile" accept="image/*,video/*" style="display:none;" onchange="handleVersusMediaSelect('right', event)">
@@ -2069,6 +2069,7 @@
 
         <button type="button" class="btn-ghost" style="width:100%;justify-content:center;margin-bottom:12px;border-color:#38bdf8;color:#7dd3fc;" onclick="detectGpsForNewCity()" data-i18n="add_city_gps_btn">📍 Auto-Detect My Live GPS</button>
 
+        <div style="font-size:0.75rem;color:#7dd3fc;background:rgba(56,189,248,0.08);border:1px solid rgba(56,189,248,0.25);border-radius:10px;padding:8px 10px;margin-bottom:10px;line-height:1.4;" data-i18n="add_city_auto_note">🌐 Auto-Pilot: REMO automatically fetches a real city photo (Wikipedia/Commons) &amp; local FM streams right after creation!</div>
         <button type="submit" class="btn-cyber btn-gold" style="width:100%;justify-content:center;padding:12px;font-size:0.92rem;" data-i18n="add_city_submit_btn">🚀 Found City &amp; Mint Card #0001 (+75 🪙)</button>
       </form>
     </div>
@@ -2736,15 +2737,15 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js" integrity="sha384-oFrOL1TiREYNET0lsYF3LjQuyi2gL7vhjH1X8vFr+umcmzAdPELopeSgbcrv4uRm" crossorigin="anonymous"></script>
 
   <!-- REMO Modular Engines -->
-  <script src="js/remo-i18n.js?v=128"></script>
-  <script src="js/remo-cities-data.js?v=128"></script>
-  <script src="js/remo-store.js?v=128"></script>
-  <script src="js/remo-card-engine.js?v=128"></script>
-  <script src="js/remo-radar-arena.js?v=128"></script>
-  <script src="js/remo-social-comms.js?v=128"></script>
-  <script src="js/remo-radio-engine.js?v=128"></script>
-  <script src="js/remo-focus-tv.js?v=128"></script>
-  <script src="js/remo-world-blitz.js?v=128"></script>
+  <script src="js/remo-i18n.js?v=129"></script>
+  <script src="js/remo-cities-data.js?v=129"></script>
+  <script src="js/remo-store.js?v=129"></script>
+  <script src="js/remo-card-engine.js?v=129"></script>
+  <script src="js/remo-radar-arena.js?v=129"></script>
+  <script src="js/remo-social-comms.js?v=129"></script>
+  <script src="js/remo-radio-engine.js?v=129"></script>
+  <script src="js/remo-focus-tv.js?v=129"></script>
+  <script src="js/remo-world-blitz.js?v=129"></script>
 
   <noscript>
     <nav aria-label="REMO World Static Directory" style="padding:20px;background:#050816;color:#f8fafc;">

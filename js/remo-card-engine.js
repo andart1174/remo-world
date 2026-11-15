@@ -547,9 +547,11 @@ function resolveCardPhotoUrl(spec, cityIdOverride) {
       source: spec.communityAuthorName ? 'community' : 'custom'
     };
   }
-  if (!spec._forceVectorFallback && typeof getDefaultCityCardImageUrl === 'function') {
-    const defUrl = getDefaultCityCardImageUrl(cityIdOverride || spec.cityId || 'montreal');
-    if (defUrl) return { url: defUrl, source: 'city_artwork' };
+  if (!spec._forceVectorFallback) {
+    const resolvedUrl = typeof resolveCityRealPhotoUrl === 'function'
+      ? resolveCityRealPhotoUrl(cityIdOverride || spec.cityId || 'montreal')
+      : (typeof getDefaultCityCardImageUrl === 'function' ? getDefaultCityCardImageUrl(cityIdOverride || spec.cityId || 'montreal') : '');
+    if (resolvedUrl) return { url: resolvedUrl, source: 'city_artwork' };
   }
   return { url: '', source: 'vector' };
 }

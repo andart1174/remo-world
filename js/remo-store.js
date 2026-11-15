@@ -5144,6 +5144,7 @@ const REMO_STORE = {
             jukeboxTracks: (this.state.jukeboxTracks || []).slice(0, 30),
             auctions: (this.state.auctions || []).slice(0, 25),
             geoVaults: (this.state.geoVaults || []).slice(0, 35),
+            customCities: typeof getCustomRemoCitiesPatch === 'function' ? getCustomRemoCitiesPatch() : [],
             viralContests: this.state.viralContests || getDefaultViralContests(),
             worldSystems: this.state.worldSystems || getDefaultUniqueWorldSystems(),
             deletedPostIds: [...(this.deletedPostIds || [])].slice(-100),
@@ -5174,6 +5175,9 @@ const REMO_STORE = {
             if (Array.isArray(data.geoVaults)) {
               this.state.geoVaults = data.geoVaults;
               if (typeof refreshRadarMarkers === 'function') refreshRadarMarkers();
+            }
+            if (Array.isArray(data.customCities) && typeof mergeCustomRemoCitiesFromCloud === 'function') {
+              mergeCustomRemoCitiesFromCloud(data.customCities);
             }
             if (Array.isArray(data.deletedPostIds)) {
               if (!this.deletedPostIds) this.deletedPostIds = new Set();
@@ -7100,6 +7104,7 @@ const REMO_STORE = {
           jukeboxTracks: (this.state.jukeboxTracks || []).slice(0, 30),
           auctions: cleanAuctions,
           geoVaults: (this.state.geoVaults || []).slice(0, 35),
+          customCities: typeof getCustomRemoCitiesPatch === 'function' ? getCustomRemoCitiesPatch() : [],
           stories: (this.state.stories || [])
             .filter((s) => s && s.id && (!this.deletedStoryIds || !this.deletedStoryIds.has(s.id)))
             .map((s) => ({

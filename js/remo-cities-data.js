@@ -803,6 +803,121 @@ function getDefaultCityCardImageUrl(cityId) {
   return prefix + id + '.jpg';
 }
 
+function resolveCityRealPhotoUrl(cityOrId) {
+  const city = (cityOrId && typeof cityOrId === 'object') ? cityOrId : getCityById(cityOrId);
+  const cid = String((city && city.id) || (typeof cityOrId === 'string' ? cityOrId : '') || '').trim().toLowerCase();
+  if (city) {
+    const custom = city.cardImageUrl || city.imageUrl || city.photoUrl || '';
+    if (custom && typeof custom === 'string' && !custom.startsWith('data:image/svg')) {
+      return custom;
+    }
+  }
+  return cid ? getDefaultCityCardImageUrl(cid) : '';
+}
+
+async function fetchCityPhotoFromWikipedia(cityName, countryName) {
+  if (typeof fetch !== 'function') return '';
+  const cleanCity = String(cityName || '').trim();
+  const cleanCountry = String(countryName || '').trim();
+  if (!cleanCity) return '';
+
+  const candidates = [];
+  if (cleanCountry && cleanCountry.toLowerCase() !== 'world') {
+    candidates.push(`${cleanCity}, ${cleanCountry}`);
+  }
+  candidates.push(cleanCity);
+
+  const hosts = ['en.wikipedia.org', 'fr.wikipedia.org'];
+  for (let hIdx = 0; hIdx < hosts.length; hIdx++) {
+    const host = hosts[hIdx];
+    for (let cIdx = 0; cIdx < candidates.length; cIdx++) {
+      const title = candidates[cIdx];
+      let timer = null;
+      try {
+        const ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+        if (ctrl) timer = setTimeout(() => { try { ctrl.abort(); } catch (e) {} }, 5000);
+        const url = `https://${host}/w/api.php?action=query&prop=pageimages&piprop=thumbnail&pithumbsize=960&redirects=1&format=json&origin=*&titles=${encodeURIComponent(title)}`;
+        const resp = await fetch(url, ctrl ? { signal: ctrl.signal } : undefined);
+        if (!resp || !resp.ok) continue;
+        const json = await resp.json();
+        const pages = json && json.query && json.query.pages;
+        if (!pages || typeof pages !== 'object') continue;
+        const pageIds = Object.keys(pages);
+        for (let pIdx = 0; pIdx < pageIds.length; pIdx++) {
+          const pg = pages[pageIds[pIdx]];
+          const src = pg && pg.thumbnail && pg.thumbnail.source ? String(pg.thumbnail.source) : '';
+          if (src && /^https:\/\//i.test(src) && !/\.(svg|pdf)(\?|$)/i.test(src)) {
+            return src;
+          }
+        }
+      } catch (e) {
+      } finally {
+        if (timer) clearTimeout(timer);
+      }
+    }
+  }
+  return '';
+}
+
+function updateRemoCityMedia(cityId, patch = {}) {
+  const cid = String(cityId || '').trim().toLowerCase();
+  if (!cid || !patch || typeof patch !== 'object') return null;
+  const list = getRemoCities();
+  const idx = list.findIndex((c) => c && String(c.id).toLowerCase() === cid);
+  if (idx === -1) return null;
+  const target = Object.assign({}, list[idx]);
+  ['imageUrl', 'cardImageUrl', 'radioStreamUrl', 'radioName', 'radioBadge', 'tagline_en', 'tagline_fr'].forEach((k) => {
+    if (patch[k] !== undefined) {
+      const val = String(patch[k] || '').trim();
+      if (val) target[k] = val;
+      else delete target[k];
+    }
+  });
+  list[idx] = target;
+  saveRemoCities(list);
+  return target;
+}
+
+const _REMO_DEFAULT_CITY_IDS = new Set(REMO_DEFAULT_CITIES.map((c) => c.id));
+function getCustomRemoCitiesPatch() {
+  return getRemoCities().filter((c) => {
+    if (!c || !c.id) return false;
+    if (!_REMO_DEFAULT_CITY_IDS.has(c.id)) return true;
+    return Boolean(c.imageUrl || c.cardImageUrl || c.radioStreamUrl);
+  }).slice(-80);
+}
+
+function mergeCustomRemoCitiesFromCloud(cloudCities) {
+  if (!Array.isArray(cloudCities) || !cloudCities.length) return false;
+  const current = getRemoCities();
+  const byId = new Map(current.map((c) => [c.id, c]));
+  let changed = false;
+
+  cloudCities.forEach((cc) => {
+    if (!cc || !cc.id || !cc.name_en) return;
+    const existing = byId.get(cc.id);
+    if (!existing) {
+      current.push(cc);
+      byId.set(cc.id, cc);
+      changed = true;
+    } else {
+      let updated = false;
+      ['imageUrl', 'cardImageUrl', 'radioStreamUrl', 'radioName', 'radioBadge'].forEach((k) => {
+        if (cc[k] && !existing[k]) {
+          existing[k] = cc[k];
+          updated = true;
+        }
+      });
+      if (updated) changed = true;
+    }
+  });
+
+  if (changed) {
+    saveRemoCities(current);
+  }
+  return changed;
+}
+
 /* Crisp heraldic / architectural emblem watermark rendered inside the card artwork corner */
 function drawCityCrestWatermark(ctx, city, x, y, r = 19, color = '#fbbf24') {
   if (!ctx || !city) return;
@@ -1001,6 +1116,11 @@ window.REMO_DEFAULT_CITIES = REMO_DEFAULT_CITIES;
 window.REMO_ELEMENTS = REMO_ELEMENTS;
 window.REMO_BUNDLED_CITY_IMAGE_IDS = REMO_BUNDLED_CITY_IMAGE_IDS;
 window.getDefaultCityCardImageUrl = getDefaultCityCardImageUrl;
+window.resolveCityRealPhotoUrl = resolveCityRealPhotoUrl;
+window.fetchCityPhotoFromWikipedia = fetchCityPhotoFromWikipedia;
+window.updateRemoCityMedia = updateRemoCityMedia;
+window.getCustomRemoCitiesPatch = getCustomRemoCitiesPatch;
+window.mergeCustomRemoCitiesFromCloud = mergeCustomRemoCitiesFromCloud;
 window.drawCityCrestWatermark = drawCityCrestWatermark;
 window.getRemoCities = getRemoCities;
 window.saveRemoCities = saveRemoCities;

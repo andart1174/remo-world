@@ -7622,9 +7622,11 @@ select.remo-input option {
   border-radius: 99px;
   font-size: 0.68rem;
   font-weight: 800;
-  background: rgba(5, 10, 26, 0.78);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  color: #cbd5e1;
+  background: rgba(5, 10, 26, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: #f8fafc;
+  backdrop-filter: blur(6px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
 }
 .blitz-reveal-banner {
   position: absolute;

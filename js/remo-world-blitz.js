@@ -51,6 +51,8 @@
     rafId: null,
     stars: [],
     pulsePhase: 0,
+    camZoom: 1.24,
+    roundIndexPrev: -1,
     copiedRecently: false,
     challenger: null,      // { n, s, t, g, d, b } decoded from ?vs=...
     isDemoRun: false,
@@ -865,6 +867,123 @@
     }
   }
 
+  const _blitzPhotoCache = Object.create(null);
+
+  function _getBlitzPhotoImg(city) {
+    if (!city || !city.id) return null;
+    const cid = String(city.id).toLowerCase();
+    const src = (typeof resolveCityRealPhotoUrl === 'function')
+      ? resolveCityRealPhotoUrl(city)
+      : (typeof getDefaultCityCardImageUrl === 'function' ? getDefaultCityCardImageUrl(cid) : '');
+    if (!src || src.startsWith('data:image/svg')) return null;
+
+    const existing = _blitzPhotoCache[cid];
+    if (existing && existing._src === src) return existing;
+
+    const entry = { img: null, ready: false, failed: false, _src: src };
+    _blitzPhotoCache[cid] = entry;
+
+    if (typeof Image === 'undefined') return entry;
+    const loadImg = (useCors) => {
+      const img = new Image();
+      if (useCors && /^https?:\/\//i.test(src)) img.crossOrigin = 'anonymous';
+      img.decoding = 'async';
+      img.onload = () => {
+        if ((img.naturalWidth || img.width) > 0) {
+          entry.img = img;
+          entry.ready = true;
+          entry.failed = false;
+        }
+      };
+      img.onerror = () => {
+        if (useCors) {
+          loadImg(false);
+        } else {
+          entry.failed = true;
+        }
+      };
+      img.src = src;
+    };
+    loadImg(true);
+    return entry;
+  }
+
+  function _preloadChallengePhotos(challenge) {
+    const list = Array.isArray(challenge)
+      ? challenge
+      : (challenge && Array.isArray(challenge.rounds) ? challenge.rounds : []);
+    list.forEach((r) => {
+      if (r && r.city) _getBlitzPhotoImg(r.city);
+    });
+  }
+
+  function _drawBlitzPhotoBackdrop(ctx, canvas, w, city) {
+    const entry = _getBlitzPhotoImg(city);
+    if (!entry || !entry.ready || !entry.img) return false;
+
+    const img = entry.img;
+    const iw = img.naturalWidth || img.width || 1;
+    const ih = img.naturalHeight || img.height || 1;
+    const logicalRatio = (w && canvas.width) ? (canvas.width / w) : 1;
+    const viewH = (logicalRatio > 0 && canvas.height) ? (canvas.height / logicalRatio) : (canvas.clientHeight || 220);
+
+    if (state.roundIndexPrev !== state.roundIdx) {
+      state.roundIndexPrev = state.roundIdx;
+      state.camZoom = 1.24;
+    }
+
+    const revealedOrHinted = Boolean(state.hintUsedInRound || state.revealLock);
+    const targetZoom = revealedOrHinted ? 1.03 : 1.18;
+    state.camZoom = (typeof state.camZoom === 'number' ? state.camZoom : 1.24);
+    state.camZoom += (targetZoom - state.camZoom) * 0.08;
+
+    const baseScale = Math.max(w / iw, viewH / ih);
+    const drawW = iw * baseScale * state.camZoom;
+    const drawH = ih * baseScale * state.camZoom;
+    const swayX = Math.sin((state.pulsePhase || 0) * 0.45) * (drawW - w) * 0.18;
+    const swayY = Math.cos((state.pulsePhase || 0) * 0.35) * (drawH - viewH) * 0.15;
+    const dx = Math.min(0, Math.max(w - drawW, (w - drawW) * 0.5 + swayX));
+    const dy = Math.min(0, Math.max(viewH - drawH, (viewH - drawH) * 0.5 + swayY));
+
+    ctx.save();
+    ctx.drawImage(img, dx, dy, drawW, drawH);
+
+    // Subtle local-time lighting glaze & cinema edge vignette for UI legibility
+    let localHour = 13;
+    if (typeof getCityLocalTimeInfo === 'function') {
+      const tInfo = getCityLocalTimeInfo(city);
+      if (tInfo && typeof tInfo.hour === 'number') localHour = tInfo.hour;
+    }
+    if (localHour < 6 || localHour >= 20) {
+      ctx.fillStyle = 'rgba(8, 14, 34, 0.28)';
+      ctx.fillRect(0, 0, w, viewH);
+    } else if (localHour <= 8 || localHour >= 17) {
+      ctx.fillStyle = 'rgba(245, 158, 11, 0.11)';
+      ctx.fillRect(0, 0, w, viewH);
+    }
+
+    const vig = ctx.createRadialGradient(w * 0.5, viewH * 0.48, w * 0.2, w * 0.5, viewH * 0.5, w * 0.72);
+    vig.addColorStop(0, 'rgba(5, 10, 24, 0.02)');
+    vig.addColorStop(1, 'rgba(5, 10, 24, 0.46)');
+    ctx.fillStyle = vig;
+    ctx.fillRect(0, 0, w, viewH);
+
+    // Soft top & bottom gradient scrim so badge & reveal pill remain high-contrast over bright photos
+    const topScrim = ctx.createLinearGradient(0, 0, 0, viewH * 0.32);
+    topScrim.addColorStop(0, 'rgba(4, 8, 20, 0.52)');
+    topScrim.addColorStop(1, 'rgba(4, 8, 20, 0)');
+    ctx.fillStyle = topScrim;
+    ctx.fillRect(0, 0, w, viewH * 0.32);
+
+    const botScrim = ctx.createLinearGradient(0, viewH * 0.62, 0, viewH);
+    botScrim.addColorStop(0, 'rgba(4, 8, 20, 0)');
+    botScrim.addColorStop(1, 'rgba(4, 8, 20, 0.62)');
+    ctx.fillStyle = botScrim;
+    ctx.fillRect(0, viewH * 0.62, w, viewH * 0.38);
+    ctx.restore();
+    return true;
+  }
+
   function _renderCanvasFrame() {
     const canvas = document.getElementById('blitzCanvas');
     if (!canvas || !state.isOpen) {
@@ -922,8 +1041,11 @@
     ctx.restore();
 
     if (city) {
-      const pulseScale = 1 + 0.015 * Math.sin(state.pulsePhase);
-      _drawBlitzLandmark(ctx, city, w / 2, cy, sz * pulseScale);
+      const drewRealPhoto = _drawBlitzPhotoBackdrop(ctx, canvas, w, city);
+      if (!drewRealPhoto) {
+        const pulseScale = 1 + 0.015 * Math.sin(state.pulsePhase);
+        _drawBlitzLandmark(ctx, city, w / 2, cy, sz * pulseScale);
+      }
     }
 
     state.rafId = requestAnimationFrame(_renderCanvasFrame);
@@ -1082,6 +1204,7 @@
     const seedKey = state.demoSeed || todayKey;
     state.challengeDate = seedKey;
     state.challenge = buildDailyChallenge(seedKey);
+    _preloadChallengePhotos(state.challenge);
     state.roundIdx = 0;
     state.results = [];
     state.pickedIds = [];
@@ -2012,6 +2135,7 @@
     if (!state.challenge || state.challengeDate !== todayKey || state.phase !== 'playing') {
       state.challengeDate = todayKey;
       state.challenge = buildDailyChallenge(todayKey);
+      _preloadChallengePhotos(state.challenge);
       state.roundIdx = 0;
       state.results = [];
       state.pickedIds = [];

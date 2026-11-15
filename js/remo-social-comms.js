@@ -723,6 +723,63 @@ function claimPostFeedBounty(postId) {
   }
 }
 
+function resolveCityFallbackArtUrl(cityOrId, headline = '', subline = '') {
+  const city = (cityOrId && typeof cityOrId === 'object') ? cityOrId : getCityById(cityOrId);
+  const cid = (city && city.id) || (typeof cityOrId === 'string' ? cityOrId : '') || 'montreal';
+  const cleanHeadline = String(headline || '').trim();
+  if (cleanHeadline && typeof generateCityPostVisualDataUrl === 'function') {
+    return generateCityPostVisualDataUrl(cid, cleanHeadline, subline || '');
+  }
+  if (typeof resolveCityRealPhotoUrl === 'function') {
+    const realUrl = resolveCityRealPhotoUrl(city || cid);
+    if (realUrl) return realUrl;
+  }
+  return typeof generateCityPostVisualDataUrl === 'function'
+    ? generateCityPostVisualDataUrl(cid, cleanHeadline || getCityName(city, 'en'), subline || '')
+    : '';
+}
+
+function updateVersusAutoPreviews() {
+  const isFr = typeof REMO_I18N !== 'undefined' && REMO_I18N.getLang && REMO_I18N.getLang() === 'fr';
+  const autoBadgeTxt = isFr ? '🌐 Photo auto ville' : '🌐 Auto City Photo';
+  const resetTitle = isFr ? 'Revenir à la photo auto' : 'Revert to Auto Photo';
+
+  ['left', 'right'].forEach((side) => {
+    const prev = document.getElementById(side === 'left' ? 'versusLeftPreview' : 'versusRightPreview');
+    if (!prev) return;
+    const customSrc = pendingVersusMedia && pendingVersusMedia[side];
+    if (customSrc) {
+      const safeCustom = sanitizeSafeMediaUrl(customSrc);
+      prev.style.display = 'block';
+      prev.innerHTML = `<div style="position:relative;width:100%;height:100%;"><img src="${escapeHtmlStr(safeCustom)}" alt="${side}" style="width:100%;height:100%;object-fit:cover;display:block;"><button type="button" onclick="clearVersusCustomMedia('${side}')" title="${escapeHtmlStr(resetTitle)}" style="position:absolute;top:5px;right:5px;padding:2px 7px;border-radius:999px;border:1px solid rgba(255,255,255,0.28);background:rgba(15,23,42,0.84);color:#fff;font-size:0.66rem;font-weight:800;cursor:pointer;">↺ Auto</button></div>`;
+      return;
+    }
+    const sel = document.getElementById(side === 'left' ? 'createVersusLeftCity' : 'createVersusRightCity');
+    const cid = (sel && sel.value) || (side === 'left' ? 'montreal' : 'paris');
+    const autoSrc = resolveCityFallbackArtUrl(cid);
+    if (autoSrc) {
+      const safeAuto = sanitizeSafeMediaUrl(autoSrc) || autoSrc;
+      prev.style.display = 'block';
+      prev.innerHTML = `<div style="position:relative;width:100%;height:100%;"><img src="${escapeHtmlStr(safeAuto)}" alt="${escapeHtmlStr(cid)}" style="width:100%;height:100%;object-fit:cover;display:block;"><span style="position:absolute;left:6px;bottom:5px;padding:2px 8px;border-radius:999px;background:rgba(5,10,26,0.8);border:1px solid rgba(56,189,248,0.45);color:#e0f2fe;font-size:0.64rem;font-weight:800;backdrop-filter:blur(4px);pointer-events:none;">${autoBadgeTxt}</span></div>`;
+    } else {
+      prev.style.display = 'none';
+      prev.innerHTML = '';
+    }
+  });
+}
+
+function clearVersusCustomMedia(side) {
+  if (side !== 'left' && side !== 'right') return;
+  pendingVersusMedia[side] = '';
+  const inp = document.getElementById(side === 'left' ? 'createVersusLeftFile' : 'createVersusRightFile');
+  if (inp) inp.value = '';
+  updateVersusAutoPreviews();
+}
+
+window.resolveCityFallbackArtUrl = resolveCityFallbackArtUrl;
+window.updateVersusAutoPreviews = updateVersusAutoPreviews;
+window.clearVersusCustomMedia = clearVersusCustomMedia;
+
 async function handleVersusMediaSelect(side, ev) {
   const file = ev.target.files && ev.target.files[0];
   if (!file) return;
@@ -745,10 +802,7 @@ async function handleVersusMediaSelect(side, ev) {
       });
     }
     pendingVersusMedia[side] = compressedUrl;
-    if (prev) {
-      prev.style.display = 'block';
-      prev.innerHTML = `<img src="${compressedUrl}" style="width:100%;height:100%;object-fit:cover;">`;
-    }
+    updateVersusAutoPreviews();
   } catch (err) {
     console.warn('handleVersusMediaSelect error:', err);
   }
@@ -841,8 +895,8 @@ function renderCityVersusDuelStage(p, lang) {
   const total = leftVotes + rightVotes;
   const pA = total > 0 ? Math.round((leftVotes / total) * 100) : 50;
   const pB = total > 0 ? (100 - pA) : 50;
-  const leftSrc = v.leftMedia || generateCityPostVisualDataUrl(cA.id, getCityName(cA, 'en'));
-  const rightSrc = v.rightMedia || generateCityPostVisualDataUrl(cB.id, getCityName(cB, 'en'));
+  const leftSrc = v.leftMedia || resolveCityFallbackArtUrl(cA);
+  const rightSrc = v.rightMedia || resolveCityFallbackArtUrl(cB);
 
   const now = Date.now();
   const endsAt = Number(v.endsAt || (p.createdAt ? p.createdAt + (v.durationHours || 24) * 3600000 : now + 86400000));
@@ -1382,7 +1436,7 @@ function renderSinglePaneMedia(item, cityObj, lang) {
     src = RemoMediaDB.resolveSyncOrPlaceholder(src);
   } else if (!src) {
     if (!item._cachedArt) {
-      item._cachedArt = generateCityPostVisualDataUrl(cityObj.id, item.visualHeadline, item.visualSub);
+      item._cachedArt = resolveCityFallbackArtUrl(cityObj.id, item.visualHeadline, item.visualSub);
     }
     src = item._cachedArt;
   }
@@ -1527,7 +1581,7 @@ function renderPostMediaStage(p, city, lang) {
     if (!curUrl || curUrl.startsWith('idb://')) {
       curUrl = (curKey && (curKey.startsWith('data:') || curKey.startsWith('http')))
         ? curKey
-        : (p._cachedArt || generateCityPostVisualDataUrl(city.id, p.visualHeadline, p.visualSub));
+        : (p._cachedArt || resolveCityFallbackArtUrl(city.id, p.visualHeadline, p.visualSub));
     }
     return `
       <div style="position:relative;width:100%;height:100%;touch-action:pan-y;" ontouchstart="initCarouselTouchSwipe(this, '${escapeJsSingleArg(p.id)}')">
@@ -1563,7 +1617,7 @@ function renderPostMediaStage(p, city, lang) {
   }
   if (!mediaSrc || mediaSrc.startsWith('idb://')) {
     if (!p._cachedArt) {
-      p._cachedArt = generateCityPostVisualDataUrl(city.id, p.visualHeadline, p.visualSub);
+      p._cachedArt = resolveCityFallbackArtUrl(city.id, p.visualHeadline, p.visualSub);
     }
     mediaSrc = p._cachedArt;
   }
@@ -4310,8 +4364,8 @@ function drawViralPostStoryCanvas(postId, animT = 0) {
     const v = post.versus;
     const cA = getCityById(v.leftCityId || 'montreal');
     const cB = getCityById(v.rightCityId || 'paris');
-    const srcA = v.leftMedia || generateCityPostVisualDataUrl(cA.id, getCityName(cA, 'en'));
-    const srcB = v.rightMedia || generateCityPostVisualDataUrl(cB.id, getCityName(cB, 'en'));
+    const srcA = v.leftMedia || resolveCityFallbackArtUrl(cA);
+    const srcB = v.rightMedia || resolveCityFallbackArtUrl(cB);
     window._viralStoryRenderPromise = Promise.all([loadImg(srcA), loadImg(srcB)]).then(([imA, imB]) => {
       window._viralStoryLastImgs = { left: imA, right: imB };
       renderFrame(imA, imB, animT);
@@ -4326,7 +4380,7 @@ function drawViralPostStoryCanvas(postId, animT = 0) {
     if ((!rawSrc || post.mediaType === 'video' || post.mediaType === 'video_link') && domImgEl && domImgEl.src) {
       rawSrc = domImgEl.src;
     }
-    const fallbackArt = generateCityPostVisualDataUrl(city.id, post.visualHeadline || getCityName(city, 'en'), post.visualSub || '');
+    const fallbackArt = resolveCityFallbackArtUrl(city, post.visualHeadline || '', post.visualSub || '');
     const src = rawSrc || fallbackArt;
     window._viralStoryRenderPromise = loadImg(src, readyDomMedia).then((im) => {
       if (im) {
@@ -4354,7 +4408,7 @@ async function exportViralStoryCanvasDataUrl(postId) {
     const { post } = getViralPostShareData(postId);
     if (post && !post.versus) {
       const city = getCityById(post.cityId || 'montreal');
-      const cleanFallbackArt = generateCityPostVisualDataUrl(city.id, post.visualHeadline || getCityName(city, 'en'), post.visualSub || '');
+      const cleanFallbackArt = resolveCityFallbackArtUrl(city, post.visualHeadline || '', post.visualSub || '');
       const dims = getViralStoryDims(window._viralShareFormat);
       const cleanCv = document.createElement('canvas');
       cleanCv.width = dims.W;
@@ -5529,14 +5583,17 @@ function switchCreateStudioTab(tabId) {
     const rightSel = document.getElementById('createVersusRightCity');
     const cities = getRemoCities();
     const lang = REMO_I18N.getLang();
-    if (leftSel && (!leftSel.children || !leftSel.children.length)) {
+    if (leftSel && (!leftSel.children || leftSel.children.length !== cities.length)) {
+      const prevLeft = leftSel.value || 'montreal';
       leftSel.innerHTML = cities.map((c) => `<option value="${c.id}">${c.flag} ${getCityName(c, lang)}</option>`).join('');
-      leftSel.value = 'montreal';
+      leftSel.value = cities.some((c) => c.id === prevLeft) ? prevLeft : 'montreal';
     }
-    if (rightSel && (!rightSel.children || !rightSel.children.length)) {
+    if (rightSel && (!rightSel.children || rightSel.children.length !== cities.length)) {
+      const prevRight = rightSel.value || 'paris';
       rightSel.innerHTML = cities.map((c) => `<option value="${c.id}">${c.flag} ${getCityName(c, lang)}</option>`).join('');
-      rightSel.value = 'paris';
+      rightSel.value = cities.some((c) => c.id === prevRight) ? prevRight : 'paris';
     }
+    updateVersusAutoPreviews();
   }
 }
 
@@ -5560,6 +5617,9 @@ function openCreatePostModal(prefillTag = '') {
   if (vLPrev) { vLPrev.style.display = 'none'; vLPrev.innerHTML = ''; }
   const vRPrev = document.getElementById('versusRightPreview');
   if (vRPrev) { vRPrev.style.display = 'none'; vRPrev.innerHTML = ''; }
+  if (typeof activeCreateStudioTab !== 'undefined' && activeCreateStudioTab === 'versus') {
+    updateVersusAutoPreviews();
+  }
   const fLInp = document.getElementById('createVersusLeftFile');
   if (fLInp) fLInp.value = '';
   const fRInp = document.getElementById('createVersusRightFile');
@@ -6356,8 +6416,8 @@ async function publishNewRemoPost() {
     const durationHours = Math.max(1, Number(document.getElementById('createVersusDuration')?.value || 24));
     const cat = document.getElementById('createVersusCategory')?.value || 'general';
     const now = Date.now();
-    let leftImg = pendingVersusMedia.left || generateCityPostVisualDataUrl(lC, getCityName(getCityById(lC), 'en'));
-    let rightImg = pendingVersusMedia.right || generateCityPostVisualDataUrl(rC, getCityName(getCityById(rC), 'en'));
+    let leftImg = pendingVersusMedia.left || '';
+    let rightImg = pendingVersusMedia.right || '';
     if (typeof compressImageFileToDataUrl === 'function') {
       if (leftImg && leftImg.length > 180000) leftImg = await compressImageFileToDataUrl(leftImg, 960, 0.76);
       if (rightImg && rightImg.length > 180000) rightImg = await compressImageFileToDataUrl(rightImg, 960, 0.76);
@@ -6835,7 +6895,7 @@ function renderStoriesModalStripAndStage(storyId = '') {
 
   const c = getCityById(activeStory.cityId);
   const capTxt = isFr ? (activeStory.caption_fr || activeStory.caption_en) : (activeStory.caption_en || activeStory.caption_fr);
-  const imgSrc = activeStory.mediaUrl || generateCityPostVisualDataUrl(c.id, activeStory.author, capTxt);
+  const imgSrc = activeStory.mediaUrl || resolveCityFallbackArtUrl(c);
   const rx = activeStory.reactions || { '❤️': 1, '🔥': 1, '👑': 0 };
   const u = REMO_STORE.getCurrentUser();
   const isAdm = REMO_STORE.isAdminUnlocked() || REMO_STORE.isCurrentUserAdmin();
@@ -7054,7 +7114,7 @@ async function shareActive24hStory916(storyId) {
 
   drawBackgroundAndFrame();
 
-  const imgSrc = s.mediaUrl || generateCityPostVisualDataUrl(c.id, s.author, capTxt);
+  const imgSrc = s.mediaUrl || resolveCityFallbackArtUrl(c);
   if (imgSrc) {
     await new Promise((resolve) => {
       const img = new Image();
@@ -10706,6 +10766,29 @@ function submitUserNewCity(ev) {
       : `🏛️ ${flag} ${rawName} founded! You are Mayor + Card #0001 + 75 🪙!`,
     'fanfare'
   );
+
+  // Auto-Pilot Media: asynchronously fetch real city photo + local radio stream (zero UI blocking)
+  if (typeof fetchCityPhotoFromWikipedia === 'function' && typeof updateRemoCityMedia === 'function') {
+    fetchCityPhotoFromWikipedia(rawName, rawCountry).then((wikiPhotoUrl) => {
+      if (!wikiPhotoUrl) return;
+      updateRemoCityMedia(newCity.id, { imageUrl: wikiPhotoUrl, cardImageUrl: wikiPhotoUrl });
+      if (founderCard && REMO_STORE.state && Array.isArray(REMO_STORE.state.cards)) {
+        const fc = REMO_STORE.state.cards.find((c) => c && c.id === founderCard.id);
+        if (fc) fc.imageUrl = wikiPhotoUrl;
+      }
+      if (typeof REMO_STORE !== 'undefined' && typeof REMO_STORE.syncToFirestore === 'function') {
+        REMO_STORE.syncToFirestore('city_media_auto', false);
+      }
+      if (currentRemoView === 'radar') initRemoRadarMap();
+      else if (currentRemoView === 'passport') renderPassportView();
+      else if (currentRemoView === 'exchange') renderCityExchangeView();
+      else if (currentRemoView === 'cards' && typeof renderVaultView === 'function') renderVaultView();
+      else renderSocialFeed();
+    }).catch(() => {});
+  }
+  if (window.REMO_RADIO && typeof window.REMO_RADIO.autoDiscoverStationForCity === 'function') {
+    window.REMO_RADIO.autoDiscoverStationForCity(newCity).catch(() => {});
+  }
 }
 
 /* ── #4 & #5: Weather Surge Admin Trigger + Time-Capsule Watch / Unseal / X-Ray ── */
@@ -11514,7 +11597,7 @@ function openPhotoLightboxModal(postId) {
     resolved = rawKey;
   }
   if (!resolved) {
-    resolved = p._cachedArt || (typeof generateCityPostVisualDataUrl === 'function' ? generateCityPostVisualDataUrl(city.id, p.visualHeadline, p.visualSub) : '');
+    resolved = p._cachedArt || resolveCityFallbackArtUrl(city, p.visualHeadline, p.visualSub);
   }
   if (img) img.src = resolved;
   if (title) title.textContent = `${city.flag || '📸'} @${p.authorName} — 4D VIEW`;
@@ -15041,7 +15124,7 @@ function renderViralContestsView() {
           ` : pgpEntries.map((ent, idx) => {
             const c = getCityById(ent.cityId);
             const medal = idx === 0 ? '🥇 1ST' : idx === 1 ? '🥈 2ND' : idx === 2 ? '🥉 3RD' : `#${idx + 1}`;
-            const imgSrc = ent.mediaUrl || generateCityPostVisualDataUrl(c.id, ent.title, ent.authorName);
+            const imgSrc = ent.mediaUrl || resolveCityFallbackArtUrl(c);
             return `
               <div style="background:rgba(15,23,42,0.85);border:1px solid ${idx < 3 ? '#fbbf24' : 'rgba(255,255,255,0.1)'};border-radius:14px;overflow:hidden;display:flex;flex-direction:column;">
                 <div style="position:relative;height:155px;background:#050816;">

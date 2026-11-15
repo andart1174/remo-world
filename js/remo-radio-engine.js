@@ -714,7 +714,12 @@
 
   class RemoRadioEngine {
     constructor() {
-      this.stations = REMO_RADIO_STATIONS;
+      this.stations = [...REMO_RADIO_STATIONS];
+      this._discoveryPromises = Object.create(null);
+      this._discoveredCityIds = new Set();
+      this._pendingAutoCityId = '';
+      this._pendingAutoFallbackStationId = '';
+      this._hydrateDynamicCityStations();
       this.audioEl = new Audio();
       this.audioEl.preload = 'none';
       // IMPORTANT: Never set crossOrigin='anonymous' on live radio <audio> —
@@ -1242,10 +1247,248 @@
       this._updateUI();
     }
 
+    _hydrateDynamicCityStations() {
+      try {
+        const raw = localStorage.getItem('remo_autodiscovered_stations_v1');
+        if (raw) {
+          const cached = JSON.parse(raw);
+          if (Array.isArray(cached)) {
+            cached.forEach((st) => {
+              if (
+                st &&
+                st.id &&
+                st.cityId &&
+                typeof st.streamUrl === 'string' &&
+                /^https:\/\//i.test(st.streamUrl) &&
+                !this.stations.some((x) => x.id === st.id)
+              ) {
+                this.stations.push(st);
+              }
+            });
+          }
+        }
+      } catch (e) {}
+      if (typeof getRemoCities === 'function') {
+        try {
+          getRemoCities().forEach((c) => this.ensureCustomCityStation(c));
+        } catch (e) {}
+      }
+    }
+
+    _saveDiscoveredStationsCache() {
+      try {
+        const dynamic = this.stations
+          .filter((s) => s && typeof s.id === 'string' && s.id.startsWith('auto_') && s.cityId && s.streamUrl)
+          .slice(-80);
+        localStorage.setItem('remo_autodiscovered_stations_v1', JSON.stringify(dynamic));
+      } catch (e) {}
+    }
+
+    ensureCustomCityStation(cityOrId) {
+      const city = (cityOrId && typeof cityOrId === 'object')
+        ? cityOrId
+        : (typeof getCityById === 'function' ? getCityById(cityOrId) : null);
+      if (!city || !city.id) return null;
+      const cid = String(city.id).toLowerCase();
+      const rawUrl = String(city.radioStreamUrl || '').trim();
+      if (!/^https:\/\//i.test(rawUrl)) {
+        const staleIdx = this.stations.findIndex((s) => s.id === `custom_${cid}`);
+        if (staleIdx >= 0) this.stations.splice(staleIdx, 1);
+        return null;
+      }
+
+      const stId = `custom_${cid}`;
+      // Avoid duplicate entry if auto-discovery already loaded this exact stream for this city
+      const dupAuto = this.stations.find((s) => s.cityId === cid && s.id !== stId && s.streamUrl === rawUrl);
+      if (dupAuto) return dupAuto;
+
+      const cityNameEn = city.name_en || cid;
+      const cityNameFr = city.name_fr || cityNameEn;
+      const stationObj = {
+        id: stId,
+        category: 'city',
+        cityId: cid,
+        name: city.radioName || `${cityNameEn} Local FM`,
+        desc_en: `${cityNameEn} · Custom Local Radio`,
+        desc_fr: `${cityNameFr} · Radio locale personnalisée`,
+        icon: city.flag || '📻',
+        flag: city.flag || '📻',
+        country: city.country || '',
+        streamUrl: rawUrl,
+        fallbackUrl: 'https://ice1.somafm.com/groovesalad-128-mp3',
+        badge: city.radioBadge || 'LOCAL FM'
+      };
+      const idx = this.stations.findIndex((s) => s.id === stId);
+      if (idx >= 0) this.stations[idx] = stationObj;
+      else this.stations.push(stationObj);
+      return stationObj;
+    }
+
+    getFallbackVibeStationForCity(cityOrId) {
+      const vibes = this.stations.filter((s) => s.category === 'vibe');
+      if (!vibes.length) return this.stations[0] || null;
+      const city = (cityOrId && typeof cityOrId === 'object')
+        ? cityOrId
+        : (typeof getCityById === 'function' ? getCityById(cityOrId) : null);
+      let hour = new Date().getHours();
+      if (city && typeof getCityLocalTimeInfo === 'function') {
+        try {
+          const tInfo = getCityLocalTimeInfo(city);
+          if (tInfo && typeof tInfo.hour === 'number') hour = tInfo.hour;
+        } catch (e) {}
+      }
+      const isNight = hour < 6 || hour >= 21;
+      const isFocus = hour >= 8 && hour < 17;
+      const match = vibes.find((s) => {
+        const hay = `${s.id} ${s.name} ${s.badge || ''} ${s.desc_en || ''}`.toLowerCase();
+        if (isNight) return /chill|lofi|sleep|ambient|night|groove/.test(hay);
+        if (isFocus) return /focus|chill|groove|jazz|cafe|classic|ambient/.test(hay);
+        return /electro|soul|jazz|house|lounge|chill|groove/.test(hay);
+      });
+      return match || vibes[0];
+    }
+
+    async autoDiscoverStationForCity(cityOrId, forceRefresh = false) {
+      const city = (cityOrId && typeof cityOrId === 'object')
+        ? cityOrId
+        : (typeof getCityById === 'function' ? getCityById(cityOrId) : null);
+      const cid = String((city && city.id) || (typeof cityOrId === 'string' ? cityOrId : '') || '').trim().toLowerCase();
+      if (!cid || !city) return [];
+
+      this.ensureCustomCityStation(city);
+      if (!forceRefresh) {
+        const existing = this.stations.filter((s) => s.cityId === cid);
+        if (existing.length > 0 || this._discoveredCityIds.has(cid)) return existing;
+      }
+      if (this._discoveryPromises[cid]) return this._discoveryPromises[cid];
+
+      const runDiscovery = async () => {
+        if (typeof fetch !== 'function') return [];
+        const cityName = String(city.name_en || city.name_fr || cid).trim();
+        const countryName = String(city.country || '').trim();
+        const hosts = [
+          'https://de1.api.radio-browser.info/json/stations/search',
+          'https://at1.api.radio-browser.info/json/stations/search'
+        ];
+
+        const queryApi = async (params) => {
+          for (let i = 0; i < hosts.length; i++) {
+            let timer = null;
+            try {
+              const ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+              if (ctrl) timer = setTimeout(() => { try { ctrl.abort(); } catch (e) {} }, 5500);
+              const qs = new URLSearchParams(params).toString();
+              const resp = await fetch(`${hosts[i]}?${qs}`, ctrl ? { signal: ctrl.signal } : undefined);
+              if (resp && resp.ok) {
+                const rows = await resp.json();
+                if (Array.isArray(rows)) return rows;
+              }
+            } catch (e) {
+            } finally {
+              if (timer) clearTimeout(timer);
+            }
+          }
+          return [];
+        };
+
+        const isPlayable = (row) => {
+          if (!row || !row.url_resolved) return false;
+          const u = String(row.url_resolved).trim();
+          if (!/^https:\/\//i.test(u)) return false;
+          if (Number(row.hls) === 1) return false;
+          const codec = String(row.codec || 'mp3').toLowerCase();
+          return /mp3|aac|ogg/i.test(codec);
+        };
+
+        let raw = await queryApi({
+          name: cityName,
+          hidebroken: 'true',
+          is_https: 'true',
+          order: 'votes',
+          reverse: 'true',
+          limit: '12'
+        });
+        let filtered = raw.filter(isPlayable);
+
+        if (filtered.length === 0 && countryName && countryName.toLowerCase() !== 'world') {
+          const byCountry = await queryApi({
+            country: countryName,
+            hidebroken: 'true',
+            is_https: 'true',
+            order: 'votes',
+            reverse: 'true',
+            limit: '20'
+          });
+          const cityLower = cityName.toLowerCase();
+          filtered = byCountry.filter(isPlayable).sort((a, b) => {
+            const aHit = `${a.name || ''} ${a.state || ''} ${a.tags || ''}`.toLowerCase().includes(cityLower) ? 1 : 0;
+            const bHit = `${b.name || ''} ${b.state || ''} ${b.tags || ''}`.toLowerCase().includes(cityLower) ? 1 : 0;
+            return bHit - aHit;
+          });
+        }
+
+        const seenUrls = new Set();
+        const picked = [];
+        for (let i = 0; i < filtered.length && picked.length < 2; i++) {
+          const row = filtered[i];
+          const url = String(row.url_resolved).trim();
+          if (seenUrls.has(url)) continue;
+          seenUrls.add(url);
+          const cleanTitle = String(row.name || `${cityName} FM`).trim().slice(0, 42);
+          const tags = String(row.tags || '').split(',').filter(Boolean).slice(0, 2).join(', ');
+          picked.push({
+            id: `auto_${cid}_${picked.length + 1}`,
+            category: 'city',
+            cityId: cid,
+            name: cleanTitle,
+            desc_en: tags ? `${cityName} · ${tags}` : `${cityName} · Live Local FM`,
+            desc_fr: tags ? `${cityName} · ${tags}` : `${cityName} · FM locale en direct`,
+            icon: city.flag || '📻',
+            flag: city.flag || '📻',
+            country: row.country || countryName || '',
+            streamUrl: url,
+            fallbackUrl: 'https://ice1.somafm.com/groovesalad-128-mp3',
+            badge: '🌐 AUTO FM'
+          });
+        }
+
+        this._discoveredCityIds.add(cid);
+        if (picked.length > 0) {
+          this.stations = this.stations.filter((s) => !(s.cityId === cid && String(s.id).startsWith('auto_')));
+          picked.forEach((st) => this.stations.push(st));
+          this._saveDiscoveredStationsCache();
+          if (!city.radioStreamUrl && typeof updateRemoCityMedia === 'function') {
+            updateRemoCityMedia(cid, {
+              radioStreamUrl: picked[0].streamUrl,
+              radioName: picked[0].name,
+              radioBadge: picked[0].badge
+            });
+          }
+          if (typeof window.syncFocusTvUI === 'function') window.syncFocusTvUI();
+          if (document.getElementById('remoRadioModal')?.classList.contains('open')) {
+            renderRadioStationsList();
+          }
+        }
+        return this.stations.filter((s) => s.cityId === cid);
+      };
+
+      this._discoveryPromises[cid] = runDiscovery().finally(() => {
+        delete this._discoveryPromises[cid];
+      });
+      return this._discoveryPromises[cid];
+    }
+
     getStationsForCity(cityId) {
       if (!cityId) return [];
       const cid = String(cityId).toLowerCase();
-      return this.stations.filter((s) => s.cityId === cid);
+      this.ensureCustomCityStation(cid);
+      return this.stations
+        .filter((s) => s.cityId === cid)
+        .sort((a, b) => {
+          const ac = String(a.id || '').startsWith('custom_') ? 0 : 1;
+          const bc = String(b.id || '').startsWith('custom_') ? 0 : 1;
+          return ac - bc;
+        });
     }
 
     cycleCityStation(cityId, forcePlay = true) {
@@ -1259,12 +1502,38 @@
 
     tuneToCity(cityId, forcePlay = false) {
       if (!cityId) return false;
-      const match = this.stations.find((s) => s.cityId === cityId);
+      const cid = String(cityId).toLowerCase();
+      const localList = this.getStationsForCity(cid);
+      const match = localList[0];
       if (match) {
+        this._pendingAutoCityId = '';
+        this._pendingAutoFallbackStationId = '';
         this.selectStation(match.id, forcePlay ? true : this.isPlaying);
         return true;
       }
-      return false;
+
+      // New/custom city without local station yet: play time-matched Vibe immediately while discovering local FM
+      const vibeFallback = this.getFallbackVibeStationForCity(cid);
+      this._pendingAutoCityId = cid;
+      if (vibeFallback) {
+        this._pendingAutoFallbackStationId = vibeFallback.id;
+        this.selectStation(vibeFallback.id, forcePlay ? true : this.isPlaying);
+      }
+      this.autoDiscoverStationForCity(cid).then((discovered) => {
+        if (
+          discovered &&
+          discovered.length &&
+          this._pendingAutoCityId === cid &&
+          (!this._pendingAutoFallbackStationId || (this.currentStation && this.currentStation.id === this._pendingAutoFallbackStationId))
+        ) {
+          this._pendingAutoCityId = '';
+          this._pendingAutoFallbackStationId = '';
+          this.selectStation(discovered[0].id, this.isPlaying);
+        }
+        if (typeof window.syncFocusTvUI === 'function') window.syncFocusTvUI();
+      }).catch(() => {});
+
+      return Boolean(vibeFallback);
     }
 
     _updateUI() {

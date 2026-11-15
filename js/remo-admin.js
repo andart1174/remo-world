@@ -565,13 +565,19 @@ function renderAdminCitiesPanel() {
     tbody.innerHTML = cities.map((c) => {
       const pts = REMO_STORE.state.cityScores[c.id] || 1000;
       const wx = typeof REMO_WEATHER !== 'undefined' ? REMO_WEATHER.getCityLiveStatus(c) : null;
+      const photoUrl = typeof resolveCityRealPhotoUrl === 'function' ? resolveCityRealPhotoUrl(c) : '';
+      const hasCustomRadio = Boolean(c.radioStreamUrl && /^https:\/\//i.test(c.radioStreamUrl));
+      const thumbHtml = photoUrl
+        ? `<img src="${photoUrl.replace(/"/g, '&quot;')}" alt="${c.id}" style="width:30px;height:21px;object-fit:cover;border-radius:4px;border:1px solid rgba(255,255,255,0.22);vertical-align:middle;margin-right:6px;">`
+        : '';
       return `
         <tr>
           <td>
-            <b>${c.flag} ${getCityName(c, lang)}</b> <span style="color:var(--muted);">(${c.code})</span>
+            ${thumbHtml}<b>${c.flag} ${getCityName(c, lang)}</b> <span style="color:var(--muted);">(${c.code})</span>
             ${wx ? `<span style="color:#7dd3fc;font-size:0.74rem;font-weight:800;"> · 🕒 ${wx.timeStr} ${wx.icon} ${wx.tempC}°C</span>` : ''}
             ${wx && wx.isSurge ? `<span style="background:rgba(245,158,11,0.25);color:#fde047;padding:2px 6px;border-radius:99px;font-size:0.68rem;font-weight:900;">⚡ 2X SURGE</span>` : ''}
             ${c.foundedBy ? `<span style="background:rgba(16,185,129,0.2);color:#34d399;padding:2px 6px;border-radius:99px;font-size:0.68rem;font-weight:900;">🌱 @${c.foundedBy}</span>` : ''}
+            ${hasCustomRadio ? `<span style="background:rgba(56,189,248,0.18);color:#7dd3fc;padding:2px 6px;border-radius:99px;font-size:0.66rem;font-weight:800;">📻 FM</span>` : ''}
           </td>
           <td>${getCityCountry(c, lang)}</td>
           <td><code>${c.lat.toFixed(2)}, ${c.lng.toFixed(2)}</code></td>
@@ -580,6 +586,8 @@ function renderAdminCitiesPanel() {
             <button class="adm-btn ${wx && wx.isSurge ? 'emerald' : 'outline'}" style="padding:5px 10px;" onclick="adminToggleCityWeatherSurge('${c.id}')">${wx && wx.isSurge ? '⛈️ 2X ON' : '⛈️ 2X Surge'}</button>
             <button class="adm-btn outline" style="padding:5px 10px;" onclick="adminBoostCityPoints('${c.id}', 250)">+250 PTS</button>
             <button class="adm-btn gold" style="padding:5px 10px;" onclick="jumpStudioToCity('${c.id}')">🎴 Mint Card</button>
+            <button class="adm-btn outline" style="padding:5px 10px;" onclick="adminEditCityMediaPrompt('${c.id}')">🖼️ Media</button>
+            <button class="adm-btn outline" style="padding:5px 10px;" onclick="adminAutoDiscoverCityMedia('${c.id}')">🌐 Auto</button>
             ${c.communityAdded ? `<button class="adm-btn rose" style="padding:5px 10px;" onclick="adminDeleteCity('${c.id}')">🗑️</button>` : ''}
           </td>
         </tr>
@@ -672,6 +680,126 @@ function adminDropFounderGeoVault() {
   }
 }
 
+async function _adminDiscoverRadioStreamForCity(city) {
+  if (!city || typeof fetch !== 'function') return null;
+  const cityName = String(city.name_en || city.name_fr || city.id || '').trim();
+  if (!cityName) return null;
+  try {
+    const qs = new URLSearchParams({
+      name: cityName,
+      hidebroken: 'true',
+      is_https: 'true',
+      order: 'votes',
+      reverse: 'true',
+      limit: '10'
+    }).toString();
+    const resp = await fetch(`https://de1.api.radio-browser.info/json/stations/search?${qs}`);
+    if (!resp || !resp.ok) return null;
+    const rows = await resp.json();
+    if (!Array.isArray(rows)) return null;
+    const match = rows.find((r) => {
+      if (!r || !r.url_resolved) return false;
+      const u = String(r.url_resolved).trim();
+      return /^https:\/\//i.test(u) && Number(r.hls) !== 1 && /mp3|aac|ogg/i.test(String(r.codec || 'mp3'));
+    });
+    if (!match) return null;
+    return {
+      radioStreamUrl: String(match.url_resolved).trim(),
+      radioName: String(match.name || `${cityName} FM`).trim().slice(0, 42),
+      radioBadge: '🌐 AUTO FM'
+    };
+  } catch (e) {
+    return null;
+  }
+}
+
+async function adminAutoDiscoverCityMedia(cityId, silent = false) {
+  const lang = REMO_I18N.getLang();
+  const c = getCityById(cityId);
+  if (!c || typeof updateRemoCityMedia !== 'function') return false;
+  const patch = {};
+  if (typeof fetchCityPhotoFromWikipedia === 'function') {
+    const photoUrl = await fetchCityPhotoFromWikipedia(c.name_en, getCityCountry(c, 'en'));
+    if (photoUrl) {
+      patch.imageUrl = photoUrl;
+      patch.cardImageUrl = photoUrl;
+    }
+  }
+  const radioMeta = await _adminDiscoverRadioStreamForCity(c);
+  if (radioMeta && radioMeta.radioStreamUrl) {
+    patch.radioStreamUrl = radioMeta.radioStreamUrl;
+    patch.radioName = radioMeta.radioName;
+    patch.radioBadge = radioMeta.radioBadge;
+  }
+  if (!Object.keys(patch).length) {
+    if (!silent) {
+      admToast(lang === 'fr'
+        ? `ℹ️ Aucun média auto trouvé pour ${getCityName(c, lang)} (vous pouvez saisir une URL via 🖼️ Media).`
+        : `ℹ️ No auto media found for ${getCityName(c, lang)} (you can set URLs via 🖼️ Media).`);
+    }
+    return false;
+  }
+  updateRemoCityMedia(c.id, patch);
+  REMO_STORE.syncToFirestore('admin_city_media', true);
+  renderAdminCitiesPanel();
+  if (!silent) {
+    const parts = [];
+    if (patch.imageUrl) parts.push('📸 Photo');
+    if (patch.radioStreamUrl) parts.push(`📻 ${patch.radioName}`);
+    admToast(lang === 'fr'
+      ? `✅ ${getCityName(c, lang)} mis à jour : ${parts.join(' + ')}`
+      : `✅ ${getCityName(c, lang)} updated: ${parts.join(' + ')}`);
+  }
+  return true;
+}
+
+function adminEditCityMediaPrompt(cityId) {
+  const lang = REMO_I18N.getLang();
+  const c = getCityById(cityId);
+  if (!c || typeof updateRemoCityMedia !== 'function') return;
+  const curImg = c.cardImageUrl || c.imageUrl || '';
+  const curRadio = c.radioStreamUrl || '';
+
+  const imgInput = window.prompt(
+    lang === 'fr'
+      ? `URL photo HTTPS pour ${getCityName(c, lang)} (laisser vide pour réinitialiser) :`
+      : `HTTPS Photo URL for ${getCityName(c, lang)} (leave blank to reset):`,
+    curImg
+  );
+  if (imgInput === null) return;
+  const cleanImg = String(imgInput || '').trim();
+  if (cleanImg && !/^(https:\/\/|(\.\.?\/)?img\/)/i.test(cleanImg)) {
+    admToast(lang === 'fr' ? '⚠️ URL photo invalide (HTTPS requis).' : '⚠️ Invalid photo URL (HTTPS required).');
+    return;
+  }
+
+  const radioInput = window.prompt(
+    lang === 'fr'
+      ? `URL flux radio HTTPS (MP3/AAC) pour ${getCityName(c, lang)} (laisser vide pour défaut) :`
+      : `HTTPS Radio Stream URL (MP3/AAC) for ${getCityName(c, lang)} (leave blank for default):`,
+    curRadio
+  );
+  if (radioInput === null) return;
+  const cleanRadio = String(radioInput || '').trim();
+  if (cleanRadio && !/^https:\/\//i.test(cleanRadio)) {
+    admToast(lang === 'fr' ? '⚠️ URL radio invalide (HTTPS requis).' : '⚠️ Invalid radio stream URL (HTTPS required).');
+    return;
+  }
+
+  updateRemoCityMedia(c.id, {
+    imageUrl: cleanImg,
+    cardImageUrl: cleanImg,
+    radioStreamUrl: cleanRadio,
+    radioName: cleanRadio ? `${c.name_en || c.id} Local FM` : '',
+    radioBadge: cleanRadio ? 'LOCAL FM' : ''
+  });
+  REMO_STORE.syncToFirestore('admin_city_media', true);
+  renderAdminCitiesPanel();
+  admToast(lang === 'fr'
+    ? `✅ Médias enregistrés pour ${getCityName(c, lang)} !`
+    : `✅ Media saved for ${getCityName(c, lang)}!`);
+}
+
 function adminAddNewCity(ev) {
   if (ev) ev.preventDefault();
   const lang = REMO_I18N.getLang();
@@ -683,11 +811,15 @@ function adminAddNewCity(ev) {
   const lat = Number(document.getElementById('newCityLat')?.value || 45.0);
   const lng = Number(document.getElementById('newCityLng')?.value || 0.0);
   const color = document.getElementById('newCityColor')?.value || '#38bdf8';
+  const rawImageUrl = (document.getElementById('newCityImageUrl')?.value || '').trim();
+  const rawRadioUrl = (document.getElementById('newCityRadioUrl')?.value || '').trim();
 
   if (!nameEn) return;
+  const safeImg = /^https:\/\//i.test(rawImageUrl) ? rawImageUrl : '';
+  const safeRadio = /^https:\/\//i.test(rawRadioUrl) ? rawRadioUrl : '';
   const id = nameEn.toLowerCase().replace(/[^a-z0-9]/g, '') + '_' + Date.now().toString(36).slice(-3);
   const cities = getRemoCities();
-  cities.push({
+  const newCityObj = {
     id, code, flag, continent: 'World',
     name_en: nameEn, name_fr: nameFr,
     country_en: country, country_fr: country,
@@ -698,12 +830,51 @@ function adminAddNewCity(ev) {
     lat, lng, themeColor: color, themeId: 0,
     element: 'neon', rarity: 'Legendary Gold', baseValue: 8800,
     stats: { culture: 90, nightlife: 90, tech: 90, gastronomy: 90 }
-  });
+  };
+  if (safeImg) {
+    newCityObj.imageUrl = safeImg;
+    newCityObj.cardImageUrl = safeImg;
+  }
+  if (safeRadio) {
+    newCityObj.radioStreamUrl = safeRadio;
+    newCityObj.radioName = `${nameEn} Local FM`;
+    newCityObj.radioBadge = 'LOCAL FM';
+  }
+  cities.push(newCityObj);
   saveRemoCities(cities);
+  if (document.getElementById('newCityImageUrl')) document.getElementById('newCityImageUrl').value = '';
+  if (document.getElementById('newCityRadioUrl')) document.getElementById('newCityRadioUrl').value = '';
   REMO_STORE.state.cityScores[id] = 1500;
   REMO_STORE.save(true, 'city_added');
   refreshAllAdminPanels();
   admToast(lang === 'fr' ? `🌍 Ville ${flag} ${nameFr} ajoutée à REMO !` : `🌍 City ${flag} ${nameEn} added to REMO!`);
+
+  // Auto-discover photo / radio if Admin left either URL blank
+  if (!safeImg || !safeRadio) {
+    Promise.resolve().then(async () => {
+      const autoPatch = {};
+      if (!safeImg && typeof fetchCityPhotoFromWikipedia === 'function') {
+        const wUrl = await fetchCityPhotoFromWikipedia(nameEn, country);
+        if (wUrl) {
+          autoPatch.imageUrl = wUrl;
+          autoPatch.cardImageUrl = wUrl;
+        }
+      }
+      if (!safeRadio) {
+        const rMeta = await _adminDiscoverRadioStreamForCity(newCityObj);
+        if (rMeta && rMeta.radioStreamUrl) {
+          autoPatch.radioStreamUrl = rMeta.radioStreamUrl;
+          autoPatch.radioName = rMeta.radioName;
+          autoPatch.radioBadge = rMeta.radioBadge;
+        }
+      }
+      if (Object.keys(autoPatch).length && typeof updateRemoCityMedia === 'function') {
+        updateRemoCityMedia(id, autoPatch);
+        REMO_STORE.syncToFirestore('admin_city_media', true);
+        renderAdminCitiesPanel();
+      }
+    }).catch(() => {});
+  }
 }
 
 /* ── 5. CITY WARS & DAILY PULSE CONTROLLER ── */
@@ -1739,6 +1910,8 @@ window.adminAddVipStoreItemFromOffice = adminAddVipStoreItemFromOffice;
 window.adminRemoveVipShopItem = adminRemoveVipShopItem;
 window.adminDeliverVipOrder = adminDeliverVipOrder;
 window.adminDeleteCity = adminDeleteCity;
+window.adminEditCityMediaPrompt = adminEditCityMediaPrompt;
+window.adminAutoDiscoverCityMedia = adminAutoDiscoverCityMedia;
 window.adminToggleCityWeatherSurge = adminToggleCityWeatherSurge;
 window.adminUnsealCapsuleFromOffice = adminUnsealCapsuleFromOffice;
 window.adminOnAlloySelectChange = adminOnAlloySelectChange;
