@@ -719,15 +719,34 @@ async function uploadMediaToCloudOrDataUrl(blobOrFile, folder = 'posts') {
   if (typeof firebase !== 'undefined' && firebase.storage) {
     try {
       const storage = firebase.storage();
-      const isMp4 = blobOrFile.type && blobOrFile.type.includes('mp4');
-      const ext = isMp4 ? 'mp4' : 'webm';
-      const mime = blobOrFile.type || (isMp4 ? 'video/mp4' : 'video/webm');
+      const rawMime = String(blobOrFile.type || '').toLowerCase();
+      const rawName = String(blobOrFile.name || '').toLowerCase();
+      let ext = 'webm';
+      let mime = rawMime || 'video/webm';
+      if (rawMime.includes('mpeg') || rawMime.includes('mp3') || rawName.endsWith('.mp3')) {
+        ext = 'mp3';
+        mime = rawMime || 'audio/mpeg';
+      } else if (rawMime.includes('wav') || rawName.endsWith('.wav')) {
+        ext = 'wav';
+        mime = rawMime || 'audio/wav';
+      } else if (rawMime.includes('ogg') || rawName.endsWith('.ogg')) {
+        ext = 'ogg';
+        mime = rawMime || 'audio/ogg';
+      } else if (rawMime.includes('m4a') || rawMime.includes('aac') || rawName.endsWith('.m4a')) {
+        ext = 'm4a';
+        mime = rawMime || 'audio/mp4';
+      } else if (rawMime.includes('mp4') || rawName.endsWith('.mp4')) {
+        ext = 'mp4';
+        mime = rawMime || 'video/mp4';
+      } else if (rawMime.startsWith('audio/')) {
+        ext = 'audio';
+      }
       const ref = storage.ref().child(`remo_${folder}/${Date.now()}_${Math.random().toString(36).slice(2, 7)}.${ext}`);
       const snap = await ref.put(blobOrFile, { contentType: mime });
       const downloadUrl = await snap.ref.getDownloadURL();
       if (downloadUrl) return downloadUrl;
     } catch (e) {
-      console.warn('Firebase storage video upload notice:', e);
+      console.warn('Firebase storage media upload notice:', e);
     }
   }
 
@@ -1437,6 +1456,7 @@ function getDefaultViralContests() {
       active: false,
       status: 'idle',
       imageUrl: '',
+      blurImage: false,
       clue_en: '',
       clue_fr: '',
       correctCityId: 'paris',
@@ -1445,6 +1465,7 @@ function getDefaultViralContests() {
       endsAt: 0,
       attempts: {},
       winners: [],
+      launchedAt: 0,
       updatedAt: 0
     },
     goldenRaffle: {
@@ -1457,6 +1478,7 @@ function getDefaultViralContests() {
       endsAt: 0,
       tickets: [],
       winningTickets: [],
+      launchedAt: 0,
       updatedAt: 0
     },
     flashHunt: {
@@ -1467,8 +1489,10 @@ function getDefaultViralContests() {
       targetCityId: 'montreal',
       rewardCoins: 300,
       maxClaims: 20,
+      endsAt: 0,
       claims: [],
       attempts: {},
+      launchedAt: 0,
       updatedAt: 0
     }
   };
@@ -5072,9 +5096,7 @@ const REMO_STORE = {
             const cObj = data.viralContests[k];
             if (cObj && typeof cObj === 'object') {
               const localObj = this.state.viralContests[k] || {};
-              if (Number(cObj.updatedAt || 0) >= Number(localObj.updatedAt || 0)) {
-                this.state.viralContests[k] = Object.assign({}, localObj, cObj);
-              }
+              this.state.viralContests[k] = this._mergeCollaborativeStateObject(localObj, cObj, k);
             }
           });
           if (typeof renderViralContestsView === 'function') renderViralContestsView();
@@ -5124,9 +5146,7 @@ const REMO_STORE = {
             const sObj = data.worldSystems[k];
             if (sObj && typeof sObj === 'object') {
               const localObj = this.state.worldSystems[k] || {};
-              if (Number(sObj.updatedAt || 0) >= Number(localObj.updatedAt || 0)) {
-                this.state.worldSystems[k] = Object.assign({}, localObj, sObj);
-              }
+              this.state.worldSystems[k] = this._mergeCollaborativeStateObject(localObj, sObj, k);
             }
           });
           if (typeof renderViralContestsView === 'function') renderViralContestsView();
@@ -5703,6 +5723,178 @@ const REMO_STORE = {
     return this.state.viralContests;
   },
 
+  _mergeCollaborativeStateObject(localObj = {}, cloudObj = {}, key = '') {
+    const localTs = Number(localObj.updatedAt || 0);
+    const cloudTs = Number(cloudObj.updatedAt || 0);
+    const cloudNewer = cloudTs >= localTs;
+    const localLaunch = Number(localObj.launchedAt || 0);
+    const cloudLaunch = Number(cloudObj.launchedAt || 0);
+
+    // Respect explicit Admin Stop/Reset or launch of a brand-new edition
+    if (cloudNewer && (cloudLaunch > localLaunch || (cloudObj.active === false && (cloudObj.status === 'idle' || !cloudObj.status)))) {
+      return Object.assign({}, cloudObj);
+    }
+    if (!cloudNewer && (localLaunch > cloudLaunch || (localObj.active === false && (localObj.status === 'idle' || !localObj.status)))) {
+      return Object.assign({}, localObj);
+    }
+
+    const base = cloudNewer ? Object.assign({}, localObj, cloudObj) : Object.assign({}, cloudObj, localObj);
+    if (key === 'worldCupBracket') {
+      const rank = { idle: 0, qf: 1, sf: 2, final: 3, champion: 4 };
+      const lr = rank[localObj.round || 'idle'] || 0;
+      const cr = rank[cloudObj.round || 'idle'] || 0;
+      if (cr > lr) {
+        base.round = cloudObj.round;
+        base.status = cloudObj.status;
+        base.championCityId = cloudObj.championCityId || base.championCityId;
+      } else if (lr > cr) {
+        base.round = localObj.round;
+        base.status = localObj.status;
+        base.championCityId = localObj.championCityId || base.championCityId;
+      }
+    }
+
+    const deletedSet = new Set([
+      ...(Array.isArray(localObj.deletedEntryIds) ? localObj.deletedEntryIds : []),
+      ...(Array.isArray(cloudObj.deletedEntryIds) ? cloudObj.deletedEntryIds : [])
+    ]);
+    if (deletedSet.size > 0) base.deletedEntryIds = Array.from(deletedSet);
+
+    ['voters', 'attempts', 'participants', 'contributors', 'pixels', 'cityDecrees'].forEach((mKey) => {
+      if ((localObj[mKey] && typeof localObj[mKey] === 'object') || (cloudObj[mKey] && typeof cloudObj[mKey] === 'object')) {
+        base[mKey] = Object.assign({}, localObj[mKey] || {}, cloudObj[mKey] || {});
+      }
+    });
+
+    if (key === 'mayorElections') {
+      const candOut = {};
+      const lc = localObj.candidates || {};
+      const cc = cloudObj.candidates || {};
+      const cityKeys = new Set([...Object.keys(lc), ...Object.keys(cc)]);
+      cityKeys.forEach((cid) => {
+        const mergedMap = new Map();
+        [...(Array.isArray(lc[cid]) ? lc[cid] : []), ...(Array.isArray(cc[cid]) ? cc[cid] : [])].forEach((c) => {
+          if (!c || !c.uid) return;
+          const prev = mergedMap.get(c.uid);
+          if (!prev) mergedMap.set(c.uid, Object.assign({}, c));
+          else {
+            mergedMap.set(c.uid, Object.assign({}, prev, c, {
+              votes: Math.max(Number(prev.votes || 0), Number(c.votes || 0))
+            }));
+          }
+        });
+        candOut[cid] = Array.from(mergedMap.values());
+      });
+      base.candidates = candOut;
+    }
+
+    if (key === 'torchRelay') {
+      const vcSet = new Set([
+        ...(Array.isArray(localObj.visitedCities) ? localObj.visitedCities : []),
+        ...(Array.isArray(cloudObj.visitedCities) ? cloudObj.visitedCities : [])
+      ]);
+      if (vcSet.size > 0) base.visitedCities = Array.from(vcSet);
+      base.totalKm = Math.max(Number(localObj.totalKm || 0), Number(cloudObj.totalKm || 0));
+    }
+
+    ['entries', 'tickets', 'winners', 'claims', 'moments', 'capsules', 'holdersHistory', 'treaties', 'stocks', 'matches'].forEach((aKey) => {
+      const la = Array.isArray(localObj[aKey]) ? localObj[aKey] : null;
+      const ca = Array.isArray(cloudObj[aKey]) ? cloudObj[aKey] : null;
+      if (!la && !ca) return;
+      const map = new Map();
+      const getId = (it) => (it && (it.id || it.code || it.creatorUid || it.uid || (it.ts ? String(it.ts) + '_' + (it.cityId || '') : ''))) || '';
+      const addList = (arr, isCloud) => {
+        (arr || []).forEach((it) => {
+          const id = getId(it);
+          if (!id || deletedSet.has(id)) return;
+          const prev = map.get(id);
+          if (!prev) {
+            map.set(id, Object.assign({}, it));
+          } else {
+            const next = (isCloud && cloudNewer) || (!isCloud && !cloudNewer)
+              ? Object.assign({}, prev, it)
+              : Object.assign({}, it, prev);
+            ['points', 'votesCount', 'votes', 'votesA', 'votesB', 'wavesCount', 'dividendsPaidCount'].forEach((nKey) => {
+              if (prev[nKey] !== undefined || it[nKey] !== undefined) {
+                next[nKey] = Math.max(Number(prev[nKey] || 0), Number(it[nKey] || 0));
+              }
+            });
+            ['voters', 'wavedBy', 'shareholders'].forEach((nmKey) => {
+              if (prev[nmKey] || it[nmKey]) {
+                next[nmKey] = Object.assign({}, prev[nmKey] || {}, it[nmKey] || {});
+              }
+            });
+            if (prev.winner || it.winner) next.winner = it.winner || prev.winner;
+            map.set(id, next);
+          }
+        });
+      };
+      addList(la, false);
+      addList(ca, true);
+      base[aKey] = Array.from(map.values());
+    });
+
+    base.updatedAt = Math.max(localTs, cloudTs);
+    return base;
+  },
+
+  _resolveSafeCoinTargetUid(candidateUid) {
+    if (candidateUid && (this.state.users || []).some((x) => x && x.uid === candidateUid)) {
+      return candidateUid;
+    }
+    const cur = this.getCurrentUser();
+    if (cur && cur.uid && cur.role !== 'guest') return cur.uid;
+    const adm = (this.state.users || []).find((x) => x && (x.role === 'admin' || x.uid === 'u_admin_founder'));
+    return adm ? adm.uid : '';
+  },
+
+  adminPublishContestPromoPost(opts = {}) {
+    const cur = this.getCurrentUser();
+    const adm = (this.state.users || []).find((x) => x && x.role === 'admin') || cur || {
+      uid: 'u_admin_founder',
+      name: 'REMO Founder',
+      avatarUrl: '',
+      passportNum: 'REMO-FOUNDER'
+    };
+    const key = String(opts.contestKey || 'eurovision').trim();
+    const enTitle = String(opts.title_en || 'Official REMO Global Event is LIVE!').trim();
+    const frTitle = String(opts.title_fr || 'Événement Mondial Officiel REMO EN DIRECT !').trim();
+    const deepLink = `?view=contests&contest=${encodeURIComponent(key)}`;
+    const captionEn = `🏆 ${enTitle}\n${opts.subtitle_en || 'Join now, participate & win REMO Coins!'}\n👉 remoworld.com/${deepLink}`;
+    const captionFr = `🏆 ${frTitle}\n${opts.subtitle_fr || 'Participez maintenant et gagnez des Pièces REMO !'}\n👉 remoworld.com/${deepLink}`;
+    const newPost = {
+      id: 'post_contest_' + key + '_' + Date.now(),
+      uid: adm.uid,
+      authorUid: adm.uid,
+      authorName: adm.name || 'REMO Founder',
+      authorAvatar: adm.avatarUrl || '',
+      authorVerified: true,
+      authorPassport: adm.passportNum || 'REMO-FOUNDER',
+      cityId: opts.cityId || 'montreal',
+      vibe: 'contest',
+      caption_en: captionEn,
+      caption_fr: captionFr,
+      mediaType: opts.mediaUrl ? 'image' : 'text_card',
+      mediaUrl: opts.mediaUrl || '',
+      textCard: opts.mediaUrl ? null : {
+        headline: enTitle.slice(0, 65),
+        subline: 'REMO Contests Live · Open Now',
+        theme: 'gold'
+      },
+      contestPromoKey: key,
+      contestDeepLink: deepLink,
+      likes: [],
+      comments: [],
+      reactions: {},
+      createdAt: Date.now()
+    };
+    this.state.posts = Array.isArray(this.state.posts) ? this.state.posts : [];
+    this.state.posts.unshift(newPost);
+    if (typeof this.syncPostToCloud === 'function') this.syncPostToCloud(newPost);
+    this.save(true, 'contest_promo_post');
+    return newPost;
+  },
+
   _notifyContestUpdate(reason = 'viral_contest_update') {
     this.save(true, reason);
     this.syncToFirestore(reason, true);
@@ -5720,20 +5912,32 @@ const REMO_STORE = {
     const vc = this.ensureViralContests();
     const hours = Math.max(1, Number(opts.durationHours || 48));
     const prevEntries = opts.keepEntries && Array.isArray(vc.eurovision.entries) ? vc.eurovision.entries : [];
+    const now = Date.now();
     vc.eurovision = {
       active: true,
       status: 'open',
       title_en: (opts.title_en || 'REMO Music Contest — 60s City Sounds & Anthems').trim(),
       title_fr: (opts.title_fr || 'REMO Concours Musical — Sons & Hymnes 60s des Villes').trim(),
       prizeCoins: Math.max(100, Number(opts.prizeCoins || 5000)),
-      endsAt: Date.now() + hours * 3600000,
+      endsAt: now + hours * 3600000,
       allowCitizenSubmissions: opts.allowCitizenSubmissions !== false,
       noSelfCityVote: opts.noSelfCityVote !== false,
       entries: prevEntries,
       voters: opts.keepEntries ? (vc.eurovision.voters || {}) : {},
+      deletedEntryIds: opts.keepEntries ? (vc.eurovision.deletedEntryIds || []) : [],
       winnerEntryId: '',
-      updatedAt: Date.now()
+      launchedAt: now,
+      updatedAt: now
     };
+    if (opts.announceInFeed) {
+      this.adminPublishContestPromoPost({
+        contestKey: 'eurovision',
+        title_en: vc.eurovision.title_en,
+        title_fr: vc.eurovision.title_fr,
+        subtitle_en: `Grand Prize: +${vc.eurovision.prizeCoins} REMO Coins! Submit a 60s track & vote for the winning city.`,
+        subtitle_fr: `Grand Prix : +${vc.eurovision.prizeCoins} Pièces REMO ! Envoyez votre son 60s et votez.`
+      });
+    }
     this._notifyContestUpdate('eurovision_launched');
     return vc.eurovision;
   },
@@ -5743,8 +5947,8 @@ const REMO_STORE = {
     const ev = vc.eurovision;
     const u = this.getCurrentUser();
     const isAdm = this.isCurrentUserAdmin() || this.isAdminUnlocked();
-    if (!isAdm && (!ev.active || ev.status !== 'open')) {
-      return { ok: false, error: 'inactive' };
+    if (!isAdm && (!ev.active || ev.status !== 'open' || (ev.endsAt && Date.now() > ev.endsAt))) {
+      return { ok: false, error: (ev.endsAt && Date.now() > ev.endsAt) ? 'ended' : 'inactive' };
     }
     if (!isAdm && !ev.allowCitizenSubmissions) {
       return { ok: false, error: 'submissions_closed' };
@@ -5753,7 +5957,7 @@ const REMO_STORE = {
       return { ok: false, error: 'auth_required' };
     }
     ev.entries = Array.isArray(ev.entries) ? ev.entries : [];
-    const submitterUid = u ? u.uid : 'u_admin_founder';
+    const submitterUid = u ? u.uid : (this._resolveSafeCoinTargetUid('') || 'u_admin_founder');
     const submitterName = (entryData.artistName || (u && u.name) || 'REMO Creator').trim();
     if (!isAdm && ev.entries.some((e) => e && e.uid === submitterUid)) {
       return { ok: false, error: 'already_submitted' };
@@ -5786,6 +5990,8 @@ const REMO_STORE = {
     const vc = this.ensureViralContests();
     if (!vc.eurovision || !Array.isArray(vc.eurovision.entries)) return;
     vc.eurovision.entries = vc.eurovision.entries.filter((e) => e && e.id !== entryId);
+    vc.eurovision.deletedEntryIds = Array.isArray(vc.eurovision.deletedEntryIds) ? vc.eurovision.deletedEntryIds : [];
+    if (entryId && !vc.eurovision.deletedEntryIds.includes(entryId)) vc.eurovision.deletedEntryIds.push(entryId);
     vc.eurovision.updatedAt = Date.now();
     this._notifyContestUpdate('eurovision_entry_deleted');
   },
@@ -5823,14 +6029,19 @@ const REMO_STORE = {
     if (!ev || !Array.isArray(ev.entries) || ev.entries.length === 0) {
       return { ok: false, error: 'no_entries' };
     }
+    if (ev.status === 'concluded') {
+      const prevWin = ev.entries.find((e) => e && e.id === ev.winnerEntryId) || ev.entries[0];
+      return { ok: false, error: 'already_concluded', winner: prevWin };
+    }
     const sorted = ev.entries.slice().sort((a, b) => Number(b.points || 0) - Number(a.points || 0));
     const winner = sorted[0];
     ev.status = 'concluded';
     ev.winnerEntryId = winner.id;
     ev.updatedAt = Date.now();
     const prize = Number(ev.prizeCoins || 5000);
-    if (winner.uid) {
-      this.creditSystemCoins(winner.uid, prize, '', 50000);
+    const payUid = this._resolveSafeCoinTargetUid(winner.uid);
+    if (payUid) {
+      this.creditSystemCoins(payUid, prize, `🎤 REMO Music Contest 1st Prize: ${winner.songTitle}`, 50000);
     }
     this.addCityScore(winner.cityId, 500);
     this._notifyContestUpdate('eurovision_concluded');
@@ -5839,7 +6050,7 @@ const REMO_STORE = {
 
   adminStopEurovision() {
     const vc = this.ensureViralContests();
-    vc.eurovision = Object.assign(getDefaultViralContests().eurovision, { updatedAt: Date.now() });
+    vc.eurovision = Object.assign(getDefaultViralContests().eurovision, { launchedAt: 0, updatedAt: Date.now() });
     this._notifyContestUpdate('eurovision_stopped');
   },
 
@@ -5848,6 +6059,7 @@ const REMO_STORE = {
     const vc = this.ensureViralContests();
     const hours = Math.max(1, Number(opts.durationHours || 48));
     const prevEntries = opts.keepEntries && Array.isArray(vc.photoGrandPrix.entries) ? vc.photoGrandPrix.entries : [];
+    const now = Date.now();
     vc.photoGrandPrix = {
       active: true,
       status: 'open',
@@ -5856,12 +6068,23 @@ const REMO_STORE = {
       prize1st: Math.max(100, Number(opts.prize1st || 3000)),
       prize2nd: Math.max(50, Number(opts.prize2nd || 1500)),
       prize3rd: Math.max(25, Number(opts.prize3rd || 750)),
-      endsAt: Date.now() + hours * 3600000,
+      endsAt: now + hours * 3600000,
       entries: prevEntries,
       voters: opts.keepEntries ? (vc.photoGrandPrix.voters || {}) : {},
+      deletedEntryIds: opts.keepEntries ? (vc.photoGrandPrix.deletedEntryIds || []) : [],
       winnersAwarded: false,
-      updatedAt: Date.now()
+      launchedAt: now,
+      updatedAt: now
     };
+    if (opts.announceInFeed) {
+      this.adminPublishContestPromoPost({
+        contestKey: 'photoGrandPrix',
+        title_en: vc.photoGrandPrix.title_en,
+        title_fr: vc.photoGrandPrix.title_fr,
+        subtitle_en: `Top 3 Podium: 🥇${vc.photoGrandPrix.prize1st} · 🥈${vc.photoGrandPrix.prize2nd} · 🥉${vc.photoGrandPrix.prize3rd} REMO Coins!`,
+        subtitle_fr: `Podium Top 3 : 🥇${vc.photoGrandPrix.prize1st} · 🥈${vc.photoGrandPrix.prize2nd} · 🥉${vc.photoGrandPrix.prize3rd} Pièces REMO !`
+      });
+    }
     this._notifyContestUpdate('pgp_launched');
     return vc.photoGrandPrix;
   },
@@ -5871,10 +6094,14 @@ const REMO_STORE = {
     const pgp = vc.photoGrandPrix;
     const u = this.getCurrentUser();
     const isAdm = this.isCurrentUserAdmin() || this.isAdminUnlocked();
-    if (!isAdm && (!pgp.active || pgp.status !== 'open')) return { ok: false, error: 'inactive' };
+    if (!isAdm && (!pgp.active || pgp.status !== 'open' || (pgp.endsAt && Date.now() > pgp.endsAt))) {
+      return { ok: false, error: (pgp.endsAt && Date.now() > pgp.endsAt) ? 'ended' : 'inactive' };
+    }
     if (!u && !isAdm) return { ok: false, error: 'auth_required' };
+    const mediaUrl = String(data.mediaUrl || '').trim();
+    if (!isAdm && !mediaUrl) return { ok: false, error: 'media_required' };
     pgp.entries = Array.isArray(pgp.entries) ? pgp.entries : [];
-    const uid = u ? u.uid : 'u_admin_founder';
+    const uid = u ? u.uid : (this._resolveSafeCoinTargetUid('') || 'u_admin_founder');
     if (!isAdm && pgp.entries.some((e) => e && e.uid === uid)) {
       return { ok: false, error: 'already_submitted' };
     }
@@ -5883,9 +6110,9 @@ const REMO_STORE = {
       id: 'pgp_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
       cityId,
       title: (data.title || 'City Masterpiece').trim().slice(0, 90),
-      authorName: ((u && u.name) || 'Creator').slice(0, 45),
+      authorName: (data.authorName || (u && u.name) || 'REMO Creator').slice(0, 45),
       uid,
-      mediaUrl: (data.mediaUrl || '').trim(),
+      mediaUrl,
       mediaType: data.mediaType || 'image',
       votes: 0,
       createdAt: Date.now()
@@ -5904,6 +6131,8 @@ const REMO_STORE = {
     const vc = this.ensureViralContests();
     if (!vc.photoGrandPrix || !Array.isArray(vc.photoGrandPrix.entries)) return;
     vc.photoGrandPrix.entries = vc.photoGrandPrix.entries.filter((e) => e && e.id !== entryId);
+    vc.photoGrandPrix.deletedEntryIds = Array.isArray(vc.photoGrandPrix.deletedEntryIds) ? vc.photoGrandPrix.deletedEntryIds : [];
+    if (entryId && !vc.photoGrandPrix.deletedEntryIds.includes(entryId)) vc.photoGrandPrix.deletedEntryIds.push(entryId);
     vc.photoGrandPrix.updatedAt = Date.now();
     this._notifyContestUpdate('pgp_entry_deleted');
   },
@@ -5935,11 +6164,15 @@ const REMO_STORE = {
     if (!pgp || !Array.isArray(pgp.entries) || pgp.entries.length === 0) {
       return { ok: false, error: 'no_entries' };
     }
+    if (pgp.winnersAwarded || pgp.status === 'concluded') {
+      return { ok: false, error: 'already_concluded', podium: pgp.entries.slice(0, 3) };
+    }
     const sorted = pgp.entries.slice().sort((a, b) => Number(b.votes || 0) - Number(a.votes || 0));
     const prizes = [Number(pgp.prize1st || 3000), Number(pgp.prize2nd || 1500), Number(pgp.prize3rd || 750)];
     sorted.slice(0, 3).forEach((ent, idx) => {
-      if (ent && ent.uid) {
-        this.creditSystemCoins(ent.uid, prizes[idx], '', 50000);
+      const payUid = ent && this._resolveSafeCoinTargetUid(ent.uid);
+      if (payUid) {
+        this.creditSystemCoins(payUid, prizes[idx], `📸 Grand Prix #${idx + 1} Podium: ${ent.title}`, 50000);
       }
       if (ent && ent.cityId) {
         this.addCityScore(ent.cityId, idx === 0 ? 300 : idx === 1 ? 150 : 75);
@@ -5954,7 +6187,7 @@ const REMO_STORE = {
 
   adminStopPhotoGrandPrix() {
     const vc = this.ensureViralContests();
-    vc.photoGrandPrix = Object.assign(getDefaultViralContests().photoGrandPrix, { updatedAt: Date.now() });
+    vc.photoGrandPrix = Object.assign(getDefaultViralContests().photoGrandPrix, { launchedAt: 0, updatedAt: Date.now() });
     this._notifyContestUpdate('pgp_stopped');
   },
 
@@ -5962,8 +6195,19 @@ const REMO_STORE = {
   adminLaunchWorldCupBracket(opts = {}) {
     const vc = this.ensureViralContests();
     const default8 = ['montreal', 'chisinau', 'paris', 'bucharest', 'newyork', 'tokyo', 'london', 'dubai'];
-    const rawCities = Array.isArray(opts.cityIds) && opts.cityIds.length >= 8 ? opts.cityIds.slice(0, 8) : default8;
+    const custom8 = Array.isArray(opts.cityIds) ? Array.from(new Set(opts.cityIds.filter(Boolean))) : [];
+    const pool = [...custom8];
+    default8.forEach((cid) => {
+      if (pool.length < 8 && !pool.includes(cid)) pool.push(cid);
+    });
+    if (pool.length < 8 && typeof getAllRemoCities === 'function') {
+      getAllRemoCities().forEach((c) => {
+        if (pool.length < 8 && c && c.id && !pool.includes(c.id)) pool.push(c.id);
+      });
+    }
+    const rawCities = pool.slice(0, 8);
     const roundHours = Math.max(1, Number(opts.roundHours || 24));
+    const now = Date.now();
     const matches = [
       { id: 'wc_qf_1', round: 'qf', cityA: rawCities[0], cityB: rawCities[1], votesA: 0, votesB: 0, voters: {}, winner: '' },
       { id: 'wc_qf_2', round: 'qf', cityA: rawCities[2], cityB: rawCities[3], votesA: 0, votesB: 0, voters: {}, winner: '' },
@@ -5978,11 +6222,21 @@ const REMO_STORE = {
       prizePool: Math.max(500, Number(opts.prizePool || 5000)),
       round: 'qf',
       roundHours,
-      endsAt: Date.now() + roundHours * 3600000,
+      endsAt: now + roundHours * 3600000,
       matches,
       championCityId: '',
-      updatedAt: Date.now()
+      launchedAt: now,
+      updatedAt: now
     };
+    if (opts.announceInFeed) {
+      this.adminPublishContestPromoPost({
+        contestKey: 'worldCupBracket',
+        title_en: vc.worldCupBracket.title_en,
+        title_fr: vc.worldCupBracket.title_fr,
+        subtitle_en: `8 Cities battle in QF ➔ SF ➔ Final! Vote in every matchup (+10 Coins/vote).`,
+        subtitle_fr: `8 Villes s'affrontent en Quart ➔ Demi ➔ Finale ! Votez sur chaque duel (+10 Pièces/vote).`
+      });
+    }
     this._notifyContestUpdate('worldcup_launched');
     return vc.worldCupBracket;
   },
@@ -5992,7 +6246,9 @@ const REMO_STORE = {
     const wc = vc.worldCupBracket;
     const u = this.getCurrentUser();
     if (!u || u.role === 'guest') return { ok: false, error: 'auth_required' };
-    if (!wc.active || wc.status !== 'open') return { ok: false, error: 'ended' };
+    if (!wc.active || wc.status !== 'open' || (wc.endsAt && Date.now() > wc.endsAt)) {
+      return { ok: false, error: 'ended' };
+    }
     const m = (wc.matches || []).find((x) => x && x.id === matchId && x.round === wc.round);
     if (!m) return { ok: false, error: 'not_found' };
     m.voters = m.voters || {};
@@ -6014,12 +6270,18 @@ const REMO_STORE = {
   adminAdvanceWorldCupRound() {
     const vc = this.ensureViralContests();
     const wc = vc.worldCupBracket;
-    if (!wc || !wc.active) return { ok: false };
+    if (!wc || !wc.active || wc.status === 'concluded' || wc.round === 'champion') {
+      return { ok: false, error: 'already_finished', round: wc && wc.round, championCityId: wc && wc.championCityId };
+    }
     const pickWinner = (m) => (Number(m.votesA || 0) >= Number(m.votesB || 0) ? m.cityA : m.cityB);
     const roundHours = Math.max(1, Number(wc.roundHours || 24));
+    let tiesResolved = 0;
     if (wc.round === 'qf') {
       const qfs = (wc.matches || []).filter((m) => m.round === 'qf');
-      qfs.forEach((m) => { m.winner = pickWinner(m); });
+      qfs.forEach((m) => {
+        if (Number(m.votesA || 0) === Number(m.votesB || 0)) tiesResolved++;
+        m.winner = pickWinner(m);
+      });
       if (qfs.length >= 4) {
         wc.matches.push(
           { id: 'wc_sf_1', round: 'sf', cityA: qfs[0].winner, cityB: qfs[1].winner, votesA: 0, votesB: 0, voters: {}, winner: '' },
@@ -6030,7 +6292,10 @@ const REMO_STORE = {
       }
     } else if (wc.round === 'sf') {
       const sfs = (wc.matches || []).filter((m) => m.round === 'sf');
-      sfs.forEach((m) => { m.winner = pickWinner(m); });
+      sfs.forEach((m) => {
+        if (Number(m.votesA || 0) === Number(m.votesB || 0)) tiesResolved++;
+        m.winner = pickWinner(m);
+      });
       if (sfs.length >= 2) {
         wc.matches.push(
           { id: 'wc_final_1', round: 'final', cityA: sfs[0].winner, cityB: sfs[1].winner, votesA: 0, votesB: 0, voters: {}, winner: '' }
@@ -6041,6 +6306,7 @@ const REMO_STORE = {
     } else if (wc.round === 'final') {
       const fin = (wc.matches || []).find((m) => m.round === 'final');
       if (fin) {
+        if (Number(fin.votesA || 0) === Number(fin.votesB || 0)) tiesResolved++;
         fin.winner = pickWinner(fin);
         wc.championCityId = fin.winner;
         wc.round = 'champion';
@@ -6050,12 +6316,12 @@ const REMO_STORE = {
     }
     wc.updatedAt = Date.now();
     this._notifyContestUpdate('worldcup_advanced');
-    return { ok: true, round: wc.round, championCityId: wc.championCityId };
+    return { ok: true, round: wc.round, championCityId: wc.championCityId, tiesResolved };
   },
 
   adminStopWorldCupBracket() {
     const vc = this.ensureViralContests();
-    vc.worldCupBracket = Object.assign(getDefaultViralContests().worldCupBracket, { updatedAt: Date.now() });
+    vc.worldCupBracket = Object.assign(getDefaultViralContests().worldCupBracket, { launchedAt: 0, updatedAt: Date.now() });
     this._notifyContestUpdate('worldcup_stopped');
   },
 
@@ -6063,20 +6329,32 @@ const REMO_STORE = {
   adminLaunchMysteryDetective(opts = {}) {
     const vc = this.ensureViralContests();
     const hours = Math.max(1, Number(opts.durationHours || 24));
+    const now = Date.now();
     vc.mysteryDetective = {
       active: true,
       status: 'open',
       imageUrl: (opts.imageUrl || '').trim(),
+      blurImage: Boolean(opts.blurImage),
       clue_en: (opts.clue_en || 'Identify the secret world city from this view & clue!').trim(),
       clue_fr: (opts.clue_fr || 'Identifiez la ville secrète grâce à cette vue et cet indice !').trim(),
       correctCityId: opts.correctCityId || 'paris',
       rewardCoins: Math.max(50, Number(opts.rewardCoins || 500)),
       maxWinners: Math.max(1, Number(opts.maxWinners || 15)),
-      endsAt: Date.now() + hours * 3600000,
+      endsAt: now + hours * 3600000,
       attempts: {},
       winners: [],
-      updatedAt: Date.now()
+      launchedAt: now,
+      updatedAt: now
     };
+    if (opts.announceInFeed) {
+      this.adminPublishContestPromoPost({
+        contestKey: 'mysteryDetective',
+        title_en: '🕵️ Mystery City Detective — Can you guess the city?',
+        title_fr: '🕵️ Détective Ville Mystère — Saurez-vous deviner ?',
+        subtitle_en: `1 Attempt only! First ${vc.mysteryDetective.maxWinners} detectives win +${vc.mysteryDetective.rewardCoins} REMO Coins.`,
+        subtitle_fr: `1 seul essai ! Les ${vc.mysteryDetective.maxWinners} premiers gagnent +${vc.mysteryDetective.rewardCoins} Pièces REMO.`
+      });
+    }
     this._notifyContestUpdate('mystery_launched');
     return vc.mysteryDetective;
   },
@@ -6086,7 +6364,9 @@ const REMO_STORE = {
     const md = vc.mysteryDetective;
     const u = this.getCurrentUser();
     if (!u || u.role === 'guest') return { ok: false, error: 'auth_required' };
-    if (!md.active || md.status !== 'open') return { ok: false, error: 'ended' };
+    if (!md.active || md.status !== 'open' || (md.endsAt && Date.now() > md.endsAt)) {
+      return { ok: false, error: 'ended' };
+    }
     md.attempts = md.attempts || {};
     md.winners = Array.isArray(md.winners) ? md.winners : [];
     if (md.attempts[u.uid]) return { ok: false, error: 'already_tried' };
@@ -6102,6 +6382,7 @@ const REMO_STORE = {
       this.addCityScore(u.homeCity || md.correctCityId, 50);
       if (md.winners.length >= Number(md.maxWinners || 15)) {
         md.status = 'concluded';
+        md.blurImage = false;
       }
     }
     md.updatedAt = Date.now();
@@ -6109,9 +6390,23 @@ const REMO_STORE = {
     return { ok: true, correct: isCorrect, reward: isCorrect ? Number(md.rewardCoins || 500) : 0 };
   },
 
+  adminConcludeMysteryDetective() {
+    const vc = this.ensureViralContests();
+    const md = vc.mysteryDetective;
+    if (!md || !md.active) return { ok: false, error: 'inactive' };
+    if (md.status === 'concluded') {
+      return { ok: false, error: 'already_concluded', correctCityId: md.correctCityId, winners: md.winners || [] };
+    }
+    md.status = 'concluded';
+    md.blurImage = false;
+    md.updatedAt = Date.now();
+    this._notifyContestUpdate('mystery_concluded');
+    return { ok: true, correctCityId: md.correctCityId, winners: md.winners || [] };
+  },
+
   adminStopMysteryDetective() {
     const vc = this.ensureViralContests();
-    vc.mysteryDetective = Object.assign(getDefaultViralContests().mysteryDetective, { updatedAt: Date.now() });
+    vc.mysteryDetective = Object.assign(getDefaultViralContests().mysteryDetective, { launchedAt: 0, updatedAt: Date.now() });
     this._notifyContestUpdate('mystery_stopped');
   },
 
@@ -6119,6 +6414,7 @@ const REMO_STORE = {
   adminLaunchGoldenRaffle(opts = {}) {
     const vc = this.ensureViralContests();
     const hours = Math.max(1, Number(opts.durationHours || 48));
+    const now = Date.now();
     vc.goldenRaffle = {
       active: true,
       status: 'open',
@@ -6126,11 +6422,21 @@ const REMO_STORE = {
       title_fr: (opts.title_fr || 'Grande Tombola Ticket d’Or du Fondateur').trim(),
       prizeCoins: Math.max(100, Number(opts.prizeCoins || 2500)),
       winnersCount: Math.max(1, Number(opts.winnersCount || 3)),
-      endsAt: Date.now() + hours * 3600000,
+      endsAt: now + hours * 3600000,
       tickets: [],
       winningTickets: [],
-      updatedAt: Date.now()
+      launchedAt: now,
+      updatedAt: now
     };
+    if (opts.announceInFeed) {
+      this.adminPublishContestPromoPost({
+        contestKey: 'goldenRaffle',
+        title_en: vc.goldenRaffle.title_en,
+        title_fr: vc.goldenRaffle.title_fr,
+        subtitle_en: `Claim your FREE numbered #GOLD ticket! ${vc.goldenRaffle.winnersCount} lucky winners get +${vc.goldenRaffle.prizeCoins} REMO Coins.`,
+        subtitle_fr: `Prenez votre ticket #GOLD GRATUIT ! ${vc.goldenRaffle.winnersCount} gagnants recevront +${vc.goldenRaffle.prizeCoins} Pièces REMO.`
+      });
+    }
     this._notifyContestUpdate('raffle_launched');
     return vc.goldenRaffle;
   },
@@ -6140,7 +6446,9 @@ const REMO_STORE = {
     const gr = vc.goldenRaffle;
     const u = this.getCurrentUser();
     if (!u || u.role === 'guest') return { ok: false, error: 'auth_required' };
-    if (!gr.active || gr.status !== 'open') return { ok: false, error: 'ended' };
+    if (!gr.active || gr.status !== 'open' || (gr.endsAt && Date.now() > gr.endsAt)) {
+      return { ok: false, error: 'ended' };
+    }
     gr.tickets = Array.isArray(gr.tickets) ? gr.tickets : [];
     const existing = gr.tickets.find((t) => t && t.uid === u.uid);
     if (existing) return { ok: false, error: 'already_claimed', ticket: existing };
@@ -6165,6 +6473,9 @@ const REMO_STORE = {
     if (!gr || !Array.isArray(gr.tickets) || gr.tickets.length === 0) {
       return { ok: false, error: 'no_tickets' };
     }
+    if (gr.status === 'concluded') {
+      return { ok: false, error: 'already_concluded', winners: gr.winningTickets || [] };
+    }
     const pool = gr.tickets.slice();
     const count = Math.min(pool.length, Math.max(1, Number(gr.winnersCount || 3)));
     const winners = [];
@@ -6173,8 +6484,9 @@ const REMO_STORE = {
       const picked = pool.splice(idx, 1)[0];
       if (picked) {
         winners.push(picked);
-        if (picked.uid) {
-          this.creditSystemCoins(picked.uid, Number(gr.prizeCoins || 2500), '', 50000);
+        const payUid = this._resolveSafeCoinTargetUid(picked.uid);
+        if (payUid) {
+          this.creditSystemCoins(payUid, Number(gr.prizeCoins || 2500), `🎟️ Golden Ticket Raffle Winner (${picked.code})`, 50000);
         }
       }
     }
@@ -6187,13 +6499,15 @@ const REMO_STORE = {
 
   adminStopGoldenRaffle() {
     const vc = this.ensureViralContests();
-    vc.goldenRaffle = Object.assign(getDefaultViralContests().goldenRaffle, { updatedAt: Date.now() });
+    vc.goldenRaffle = Object.assign(getDefaultViralContests().goldenRaffle, { launchedAt: 0, updatedAt: Date.now() });
     this._notifyContestUpdate('raffle_stopped');
   },
 
   // ── 6. ⚡ FOUNDER'S FLASH TREASURE HUNT (First N Citizens) ──
   adminLaunchFlashHunt(opts = {}) {
     const vc = this.ensureViralContests();
+    const hours = Math.max(0, Number(opts.durationHours !== undefined ? opts.durationHours : 24));
+    const now = Date.now();
     vc.flashHunt = {
       active: true,
       status: 'open',
@@ -6202,10 +6516,21 @@ const REMO_STORE = {
       targetCityId: opts.targetCityId || 'montreal',
       rewardCoins: Math.max(50, Number(opts.rewardCoins || 300)),
       maxClaims: Math.max(1, Number(opts.maxClaims || 20)),
+      endsAt: hours > 0 ? now + hours * 3600000 : 0,
       claims: [],
       attempts: {},
-      updatedAt: Date.now()
+      launchedAt: now,
+      updatedAt: now
     };
+    if (opts.announceInFeed) {
+      this.adminPublishContestPromoPost({
+        contestKey: 'flashHunt',
+        title_en: '⚡ Founder’s Flash Treasure Hunt is OPEN!',
+        title_fr: '⚡ Chasse au Trésor Flash du Fondateur OUVERTE !',
+        subtitle_en: `First ${vc.flashHunt.maxClaims} citizens to find the hidden city claim +${vc.flashHunt.rewardCoins} Coins!`,
+        subtitle_fr: `Les ${vc.flashHunt.maxClaims} premiers à trouver la ville secrète gagnent +${vc.flashHunt.rewardCoins} Pièces !`
+      });
+    }
     this._notifyContestUpdate('flash_hunt_launched');
     return vc.flashHunt;
   },
@@ -6215,7 +6540,9 @@ const REMO_STORE = {
     const fh = vc.flashHunt;
     const u = this.getCurrentUser();
     if (!u || u.role === 'guest') return { ok: false, error: 'auth_required' };
-    if (!fh.active || fh.status !== 'open') return { ok: false, error: 'ended' };
+    if (!fh.active || fh.status !== 'open' || (fh.endsAt && Date.now() > fh.endsAt)) {
+      return { ok: false, error: 'ended' };
+    }
     fh.claims = Array.isArray(fh.claims) ? fh.claims : [];
     fh.attempts = fh.attempts || {};
     if (fh.claims.some((c) => c && c.uid === u.uid) || fh.attempts[u.uid]) {
@@ -6242,7 +6569,7 @@ const REMO_STORE = {
 
   adminStopFlashHunt() {
     const vc = this.ensureViralContests();
-    vc.flashHunt = Object.assign(getDefaultViralContests().flashHunt, { updatedAt: Date.now() });
+    vc.flashHunt = Object.assign(getDefaultViralContests().flashHunt, { launchedAt: 0, updatedAt: Date.now() });
     this._notifyContestUpdate('flash_hunt_stopped');
   },
 
@@ -6286,6 +6613,7 @@ const REMO_STORE = {
   adminLaunchTorchRelay(opts = {}) {
     const ws = this.ensureWorldSystems();
     const startCity = opts.startCityId || 'montreal';
+    const now = Date.now();
     ws.torchRelay = {
       active: true,
       status: 'running',
@@ -6308,12 +6636,22 @@ const REMO_STORE = {
           toCityId: startCity,
           km: 0,
           message: '🔥 Planetary Torch Ignited by Founder!',
-          ts: Date.now()
+          ts: now
         }
       ],
       jackpotPaid: false,
-      updatedAt: Date.now()
+      launchedAt: now,
+      updatedAt: now
     };
+    if (opts.announceInFeed) {
+      this.adminPublishContestPromoPost({
+        contestKey: 'torchRelay',
+        title_en: ws.torchRelay.title_en,
+        title_fr: ws.torchRelay.title_fr,
+        subtitle_en: `Pass the 4D Flame across ${ws.torchRelay.targetCitiesCount} cities to unlock +${ws.torchRelay.jackpotCoins} Jackpot!`,
+        subtitle_fr: `Passez la Flamme 4D à travers ${ws.torchRelay.targetCitiesCount} villes pour +${ws.torchRelay.jackpotCoins} Jackpot !`
+      });
+    }
     this.addCityScore(startCity, 50);
     this._notifyContestUpdate('torch_relay_launched');
     return ws.torchRelay;
@@ -6393,7 +6731,7 @@ const REMO_STORE = {
 
   adminStopTorchRelay() {
     const ws = this.ensureWorldSystems();
-    ws.torchRelay = Object.assign(getDefaultUniqueWorldSystems().torchRelay, { updatedAt: Date.now() });
+    ws.torchRelay = Object.assign(getDefaultUniqueWorldSystems().torchRelay, { launchedAt: 0, updatedAt: Date.now() });
     this._notifyContestUpdate('torch_relay_stopped');
   },
 
@@ -6401,17 +6739,28 @@ const REMO_STORE = {
   adminLaunchGlobalSync(opts = {}) {
     const ws = this.ensureWorldSystems();
     const durationMin = Math.max(5, Number(opts.durationMinutes || 25));
+    const now = Date.now();
     ws.globalSync = {
       active: true,
       status: 'open',
       prompt_en: (opts.prompt_en || 'Show the sky or your view in your city right now!').trim(),
       prompt_fr: (opts.prompt_fr || 'Montrez le ciel ou votre vue dans votre ville en cet instant !').trim(),
       rewardCoins: Math.max(25, Number(opts.rewardCoins || 100)),
-      endsAt: Date.now() + durationMin * 60000,
+      endsAt: now + durationMin * 60000,
       moments: [],
       participants: {},
-      updatedAt: Date.now()
+      launchedAt: now,
+      updatedAt: now
     };
+    if (opts.announceInFeed) {
+      this.adminPublishContestPromoPost({
+        contestKey: 'globalSync',
+        title_en: '🌍 GLOBAL SYNC FLASH™ IS LIVE RIGHT NOW!',
+        title_fr: '🌍 MOMENT PLANÉTAIRE SYNCHRONISÉ EN DIRECT !',
+        subtitle_en: `${durationMin} minutes window! Share your live city sky/view for +${ws.globalSync.rewardCoins} REMO Coins.`,
+        subtitle_fr: `Fenêtre de ${durationMin} minutes ! Partagez votre vue en direct pour +${ws.globalSync.rewardCoins} Pièces REMO.`
+      });
+    }
     this._notifyContestUpdate('global_sync_launched');
     return ws.globalSync;
   },
@@ -6464,16 +6813,18 @@ const REMO_STORE = {
 
   adminStopGlobalSync() {
     const ws = this.ensureWorldSystems();
-    ws.globalSync = Object.assign(getDefaultUniqueWorldSystems().globalSync, { updatedAt: Date.now() });
+    ws.globalSync = Object.assign(getDefaultUniqueWorldSystems().globalSync, { launchedAt: 0, updatedAt: Date.now() });
     this._notifyContestUpdate('global_sync_stopped');
   },
 
   // ── 🏛️ 3. WORLD CITY MAYOR & ROYAL KEY™ ──
   adminToggleMayorElections(active = true) {
     const ws = this.ensureWorldSystems();
+    const now = Date.now();
     ws.mayorElections.active = !!active;
     ws.mayorElections.status = active ? 'open' : 'idle';
-    ws.mayorElections.updatedAt = Date.now();
+    ws.mayorElections.launchedAt = active ? (ws.mayorElections.launchedAt || now) : 0;
+    ws.mayorElections.updatedAt = now;
     this._notifyContestUpdate('mayor_elections_toggled');
     return ws.mayorElections;
   },
@@ -6620,7 +6971,9 @@ const REMO_STORE = {
     if (!cityA || !cityB || cityA === cityB) return { ok: false, error: 'same_city' };
     const ws = this.ensureWorldSystems();
     const sa = ws.sisterAlliances;
+    const now = Date.now();
     sa.active = true;
+    sa.launchedAt = sa.launchedAt || now;
     sa.treaties = Array.isArray(sa.treaties) ? sa.treaties : [];
     const existingIdx = sa.treaties.findIndex(
       (t) => t && ((t.cityA === cityA && t.cityB === cityB) || (t.cityA === cityB && t.cityB === cityA))
@@ -6687,9 +7040,13 @@ const REMO_STORE = {
     if (treatyId === 'ALL') {
       sa.treaties = [];
       sa.active = false;
+      sa.launchedAt = 0;
     } else {
       sa.treaties = (sa.treaties || []).filter((t) => t && t.id !== treatyId);
-      if (sa.treaties.length === 0) sa.active = false;
+      if (sa.treaties.length === 0) {
+        sa.active = false;
+        sa.launchedAt = 0;
+      }
     }
     sa.updatedAt = Date.now();
     this._notifyContestUpdate('sister_alliance_removed');
@@ -6700,11 +7057,13 @@ const REMO_STORE = {
   adminTogglePixelCanvas(active = true, opts = {}) {
     const ws = this.ensureWorldSystems();
     const pc = ws.pixelCanvas;
+    const now = Date.now();
     pc.active = !!active;
     if (opts.title_en) pc.title_en = opts.title_en.trim();
     if (opts.title_fr) pc.title_fr = opts.title_fr.trim();
     if (opts.pixelRewardCoins) pc.pixelRewardCoins = Math.max(1, Number(opts.pixelRewardCoins));
-    pc.updatedAt = Date.now();
+    pc.launchedAt = active ? (pc.launchedAt || now) : 0;
+    pc.updatedAt = now;
     this._notifyContestUpdate('pixel_canvas_toggled');
     return pc;
   },
@@ -6798,6 +7157,7 @@ const REMO_STORE = {
   adminLaunchMonumentVault(opts = {}) {
     const ws = this.ensureWorldSystems();
     const mv = ws.monumentVault;
+    const now = Date.now();
     mv.active = true;
     mv.sealed = opts.sealed !== undefined ? !!opts.sealed : true;
     mv.title_en = (opts.title_en || 'City Monument Time-Vault™ — Sealed Wishes & Predictions').trim();
@@ -6806,7 +7166,8 @@ const REMO_STORE = {
     mv.unsealTargetLabel_fr = (opts.unsealTargetLabel_fr || 'Grande Ouverture Gala du Fondateur').trim();
     mv.depositRewardCoins = Math.max(10, Number(opts.depositRewardCoins || 25));
     if (opts.resetCapsules) mv.capsules = [];
-    mv.updatedAt = Date.now();
+    mv.launchedAt = now;
+    mv.updatedAt = now;
     this._notifyContestUpdate('monument_vault_launched');
     return mv;
   },
@@ -6846,14 +7207,17 @@ const REMO_STORE = {
   adminUnsealMonumentVault() {
     const ws = this.ensureWorldSystems();
     const mv = ws.monumentVault;
+    if (!mv.sealed) {
+      return { ok: false, error: 'already_unsealed', count: (mv.capsules || []).length };
+    }
     mv.active = true;
     mv.sealed = false;
     // Bonus +50 coins to every citizen who deposited a capsule!
     (mv.capsules || []).forEach((c) => {
-      if (c && c.uid) this.creditSystemCoins(c.uid, 50, '', 5000);
+      if (c && c.uid) this.creditSystemCoins(c.uid, 50, '⏳ Time-Vault Unsealing Gala Bonus!', 5000);
     });
     mv.updatedAt = Date.now();
-    RemoAudio.play('fanfare');
+    if (typeof RemoAudio !== 'undefined' && RemoAudio.play) RemoAudio.play('fanfare');
     this._notifyContestUpdate('monument_vault_unsealed');
     return { ok: true, count: (mv.capsules || []).length };
   },
@@ -6861,6 +7225,7 @@ const REMO_STORE = {
   adminStopMonumentVault() {
     const ws = this.ensureWorldSystems();
     ws.monumentVault.active = false;
+    ws.monumentVault.launchedAt = 0;
     ws.monumentVault.updatedAt = Date.now();
     this._notifyContestUpdate('monument_vault_stopped');
   },
@@ -6868,8 +7233,10 @@ const REMO_STORE = {
   // ── 📈 7. CREATOR SHARES & FAN DIVIDENDS™ (Creator Stock Exchange) ──
   adminToggleCreatorBourse(active = true) {
     const ws = this.ensureWorldSystems();
+    const now = Date.now();
     ws.creatorBourse.active = !!active;
-    ws.creatorBourse.updatedAt = Date.now();
+    ws.creatorBourse.launchedAt = active ? (ws.creatorBourse.launchedAt || now) : 0;
+    ws.creatorBourse.updatedAt = now;
     this._notifyContestUpdate('creator_bourse_toggled');
     return ws.creatorBourse;
   },
@@ -7159,6 +7526,7 @@ const REMO_STORE = {
 };
 
 REMO_STORE.getDefaultVipShopItems = getDefaultVipShopItems;
+REMO_STORE.uploadMediaToCloudOrDataUrl = uploadMediaToCloudOrDataUrl;
 window.getDefaultVipShopItems = getDefaultVipShopItems;
 
 REMO_STORE.init();

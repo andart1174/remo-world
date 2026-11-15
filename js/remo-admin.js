@@ -1919,18 +1919,100 @@ window.adminOnAlloySelectChange = adminOnAlloySelectChange;
 
 
 /* ════════════════════════════════════════════════════════════════════
-   🎤🏆⚽🕵️🎟️⚡ v69: ADMIN VIRAL CONTESTS COMMAND CENTER CONTROLLER
+   🎤🏆⚽🕵️🎟️⚡ v132: ADMIN VIRAL CONTESTS COMMAND CENTER CONTROLLER
    ════════════════════════════════════════════════════════════════════ */
 
 let _admPendingEuroAudioUrl = '';
+let _admPendingPgpMediaUrl = '';
+let _admPendingPgpMediaType = 'image';
+let _admWcSelectedCities = [];
 
-function setContestPillDOM(id, active, statusText) {
+function _admFormatContestTimer(endsAt, status) {
+  if (status === 'concluded') return '🏆 CONCLUDED';
+  const endTs = Number(endsAt || 0);
+  if (!endTs) return '';
+  const diff = endTs - Date.now();
+  if (diff <= 0) return '⌛ EXPIRED';
+  const mins = Math.floor(diff / 60000);
+  const hrs = Math.floor(mins / 60);
+  const remM = mins % 60;
+  return hrs > 0 ? `⏳ ${hrs}h ${remM}m` : `⏳ ${remM}m`;
+}
+
+function setContestPillDOM(id, active, statusText, isExpired = false) {
   const el = document.getElementById(id);
   if (!el) return;
   el.textContent = statusText;
-  el.style.background = active ? 'rgba(16,185,129,0.22)' : 'rgba(255,255,255,0.08)';
-  el.style.color = active ? '#6ee7b7' : '#94a3b8';
-  el.style.border = active ? '1px solid #10b981' : '1px solid rgba(255,255,255,0.12)';
+  if (isExpired) {
+    el.style.background = 'rgba(244,63,94,0.22)';
+    el.style.color = '#fda4af';
+    el.style.border = '1px solid #f43f5e';
+  } else {
+    el.style.background = active ? 'rgba(16,185,129,0.22)' : 'rgba(255,255,255,0.08)';
+    el.style.color = active ? '#6ee7b7' : '#94a3b8';
+    el.style.border = active ? '1px solid #10b981' : '1px solid rgba(255,255,255,0.12)';
+  }
+}
+
+function _admSyncWorldCupCityCheckboxes(cities, wc) {
+  const grid = document.getElementById('admWcCitiesGrid');
+  const countEl = document.getElementById('admWcPickedCount');
+  if (!grid) return;
+  if (_admWcSelectedCities.length === 0) {
+    const fromMatches = [];
+    (wc.matches || []).forEach((m) => {
+      if (m && m.round === 'qf') {
+        if (m.cityA && !fromMatches.includes(m.cityA)) fromMatches.push(m.cityA);
+        if (m.cityB && !fromMatches.includes(m.cityB)) fromMatches.push(m.cityB);
+      }
+    });
+    _admWcSelectedCities = fromMatches.length >= 8
+      ? fromMatches.slice(0, 8)
+      : cities.slice(0, 8).map((c) => c.id);
+  }
+  const lang = REMO_I18N.getLang();
+  grid.innerHTML = cities.map((c) => {
+    const checked = _admWcSelectedCities.includes(c.id);
+    return `
+      <label class="check-pill" style="padding:4px 8px;font-size:0.72rem;${checked ? 'border-color:#10b981;background:rgba(16,185,129,0.18);' : ''}">
+        <input type="checkbox" value="${c.id}" ${checked ? 'checked' : ''} onchange="adminToggleWorldCupCity('${c.id}', this.checked)">
+        ${c.flag} ${getCityName(c, lang)}
+      </label>
+    `;
+  }).join('');
+  if (countEl) countEl.textContent = String(_admWcSelectedCities.length);
+}
+
+function adminToggleWorldCupCity(cityId, checked) {
+  if (checked) {
+    if (!_admWcSelectedCities.includes(cityId)) {
+      if (_admWcSelectedCities.length >= 8) {
+        admToast('⚠️ Maximum 8 cities allowed — uncheck one first!');
+        renderAdminContestsPanel();
+        return;
+      }
+      _admWcSelectedCities.push(cityId);
+    }
+  } else {
+    _admWcSelectedCities = _admWcSelectedCities.filter((id) => id !== cityId);
+  }
+  renderAdminContestsPanel();
+}
+
+function adminSelectWorldCupPreset(mode = 'top') {
+  const cities = getRemoCities().slice();
+  if (mode === 'random') {
+    for (let i = cities.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [cities[i], cities[j]] = [cities[j], cities[i]];
+    }
+    _admWcSelectedCities = cities.slice(0, 8).map((c) => c.id);
+  } else {
+    const scored = cities.sort((a, b) => Number(REMO_STORE.getCityScore(b.id) || 0) - Number(REMO_STORE.getCityScore(a.id) || 0));
+    _admWcSelectedCities = scored.slice(0, 8).map((c) => c.id);
+  }
+  renderAdminContestsPanel();
+  admToast(mode === 'random' ? '🎲 Selected 8 Random Cities!' : '🏆 Selected Top 8 Score Cities!');
 }
 
 function renderAdminContestsPanel() {
@@ -1949,12 +2031,15 @@ function renderAdminContestsPanel() {
   };
 
   populateCitySel('admEuroAddCity', 'montreal');
+  populateCitySel('admPgpAddCity', 'montreal');
   populateCitySel('admMdCity', (vc.mysteryDetective && vc.mysteryDetective.correctCityId) || 'paris');
   populateCitySel('admFhCity', (vc.flashHunt && vc.flashHunt.targetCityId) || 'montreal');
 
   // 1. Eurovision Status & Table
   const ev = vc.eurovision || {};
-  setContestPillDOM('admEuroStatusPill', !!ev.active, ev.active ? `🟢 LIVE (${(ev.entries || []).length} songs)` : '⚪ IDLE');
+  const evTimer = _admFormatContestTimer(ev.endsAt, ev.status);
+  const evExp = !!(ev.active && ev.status === 'open' && ev.endsAt && Date.now() > ev.endsAt);
+  setContestPillDOM('admEuroStatusPill', !!ev.active, ev.active ? `${evTimer || '🟢 LIVE'} · ${(ev.entries || []).length} songs` : '⚪ IDLE', evExp);
   const euroBody = document.getElementById('admEuroEntriesTable');
   if (euroBody) {
     const entries = (ev.entries || []).slice().sort((a, b) => Number(b.points || 0) - Number(a.points || 0));
@@ -1977,7 +2062,9 @@ function renderAdminContestsPanel() {
 
   // 2. Photo Grand Prix Status & Table
   const pgp = vc.photoGrandPrix || {};
-  setContestPillDOM('admPgpStatusPill', !!pgp.active, pgp.active ? `🟢 LIVE (${(pgp.entries || []).length} entries)` : '⚪ IDLE');
+  const pgpTimer = _admFormatContestTimer(pgp.endsAt, pgp.status);
+  const pgpExp = !!(pgp.active && pgp.status === 'open' && pgp.endsAt && Date.now() > pgp.endsAt);
+  setContestPillDOM('admPgpStatusPill', !!pgp.active, pgp.active ? `${pgpTimer || '🟢 LIVE'} · ${(pgp.entries || []).length} entries` : '⚪ IDLE', pgpExp);
   const pgpBody = document.getElementById('admPgpEntriesTable');
   if (pgpBody) {
     const entries = (pgp.entries || []).slice().sort((a, b) => Number(b.votes || 0) - Number(a.votes || 0));
@@ -1985,10 +2072,13 @@ function renderAdminContestsPanel() {
       ? `<tr><td colspan="4" style="color:var(--muted);text-align:center;">No Grand Prix entries yet.</td></tr>`
       : entries.map((e, i) => {
           const c = getCityById(e.cityId);
+          const thumb = e.mediaUrl
+            ? (e.mediaType === 'video' ? `<a href="${e.mediaUrl}" target="_blank" rel="noopener noreferrer" style="color:#38bdf8;font-size:0.74rem;">🎬 Video</a>` : `<img src="${e.mediaUrl}" alt="" style="width:42px;height:28px;object-fit:cover;border-radius:6px;vertical-align:middle;margin-right:6px;">`)
+            : '';
           return `
             <tr>
               <td><b>#${i + 1}</b> ${c.flag} ${getCityName(c, lang)}</td>
-              <td><b>${e.title}</b> · <span style="color:#7dd3fc;">@${e.authorName}</span></td>
+              <td>${thumb}<b>${e.title}</b> · <span style="color:#7dd3fc;">@${e.authorName}</span></td>
               <td style="color:#fbbf24;font-weight:900;">🔥 ${Number(e.votes || 0)} votes</td>
               <td>
                 <button class="adm-btn rose" style="padding:4px 9px;font-size:0.75rem;" onclick="REMO_STORE.adminDeletePhotoGrandPrixEntry('${e.id}')">✕ Delete</button>
@@ -1998,21 +2088,97 @@ function renderAdminContestsPanel() {
         }).join('');
   }
 
-  // 3. World Cup Bracket Status
+  // 3. World Cup Bracket Status + Cities Selector + Live Match Scores
   const wc = vc.worldCupBracket || {};
-  setContestPillDOM('admWcStatusPill', !!wc.active, wc.active ? `🟢 LIVE (Round: ${String(wc.round || 'qf').toUpperCase()})` : '⚪ IDLE');
+  const wcTimer = _admFormatContestTimer(wc.endsAt, wc.status);
+  const wcExp = !!(wc.active && wc.status === 'open' && wc.endsAt && Date.now() > wc.endsAt);
+  setContestPillDOM('admWcStatusPill', !!wc.active, wc.active ? `${wcTimer || '🟢 LIVE'} · ${String(wc.round || 'qf').toUpperCase()}` : '⚪ IDLE', wcExp);
+  _admSyncWorldCupCityCheckboxes(cities, wc);
+  const wcMatchesBody = document.getElementById('admWcMatchesTable');
+  if (wcMatchesBody) {
+    const matches = Array.isArray(wc.matches) ? wc.matches : [];
+    wcMatchesBody.innerHTML = matches.length === 0
+      ? `<tr><td colspan="3" style="color:var(--muted);text-align:center;">No World Cup bracket launched yet.</td></tr>`
+      : matches.map((m) => {
+          const cA = getCityById(m.cityA);
+          const cB = getCityById(m.cityB);
+          const vA = Number(m.votesA || 0);
+          const vB = Number(m.votesB || 0);
+          const isTie = vA === vB && m.round === wc.round && !m.winner;
+          return `
+            <tr>
+              <td><b>${String(m.round || '').toUpperCase()}</b></td>
+              <td>${cA.flag} ${getCityName(cA, lang)} (<b>${vA}</b>) <span style="color:#94a3b8;">VS</span> ${cB.flag} ${getCityName(cB, lang)} (<b>${vB}</b>)</td>
+              <td>${m.winner ? `<span style="color:#34d399;font-weight:800;">🏆 ${getCityName(getCityById(m.winner), lang)}</span>` : (isTie ? `<span style="color:#fbbf24;font-weight:800;">⚖️ TIE (A seeded)</span>` : '<span style="color:#7dd3fc;">LIVE VOTING</span>')}</td>
+            </tr>
+          `;
+        }).join('');
+  }
 
-  // 4. Mystery Detective Status
+  // 4. Mystery Detective Status + Winners
   const md = vc.mysteryDetective || {};
-  setContestPillDOM('admMdStatusPill', !!md.active, md.active ? `🟢 LIVE (${(md.winners || []).length}/${md.maxWinners || 15} winners)` : '⚪ IDLE');
+  const mdTimer = _admFormatContestTimer(md.endsAt, md.status);
+  const mdExp = !!(md.active && md.status === 'open' && md.endsAt && Date.now() > md.endsAt);
+  setContestPillDOM('admMdStatusPill', !!md.active, md.active ? `${mdTimer || '🟢 LIVE'} · ${(md.winners || []).length}/${md.maxWinners || 15}` : '⚪ IDLE', mdExp);
+  const mdBody = document.getElementById('admMdWinnersTable');
+  if (mdBody) {
+    const wins = Array.isArray(md.winners) ? md.winners : [];
+    const totalAttempts = Object.keys(md.attempts || {}).length;
+    mdBody.innerHTML = !md.active
+      ? ''
+      : (wins.length === 0
+          ? `<tr><td colspan="3" style="color:var(--muted);text-align:center;">${totalAttempts} detective attempt(s) so far · 0 winners yet.</td></tr>`
+          : wins.map((w, idx) => `
+              <tr>
+                <td><b>#${idx + 1}</b> @${w.name}</td>
+                <td>${getCityById(w.cityId || 'montreal').flag} ${w.cityId || ''}</td>
+                <td style="color:#fbbf24;font-weight:800;">+${Number(w.reward || md.rewardCoins || 500)} 🪙</td>
+              </tr>
+            `).join(''));
+  }
 
-  // 5. Golden Raffle Status
+  // 5. Golden Raffle Status + Claimed Tickets Table
   const gr = vc.goldenRaffle || {};
-  setContestPillDOM('admGrStatusPill', !!gr.active, gr.active ? `🟢 LIVE (${(gr.tickets || []).length} tickets)` : '⚪ IDLE');
+  const grTimer = _admFormatContestTimer(gr.endsAt, gr.status);
+  const grExp = !!(gr.active && gr.status === 'open' && gr.endsAt && Date.now() > gr.endsAt);
+  setContestPillDOM('admGrStatusPill', !!gr.active, gr.active ? `${grTimer || '🟢 LIVE'} · ${(gr.tickets || []).length} tickets` : '⚪ IDLE', grExp);
+  const grBody = document.getElementById('admGrTicketsTable');
+  if (grBody) {
+    const tks = Array.isArray(gr.tickets) ? gr.tickets : [];
+    const winCodes = new Set((gr.winningTickets || []).map((w) => w && w.code));
+    grBody.innerHTML = !gr.active
+      ? ''
+      : (tks.length === 0
+          ? `<tr><td colspan="3" style="color:var(--muted);text-align:center;">No tickets claimed yet.</td></tr>`
+          : tks.slice(0, 25).map((tk) => `
+              <tr>
+                <td><b style="color:#fbbf24;">${tk.code}</b> ${winCodes.has(tk.code) ? '👑 WINNER!' : ''}</td>
+                <td>@${tk.name}</td>
+                <td>${getCityById(tk.cityId || 'montreal').flag} ${getCityName(getCityById(tk.cityId || 'montreal'), lang)}</td>
+              </tr>
+            `).join(''));
+  }
 
-  // 6. Flash Hunt Status
+  // 6. Flash Hunt Status + Claims Table
   const fh = vc.flashHunt || {};
-  setContestPillDOM('admFhStatusPill', !!fh.active, fh.active ? `🟢 LIVE (${(fh.claims || []).length}/${fh.maxClaims || 20} claimed)` : '⚪ IDLE');
+  const fhTimer = _admFormatContestTimer(fh.endsAt, fh.status);
+  const fhExp = !!(fh.active && fh.status === 'open' && fh.endsAt && Date.now() > fh.endsAt);
+  setContestPillDOM('admFhStatusPill', !!fh.active, fh.active ? `${fhTimer || '🟢 LIVE'} · ${(fh.claims || []).length}/${fh.maxClaims || 20}` : '⚪ IDLE', fhExp);
+  const fhBody = document.getElementById('admFhClaimsTable');
+  if (fhBody) {
+    const cls = Array.isArray(fh.claims) ? fh.claims : [];
+    fhBody.innerHTML = !fh.active
+      ? ''
+      : (cls.length === 0
+          ? `<tr><td colspan="3" style="color:var(--muted);text-align:center;">${Object.keys(fh.attempts || {}).length} hunter(s) tried · 0 chest claims yet.</td></tr>`
+          : cls.map((cl, idx) => `
+              <tr>
+                <td><b>#${idx + 1}</b> @${cl.name}</td>
+                <td>${getCityById(cl.cityId || 'montreal').flag}</td>
+                <td style="color:#fbbf24;font-weight:800;">+${Number(cl.reward || fh.rewardCoins || 300)} 🪙</td>
+              </tr>
+            `).join(''));
+  }
 
   // ── 7 UNIQUE REMO WORLD SYSTEMS (Admin Status & Tables) ──
   const ws = typeof REMO_STORE.ensureWorldSystems === 'function' ? REMO_STORE.ensureWorldSystems() : {};
@@ -2024,15 +2190,70 @@ function renderAdminContestsPanel() {
 
   const tr = ws.torchRelay || {};
   setContestPillDOM('admWsTorchPill', !!tr.active, tr.active ? `🟢 LIVE (${tr.totalKm || 0} km · ${(tr.visitedCities || []).length}/${tr.targetCitiesCount || 10} cities)` : '⚪ IDLE');
+  const trInfo = document.getElementById('admWsTorchInfo');
+  if (trInfo) {
+    trInfo.innerHTML = tr.active
+      ? `🔥 Current City: <b>${getCityName(getCityById(tr.currentCityId), lang)}</b> (Holder: <b>@${tr.currentHolderName}</b>) · Route: ${(tr.visitedCities || []).map((id) => getCityById(id).flag).join(' ➔ ')}`
+      : '';
+  }
 
   const gs = ws.globalSync || {};
-  setContestPillDOM('admWsSyncPill', !!gs.active, gs.active ? `🟢 LIVE (${(gs.moments || []).length} synced)` : '⚪ IDLE');
+  const gsTimer = _admFormatContestTimer(gs.endsAt, gs.status);
+  const gsExp = !!(gs.active && gs.status === 'open' && gs.endsAt && Date.now() > gs.endsAt);
+  setContestPillDOM('admWsSyncPill', !!gs.active, gs.active ? `${gsTimer || '🟢 LIVE'} · ${(gs.moments || []).length} synced` : '⚪ IDLE', gsExp);
+  const gsInfo = document.getElementById('admWsSyncInfo');
+  if (gsInfo) {
+    const ms = Array.isArray(gs.moments) ? gs.moments : [];
+    gsInfo.innerHTML = gs.active
+      ? `⚡ Synced Cities (${ms.length}): ${ms.slice(0, 8).map((m) => `${getCityById(m.cityId).flag} @${m.authorName}${m.mediaUrl ? ' 📸' : ''}`).join(' · ')}`
+      : '';
+  }
 
   const me = ws.mayorElections || {};
   setContestPillDOM('admWsMayorPill', !!me.active, me.active ? '🟢 LIVE (Mayor Elections Open)' : '⚪ IDLE');
+  const decreesBody = document.getElementById('admMayorDecreesTable');
+  if (decreesBody) {
+    const decEntries = Object.entries(me.cityDecrees || {});
+    decreesBody.innerHTML = decEntries.length === 0
+      ? `<tr><td colspan="4" style="color:var(--muted);text-align:center;">No city mayor decrees submitted yet.</td></tr>`
+      : decEntries.map(([cid, dec]) => {
+          const c = getCityById(cid);
+          return `
+            <tr>
+              <td>${c.flag} <b>${getCityName(c, lang)}</b><br><span style="font-size:0.72rem;color:#94a3b8;">@${dec.authorName || 'Mayor'}</span></td>
+              <td style="font-size:0.76rem;">"${(dec.text_en || dec.text_fr || '').slice(0, 100)}"</td>
+              <td>${dec.approved ? '<span style="color:#34d399;font-weight:800;">✅ Approved</span>' : '<span style="color:#fbbf24;font-weight:800;">⏳ Pending</span>'}</td>
+              <td style="white-space:nowrap;">
+                ${!dec.approved ? `<button class="adm-btn emerald" style="padding:3px 8px;font-size:0.72rem;margin-right:4px;" onclick="REMO_STORE.adminApproveMayorDecree('${cid}', true);admToast('✅ Decree approved!');">✅ Approve</button>` : ''}
+                <button class="adm-btn rose" style="padding:3px 8px;font-size:0.72rem;" onclick="REMO_STORE.adminApproveMayorDecree('${cid}', false);admToast('🗑️ Decree removed.');">✕ Reject</button>
+              </td>
+            </tr>
+          `;
+        }).join('');
+  }
 
   const sa = ws.sisterAlliances || {};
   setContestPillDOM('admWsAlliancePill', !!(sa.active && (sa.treaties || []).length), sa.active ? `🟢 LIVE (${(sa.treaties || []).length} treaties)` : '⚪ IDLE');
+  const allyBody = document.getElementById('admAlliancesTable');
+  if (allyBody) {
+    const treaties = Array.isArray(sa.treaties) ? sa.treaties : [];
+    allyBody.innerHTML = treaties.length === 0
+      ? `<tr><td colspan="3" style="color:var(--muted);text-align:center;">No active Sister City treaties.</td></tr>`
+      : treaties.map((trItem) => {
+          const cA = getCityById(trItem.cityA);
+          const cB = getCityById(trItem.cityB);
+          const rem = _admFormatContestTimer(trItem.endsAt, 'open');
+          return `
+            <tr>
+              <td>${cA.flag} <b>${getCityName(cA, lang)}</b> × ${cB.flag} <b>${getCityName(cB, lang)}</b></td>
+              <td style="color:#34d399;font-weight:800;">👋 ${Number(trItem.wavesCount || 0)} waves · ${rem || 'Active'}</td>
+              <td>
+                <button class="adm-btn rose" style="padding:3px 8px;font-size:0.72rem;" onclick="REMO_STORE.adminRemoveSisterAlliance('${trItem.id}');admToast('🗑️ Treaty ended.');">✕ End</button>
+              </td>
+            </tr>
+          `;
+        }).join('');
+  }
 
   const pc = ws.pixelCanvas || {};
   setContestPillDOM('admWsPixelPill', !!pc.active, pc.active ? `🟢 LIVE (${pc.totalPixelsPlaced || 0} pixels)` : '⚪ IDLE');
@@ -2061,20 +2282,73 @@ function renderAdminContestsPanel() {
   }
 }
 
-function handleAdminEuroAudioFile(ev) {
+async function handleAdminEuroAudioFile(ev) {
   const f = ev.target.files && ev.target.files[0];
   if (!f) return;
-  const rd = new FileReader();
-  rd.onload = async (e) => {
-    const dataUrl = e.target.result;
-    if (window.RemoMediaDB && typeof window.RemoMediaDB.saveDataUrl === 'function') {
-      _admPendingEuroAudioUrl = await window.RemoMediaDB.saveDataUrl(dataUrl);
-    } else {
-      _admPendingEuroAudioUrl = dataUrl;
-    }
-    admToast(`🎵 60s Audio ready: ${f.name}`);
-  };
-  rd.readAsDataURL(f);
+  const stEl = document.getElementById('admEuroAudioStatus');
+  if (stEl) stEl.textContent = '⏳ Uploading audio to cloud...';
+  let url = '';
+  if (typeof REMO_STORE !== 'undefined' && typeof REMO_STORE.uploadMediaToCloudOrDataUrl === 'function') {
+    url = await REMO_STORE.uploadMediaToCloudOrDataUrl(f, 'contests_audio');
+  }
+  if (!url || url.startsWith('idb://')) {
+    _admPendingEuroAudioUrl = '';
+    if (stEl) stEl.textContent = '⚠️ Cloud unavailable & file > 1.2MB — use smaller MP3 (<1.2MB) or external link.';
+    admToast('⚠️ Cloud unavailable for large file (>1.2MB). Use <1.2MB MP3 or external URL.');
+    return;
+  }
+  _admPendingEuroAudioUrl = url;
+  if (stEl) stEl.textContent = `✅ Ready (Cloud): ${f.name}`;
+  admToast(`🎵 60s Audio ready for all citizens: ${f.name}`);
+}
+
+async function handleAdminPgpMediaFile(ev) {
+  const f = ev.target.files && ev.target.files[0];
+  if (!f) return;
+  const stEl = document.getElementById('admPgpMediaStatus');
+  if (stEl) stEl.textContent = '⏳ Uploading to cloud...';
+  const url = typeof REMO_STORE.uploadMediaToCloudOrDataUrl === 'function'
+    ? await REMO_STORE.uploadMediaToCloudOrDataUrl(f, 'contests_pgp')
+    : '';
+  if (!url || url.startsWith('idb://')) {
+    _admPendingPgpMediaUrl = '';
+    if (stEl) stEl.textContent = '⚠️ File too large without cloud — pick image or <1.2MB clip.';
+    return;
+  }
+  _admPendingPgpMediaUrl = url;
+  _admPendingPgpMediaType = f.type && f.type.startsWith('video/') ? 'video' : 'image';
+  const inp = document.getElementById('admPgpAddMediaUrl');
+  if (inp) inp.value = url.startsWith('data:') ? `[Uploaded ${f.name}]` : url;
+  if (stEl) stEl.textContent = `✅ Ready: ${f.name}`;
+  admToast(`📸 Grand Prix media ready: ${f.name}`);
+}
+
+function adminAddPgpEntryFromOffice() {
+  const cityId = document.getElementById('admPgpAddCity')?.value || 'montreal';
+  const title = (document.getElementById('admPgpAddTitle')?.value || '').trim();
+  const rawUrl = (document.getElementById('admPgpAddMediaUrl')?.value || '').trim();
+  const mediaUrl = _admPendingPgpMediaUrl || (!rawUrl.startsWith('[') ? rawUrl : '');
+  if (!title || !mediaUrl) {
+    admToast('⚠️ Enter an Entry Title AND upload or paste a Photo/Video URL!');
+    return;
+  }
+  REMO_STORE.submitPhotoGrandPrixEntry({
+    cityId,
+    title,
+    authorName: 'REMO Official',
+    mediaUrl,
+    mediaType: _admPendingPgpMediaType
+  });
+  _admPendingPgpMediaUrl = '';
+  const tInp = document.getElementById('admPgpAddTitle');
+  if (tInp) tInp.value = '';
+  const uInp = document.getElementById('admPgpAddMediaUrl');
+  if (uInp) uInp.value = '';
+  admToast(`📸 Added "${title}" to Photo & Video Grand Prix!`);
+}
+
+function _admWantAnnounceFeed() {
+  return !!document.getElementById('admAnnounceInFeed')?.checked;
 }
 
 function adminStartEurovisionFromOffice() {
@@ -2092,7 +2366,8 @@ function adminStartEurovisionFromOffice() {
     durationHours,
     allowCitizenSubmissions,
     noSelfCityVote,
-    keepEntries: true
+    keepEntries: true,
+    announceInFeed: _admWantAnnounceFeed()
   });
   RemoAudio.play('fanfare');
   admToast('🎤 REMO Music Contest is now LIVE across the world!');
@@ -2119,6 +2394,8 @@ function adminAddEurovisionSongFromOffice() {
     soundPreset
   });
   _admPendingEuroAudioUrl = '';
+  const stEl = document.getElementById('admEuroAudioStatus');
+  if (stEl) stEl.textContent = '';
   const titleInp = document.getElementById('admEuroAddTitle');
   if (titleInp) titleInp.value = '';
   const linkInp = document.getElementById('admEuroAddLink');
@@ -2129,7 +2406,7 @@ function adminAddEurovisionSongFromOffice() {
 function adminConcludeEurovisionFromOffice() {
   const res = REMO_STORE.adminConcludeEurovision();
   if (!res.ok) {
-    admToast('⚠️ Add at least 1 song before concluding the Music Contest!');
+    admToast(res.error === 'already_concluded' ? 'ℹ️ Music Contest already concluded & winner paid.' : '⚠️ Add at least 1 song before concluding the Music Contest!');
     return;
   }
   RemoAudio.play('fanfare');
@@ -2149,7 +2426,8 @@ function adminStartPgpFromOffice() {
     prize2nd: Number(document.getElementById('admPgpPrize2')?.value || 1500),
     prize3rd: Number(document.getElementById('admPgpPrize3')?.value || 750),
     durationHours: Number(document.getElementById('admPgpHours')?.value || 48),
-    keepEntries: true
+    keepEntries: true,
+    announceInFeed: _admWantAnnounceFeed()
   });
   RemoAudio.play('fanfare');
   admToast('📸 Photo & Video Grand Prix is now LIVE!');
@@ -2158,7 +2436,7 @@ function adminStartPgpFromOffice() {
 function adminConcludePgpFromOffice() {
   const res = REMO_STORE.adminConcludePhotoGrandPrix();
   if (!res.ok) {
-    admToast('⚠️ No entries to conclude!');
+    admToast(res.error === 'already_concluded' ? 'ℹ️ Top 3 Podium prizes already awarded.' : '⚠️ No entries to conclude!');
     return;
   }
   RemoAudio.play('fanfare');
@@ -2171,11 +2449,17 @@ function adminResetPgpFromOffice() {
 }
 
 function adminStartWorldCupFromOffice() {
+  if (_admWcSelectedCities.length > 0 && _admWcSelectedCities.length < 8) {
+    admToast(`⚠️ Please pick 8 cities (currently ${_admWcSelectedCities.length}/8) or click Random 8 / Top 8.`);
+    return;
+  }
   REMO_STORE.adminLaunchWorldCupBracket({
     title_en: document.getElementById('admWcTitleEn')?.value || '8-City World Knockout Cup',
     title_fr: document.getElementById('admWcTitleFr')?.value || 'Coupe du Monde des Villes (8 Villes)',
     prizePool: Number(document.getElementById('admWcPrizePool')?.value || 5000),
-    roundHours: Number(document.getElementById('admWcRoundHours')?.value || 24)
+    roundHours: Number(document.getElementById('admWcRoundHours')?.value || 24),
+    cityIds: _admWcSelectedCities.slice(0, 8),
+    announceInFeed: _admWantAnnounceFeed()
   });
   RemoAudio.play('fanfare');
   admToast('⚽ 8-City World Knockout Cup Quarter-Finals launched!');
@@ -2184,11 +2468,12 @@ function adminStartWorldCupFromOffice() {
 function adminAdvanceWorldCupFromOffice() {
   const res = REMO_STORE.adminAdvanceWorldCupRound();
   if (!res.ok) {
-    admToast('⚠️ Launch the World Cup Bracket first!');
+    admToast(res.error === 'already_finished' ? '🏆 Tournament already crowned its Champion!' : '⚠️ Launch the World Cup Bracket first!');
     return;
   }
   RemoAudio.play('fanfare');
-  admToast(`⚽ World Cup advanced to: ${String(res.round).toUpperCase()}!`);
+  const tieNote = res.tiesResolved > 0 ? ` (${res.tiesResolved} tie(s) broke to City A)` : '';
+  admToast(`⚽ World Cup advanced to: ${String(res.round).toUpperCase()}!${tieNote}`);
 }
 
 function adminResetWorldCupFromOffice() {
@@ -2196,18 +2481,42 @@ function adminResetWorldCupFromOffice() {
   admToast('🗑️ World Cup Bracket stopped.');
 }
 
+function adminFillMysteryCityPhoto() {
+  const cid = document.getElementById('admMdCity')?.value || 'paris';
+  const photo = typeof resolveCityRealPhotoUrl === 'function' ? resolveCityRealPhotoUrl(cid) : '';
+  const inp = document.getElementById('admMdImage');
+  if (inp && photo) {
+    inp.value = photo;
+    admToast(`🖼️ Filled real city photo for ${cid.toUpperCase()}!`);
+  } else {
+    admToast('⚠️ Could not find a photo for this city.');
+  }
+}
+
 function adminStartMysteryFromOffice() {
   REMO_STORE.adminLaunchMysteryDetective({
     correctCityId: document.getElementById('admMdCity')?.value || 'paris',
     imageUrl: document.getElementById('admMdImage')?.value || '',
+    blurImage: !!document.getElementById('admMdBlur')?.checked,
     clue_en: document.getElementById('admMdClueEn')?.value || 'Identify the secret world city from this clue!',
     clue_fr: document.getElementById('admMdClueFr')?.value || 'Identifiez la ville secrète grâce à cet indice !',
     rewardCoins: Number(document.getElementById('admMdReward')?.value || 500),
     maxWinners: Number(document.getElementById('admMdMaxWinners')?.value || 15),
-    durationHours: 24
+    durationHours: Number(document.getElementById('admMdHours')?.value || 24),
+    announceInFeed: _admWantAnnounceFeed()
   });
   RemoAudio.play('fanfare');
   admToast('🕵️ Mystery City Detective is now LIVE!');
+}
+
+function adminConcludeMysteryFromOffice() {
+  const res = REMO_STORE.adminConcludeMysteryDetective();
+  if (!res.ok) {
+    admToast('⚠️ Launch Mystery City Detective first!');
+    return;
+  }
+  RemoAudio.play('fanfare');
+  admToast(`👁️ Mystery Concluded & Answer Revealed (${String(res.correctCityId).toUpperCase()})!`);
 }
 
 function adminResetMysteryFromOffice() {
@@ -2221,7 +2530,8 @@ function adminStartRaffleFromOffice() {
     title_fr: document.getElementById('admGrTitleFr')?.value || 'Grande Tombola Ticket d’Or du Fondateur',
     prizeCoins: Number(document.getElementById('admGrPrize')?.value || 2500),
     winnersCount: Number(document.getElementById('admGrCount')?.value || 3),
-    durationHours: 48
+    durationHours: Number(document.getElementById('admGrHours')?.value || 48),
+    announceInFeed: _admWantAnnounceFeed()
   });
   RemoAudio.play('fanfare');
   admToast('🎟️ Golden Ticket Raffle is now OPEN!');
@@ -2230,7 +2540,7 @@ function adminStartRaffleFromOffice() {
 function adminDrawRaffleFromOffice() {
   const res = REMO_STORE.adminDrawGoldenRaffleWinners();
   if (!res.ok) {
-    admToast('⚠️ No tickets claimed yet!');
+    admToast(res.error === 'already_concluded' ? 'ℹ️ Winners already drawn for this raffle.' : '⚠️ No tickets claimed yet!');
     return;
   }
   RemoAudio.play('fanfare');
@@ -2248,7 +2558,9 @@ function adminStartFlashHuntFromOffice() {
     maxClaims: Number(document.getElementById('admFhMax')?.value || 20),
     riddle_en: document.getElementById('admFhRiddleEn')?.value || 'Solve the Founder’s riddle and unlock the secret city chest!',
     riddle_fr: document.getElementById('admFhRiddleFr')?.value || 'Résolvez l’énigme du Fondateur et ouvrez le coffre secret !',
-    rewardCoins: Number(document.getElementById('admFhReward')?.value || 300)
+    rewardCoins: Number(document.getElementById('admFhReward')?.value || 300),
+    durationHours: Number(document.getElementById('admFhHours')?.value ?? 24),
+    announceInFeed: _admWantAnnounceFeed()
   });
   RemoAudio.play('fanfare');
   admToast('⚡ Founder’s Flash Treasure Hunt is now LIVE!');
@@ -2259,8 +2571,62 @@ function adminResetFlashHuntFromOffice() {
   admToast('🗑️ Flash Treasure Hunt stopped.');
 }
 
+function adminShareContestPromoFromOffice(contestKey = 'eurovision') {
+  const modal = document.getElementById('admContestShareModal');
+  const titleEl = document.getElementById('admShareModalTitle');
+  const urlEl = document.getElementById('admShareModalUrl');
+  const actionsEl = document.getElementById('admShareModalActions');
+  if (!modal || !actionsEl) return;
+
+  const baseOrigin = (typeof window !== 'undefined' && window.location && window.location.origin && window.location.origin.startsWith('http'))
+    ? window.location.origin
+    : 'https://remoworld.com';
+  const shareUrl = `${baseOrigin}/index.html?view=contests&contest=${encodeURIComponent(contestKey)}`;
+
+  const labels = {
+    eurovision: { en: '🎤 REMO Music Contest (60s City Songs)', fr: '🎤 REMO Concours Musical' },
+    photoGrandPrix: { en: '📸 Photo & Video Grand Prix (Top 3)', fr: '📸 Grand Prix Photo & Vidéo' },
+    worldCupBracket: { en: '⚽ 8-City World Knockout Cup', fr: '⚽ Coupe du Monde des Villes' },
+    mysteryDetective: { en: '🕵️ Mystery City Detective Challenge', fr: '🕵️ Détective Ville Mystère' },
+    goldenRaffle: { en: '🎟️ Founder’s Golden Ticket Raffle', fr: '🎟️ Tombola Ticket d’Or REMO' },
+    flashHunt: { en: '⚡ Founder’s Flash Treasure Hunt', fr: '⚡ Chasse au Trésor Flash REMO' },
+    torchRelay: { en: '🔥 4D World Torch Relay™', fr: '🔥 Relais de la Flamme 4D REMO™' },
+    globalSync: { en: '🌍 Global Sync Flash™ Live', fr: '🌍 Moment Planétaire Synchronisé™' },
+    mayorElections: { en: '🏛️ World City Mayor Elections', fr: '🏛️ Élections du Maire REMO' },
+    sisterAlliances: { en: '🤝 Sister Cities 2X Alliance™', fr: '🤝 Traité de Jumelage 2X™' },
+    pixelCanvas: { en: '🎨 REMO World Pixel-Art Fresco™', fr: '🎨 Fresque Pixel-Art REMO™' },
+    monumentVault: { en: '⏳ City Monument Time-Vault™', fr: '⏳ Capsule Temporelle des Villes™' },
+    creatorBourse: { en: '📈 Creator Shares & Fan Dividends™', fr: '📈 Bourse des Créateurs REMO™' }
+  };
+  const info = labels[contestKey] || { en: '🏆 REMO Contests Live', fr: '🏆 REMO Concours en Direct' };
+  const text = `${info.en} — Join live on REMO World & win REMO Coins! 🏆\n${shareUrl}`;
+
+  if (titleEl) titleEl.textContent = `📣 Share: ${info.en}`;
+  if (urlEl) urlEl.textContent = shareUrl;
+
+  const encU = encodeURIComponent(shareUrl);
+  const encT = encodeURIComponent(text);
+  const encTOnly = encodeURIComponent(`${info.en} — Join live on REMO World! 🏆`);
+  actionsEl.innerHTML = `
+    <a href="https://wa.me/?text=${encT}" target="_blank" rel="noopener noreferrer" class="adm-btn emerald" style="text-align:center;text-decoration:none;">💬 WhatsApp</a>
+    <a href="https://www.facebook.com/sharer/sharer.php?u=${encU}&quote=${encTOnly}" target="_blank" rel="noopener noreferrer" class="adm-btn indigo" style="text-align:center;text-decoration:none;">📘 Facebook</a>
+    <a href="https://twitter.com/intent/tweet?text=${encTOnly}&url=${encU}" target="_blank" rel="noopener noreferrer" class="adm-btn outline" style="text-align:center;text-decoration:none;">𝕏 X / Twitter</a>
+    <a href="https://t.me/share/url?url=${encU}&text=${encTOnly}" target="_blank" rel="noopener noreferrer" class="adm-btn indigo" style="text-align:center;text-decoration:none;">✈️ Telegram</a>
+    <button class="adm-btn gold" onclick="navigator.clipboard && navigator.clipboard.writeText('${shareUrl.replace(/'/g, "\\'")}');admToast('🔗 Contest share link copied!');">🔗 Copy Link</button>
+    <button class="adm-btn emerald" onclick="REMO_STORE.adminPublishContestPromoPost({contestKey:'${contestKey}',title_en:'${info.en.replace(/'/g, "\\'")}',title_fr:'${info.fr.replace(/'/g, "\\'")}'});admToast('📢 Published promo post to REMO Social Feed!');document.getElementById('admContestShareModal').style.display='none';">📢 Post to REMO Feed</button>
+  `;
+  modal.style.display = 'flex';
+}
+
 window.renderAdminContestsPanel = renderAdminContestsPanel;
 window.handleAdminEuroAudioFile = handleAdminEuroAudioFile;
+window.handleAdminPgpMediaFile = handleAdminPgpMediaFile;
+window.adminAddPgpEntryFromOffice = adminAddPgpEntryFromOffice;
+window.adminToggleWorldCupCity = adminToggleWorldCupCity;
+window.adminSelectWorldCupPreset = adminSelectWorldCupPreset;
+window.adminFillMysteryCityPhoto = adminFillMysteryCityPhoto;
+window.adminConcludeMysteryFromOffice = adminConcludeMysteryFromOffice;
+window.adminShareContestPromoFromOffice = adminShareContestPromoFromOffice;
 window.adminStartEurovisionFromOffice = adminStartEurovisionFromOffice;
 window.adminAddEurovisionSongFromOffice = adminAddEurovisionSongFromOffice;
 window.adminConcludeEurovisionFromOffice = adminConcludeEurovisionFromOffice;
@@ -2285,7 +2651,8 @@ function adminIgniteWorldTorchFromOffice() {
     startCityId: document.getElementById('admTorchStartCity')?.value || 'montreal',
     targetCitiesCount: Number(document.getElementById('admTorchTargetCities')?.value || 10),
     jackpotCoins: Number(document.getElementById('admTorchJackpot')?.value || 5000),
-    perPassCoins: Number(document.getElementById('admTorchPerPass')?.value || 50)
+    perPassCoins: Number(document.getElementById('admTorchPerPass')?.value || 50),
+    announceInFeed: _admWantAnnounceFeed()
   });
   RemoAudio.play('fanfare');
   admToast('🔥 4D World Torch Relay ignited and LIVE!');
@@ -2307,7 +2674,8 @@ function adminStartGlobalSyncFromOffice() {
     prompt_en: document.getElementById('admSyncPromptEn')?.value || 'Show the sky or your view in your city right now!',
     prompt_fr: document.getElementById('admSyncPromptFr')?.value || 'Montrez le ciel ou votre vue dans votre ville en cet instant !',
     durationMinutes: Number(document.getElementById('admSyncMinutes')?.value || 25),
-    rewardCoins: Number(document.getElementById('admSyncReward')?.value || 100)
+    rewardCoins: Number(document.getElementById('admSyncReward')?.value || 100),
+    announceInFeed: _admWantAnnounceFeed()
   });
   RemoAudio.play('fanfare');
   admToast('🌍 Global Sync Flash triggered LIVE across all cities!');
@@ -2376,6 +2744,10 @@ function adminOpenMonumentVaultFromOffice(sealed = true) {
 
 function adminUnsealMonumentVaultFromOffice() {
   const res = REMO_STORE.adminUnsealMonumentVault();
+  if (!res.ok) {
+    admToast('ℹ️ Monument Time-Vault is already unsealed!');
+    return;
+  }
   admToast(`🔓 MONUMENT UNSEALED! All ${res.count} capsules revealed in the Gala (+50 🪙 bonus paid)!`);
 }
 
@@ -2531,3 +2903,12 @@ window.renderAdminSupportTicketsTables = renderAdminSupportTicketsTables;
 window.adminReplySupportTicketFromOffice = adminReplySupportTicketFromOffice;
 window.adminDeleteSupportTicketFromOffice = adminDeleteSupportTicketFromOffice;
 window.adminReplyDmFromOffice = adminReplyDmFromOffice;
+
+if (typeof window !== 'undefined' && typeof document !== 'undefined' && !window._admContestTickTimer) {
+  window._admContestTickTimer = setInterval(() => {
+    const panel = document.getElementById('adm-panel-contests');
+    if (panel && panel.classList.contains('active')) {
+      renderAdminContestsPanel();
+    }
+  }, 30000);
+}

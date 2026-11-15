@@ -9288,3 +9288,119 @@ select.remo-input option {
   gap: 6px;
   margin-bottom: 8px;
 }
+
+/* ══ v132: REMO CONTESTS SHARE, TIMERS, BLUR & DEEP-LINK HIGHLIGHT ══ */
+.contest-timer-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 99px;
+  font-size: 0.72rem;
+  font-weight: 900;
+  color: #fde047;
+  background: rgba(251, 191, 36, 0.14);
+  border: 1px solid rgba(251, 191, 36, 0.4);
+}
+.contest-timer-pill.expired {
+  color: #fda4af;
+  background: rgba(244, 63, 94, 0.18);
+  border-color: rgba(244, 63, 94, 0.45);
+}
+.contest-card-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+.contest-share-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 11px;
+  border-radius: 99px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: #e0f2fe;
+  background: linear-gradient(135deg, rgba(14, 165, 233, 0.25), rgba(139, 92, 246, 0.25));
+  border: 1px solid rgba(56, 189, 248, 0.45);
+  cursor: pointer;
+  transition: transform 0.15s ease, filter 0.15s ease;
+}
+.contest-share-btn:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.15);
+}
+.contest-blur-mystery {
+  filter: blur(13px) saturate(1.1);
+  transform: scale(1.04);
+  transition: filter 0.45s ease, transform 0.45s ease;
+  pointer-events: none;
+}
+@keyframes contestHighlightRing {
+  0% { box-shadow: 0 0 0 0 rgba(56, 189, 248, 0.85), 0 0 28px rgba(251, 191, 36, 0.55); }
+  70% { box-shadow: 0 0 0 10px rgba(56, 189, 248, 0), 0 0 24px rgba(56, 189, 248, 0.25); }
+  100% { box-shadow: 0 0 0 0 rgba(56, 189, 248, 0); }
+}
+.contest-highlight-pulse {
+  animation: contestHighlightRing 1.6s ease-out 2;
+  outline: 2px solid #38bdf8;
+}
+.contest-share-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 950;
+  background: rgba(2, 6, 23, 0.82);
+  backdrop-filter: blur(10px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+.contest-share-sheet {
+  width: 100%;
+  max-width: 440px;
+  background: linear-gradient(155deg, rgba(15, 23, 42, 0.98), rgba(30, 27, 75, 0.96));
+  border: 1px solid rgba(56, 189, 248, 0.45);
+  border-radius: 20px;
+  padding: 16px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.78);
+  color: #f8fafc;
+}
+.contest-share-poster-preview {
+  width: 100%;
+  max-height: 220px;
+  object-fit: contain;
+  border-radius: 12px;
+  border: 1px solid rgba(251, 191, 36, 0.4);
+  background: #040814;
+  display: block;
+  margin: 10px auto 12px;
+}
+.contest-share-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.contest-share-plat-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 9px 8px;
+  border-radius: 11px;
+  font-size: 0.76rem;
+  font-weight: 800;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  cursor: pointer;
+}
+.contest-share-plat-btn:hover {
+  background: rgba(56, 189, 248, 0.22);
+  border-color: rgba(56, 189, 248, 0.55);
+}

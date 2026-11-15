@@ -8853,7 +8853,14 @@ document.addEventListener('DOMContentLoaded', () => {
     currentFeedCityFilter = params.get('city');
     renderSocialFeed();
   }
-  if (params.get('view')) {
+  if (params.get('contest')) {
+    window._pendingContestDeepLink = {
+      key: params.get('contest').trim(),
+      entry: (params.get('entry') || '').trim()
+    };
+    switchRemoView('contests');
+    setTimeout(() => { if (typeof focusPendingContestDeepLink === 'function') focusPendingContestDeepLink(); }, 450);
+  } else if (params.get('view')) {
     switchRemoView(params.get('view'));
   }
   if (params.get('verify')) {
@@ -14717,6 +14724,7 @@ let _euroElapsedSec = 0;
 let _pendingEuroAudioDataUrl = '';
 let _pendingPgpMediaDataUrl = '';
 let _pendingPgpMediaType = 'image';
+let _pendingGlobalSyncMediaUrl = '';
 
 function stopEurovision60sPreview() {
   if (_euroTimerInterval) {
@@ -14815,6 +14823,66 @@ function formatContestRemainingTime(endsAt) {
   const hrs = Math.floor(diff / 3600000);
   const mins = Math.floor((diff % 3600000) / 60000);
   return `${hrs}h ${mins}m`;
+}
+
+function _isContestExpired(obj) {
+  if (!obj) return false;
+  if (obj.status && obj.status !== 'open' && obj.status !== 'running') return true;
+  return Boolean(obj.endsAt && Date.now() > Number(obj.endsAt));
+}
+
+function renderContestTimerBadgeHtml(endsAt, status = 'open', isFr = false) {
+  const isConcluded = status === 'concluded';
+  const expired = !isConcluded && Boolean(endsAt && Date.now() > Number(endsAt));
+  const label = isConcluded
+    ? (isFr ? '🏆 TERMINÉ' : '🏆 CONCLUDED')
+    : expired
+    ? (isFr ? '⌛ TEMPS ÉCOULÉ' : '⌛ ENDED')
+    : `⏳ ${formatContestRemainingTime(endsAt)}`;
+  return `<span class="contest-timer-pill ${expired ? 'expired' : ''}" data-contest-timer="${Number(endsAt || 0)}" data-contest-status="${escapeHtmlStr(status || 'open')}">${escapeHtmlStr(label)}</span>`;
+}
+
+function _contestShareFootHtml(contestKey, infoEn, infoFr, entryId = '') {
+  const isFr = REMO_I18N.getLang() === 'fr';
+  return `
+    <div class="contest-card-foot">
+      <span style="font-size:0.72rem;color:#94a3b8;font-weight:700;">${escapeHtmlStr(isFr ? infoFr : infoEn)}</span>
+      <button type="button" class="contest-share-btn" onclick="openContestShareSheet('${escapeHtmlStr(contestKey)}', '${escapeHtmlStr(entryId)}')">
+        ${escapeHtmlStr(t('contest_share_btn'))}
+      </button>
+    </div>
+  `;
+}
+
+function focusPendingContestDeepLink() {
+  const dl = window._pendingContestDeepLink;
+  if (!dl || !dl.key) return;
+  const target = (dl.entry && document.getElementById('contestEntry_' + dl.entry))
+    || document.getElementById('contestCard_' + dl.key);
+  if (!target) return;
+  window._pendingContestDeepLink = null;
+  try {
+    target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    target.classList.add('contest-highlight-pulse');
+    setTimeout(() => target.classList.remove('contest-highlight-pulse'), 3600);
+  } catch (e) {}
+}
+window.focusPendingContestDeepLink = focusPendingContestDeepLink;
+
+if (typeof window !== 'undefined' && typeof document !== 'undefined' && !window._remoContestTickTimer) {
+  window._remoContestTickTimer = setInterval(() => {
+    const viewEl = document.getElementById('view-contests');
+    if (!viewEl || !viewEl.classList.contains('active')) return;
+    const isFr = REMO_I18N.getLang() === 'fr';
+    document.querySelectorAll('[data-contest-timer]').forEach((el) => {
+      const endsAt = Number(el.getAttribute('data-contest-timer') || 0);
+      const st = el.getAttribute('data-contest-status') || 'open';
+      if (st === 'concluded' || !endsAt) return;
+      const expired = Date.now() > endsAt;
+      el.classList.toggle('expired', expired);
+      el.textContent = expired ? (isFr ? '⌛ TEMPS ÉCOULÉ' : '⌛ ENDED') : `⏳ ${formatContestRemainingTime(endsAt)}`;
+    });
+  }, 30000);
 }
 
 function renderFeedActiveContestsBanner() {
@@ -14930,10 +14998,11 @@ function renderViralContestsView() {
       : rawTitle;
     const evEntries = Array.isArray(ev.entries) ? ev.entries.slice().sort((a, b) => Number(b.points || 0) - Number(a.points || 0)) : [];
     const myVotedEntryId = u && ev.voters ? ev.voters[u.uid] : '';
-    const canSubmit = isAdm || (ev.active && ev.status === 'open' && ev.allowCitizenSubmissions);
+    const evExpired = _isContestExpired(ev);
+    const canSubmit = isAdm || (ev.active && ev.status === 'open' && !evExpired && ev.allowCitizenSubmissions);
 
     euroHtml = `
-      <div class="glass-box" style="margin-bottom:16px;border:1.5px solid rgba(251,191,36,0.55);background:radial-gradient(circle at top right,rgba(236,72,153,0.16),rgba(15,23,42,0.95) 70%);">
+      <div id="contestCard_eurovision" class="glass-box" style="margin-bottom:16px;border:1.5px solid rgba(251,191,36,0.55);background:radial-gradient(circle at top right,rgba(236,72,153,0.16),rgba(15,23,42,0.95) 70%);">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
           <div>
             <div style="display:inline-flex;align-items:center;gap:6px;background:rgba(251,191,36,0.18);border:1px solid #fbbf24;color:#fde047;padding:3px 10px;border-radius:99px;font-size:0.7rem;font-weight:900;margin-bottom:6px;">
@@ -14942,15 +15011,22 @@ function renderViralContestsView() {
             <h2 style="font-family:'Orbitron',sans-serif;font-size:1.18rem;color:#fff;margin:0;">${escapeHtmlStr(evTitle)}</h2>
             <p style="font-size:0.78rem;color:#cbd5e1;margin-top:4px;">${escapeHtmlStr(t('euro_rule_note'))}</p>
           </div>
-          <div style="text-align:right;">
+          <div style="text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:5px;">
             <div style="background:linear-gradient(135deg,#f59e0b,#ec4899);color:#fff;font-weight:900;padding:6px 14px;border-radius:12px;font-size:0.86rem;box-shadow:0 4px 15px rgba(245,158,11,0.4);">
               🏆 ${isFr ? 'Grand Prix' : 'Grand Prize'}: +${Number(ev.prizeCoins || 5000).toLocaleString()} 🪙
             </div>
-            <div style="font-size:0.74rem;color:#38bdf8;font-weight:800;margin-top:4px;">
-              ⏳ ${formatContestRemainingTime(ev.endsAt)} · ${evEntries.length} ${isFr ? 'villes en lice' : 'songs competing'}
+            <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+              ${renderContestTimerBadgeHtml(ev.endsAt, ev.status, isFr)}
+              <span style="font-size:0.74rem;color:#38bdf8;font-weight:800;">· ${evEntries.length} ${isFr ? 'villes en lice' : 'songs'}</span>
             </div>
           </div>
         </div>
+
+        ${evExpired && ev.status === 'open' ? `
+          <div style="padding:8px 12px;border-radius:10px;background:rgba(244,63,94,0.16);border:1px solid rgba(244,63,94,0.45);color:#fda4af;font-weight:800;font-size:0.78rem;margin-bottom:10px;text-align:center;">
+            ${escapeHtmlStr(t('contest_expired_lbl'))}
+          </div>
+        ` : ''}
 
         ${ev.status === 'concluded' && ev.winnerEntryId ? (() => {
           const winE = evEntries.find((x) => x.id === ev.winnerEntryId) || evEntries[0];
@@ -15030,7 +15106,7 @@ function renderViralContestsView() {
             const isMyVote = myVotedEntryId === ent.id;
             const isPlaying = _euroPlayingEntryId === ent.id;
             return `
-              <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;padding:11px 14px;border-radius:14px;background:${idx === 0 ? 'linear-gradient(90deg,rgba(251,191,36,0.16),rgba(15,23,42,0.85))' : 'rgba(255,255,255,0.04)'};border:1px solid ${isMyVote ? '#10b981' : idx === 0 ? 'rgba(251,191,36,0.5)' : 'rgba(255,255,255,0.08)'};">
+              <div id="contestEntry_${ent.id}" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;padding:11px 14px;border-radius:14px;background:${idx === 0 ? 'linear-gradient(90deg,rgba(251,191,36,0.16),rgba(15,23,42,0.85))' : 'rgba(255,255,255,0.04)'};border:1px solid ${isMyVote ? '#10b981' : idx === 0 ? 'rgba(251,191,36,0.5)' : 'rgba(255,255,255,0.08)'};">
                 <div style="display:flex;align-items:center;gap:10px;min-width:200px;flex:1;">
                   <span style="font-family:'Orbitron',sans-serif;font-weight:900;font-size:0.9rem;color:${idx === 0 ? '#fde047' : '#94a3b8'};min-width:44px;">${rankBadge}</span>
                   <span style="font-size:1.45rem;">${c.flag}</span>
@@ -15056,11 +15132,12 @@ function renderViralContestsView() {
                   <span style="font-family:'Orbitron',sans-serif;font-weight:900;font-size:0.88rem;color:#fbbf24;padding:0 6px;">
                     ${Number(ent.points || 0)} PTS
                   </span>
-                  ${ev.status === 'open' ? `
+                  ${!evExpired && ev.status === 'open' ? `
                     <button type="button" class="btn-cyber ${isMyVote ? '' : 'btn-gold'}" style="font-size:0.75rem;padding:6px 12px;" ${myVotedEntryId ? 'disabled' : ''} onclick="castCitizenEurovisionVote('${ent.id}')">
                       ${isMyVote ? escapeHtmlStr(t('euro_voted_lbl')) : escapeHtmlStr(t('euro_vote_btn'))}
                     </button>
                   ` : ''}
+                  <button type="button" class="contest-share-btn" style="padding:5px 8px;" title="Share Song" onclick="openContestShareSheet('eurovision','${ent.id}')">📤</button>
                   ${isAdm ? `
                     <button type="button" class="btn-ghost" style="padding:5px 9px;color:#f43f5e;border-color:#f43f5e;font-size:0.74rem;" onclick="REMO_STORE.adminDeleteEurovisionEntry('${ent.id}')" title="Delete Entry">✕</button>
                   ` : ''}
@@ -15069,6 +15146,7 @@ function renderViralContestsView() {
             `;
           }).join('')}
         </div>
+        ${_contestShareFootHtml('eurovision', 'Invite fans worldwide to listen & vote +100 PTS!', 'Invitez vos amis du monde entier à écouter et voter !')}
       </div>
     `;
   }
@@ -15080,9 +15158,10 @@ function renderViralContestsView() {
     const pgpTitle = isFr ? (pgp.title_fr || pgp.title_en) : (pgp.title_en || pgp.title_fr);
     const pgpEntries = Array.isArray(pgp.entries) ? pgp.entries.slice().sort((a, b) => Number(b.votes || 0) - Number(a.votes || 0)) : [];
     const myVotedId = u && pgp.voters ? pgp.voters[u.uid] : '';
+    const pgpExpired = _isContestExpired(pgp);
 
     pgpHtml = `
-      <div class="glass-box" style="margin-bottom:16px;border:1.5px solid rgba(56,189,248,0.5);">
+      <div id="contestCard_photoGrandPrix" class="glass-box" style="margin-bottom:16px;border:1.5px solid rgba(56,189,248,0.5);">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
           <div>
             <div style="display:inline-flex;align-items:center;gap:6px;background:rgba(56,189,248,0.16);border:1px solid #38bdf8;color:#7dd3fc;padding:3px 10px;border-radius:99px;font-size:0.7rem;font-weight:900;margin-bottom:6px;">
@@ -15090,14 +15169,23 @@ function renderViralContestsView() {
             </div>
             <h2 style="font-family:'Orbitron',sans-serif;font-size:1.12rem;color:#fff;margin:0;">${escapeHtmlStr(pgpTitle || 'Photo & Video Grand Prix')}</h2>
           </div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;font-size:0.78rem;font-weight:900;">
-            <span style="background:rgba(251,191,36,0.2);border:1px solid #fbbf24;color:#fde047;padding:4px 10px;border-radius:10px;">🥇 +${Number(pgp.prize1st || 3000).toLocaleString()} 🪙</span>
-            <span style="background:rgba(226,232,240,0.15);border:1px solid #cbd5e1;color:#f1f5f9;padding:4px 10px;border-radius:10px;">🥈 +${Number(pgp.prize2nd || 1500).toLocaleString()} 🪙</span>
-            <span style="background:rgba(217,119,6,0.2);border:1px solid #f59e0b;color:#fed7aa;padding:4px 10px;border-radius:10px;">🥉 +${Number(pgp.prize3rd || 750).toLocaleString()} 🪙</span>
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
+            <div style="display:flex;gap:8px;flex-wrap:wrap;font-size:0.78rem;font-weight:900;">
+              <span style="background:rgba(251,191,36,0.2);border:1px solid #fbbf24;color:#fde047;padding:4px 10px;border-radius:10px;">🥇 +${Number(pgp.prize1st || 3000).toLocaleString()} 🪙</span>
+              <span style="background:rgba(226,232,240,0.15);border:1px solid #cbd5e1;color:#f1f5f9;padding:4px 10px;border-radius:10px;">🥈 +${Number(pgp.prize2nd || 1500).toLocaleString()} 🪙</span>
+              <span style="background:rgba(217,119,6,0.2);border:1px solid #f59e0b;color:#fed7aa;padding:4px 10px;border-radius:10px;">🥉 +${Number(pgp.prize3rd || 750).toLocaleString()} 🪙</span>
+            </div>
+            ${renderContestTimerBadgeHtml(pgp.endsAt, pgp.status, isFr)}
           </div>
         </div>
 
-        ${pgp.active && pgp.status === 'open' ? `
+        ${pgpExpired && pgp.status === 'open' ? `
+          <div style="padding:8px 12px;border-radius:10px;background:rgba(244,63,94,0.16);border:1px solid rgba(244,63,94,0.45);color:#fda4af;font-weight:800;font-size:0.78rem;margin-bottom:10px;text-align:center;">
+            ${escapeHtmlStr(t('contest_expired_lbl'))}
+          </div>
+        ` : ''}
+
+        ${pgp.active && pgp.status === 'open' && !pgpExpired ? `
           <div style="margin-bottom:12px;">
             <button type="button" class="btn-cyber" onclick="document.getElementById('pgpSubmitDrawer').style.display = document.getElementById('pgpSubmitDrawer').style.display === 'none' ? 'block' : 'none'">
               ${escapeHtmlStr(t('pgp_submit_btn'))}
@@ -15126,7 +15214,7 @@ function renderViralContestsView() {
             const medal = idx === 0 ? '🥇 1ST' : idx === 1 ? '🥈 2ND' : idx === 2 ? '🥉 3RD' : `#${idx + 1}`;
             const imgSrc = ent.mediaUrl || resolveCityFallbackArtUrl(c);
             return `
-              <div style="background:rgba(15,23,42,0.85);border:1px solid ${idx < 3 ? '#fbbf24' : 'rgba(255,255,255,0.1)'};border-radius:14px;overflow:hidden;display:flex;flex-direction:column;">
+              <div id="contestEntry_${ent.id}" style="background:rgba(15,23,42,0.85);border:1px solid ${idx < 3 ? '#fbbf24' : 'rgba(255,255,255,0.1)'};border-radius:14px;overflow:hidden;display:flex;flex-direction:column;">
                 <div style="position:relative;height:155px;background:#050816;">
                   ${ent.mediaType === 'video'
                     ? `<video src="${imgSrc}" controls playsinline style="width:100%;height:100%;object-fit:cover;"></video>`
@@ -15141,11 +15229,12 @@ function renderViralContestsView() {
                     <div style="font-size:0.73rem;color:#7dd3fc;">@${escapeHtmlStr(ent.authorName)} · 🔥 ${Number(ent.votes || 0)} votes</div>
                   </div>
                   <div style="display:flex;gap:6px;">
-                    ${pgp.status === 'open' ? `
+                    ${pgp.status === 'open' && !pgpExpired ? `
                       <button type="button" class="btn-cyber ${myVotedId === ent.id ? '' : 'btn-gold'}" style="flex:1;justify-content:center;padding:6px;font-size:0.74rem;" ${myVotedId ? 'disabled' : ''} onclick="voteCitizenPgpEntry('${ent.id}')">
                         ${myVotedId === ent.id ? '✓ Voted' : escapeHtmlStr(t('pgp_vote_btn'))}
                       </button>
                     ` : ''}
+                    <button type="button" class="contest-share-btn" style="padding:5px 8px;" title="Share Photo/Video" onclick="openContestShareSheet('photoGrandPrix','${ent.id}')">📤</button>
                     ${isAdm ? `<button type="button" class="btn-ghost" style="padding:5px 8px;color:#f43f5e;border-color:#f43f5e;" onclick="REMO_STORE.adminDeletePhotoGrandPrixEntry('${ent.id}')">✕</button>` : ''}
                   </div>
                 </div>
@@ -15153,6 +15242,7 @@ function renderViralContestsView() {
             `;
           }).join('')}
         </div>
+        ${_contestShareFootHtml('photoGrandPrix', 'Share this Grand Prix & rally votes for Top 3 podium!', 'Partagez ce Grand Prix et mobilisez des votes !')}
       </div>
     `;
   }
@@ -15170,9 +15260,10 @@ function renderViralContestsView() {
       ? (isFr ? 'GRANDE FINALE MONDIALE' : 'WORLD GRAND FINAL')
       : (isFr ? 'CHAMPION COURONNÉ' : 'CHAMPION CROWNED');
     const curMatches = (wc.matches || []).filter((m) => m.round === (wc.round === 'champion' ? 'final' : wc.round));
+    const wcExpired = _isContestExpired(wc);
 
     wcHtml = `
-      <div class="glass-box" style="margin-bottom:16px;border:1.5px solid rgba(16,185,129,0.5);">
+      <div id="contestCard_worldCupBracket" class="glass-box" style="margin-bottom:16px;border:1.5px solid rgba(16,185,129,0.5);">
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
           <div>
             <div style="display:inline-flex;align-items:center;gap:6px;background:rgba(16,185,129,0.18);border:1px solid #10b981;color:#6ee7b7;padding:3px 10px;border-radius:99px;font-size:0.7rem;font-weight:900;margin-bottom:6px;">
@@ -15180,10 +15271,19 @@ function renderViralContestsView() {
             </div>
             <h2 style="font-family:'Orbitron',sans-serif;font-size:1.12rem;color:#fff;margin:0;">${escapeHtmlStr(wcTitle)}</h2>
           </div>
-          <div style="font-weight:900;color:#fbbf24;font-size:0.86rem;">
-            🏆 +${Number(wc.prizePool || 5000).toLocaleString()} PTS
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
+            <div style="font-weight:900;color:#fbbf24;font-size:0.86rem;">
+              🏆 +${Number(wc.prizePool || 5000).toLocaleString()} PTS
+            </div>
+            ${renderContestTimerBadgeHtml(wc.endsAt, wc.status, isFr)}
           </div>
         </div>
+
+        ${wcExpired && wc.status === 'open' ? `
+          <div style="padding:8px 12px;border-radius:10px;background:rgba(244,63,94,0.16);border:1px solid rgba(244,63,94,0.45);color:#fda4af;font-weight:800;font-size:0.78rem;margin-bottom:10px;text-align:center;">
+            ${escapeHtmlStr(t('contest_expired_lbl'))}
+          </div>
+        ` : ''}
 
         ${wc.championCityId ? (() => {
           const champ = getCityById(wc.championCityId);
@@ -15207,6 +15307,7 @@ function renderViralContestsView() {
             const pA = Math.round((vA / tot) * 100);
             const pB = 100 - pA;
             const myVote = u && m.voters ? m.voters[u.uid] : '';
+            const locked = Boolean(myVote || wcExpired || wc.status !== 'open');
             return `
               <div style="padding:12px;border-radius:14px;background:rgba(15,23,42,0.85);border:1px solid rgba(255,255,255,0.1);">
                 <div style="display:flex;justify-content:space-between;align-items:center;font-weight:900;font-size:0.88rem;margin-bottom:8px;">
@@ -15218,10 +15319,10 @@ function renderViralContestsView() {
                   <div class="war-bar-fill-a" style="width:${pA}%;"></div>
                 </div>
                 <div style="display:flex;gap:6px;">
-                  <button type="button" class="btn-cyber ${myVote === 'A' ? 'btn-gold' : ''}" style="flex:1;justify-content:center;font-size:0.74rem;padding:6px;" ${myVote ? 'disabled' : ''} onclick="voteCitizenWorldCupMatch('${m.id}','A')">
+                  <button type="button" class="btn-cyber ${myVote === 'A' ? 'btn-gold' : ''}" style="flex:1;justify-content:center;font-size:0.74rem;padding:6px;" ${locked ? 'disabled' : ''} onclick="voteCitizenWorldCupMatch('${m.id}','A')">
                     ${cA.flag} ${myVote === 'A' ? '✓' : 'Vote'} (${pA}%)
                   </button>
-                  <button type="button" class="btn-cyber ${myVote === 'B' ? 'btn-gold' : ''}" style="flex:1;justify-content:center;font-size:0.74rem;padding:6px;" ${myVote ? 'disabled' : ''} onclick="voteCitizenWorldCupMatch('${m.id}','B')">
+                  <button type="button" class="btn-cyber ${myVote === 'B' ? 'btn-gold' : ''}" style="flex:1;justify-content:center;font-size:0.74rem;padding:6px;" ${locked ? 'disabled' : ''} onclick="voteCitizenWorldCupMatch('${m.id}','B')">
                     ${cB.flag} ${myVote === 'B' ? '✓' : 'Vote'} (${pB}%)
                   </button>
                 </div>
@@ -15229,6 +15330,7 @@ function renderViralContestsView() {
             `;
           }).join('')}
         </div>
+        ${_contestShareFootHtml('worldCupBracket', 'Share the Knockout Bracket to push your city to the Final!', 'Partagez le Tableau Mondial pour qualifier votre ville !')}
       </div>
     `;
   }
@@ -15241,9 +15343,11 @@ function renderViralContestsView() {
     const myAttempt = u && md.attempts ? md.attempts[u.uid] : null;
     const winnersCount = (md.winners || []).length;
     const maxW = Number(md.maxWinners || 15);
+    const mdExpired = _isContestExpired(md);
+    const applyBlur = Boolean(md.blurImage && md.status === 'open' && !myAttempt && !mdExpired);
 
     mdHtml = `
-      <div class="glass-box" style="margin-bottom:16px;border:1.5px solid rgba(168,85,247,0.55);">
+      <div id="contestCard_mysteryDetective" class="glass-box" style="margin-bottom:16px;border:1.5px solid rgba(168,85,247,0.55);">
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
           <div>
             <div style="display:inline-flex;align-items:center;gap:6px;background:rgba(168,85,247,0.18);border:1px solid #a855f7;color:#e9d5ff;padding:3px 10px;border-radius:99px;font-size:0.7rem;font-weight:900;margin-bottom:6px;">
@@ -15253,13 +15357,30 @@ function renderViralContestsView() {
               🕵️ ${isFr ? 'Enquête Ville Mystère' : 'Mystery City Detective'} (+${Number(md.rewardCoins || 500)} 🪙)
             </h2>
           </div>
-          <span style="font-size:0.78rem;font-weight:900;color:#fbbf24;">🏆 ${winnersCount} / ${maxW} ${isFr ? 'Gagnants' : 'Winners'}</span>
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
+            <span style="font-size:0.78rem;font-weight:900;color:#fbbf24;">🏆 ${winnersCount} / ${maxW} ${isFr ? 'Gagnants' : 'Winners'}</span>
+            ${renderContestTimerBadgeHtml(md.endsAt, md.status, isFr)}
+          </div>
         </div>
 
-        ${md.imageUrl ? `<img src="${escapeHtmlStr(md.imageUrl)}" alt="Mystery City" style="width:100%;max-height:260px;object-fit:cover;border-radius:14px;margin-bottom:10px;">` : ''}
+        ${md.imageUrl ? `
+          <div style="position:relative;overflow:hidden;border-radius:14px;margin-bottom:10px;">
+            <img src="${escapeHtmlStr(md.imageUrl)}" alt="Mystery City" class="${applyBlur ? 'contest-blur-mystery' : ''}" style="width:100%;max-height:260px;object-fit:cover;display:block;">
+            ${applyBlur ? `<span style="position:absolute;bottom:10px;left:10px;background:rgba(15,23,42,0.88);border:1px solid #a855f7;color:#e9d5ff;font-size:0.72rem;font-weight:900;padding:4px 10px;border-radius:99px;">${escapeHtmlStr(t('md_blur_badge'))}</span>` : ''}
+          </div>
+        ` : ''}
         <div style="padding:10px 14px;border-radius:12px;background:rgba(0,0,0,0.35);border:1px solid rgba(255,255,255,0.08);color:#fde047;font-weight:700;font-size:0.86rem;margin-bottom:10px;">
           💡 "${escapeHtmlStr(clueTxt || 'Guess the secret city!')}"
         </div>
+
+        ${md.status === 'concluded' ? (() => {
+          const ansC = getCityById(md.correctCityId || 'paris');
+          return `
+            <div style="padding:10px;border-radius:12px;background:rgba(168,85,247,0.2);border:1px solid #a855f7;color:#f3e8ff;font-weight:900;text-align:center;margin-bottom:8px;">
+              👁️ ${isFr ? 'RÉPONSE RÉVÉLÉE' : 'MYSTERY ANSWER REVEALED'}: ${ansC.flag} ${escapeHtmlStr(getCityName(ansC, lang))}!
+            </div>
+          `;
+        })() : ''}
 
         ${myAttempt ? `
           <div style="padding:10px;border-radius:12px;text-align:center;font-weight:900;background:${myAttempt.correct ? 'rgba(16,185,129,0.2)' : 'rgba(244,63,94,0.2)'};color:${myAttempt.correct ? '#6ee7b7' : '#fda4af'};">
@@ -15268,14 +15389,15 @@ function renderViralContestsView() {
               : (isFr ? '❌ Essai unique utilisé ! Ce n’était pas la bonne ville.' : '❌ 1 Attempt used! That was not the secret city.')
             }
           </div>
-        ` : (md.active && md.status === 'open' ? `
+        ` : (md.active && md.status === 'open' && !mdExpired ? `
           <div style="display:flex;gap:8px;flex-wrap:wrap;">
             <select id="mdGuessCitySel" class="remo-input" style="flex:1;min-width:180px;">${cityOptionsHtml}</select>
             <button type="button" class="btn-cyber btn-gold" onclick="submitCitizenMysteryDetective()">
               🕵️ ${isFr ? 'Valider mon Unique Essai' : 'Lock In My 1 Attempt'} (+${Number(md.rewardCoins || 500)} 🪙)
             </button>
           </div>
-        ` : '')}
+        ` : (mdExpired && md.status === 'open' ? `<div style="text-align:center;font-size:0.78rem;color:#fda4af;font-weight:800;">${escapeHtmlStr(t('contest_expired_lbl'))}</div>` : ''))}
+        ${_contestShareFootHtml('mysteryDetective', 'Challenge friends: can they recognize this secret city?', 'Défiez vos amis : sauront-ils identifier cette ville ?')}
       </div>
     `;
   }
@@ -15287,9 +15409,10 @@ function renderViralContestsView() {
     const grTitle = isFr ? (gr.title_fr || gr.title_en) : (gr.title_en || gr.title_fr);
     const myTicket = u && Array.isArray(gr.tickets) ? gr.tickets.find((t) => t && t.uid === u.uid) : null;
     const winners = Array.isArray(gr.winningTickets) ? gr.winningTickets : [];
+    const grExpired = _isContestExpired(gr);
 
     grHtml = `
-      <div class="glass-box" style="margin-bottom:16px;border:1.5px solid rgba(251,191,36,0.6);">
+      <div id="contestCard_goldenRaffle" class="glass-box" style="margin-bottom:16px;border:1.5px solid rgba(251,191,36,0.6);">
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
           <div>
             <div style="display:inline-flex;align-items:center;gap:6px;background:rgba(251,191,36,0.2);border:1px solid #fbbf24;color:#fde047;padding:3px 10px;border-radius:99px;font-size:0.7rem;font-weight:900;margin-bottom:6px;">
@@ -15297,8 +15420,11 @@ function renderViralContestsView() {
             </div>
             <h2 style="font-family:'Orbitron',sans-serif;font-size:1.08rem;color:#fff;margin:0;">${escapeHtmlStr(grTitle)}</h2>
           </div>
-          <div style="font-weight:900;color:#fde047;font-size:0.86rem;">
-            🎟️ ${(gr.tickets || []).length} ${isFr ? 'Tickets inscrits' : 'Tickets Claimed'} · +${Number(gr.prizeCoins || 2500).toLocaleString()} 🪙 × ${Number(gr.winnersCount || 3)}
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
+            <div style="font-weight:900;color:#fde047;font-size:0.86rem;">
+              🎟️ ${(gr.tickets || []).length} ${isFr ? 'Tickets inscrits' : 'Tickets Claimed'} · +${Number(gr.prizeCoins || 2500).toLocaleString()} 🪙 × ${Number(gr.winnersCount || 3)}
+            </div>
+            ${renderContestTimerBadgeHtml(gr.endsAt, gr.status, isFr)}
           </div>
         </div>
 
@@ -15312,14 +15438,16 @@ function renderViralContestsView() {
         ` : ''}
 
         ${myTicket ? `
-          <div style="padding:10px 14px;border-radius:12px;background:rgba(16,185,129,0.16);border:1px solid #10b981;color:#6ee7b7;font-weight:900;text-align:center;">
-            🎟️ ${isFr ? 'Votre Ticket d’Or Officiel' : 'Your Official Golden Ticket'}: <span style="color:#fde047;font-family:'Orbitron',sans-serif;">#${escapeHtmlStr(myTicket.code)}</span>
+          <div style="padding:10px 14px;border-radius:12px;background:rgba(16,185,129,0.16);border:1px solid #10b981;color:#6ee7b7;font-weight:900;display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;">
+            <span>🎟️ ${isFr ? 'Votre Ticket d’Or Officiel' : 'Your Official Golden Ticket'}: <span style="color:#fde047;font-family:'Orbitron',sans-serif;">#${escapeHtmlStr(myTicket.code)}</span></span>
+            <button type="button" class="contest-share-btn" onclick="openContestShareSheet('goldenRaffle','${escapeHtmlStr(myTicket.code)}')">📤 ${isFr ? 'Partager mon Ticket' : 'Share My Ticket'}</button>
           </div>
-        ` : (gr.active && gr.status === 'open' ? `
+        ` : (gr.active && gr.status === 'open' && !grExpired ? `
           <button type="button" class="btn-cyber btn-gold" style="width:100%;justify-content:center;padding:11px;" onclick="claimCitizenGoldenTicket()">
             🎟️ ${isFr ? 'Réclamer mon Ticket d’Or Gratuit (+10 🪙)' : 'Claim My Free Golden Ticket (+10 🪙)'}
           </button>
-        ` : '')}
+        ` : (grExpired && gr.status === 'open' ? `<div style="text-align:center;font-size:0.78rem;color:#fda4af;font-weight:800;">${escapeHtmlStr(t('contest_expired_lbl'))}</div>` : ''))}
+        ${_contestShareFootHtml('goldenRaffle', 'Invite friends to grab a free VIP Golden Ticket!', 'Invitez vos amis à réclamer leur Ticket d’Or gratuit !')}
       </div>
     `;
   }
@@ -15333,9 +15461,10 @@ function renderViralContestsView() {
     const maxC = Number(fh.maxClaims || 20);
     const rem = Math.max(0, maxC - claimedList.length);
     const myTried = u && fh.attempts ? fh.attempts[u.uid] : null;
+    const fhExpired = _isContestExpired(fh);
 
     fhHtml = `
-      <div class="glass-box" style="margin-bottom:16px;border:1.5px solid rgba(244,63,94,0.55);">
+      <div id="contestCard_flashHunt" class="glass-box" style="margin-bottom:16px;border:1.5px solid rgba(244,63,94,0.55);">
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
           <div>
             <div style="display:inline-flex;align-items:center;gap:6px;background:rgba(244,63,94,0.2);border:1px solid #f43f5e;color:#fda4af;padding:3px 10px;border-radius:99px;font-size:0.7rem;font-weight:900;margin-bottom:6px;">
@@ -15345,7 +15474,10 @@ function renderViralContestsView() {
               ⚡ ${isFr ? 'Chasse au Trésor Flash' : 'Founder’s Flash Treasure Hunt'} (+${Number(fh.rewardCoins || 300)} 🪙)
             </h2>
           </div>
-          <span style="font-weight:900;color:#fde047;font-size:0.85rem;">🔥 ${rem} / ${maxC} ${isFr ? ' coffres restants' : ' chests left'}</span>
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
+            <span style="font-weight:900;color:#fde047;font-size:0.85rem;">🔥 ${rem} / ${maxC} ${isFr ? ' coffres restants' : ' chests left'}</span>
+            ${fh.endsAt ? renderContestTimerBadgeHtml(fh.endsAt, fh.status, isFr) : ''}
+          </div>
         </div>
 
         <div style="padding:10px 14px;border-radius:12px;background:rgba(0,0,0,0.35);border:1px solid rgba(255,255,255,0.08);color:#fde047;font-weight:700;font-size:0.86rem;margin-bottom:10px;">
@@ -15359,14 +15491,15 @@ function renderViralContestsView() {
               : (isFr ? '❌ Mauvaise ville ! Le coffre flash était ailleurs.' : '❌ Wrong city! The flash chest was hidden elsewhere.')
             }
           </div>
-        ` : (fh.active && fh.status === 'open' && rem > 0 ? `
+        ` : (fh.active && fh.status === 'open' && !fhExpired && rem > 0 ? `
           <div style="display:flex;gap:8px;flex-wrap:wrap;">
             <select id="fhGuessCitySel" class="remo-input" style="flex:1;min-width:180px;">${cityOptionsHtml}</select>
             <button type="button" class="btn-cyber btn-gold" onclick="claimCitizenFlashHunt()">
               ⚡ ${isFr ? 'Ouvrir le Coffre Flash' : 'Unlock Flash Chest'} (+${Number(fh.rewardCoins || 300)} 🪙)
             </button>
           </div>
-        ` : '')}
+        ` : (fhExpired ? `<div style="text-align:center;font-size:0.78rem;color:#fda4af;font-weight:800;">${escapeHtmlStr(t('contest_expired_lbl'))}</div>` : ''))}
+        ${_contestShareFootHtml('flashHunt', 'First citizens win instant REMO Coins — share the riddle!', 'Les premiers gagnent des Pièces REMO — partagez l’énigme !')}
       </div>
     `;
   }
@@ -15392,7 +15525,7 @@ function renderViralContestsView() {
       .join('');
 
     torchHtml = `
-      <div class="glass-box" style="margin-bottom:16px;border:1.5px solid rgba(249,115,22,0.7);background:radial-gradient(circle at top left,rgba(249,115,22,0.18),rgba(15,23,42,0.96) 70%);">
+      <div id="contestCard_torchRelay" class="glass-box" style="margin-bottom:16px;border:1.5px solid rgba(249,115,22,0.7);background:radial-gradient(circle at top left,rgba(249,115,22,0.18),rgba(15,23,42,0.96) 70%);">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
           <div>
             <div style="display:inline-flex;align-items:center;gap:6px;background:rgba(249,115,22,0.2);border:1px solid #f97316;color:#fdba74;padding:3px 10px;border-radius:99px;font-size:0.7rem;font-weight:900;margin-bottom:6px;">
@@ -15439,6 +15572,7 @@ function renderViralContestsView() {
             🎉 ${isFr ? 'Objectif Planétaire Atteint ! Tous les porteurs de la Flamme ont partagé le Grand Jackpot !' : 'Planetary Target Reached! All Torchbearers shared the Grand Jackpot!'}
           </div>
         `}
+        ${_contestShareFootHtml('torchRelay', 'Pass the flame & invite global cities onto the 4D route!', 'Faites tourner la flamme 4D dans le monde entier !')}
       </div>
     `;
   }
@@ -15450,9 +15584,10 @@ function renderViralContestsView() {
     const promptTxt = isFr ? (gs.prompt_fr || gs.prompt_en) : (gs.prompt_en || gs.prompt_fr);
     const moments = Array.isArray(gs.moments) ? gs.moments : [];
     const alreadySynced = Boolean(u && gs.participants && gs.participants[u.uid]);
+    const gsExpired = _isContestExpired(gs);
 
     syncHtml = `
-      <div class="glass-box" style="margin-bottom:16px;border:1.5px solid rgba(56,189,248,0.65);background:radial-gradient(circle at top right,rgba(56,189,248,0.16),rgba(15,23,42,0.96) 70%);">
+      <div id="contestCard_globalSync" class="glass-box" style="margin-bottom:16px;border:1.5px solid rgba(56,189,248,0.65);background:radial-gradient(circle at top right,rgba(56,189,248,0.16),rgba(15,23,42,0.96) 70%);">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
           <div>
             <div style="display:inline-flex;align-items:center;gap:6px;background:rgba(56,189,248,0.2);border:1px solid #38bdf8;color:#7dd3fc;padding:3px 10px;border-radius:99px;font-size:0.7rem;font-weight:900;margin-bottom:6px;">
@@ -15462,22 +15597,32 @@ function renderViralContestsView() {
               🌍 "${escapeHtmlStr(promptTxt)}"
             </h2>
           </div>
-          <div style="text-align:right;">
+          <div style="text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
             <span style="background:rgba(16,185,129,0.2);border:1px solid #10b981;color:#6ee7b7;font-weight:900;padding:4px 10px;border-radius:10px;font-size:0.8rem;">
-              ⚡ +${Number(gs.rewardCoins || 100)} 🪙 · ⏳ ${formatContestRemainingTime(gs.endsAt)}
+              ⚡ +${Number(gs.rewardCoins || 100)} 🪙
             </span>
+            ${renderContestTimerBadgeHtml(gs.endsAt, gs.status, isFr)}
           </div>
         </div>
 
-        ${!alreadySynced && gs.status === 'open' ? `
-          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
-            <select id="wsSyncCitySel" class="remo-input" style="min-width:155px;">${cityOptionsHtml}</select>
-            <input type="text" id="wsSyncCaptionInp" class="remo-input" style="flex:1;min-width:190px;" maxlength="160" placeholder="${isFr ? 'Que voyez-vous ou faites-vous dans votre ville à cette seconde ?' : 'What is happening in your city at this exact second?'}">
-            <button type="button" class="btn-cyber btn-gold" onclick="citizenSubmitGlobalSync()">
-              ${escapeHtmlStr(t('ws_sync_join_btn'))}
-            </button>
+        ${!alreadySynced && gs.status === 'open' && !gsExpired ? `
+          <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px;padding:10px;border-radius:12px;background:rgba(15,23,42,0.82);border:1px solid rgba(56,189,248,0.3);">
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <select id="wsSyncCitySel" class="remo-input" style="min-width:155px;">${cityOptionsHtml}</select>
+              <input type="text" id="wsSyncCaptionInp" class="remo-input" style="flex:1;min-width:190px;" maxlength="160" placeholder="${isFr ? 'Que voyez-vous ou faites-vous dans votre ville à cette seconde ?' : 'What is happening in your city at this exact second?'}">
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+              <label style="flex:1;min-width:200px;font-size:0.74rem;color:#7dd3fc;font-weight:800;">
+                ${escapeHtmlStr(t('ws_sync_photo_opt'))}
+                <input type="file" accept="image/*" class="remo-input" style="margin-top:4px;" onchange="handleGlobalSyncMediaUpload(event)">
+                <span id="wsSyncUploadStatus" style="display:block;font-size:0.72rem;color:#34d399;margin-top:2px;"></span>
+              </label>
+              <button type="button" class="btn-cyber btn-gold" onclick="citizenSubmitGlobalSync()">
+                ${escapeHtmlStr(t('ws_sync_join_btn'))}
+              </button>
+            </div>
           </div>
-        ` : ''}
+        ` : (gsExpired && gs.status === 'open' && !alreadySynced ? `<div style="text-align:center;font-size:0.78rem;color:#fda4af;font-weight:800;margin-bottom:10px;">${escapeHtmlStr(t('contest_expired_lbl'))}</div>` : '')}
 
         <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;">
           ${moments.length === 0 ? `
@@ -15492,12 +15637,14 @@ function renderViralContestsView() {
                   <span>${c.flag} ${escapeHtmlStr(getCityName(c, lang))}</span>
                   <span>${m.weatherIcon || '☀️'} ${escapeHtmlStr(m.localTime || '12:00')} · ${m.tempC !== undefined ? m.tempC + '°C' : ''}</span>
                 </div>
+                ${m.mediaUrl ? `<img src="${escapeHtmlStr(m.mediaUrl)}" alt="Global Sync" style="width:100%;height:130px;object-fit:cover;border-radius:8px;margin-bottom:6px;">` : ''}
                 <div style="font-size:0.84rem;color:#fff;font-weight:700;margin-bottom:4px;">"${escapeHtmlStr(m.caption)}"</div>
                 <div style="font-size:0.72rem;color:#7dd3fc;font-weight:800;">⚡ LIVE SYNC · @${escapeHtmlStr(m.authorName)}</div>
               </div>
             `;
           }).join('')}
         </div>
+        ${_contestShareFootHtml('globalSync', 'Synchronize the planet simultaneously — invite friends right now!', 'Synchronisons la planète au même instant — invitez vos amis !')}
       </div>
     `;
   }
@@ -15516,7 +15663,7 @@ function renderViralContestsView() {
     const isCityMayorOrAdmin = Boolean((u && u.uid === currentMayorUid) || isAdm);
 
     mayorHtml = `
-      <div class="glass-box" style="margin-bottom:16px;border:1.5px solid rgba(251,191,36,0.65);">
+      <div id="contestCard_mayorElections" class="glass-box" style="margin-bottom:16px;border:1.5px solid rgba(251,191,36,0.65);">
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
           <div>
             <div style="display:inline-flex;align-items:center;gap:6px;background:rgba(251,191,36,0.2);border:1px solid #fbbf24;color:#fde047;padding:3px 10px;border-radius:99px;font-size:0.7rem;font-weight:900;margin-bottom:6px;">
@@ -15571,6 +15718,7 @@ function renderViralContestsView() {
             `).join('')}
           </div>
         ` : ''}
+        ${_contestShareFootHtml('mayorElections', 'Campaign & rally votes for your city Mayor!', 'Mobilisez votre ville pour élire votre Maire !')}
       </div>
     `;
   }
@@ -15580,7 +15728,7 @@ function renderViralContestsView() {
   let allianceHtml = '';
   if (sa.active && Array.isArray(sa.treaties) && sa.treaties.length > 0) {
     allianceHtml = `
-      <div class="glass-box" style="margin-bottom:16px;border:1.5px solid rgba(16,185,129,0.6);">
+      <div id="contestCard_sisterAlliances" class="glass-box" style="margin-bottom:16px;border:1.5px solid rgba(16,185,129,0.6);">
         <div style="display:inline-flex;align-items:center;gap:6px;background:rgba(16,185,129,0.2);border:1px solid #10b981;color:#6ee7b7;padding:3px 10px;border-radius:99px;font-size:0.7rem;font-weight:900;margin-bottom:8px;">
           ${escapeHtmlStr(t('ws_alliance_badge'))}
         </div>
@@ -15589,6 +15737,8 @@ function renderViralContestsView() {
             const cA = getCityById(trItem.cityA);
             const cB = getCityById(trItem.cityB);
             const waved = Boolean(u && trItem.wavedBy && trItem.wavedBy[u.uid]);
+            const trExp = Boolean(trItem.endsAt && Date.now() > Number(trItem.endsAt));
+            const locked = waved || trExp;
             return `
               <div style="padding:12px;border-radius:14px;background:rgba(15,23,42,0.9);border:1px solid rgba(16,185,129,0.45);">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
@@ -15597,16 +15747,18 @@ function renderViralContestsView() {
                   </span>
                   <span style="background:rgba(251,191,36,0.2);border:1px solid #fbbf24;color:#fde047;font-size:0.7rem;font-weight:900;padding:2px 8px;border-radius:99px;">2X BONUS</span>
                 </div>
-                <div style="font-size:0.74rem;color:#6ee7b7;font-weight:800;margin-bottom:8px;">
-                  👋 ${Number(trItem.wavesCount || 0)} ${isFr ? 'Saluts Diplomatiques' : 'Diplomatic Waves'} · ⏳ ${formatContestRemainingTime(trItem.endsAt)}
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap;font-size:0.74rem;color:#6ee7b7;font-weight:800;margin-bottom:8px;">
+                  <span>👋 ${Number(trItem.wavesCount || 0)} ${isFr ? 'Saluts Diplomatiques' : 'Diplomatic Waves'}</span>
+                  ${renderContestTimerBadgeHtml(trItem.endsAt, trExp ? 'concluded' : 'open', isFr)}
                 </div>
-                <button type="button" class="btn-cyber ${waved ? '' : 'btn-gold'}" style="width:100%;justify-content:center;font-size:0.76rem;padding:7px;" ${waved ? 'disabled' : ''} onclick="citizenSendAllianceWave('${trItem.id}')">
-                  ${waved ? (isFr ? '✓ Salut Diplomatique Envoyé' : '✓ Diplomatic Wave Sent') : escapeHtmlStr(t('ws_alliance_wave_btn'))}
+                <button type="button" class="btn-cyber ${locked ? '' : 'btn-gold'}" style="width:100%;justify-content:center;font-size:0.76rem;padding:7px;" ${locked ? 'disabled' : ''} onclick="citizenSendAllianceWave('${trItem.id}')">
+                  ${waved ? (isFr ? '✓ Salut Diplomatique Envoyé' : '✓ Diplomatic Wave Sent') : (trExp ? escapeHtmlStr(t('contest_expired_lbl')) : escapeHtmlStr(t('ws_alliance_wave_btn')))}
                 </button>
               </div>
             `;
           }).join('')}
         </div>
+        ${_contestShareFootHtml('sisterAlliances', 'Invite both twin cities to double the diplomatic bonus!', 'Invitez les deux villes jumelées à doubler le bonus !')}
       </div>
     `;
   }
@@ -15630,7 +15782,7 @@ function renderViralContestsView() {
     }
 
     pixelHtml = `
-      <div class="glass-box" style="margin-bottom:16px;border:1.5px solid rgba(168,85,247,0.6);">
+      <div id="contestCard_pixelCanvas" class="glass-box" style="margin-bottom:16px;border:1.5px solid rgba(168,85,247,0.6);">
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
           <div>
             <div style="display:inline-flex;align-items:center;gap:6px;background:rgba(168,85,247,0.2);border:1px solid #a855f7;color:#e9d5ff;padding:3px 10px;border-radius:99px;font-size:0.7rem;font-weight:900;margin-bottom:6px;">
@@ -15655,6 +15807,7 @@ function renderViralContestsView() {
         <div style="display:grid;grid-template-columns:repeat(${W},1fr);gap:2px;background:#050816;padding:6px;border-radius:12px;border:1px solid rgba(255,255,255,0.12);max-width:680px;margin:0 auto;">
           ${gridCells}
         </div>
+        ${_contestShareFootHtml('pixelCanvas', 'Share the live world pixel fresco snapshot with friends!', 'Partagez la fresque pixel mondiale avec vos amis !')}
       </div>
     `;
   }
@@ -15668,7 +15821,7 @@ function renderViralContestsView() {
     const targetLbl = isFr ? (mv.unsealTargetLabel_fr || mv.unsealTargetLabel_en) : (mv.unsealTargetLabel_en || mv.unsealTargetLabel_fr);
 
     vaultHtml = `
-      <div class="glass-box" style="margin-bottom:16px;border:1.5px solid rgba(251,191,36,0.65);">
+      <div id="contestCard_monumentVault" class="glass-box" style="margin-bottom:16px;border:1.5px solid rgba(251,191,36,0.65);">
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
           <div>
             <div style="display:inline-flex;align-items:center;gap:6px;background:rgba(251,191,36,0.2);border:1px solid #fbbf24;color:#fde047;padding:3px 10px;border-radius:99px;font-size:0.7rem;font-weight:900;margin-bottom:6px;">
@@ -15710,6 +15863,7 @@ function renderViralContestsView() {
             `;
           }).join('')}
         </div>
+        ${_contestShareFootHtml('monumentVault', 'Seal a prediction & share the city time-capsule gala!', 'Scellez votre capsule temporelle et partagez l’événement !')}
       </div>
     `;
   }
@@ -15720,7 +15874,7 @@ function renderViralContestsView() {
   if (cb.active) {
     const stocks = Array.isArray(cb.stocks) ? cb.stocks : [];
     bourseHtml = `
-      <div class="glass-box" style="margin-bottom:16px;border:1.5px solid rgba(56,189,248,0.6);">
+      <div id="contestCard_creatorBourse" class="glass-box" style="margin-bottom:16px;border:1.5px solid rgba(56,189,248,0.6);">
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
           <div>
             <div style="display:inline-flex;align-items:center;gap:6px;background:rgba(56,189,248,0.2);border:1px solid #38bdf8;color:#7dd3fc;padding:3px 10px;border-radius:99px;font-size:0.7rem;font-weight:900;margin-bottom:6px;">
@@ -15764,6 +15918,7 @@ function renderViralContestsView() {
             `;
           }).join('')}
         </div>
+        ${_contestShareFootHtml('creatorBourse', 'Back local city creators & share Fan Dividends live!', 'Investissez dans vos créateurs locaux et partagez !')}
       </div>
     `;
   }
@@ -15804,10 +15959,13 @@ function renderViralContestsView() {
     ${grHtml}
     ${fhHtml}
   `;
+  if (typeof focusPendingContestDeepLink === 'function' && window._pendingContestDeepLink) {
+    setTimeout(focusPendingContestDeepLink, 80);
+  }
 }
 window.renderViralContestsView = renderViralContestsView;
 
-function handleEurovisionAudioUpload(ev) {
+async function handleEurovisionAudioUpload(ev) {
   const file = ev.target.files && ev.target.files[0];
   if (!file) return;
   const statusEl = document.getElementById('euroAudioUploadStatus');
@@ -15816,21 +15974,25 @@ function handleEurovisionAudioUpload(ev) {
     remoToast(lang === 'fr' ? '⚠️ Fichier trop volumineux (Max 12 MB / 60s).' : '⚠️ Audio file too large (Max 12 MB / 60s).');
     return;
   }
-  const rd = new FileReader();
-  rd.onload = async (e) => {
-    const dataUrl = e.target.result;
-    if (window.RemoMediaDB && typeof window.RemoMediaDB.saveDataUrl === 'function') {
-      _pendingEuroAudioDataUrl = await window.RemoMediaDB.saveDataUrl(dataUrl);
-    } else {
-      _pendingEuroAudioDataUrl = dataUrl;
-    }
+  if (statusEl) statusEl.textContent = t('ws_sync_uploading');
+  const url = (REMO_STORE && typeof REMO_STORE.uploadMediaToCloudOrDataUrl === 'function')
+    ? await REMO_STORE.uploadMediaToCloudOrDataUrl(file, 'contests_audio')
+    : '';
+  if (!url || url.startsWith('idb://')) {
+    _pendingEuroAudioDataUrl = '';
     if (statusEl) {
       statusEl.textContent = lang === 'fr'
-        ? `✓ Audio 60s prêt : ${file.name}`
-        : `✓ 60s Audio ready: ${file.name}`;
+        ? '⚠️ Cloud indisponible pour >1.2MB : utilisez un MP3 < 1.2MB ou collez un lien.'
+        : '⚠️ Cloud unavailable & file > 1.2MB: upload < 1.2MB MP3 or paste a link.';
     }
-  };
-  rd.readAsDataURL(file);
+    return;
+  }
+  _pendingEuroAudioDataUrl = url;
+  if (statusEl) {
+    statusEl.textContent = lang === 'fr'
+      ? `✓ Audio 60s prêt (Cloud) : ${file.name}`
+      : `✓ 60s Audio ready (Cloud): ${file.name}`;
+  }
 }
 window.handleEurovisionAudioUpload = handleEurovisionAudioUpload;
 
@@ -15865,6 +16027,8 @@ function submitCitizenEurovisionSong() {
   if (!res.ok) {
     if (res.error === 'already_submitted') {
       remoToast(isFr ? '⚠️ Vous avez déjà inscrit une chanson pour cette édition !' : '⚠️ You already submitted a song for this edition!');
+    } else if (res.error === 'ended') {
+      remoToast(isFr ? '⌛ Temps écoulé pour les inscriptions.' : '⌛ Submission time has ended.');
     } else {
       remoToast(isFr ? '⚠️ Inscriptions fermées.' : '⚠️ Submissions are closed.');
     }
@@ -15910,18 +16074,23 @@ function castCitizenEurovisionVote(entryId) {
 }
 window.castCitizenEurovisionVote = castCitizenEurovisionVote;
 
-function handlePgpMediaUpload(ev) {
+async function handlePgpMediaUpload(ev) {
   const file = ev.target.files && ev.target.files[0];
   if (!file) return;
-  const lang = REMO_I18N.getLang();
-  _pendingPgpMediaType = file.type.startsWith('video') ? 'video' : 'image';
-  const rd = new FileReader();
-  rd.onload = (e) => {
-    _pendingPgpMediaDataUrl = e.target.result;
-    const st = document.getElementById('pgpUploadStatus');
-    if (st) st.textContent = `✓ ${file.name}`;
-  };
-  rd.readAsDataURL(file);
+  const st = document.getElementById('pgpUploadStatus');
+  if (st) st.textContent = t('ws_sync_uploading');
+  _pendingPgpMediaType = (String(file.type || '').startsWith('video') || /\.(mp4|webm|mov|m4v)$/i.test(file.name || '')) ? 'video' : 'image';
+  const url = (REMO_STORE && typeof REMO_STORE.uploadMediaToCloudOrDataUrl === 'function')
+    ? await REMO_STORE.uploadMediaToCloudOrDataUrl(file, 'contests_pgp')
+    : '';
+  if (!url || url.startsWith('idb://')) {
+    _pendingPgpMediaDataUrl = '';
+    const isFr = REMO_I18N.getLang() === 'fr';
+    if (st) st.textContent = isFr ? '⚠️ Fichier trop grand sans cloud — utilisez une photo ou vidéo < 1.2MB.' : '⚠️ File too large without cloud — pick image or < 1.2MB video.';
+    return;
+  }
+  _pendingPgpMediaDataUrl = url;
+  if (st) st.textContent = `✓ ${file.name}`;
 }
 window.handlePgpMediaUpload = handlePgpMediaUpload;
 
@@ -15935,6 +16104,10 @@ function submitCitizenPgpEntry() {
     remoToast(isFr ? '⚠️ Ajoutez un titre !' : '⚠️ Please enter a title!');
     return;
   }
+  if (!_pendingPgpMediaDataUrl) {
+    remoToast(t('pgp_media_required_err'));
+    return;
+  }
   const res = REMO_STORE.submitPhotoGrandPrixEntry({
     cityId,
     title,
@@ -15942,7 +16115,13 @@ function submitCitizenPgpEntry() {
     mediaType: _pendingPgpMediaType
   });
   if (!res.ok) {
-    remoToast(isFr ? '⚠️ Vous avez déjà soumis une participation !' : '⚠️ You already submitted an entry!');
+    if (res.error === 'ended' || res.error === 'inactive') {
+      remoToast(isFr ? '⌛ Grand Prix terminé !' : '⌛ Grand Prix has ended!');
+    } else if (res.error === 'media_required') {
+      remoToast(t('pgp_media_required_err'));
+    } else {
+      remoToast(isFr ? '⚠️ Vous avez déjà soumis une participation !' : '⚠️ You already submitted an entry!');
+    }
     return;
   }
   _pendingPgpMediaDataUrl = '';
@@ -15959,7 +16138,9 @@ function voteCitizenPgpEntry(entryId) {
   if (!u || u.role === 'guest') { openAuthModal(); return; }
   const res = REMO_STORE.votePhotoGrandPrixEntry(entryId);
   if (!res.ok) {
-    remoToast(isFr ? '⚠️ 1 seul vote par citoyen !' : '⚠️ Only 1 vote per citizen!');
+    remoToast(res.error === 'ended'
+      ? (isFr ? '⌛ Temps écoulé !' : '⌛ Voting time has ended!')
+      : (isFr ? '⚠️ 1 seul vote par citoyen !' : '⚠️ Only 1 vote per citizen!'));
     return;
   }
   spawnRemoCoinsFX(6);
@@ -15975,7 +16156,9 @@ function voteCitizenWorldCupMatch(matchId, side) {
   if (!u || u.role === 'guest') { openAuthModal(); return; }
   const res = REMO_STORE.voteWorldCupMatch(matchId, side);
   if (!res.ok) {
-    remoToast(isFr ? '⚠️ Vous avez déjà voté pour ce match !' : '⚠️ You already voted in this match!');
+    remoToast(res.error === 'ended'
+      ? (isFr ? '⌛ Tour terminé !' : '⌛ Round voting ended!')
+      : (isFr ? '⚠️ Vous avez déjà voté pour ce match !' : '⚠️ You already voted in this match!'));
     return;
   }
   spawnRemoCoinsFX(6);
@@ -16012,7 +16195,9 @@ function claimCitizenGoldenTicket() {
   if (!u || u.role === 'guest') { openAuthModal(); return; }
   const res = REMO_STORE.claimGoldenRaffleTicket();
   if (!res.ok) {
-    remoToast(isFr ? '⚠️ Vous avez déjà votre Ticket d’Or !' : '⚠️ You already claimed your Golden Ticket!');
+    remoToast(res.error === 'ended'
+      ? (isFr ? '⌛ Tombola clôturée !' : '⌛ Raffle window ended!')
+      : (isFr ? '⚠️ Vous avez déjà votre Ticket d’Or !' : '⚠️ You already claimed your Golden Ticket!'));
     return;
   }
   spawnRemoCoinsFX(8);
@@ -16029,7 +16214,7 @@ function claimCitizenFlashHunt() {
   const cityId = document.getElementById('fhGuessCitySel')?.value || 'montreal';
   const res = REMO_STORE.claimFlashHuntTreasure(cityId);
   if (!res.ok) {
-    remoToast(isFr ? '⚠️ Déjà tenté ou coffres épuisés !' : '⚠️ Already tried or all chests claimed!');
+    remoToast(isFr ? '⚠️ Déjà tenté ou chasse terminée !' : '⚠️ Already tried or flash hunt ended!');
     return;
   }
   if (res.correct) {
@@ -16042,6 +16227,24 @@ function claimCitizenFlashHunt() {
   renderViralContestsView();
 }
 window.claimCitizenFlashHunt = claimCitizenFlashHunt;
+
+async function handleGlobalSyncMediaUpload(ev) {
+  const file = ev.target.files && ev.target.files[0];
+  if (!file) return;
+  const st = document.getElementById('wsSyncUploadStatus');
+  if (st) st.textContent = t('ws_sync_uploading');
+  const url = (REMO_STORE && typeof REMO_STORE.uploadMediaToCloudOrDataUrl === 'function')
+    ? await REMO_STORE.uploadMediaToCloudOrDataUrl(file, 'global_sync')
+    : '';
+  if (!url || url.startsWith('idb://')) {
+    _pendingGlobalSyncMediaUrl = '';
+    if (st) st.textContent = '⚠️ Photo could not upload cleanly.';
+    return;
+  }
+  _pendingGlobalSyncMediaUrl = url;
+  if (st) st.textContent = `✓ ${file.name}`;
+}
+window.handleGlobalSyncMediaUpload = handleGlobalSyncMediaUpload;
 
 /* ── CITIZEN HANDLERS FOR THE 7 UNIQUE REMO WORLD SYSTEMS ── */
 function citizenPassWorldTorch() {
@@ -16078,11 +16281,14 @@ function citizenSubmitGlobalSync() {
     remoToast(isFr ? '⚠️ Décrivez votre instant en direct !' : '⚠️ Describe your live moment!');
     return;
   }
-  const res = REMO_STORE.submitGlobalSyncMoment({ cityId, caption });
+  const res = REMO_STORE.submitGlobalSyncMoment({ cityId, caption, mediaUrl: _pendingGlobalSyncMediaUrl });
   if (!res.ok) {
-    remoToast(isFr ? '⚠️ Vous avez déjà synchronisé votre ville !' : '⚠️ You already synced your city in this window!');
+    remoToast(res.error === 'expired'
+      ? (isFr ? '⌛ Fenêtre Global Sync terminée !' : '⌛ Global Sync window ended!')
+      : (isFr ? '⚠️ Vous avez déjà synchronisé votre ville !' : '⚠️ You already synced your city in this window!'));
     return;
   }
+  _pendingGlobalSyncMediaUrl = '';
   spawnRemoCoinsFX(12);
   remoToast(
     isFr
@@ -16094,6 +16300,435 @@ function citizenSubmitGlobalSync() {
   renderViralContestsView();
 }
 window.citizenSubmitGlobalSync = citizenSubmitGlobalSync;
+
+function _buildContestShareUrl(contestKey, entryId = '') {
+  const u = (REMO_STORE && typeof REMO_STORE.getCurrentUser === 'function') ? REMO_STORE.getCurrentUser() : null;
+  const refCode = (u && (u.referralCode || u.passportNum)) ? String(u.referralCode || ('REMO-' + u.passportNum)) : '';
+  let baseOrigin = (typeof window !== 'undefined' && window.location && window.location.origin && window.location.origin !== 'null')
+    ? window.location.origin
+    : 'https://remoworld.com';
+  if (typeof window !== 'undefined' && window.location && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+    baseOrigin = 'https://remoworld.com';
+  }
+  return `${baseOrigin}/index.html?view=contests&contest=${encodeURIComponent(contestKey || 'eurovision')}${entryId ? '&entry=' + encodeURIComponent(entryId) : ''}${refCode ? '&ref=' + encodeURIComponent(refCode) : ''}`;
+}
+window._buildContestShareUrl = _buildContestShareUrl;
+
+function _getContestShareDescriptor(contestKey, entryId = '') {
+  const lang = (window.REMO_I18N && REMO_I18N.getLang() === 'fr') ? 'fr' : 'en';
+  const isFr = lang === 'fr';
+  const vc = (REMO_STORE.state && REMO_STORE.state.viralContests) || {};
+  const ws = (REMO_STORE.state && REMO_STORE.state.worldSystems) || {};
+  const u = REMO_STORE.getCurrentUser();
+  const url = _buildContestShareUrl(contestKey, entryId);
+  const gCityName = (cid) => {
+    const c = (typeof getCityById === 'function' ? getCityById(cid) : null) || { flag: '🌐', name_en: cid, name_fr: cid };
+    const nm = (typeof getCityName === 'function') ? getCityName(c, lang) : (c.name_en || cid);
+    return `${c.flag || '🌐'} ${nm}`;
+  };
+
+  let accent = '#fbbf24';
+  let badge = 'REMO CONTEST LIVE';
+  let title = isFr ? '🏆 Concours Mondial REMO' : '🏆 REMO Global Contest';
+  let subtitle = isFr ? 'Rejoins les citoyens du monde en direct !' : 'Join global citizens live right now!';
+  let prizeText = '';
+  let timerText = isFr ? 'EN DIRECT' : 'LIVE NOW';
+  let thumbUrl = '';
+  let pixelSnapshot = null;
+
+  if (contestKey === 'eurovision') {
+    const ev = vc.eurovision || {};
+    const songs = Array.isArray(ev.entries) ? ev.entries : [];
+    const targetSong = entryId ? songs.find((s) => s && s.id === entryId) : null;
+    accent = '#fbbf24';
+    badge = '🎤 REMO MUSIC CONTEST';
+    title = isFr ? (ev.title_fr || 'Concours Musical REMO') : (ev.title_en || 'REMO Music Contest');
+    prizeText = `🏆 +${Number(ev.prizeCoins || 5000).toLocaleString()} 🪙`;
+    timerText = ev.status === 'concluded' ? (isFr ? 'TERMINÉ' : 'CONCLUDED') : formatContestRemainingTime(ev.endsAt);
+    subtitle = targetSong
+      ? `${gCityName(targetSong.cityId)} — "${targetSong.songTitle}" (@${targetSong.artistName || targetSong.authorName}) · ${Number(targetSong.votesCount || 0)} votes`
+      : (isFr ? `${songs.length} chansons de villes en compétition` : `${songs.length} world city anthems competing`);
+  } else if (contestKey === 'photoGrandPrix') {
+    const pgp = vc.photoGrandPrix || {};
+    const items = Array.isArray(pgp.entries) ? pgp.entries : [];
+    const targetItem = entryId ? items.find((p) => p && p.id === entryId) : items[0];
+    accent = '#38bdf8';
+    badge = '📸 PHOTO & VIDEO GRAND PRIX';
+    title = isFr ? (pgp.theme_fr || 'Grand Prix Photo & Vidéo') : (pgp.theme_en || 'Photo & Video Grand Prix');
+    prizeText = `🥇 +${Number(pgp.prize1st || 3000)} 🪙`;
+    timerText = pgp.status === 'concluded' ? (isFr ? 'PODIUM FINAL' : 'FINAL PODIUM') : formatContestRemainingTime(pgp.endsAt);
+    subtitle = targetItem
+      ? `${gCityName(targetItem.cityId)} — "${targetItem.caption || ''}" · ${Number(targetItem.votesCount || 0)} votes`
+      : (isFr ? `${items.length} participations en lice` : `${items.length} city snapshots competing`);
+    if (targetItem && targetItem.mediaUrl && (!targetItem.mediaType || targetItem.mediaType === 'image')) {
+      thumbUrl = targetItem.mediaUrl;
+    }
+  } else if (contestKey === 'worldCupBracket') {
+    const wc = vc.worldCupBracket || {};
+    const matches = Array.isArray(wc.matches) ? wc.matches : [];
+    const targetMatch = entryId ? matches.find((m) => m && m.id === entryId) : matches[0];
+    accent = '#10b981';
+    badge = `⚽ WORLD CUP · ROUND ${String(wc.round || 'QF').toUpperCase()}`;
+    title = isFr ? (wc.title_fr || 'Coupe du Monde des Villes') : (wc.title_en || '8-City World Knockout Cup');
+    prizeText = `🏆 +${Number(wc.prizeCityBonus || wc.prizePool || 5000)} PTS`;
+    timerText = (wc.status === 'concluded' || wc.round === 'champion') ? (isFr ? 'CHAMPION COURONNÉ' : 'CHAMPION CROWNED') : formatContestRemainingTime(wc.endsAt);
+    if (wc.championCityId) {
+      subtitle = `${isFr ? 'Champion Mondial' : 'World Champion'}: ${gCityName(wc.championCityId)}`;
+    } else if (targetMatch) {
+      subtitle = `${gCityName(targetMatch.cityA)} (${targetMatch.votesA || 0}) ⚔️ ${gCityName(targetMatch.cityB)} (${targetMatch.votesB || 0})`;
+    }
+  } else if (contestKey === 'mysteryDetective') {
+    const md = vc.mysteryDetective || {};
+    accent = '#a855f7';
+    badge = '🕵️ MYSTERY CITY DETECTIVE';
+    title = isFr ? 'Défi Ville Mystère REMO' : 'REMO Mystery City Detective';
+    prizeText = `💎 +${Number(md.rewardCoins || 500)} 🪙 / Winner`;
+    timerText = md.status === 'concluded' ? (isFr ? 'RÉVÉLÉ' : 'REVEALED') : formatContestRemainingTime(md.endsAt);
+    const clue = isFr ? (md.clue_fr || md.clue_en) : (md.clue_en || md.clue_fr);
+    subtitle = md.status === 'concluded'
+      ? `${isFr ? 'Réponse' : 'Answer'}: ${gCityName(md.correctCityId || 'paris')} · "${clue || ''}"`
+      : (clue ? `"${clue}" — ${isFr ? '1 seul essai !' : '1 attempt only!'}` : (isFr ? 'Devinez la ville secrète !' : 'Guess the secret city!'));
+    if (md.imageUrl && (!md.blurImage || md.status === 'concluded')) thumbUrl = md.imageUrl;
+  } else if (contestKey === 'goldenRaffle') {
+    const gr = vc.goldenRaffle || {};
+    const myTk = (u && Array.isArray(gr.tickets)) ? gr.tickets.find((tk) => tk && tk.uid === u.uid) : null;
+    accent = '#fbbf24';
+    badge = '🎟️ GOLDEN TICKET RAFFLE';
+    title = isFr ? (gr.title_fr || 'Grande Tombola Ticket d’Or') : (gr.title_en || "Founder's Golden Ticket Raffle");
+    prizeText = `🪙 ${Number(gr.prizeCoins || 2500)} × ${Number(gr.winnersCount || 3)}`;
+    timerText = gr.status === 'concluded' ? (isFr ? 'TIRAGE EFFECTUÉ' : 'DRAWN') : formatContestRemainingTime(gr.endsAt);
+    subtitle = myTk
+      ? `${isFr ? 'Mon Ticket d’Or' : 'My Golden Ticket'}: #${myTk.code}`
+      : (isFr ? 'Réclamez votre Ticket d’Or gratuit maintenant !' : 'Claim your free Golden Ticket before the draw!');
+  } else if (contestKey === 'flashHunt') {
+    const fh = vc.flashHunt || {};
+    accent = '#f43f5e';
+    badge = '⚡ FLASH TREASURE HUNT';
+    title = isFr ? 'Chasse au Trésor Éclair REMO' : "Founder's Flash Treasure Hunt";
+    prizeText = `⚡ +${Number(fh.rewardCoins || 200)} 🪙`;
+    timerText = fh.endsAt ? formatContestRemainingTime(fh.endsAt) : (isFr ? 'PREMIERS ARRIVÉS' : 'FIRST CLAIMERS');
+    subtitle = isFr ? (fh.riddle_fr || fh.riddle_en || 'Trouvez le coffre secret en direct !') : (fh.riddle_en || fh.riddle_fr || 'Find the secret city chest live!');
+  } else if (contestKey === 'torchRelay') {
+    const tr = ws.torchRelay || {};
+    const vis = Array.isArray(tr.visitedCities) ? tr.visitedCities : ['montreal'];
+    accent = '#f97316';
+    badge = '🔥 4D WORLD TORCH RELAY™';
+    title = isFr ? (tr.title_fr || 'Relais Flamme 4D') : (tr.title_en || '4D World Torch Relay™');
+    prizeText = `🔥 ${Number(tr.totalKm || 0).toLocaleString()} KM · +${Number(tr.jackpotCoins || 5000)} 🪙`;
+    subtitle = vis.slice(-4).map((cid) => gCityName(cid)).join(' ➔ ');
+  } else if (contestKey === 'globalSync') {
+    const gs = ws.globalSync || {};
+    const moms = Array.isArray(gs.moments) ? gs.moments : [];
+    accent = '#38bdf8';
+    badge = '🌍 GLOBAL SYNC FLASH™';
+    title = isFr ? (gs.prompt_fr || 'Synchronisation Planétaire') : (gs.prompt_en || 'Global Sync Flash™');
+    prizeText = `⚡ +${Number(gs.rewardCoins || 100)} 🪙`;
+    timerText = formatContestRemainingTime(gs.endsAt);
+    subtitle = moms[0]
+      ? `${gCityName(moms[0].cityId)} — "${moms[0].caption || ''}" (${moms.length} live)`
+      : (isFr ? `${moms.length} villes synchronisées à cette seconde` : `${moms.length} cities synced at this exact second`);
+    if (moms[0] && moms[0].mediaUrl) thumbUrl = moms[0].mediaUrl;
+  } else if (contestKey === 'mayorElections') {
+    const selCid = window._selectedMayorElectionCity || (u && u.homeCity) || 'montreal';
+    const me = ws.mayorElections || {};
+    const mUid = (REMO_STORE.state.cityMayors && REMO_STORE.state.cityMayors[selCid]) || 'u_admin_founder';
+    const mUser = (REMO_STORE.state.users || []).find((x) => x && x.uid === mUid);
+    const mName = (mUser && mUser.name) || 'REMO Founder';
+    accent = '#fbbf24';
+    badge = '🏛️ WORLD CITY MAYOR™';
+    title = `${gCityName(selCid)} — ${isFr ? 'Élections du Maire' : 'Mayor Elections'}`;
+    prizeText = `👑 @${mName}`;
+    const cands = (me.candidates && Array.isArray(me.candidates[selCid])) ? me.candidates[selCid] : [];
+    subtitle = isFr ? `${cands.length} candidat(s) en campagne · Votez maintenant !` : `${cands.length} candidate(s) running · Cast your city vote!`;
+  } else if (contestKey === 'sisterAlliances') {
+    const sa = ws.sisterAlliances || {};
+    const tr0 = (Array.isArray(sa.treaties) && sa.treaties[0]) || null;
+    accent = '#10b981';
+    badge = '🤝 SISTER CITIES 2X ALLIANCE™';
+    title = isFr ? 'Traités de Jumelage 2X REMO' : 'Sister Cities 2X Alliance™';
+    prizeText = '2X BONUS · +40 🪙';
+    subtitle = tr0 ? `${gCityName(tr0.cityA)} 🤝 ${gCityName(tr0.cityB)} (${tr0.wavesCount || 0} waves)` : subtitle;
+    if (tr0 && tr0.endsAt) timerText = formatContestRemainingTime(tr0.endsAt);
+  } else if (contestKey === 'pixelCanvas') {
+    const pc = ws.pixelCanvas || {};
+    accent = '#a855f7';
+    badge = '🎨 REMO PIXEL FRESCO™';
+    title = isFr ? (pc.title_fr || 'Fresque Pixel-Art REMO') : (pc.title_en || 'REMO World Pixel-Art Fresco™');
+    prizeText = `🖌️ ${Number(pc.totalPixelsPlaced || 0)} PIXELS`;
+    subtitle = isFr ? 'Placez votre pixel coloré sur la fresque mondiale !' : 'Claim & paint a live pixel on the global fresco!';
+    pixelSnapshot = pc;
+  } else if (contestKey === 'monumentVault') {
+    const mv = ws.monumentVault || {};
+    const caps = Array.isArray(mv.capsules) ? mv.capsules : [];
+    accent = '#fbbf24';
+    badge = '⏳ CITY TIME-VAULT™';
+    title = isFr ? (mv.title_fr || 'Capsule Temporelle des Villes') : (mv.title_en || 'City Monument Time-Vault™');
+    prizeText = `⏳ ${caps.length} CAPSULES`;
+    subtitle = isFr ? (mv.unsealTargetLabel_fr || 'Scellez votre prédiction du futur !') : (mv.unsealTargetLabel_en || 'Seal your future prediction capsule!');
+  } else if (contestKey === 'creatorBourse') {
+    const cb = ws.creatorBourse || {};
+    const st0 = (Array.isArray(cb.stocks) && cb.stocks[0]) || null;
+    accent = '#38bdf8';
+    badge = '📈 CREATOR SHARES & DIVIDENDS™';
+    title = isFr ? 'Bourse des Créateurs REMO™' : 'REMO Creator Shares & Fan Dividends™';
+    prizeText = st0 ? `@${st0.creatorName} · ${Number(st0.sharePrice || 50)} 🪙` : '📈 FAN DIVIDENDS';
+    subtitle = isFr ? 'Soutenez les créateurs des villes & touchez des dividendes !' : 'Back city creators & earn automatic fan dividends!';
+  }
+
+  const shareText = `${badge}: ${title}\n${subtitle}${prizeText ? ` (${prizeText})` : ''}\n${isFr ? 'Rejoins & participe en direct sur REMO World 👉' : 'Join & vote live on REMO World 👉'}`;
+  const hashtags = '#REMOWorld #REMOConcours #WorldCities #LiveContest';
+  return { url, title, subtitle, prizeText, timerText, badge, accent, thumbUrl, pixelSnapshot, shareText, hashtags, isFr, u };
+}
+
+async function generateContestSharePosterDataUrl(contestKey, entryId = '') {
+  const info = _getContestShareDescriptor(contestKey, entryId);
+  const canvas = document.createElement('canvas');
+  canvas.width = 1080;
+  canvas.height = 1080;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return '';
+
+  // Cosmic gradient backdrop
+  const bg = ctx.createRadialGradient(840, 180, 60, 540, 540, 920);
+  bg.addColorStop(0, '#1e1b4b');
+  bg.addColorStop(0.55, '#0b1224');
+  bg.addColorStop(1, '#040712');
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, 1080, 1080);
+
+  // Outer neon frame
+  ctx.strokeStyle = info.accent;
+  ctx.lineWidth = 6;
+  ctx.strokeRect(26, 26, 1028, 1028);
+  ctx.strokeStyle = 'rgba(255,255,255,0.14)';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(44, 44, 992, 992);
+
+  // Header brand + badge
+  ctx.fillStyle = '#fde047';
+  ctx.font = '900 32px Orbitron, Inter, sans-serif';
+  ctx.fillText('REMO WORLD · LIVE ARENA', 76, 108);
+
+  ctx.fillStyle = 'rgba(255,255,255,0.1)';
+  ctx.fillRect(76, 134, 480, 52);
+  ctx.strokeStyle = info.accent;
+  ctx.lineWidth = 2;
+  ctx.strokeRect(76, 134, 480, 52);
+  ctx.fillStyle = '#ffffff';
+  ctx.font = '800 22px Inter, sans-serif';
+  ctx.fillText(String(info.badge).slice(0, 34), 96, 168);
+
+  // Timer pill top-right
+  ctx.fillStyle = 'rgba(56,189,248,0.18)';
+  ctx.fillRect(720, 74, 284, 52);
+  ctx.strokeStyle = '#38bdf8';
+  ctx.strokeRect(720, 74, 284, 52);
+  ctx.fillStyle = '#7dd3fc';
+  ctx.font = '900 22px Inter, sans-serif';
+  ctx.fillText(`⏳ ${String(info.timerText).slice(0, 18)}`, 742, 108);
+
+  // Helper to wrap text cleanly
+  const wrapText = (txt, x, startY, maxW, lineH, maxLines) => {
+    const words = String(txt || '').split(/\s+/);
+    let line = '';
+    let y = startY;
+    let linesDrawn = 0;
+    for (let i = 0; i < words.length; i++) {
+      const test = line ? `${line} ${words[i]}` : words[i];
+      if (ctx.measureText(test).width > maxW && line) {
+        ctx.fillText(line, x, y);
+        linesDrawn++;
+        if (linesDrawn >= maxLines) return y + lineH;
+        line = words[i];
+        y += lineH;
+      } else {
+        line = test;
+      }
+    }
+    if (line && linesDrawn < maxLines) {
+      ctx.fillText(line, x, y);
+      y += lineH;
+    }
+    return y;
+  };
+
+  // Main Title
+  ctx.fillStyle = '#ffffff';
+  ctx.font = '900 48px Orbitron, Inter, sans-serif';
+  let nextY = wrapText(info.title, 76, 265, 928, 60, 3);
+
+  // Subtitle
+  ctx.fillStyle = '#cbd5e1';
+  ctx.font = '600 30px Inter, sans-serif';
+  nextY = wrapText(info.subtitle, 76, nextY + 24, 928, 42, 3);
+
+  // Optional Pixel Canvas miniature OR Safe Image Preview
+  if (info.pixelSnapshot) {
+    const pc = info.pixelSnapshot;
+    const W = Number(pc.width || 24);
+    const H = Number(pc.height || 14);
+    const cell = 18;
+    const ox = 76;
+    const oy = Math.max(nextY + 24, 480);
+    ctx.fillStyle = '#050816';
+    ctx.fillRect(ox - 8, oy - 8, W * cell + 16, H * cell + 16);
+    for (let py = 0; py < H; py++) {
+      for (let px = 0; px < W; px++) {
+        const cellObj = pc.pixels && pc.pixels[`${px}_${py}`];
+        ctx.fillStyle = (cellObj && cellObj.color) || '#111827';
+        ctx.fillRect(ox + px * cell, oy + py * cell, cell - 2, cell - 2);
+      }
+    }
+  } else if (info.thumbUrl) {
+    try {
+      const imgData = await new Promise((resolve) => {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        const timer = setTimeout(() => resolve(null), 1600);
+        img.onload = () => { clearTimeout(timer); resolve(img); };
+        img.onerror = () => { clearTimeout(timer); resolve(null); };
+        img.src = info.thumbUrl;
+      });
+      if (imgData) {
+        const boxX = 76;
+        const boxY = Math.max(nextY + 18, 480);
+        const boxW = 680;
+        const boxH = 290;
+        ctx.save();
+        ctx.beginPath();
+        if (typeof ctx.roundRect === 'function') ctx.roundRect(boxX, boxY, boxW, boxH, 18);
+        else ctx.rect(boxX, boxY, boxW, boxH);
+        ctx.clip();
+        ctx.drawImage(imgData, boxX, boxY, boxW, boxH);
+        ctx.restore();
+      }
+    } catch (e) {}
+  }
+
+  // Prize bar
+  if (info.prizeText) {
+    ctx.fillStyle = 'rgba(251,191,36,0.16)';
+    ctx.fillRect(76, 825, 690, 88);
+    ctx.strokeStyle = '#fbbf24';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(76, 825, 690, 88);
+    ctx.fillStyle = '#fde047';
+    ctx.font = '900 34px Orbitron, Inter, sans-serif';
+    ctx.fillText(String(info.prizeText).slice(0, 34), 104, 881);
+  }
+
+  // Footer signature + QR code
+  const authorTag = (info.u && info.u.name) ? `@${info.u.name}` : 'REMO World Citizen';
+  ctx.fillStyle = '#94a3b8';
+  ctx.font = '700 22px Inter, sans-serif';
+  ctx.fillText(`🌐 ${authorTag} · remoworld.com/contests`, 76, 978);
+
+  if (window.REMO_SHARE_HUB && typeof window.REMO_SHARE_HUB.drawQrOnCanvas === 'function') {
+    window.REMO_SHARE_HUB.drawQrOnCanvas(ctx, info.url, 815, 815, 192, { borderColor: info.accent });
+  }
+
+  try {
+    return canvas.toDataURL('image/png');
+  } catch (e) {
+    // Fallback clean poster without potentially cross-origin tainted pixel data
+    ctx.fillStyle = '#050816';
+    ctx.fillRect(76, 480, 680, 290);
+    try { return canvas.toDataURL('image/png'); } catch (e2) { return ''; }
+  }
+}
+window.generateContestSharePosterDataUrl = generateContestSharePosterDataUrl;
+
+async function shareContestToPlatform(platform) {
+  const ctx = window._activeContestShareContext || { contestKey: 'eurovision', entryId: '' };
+  const info = _getContestShareDescriptor(ctx.contestKey, ctx.entryId);
+  const net = String(platform || 'copy').toLowerCase();
+
+  if (window.REMO_SHARE_HUB && typeof window.REMO_SHARE_HUB.shareToNetwork === 'function') {
+    await window.REMO_SHARE_HUB.shareToNetwork(net, {
+      url: info.url,
+      title: info.title,
+      shareText: info.shareText,
+      hashtags: info.hashtags,
+      context: 'duel',
+      isFr: info.isFr,
+      fileName: `REMO_${ctx.contestKey}`,
+      getDataUrlFn: () => window._activeContestSharePosterUrl
+        ? Promise.resolve(window._activeContestSharePosterUrl)
+        : generateContestSharePosterDataUrl(ctx.contestKey, ctx.entryId)
+    });
+    return;
+  }
+
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(`${info.shareText}\n${info.url}`);
+    }
+    remoToast(t('contest_share_copy_ok'), 'coin');
+  } catch (e) {}
+}
+window.shareContestToPlatform = shareContestToPlatform;
+
+async function downloadContestSharePoster() {
+  const ctx = window._activeContestShareContext || { contestKey: 'eurovision', entryId: '' };
+  const dataUrl = window._activeContestSharePosterUrl || await generateContestSharePosterDataUrl(ctx.contestKey, ctx.entryId);
+  if (!dataUrl) return;
+  if (window.REMO_SHARE_HUB && typeof window.REMO_SHARE_HUB.downloadDataUrl === 'function') {
+    window.REMO_SHARE_HUB.downloadDataUrl(dataUrl, `REMO_${ctx.contestKey}_Poster.png`);
+  } else {
+    const a = document.createElement('a');
+    a.href = dataUrl;
+    a.download = `REMO_${ctx.contestKey}_Poster.png`;
+    a.click();
+  }
+  remoToast('📥 Poster PNG downloaded!', 'coin');
+}
+window.downloadContestSharePoster = downloadContestSharePoster;
+
+async function openContestShareSheet(contestKey, entryId = '') {
+  window._activeContestShareContext = { contestKey: String(contestKey || 'eurovision'), entryId: String(entryId || '') };
+  window._activeContestSharePosterUrl = '';
+  const info = _getContestShareDescriptor(contestKey, entryId);
+
+  const old = document.getElementById('remoContestShareModal');
+  if (old) old.remove();
+
+  const wrap = document.createElement('div');
+  wrap.id = 'remoContestShareModal';
+  wrap.className = 'contest-share-modal-backdrop';
+  wrap.onclick = (ev) => { if (ev.target === wrap) wrap.remove(); };
+  wrap.innerHTML = `
+    <div class="contest-share-sheet">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:6px;">
+        <h3 style="font-family:'Orbitron',sans-serif;font-size:0.96rem;color:#fde047;margin:0;">${escapeHtmlStr(t('contest_share_title'))}</h3>
+        <button type="button" class="ftv-vibe-close" onclick="document.getElementById('remoContestShareModal')?.remove()">✕</button>
+      </div>
+      <p style="font-size:0.75rem;color:#cbd5e1;margin:0 0 8px;">${escapeHtmlStr(t('contest_share_sub'))}</p>
+      <img id="remoContestSharePosterImg" class="contest-share-poster-preview" alt="REMO Contest Share Poster" style="display:none;">
+      <input type="text" readonly value="${escapeHtmlStr(info.url)}" class="remo-input" style="font-size:0.72rem;margin-bottom:10px;width:100%;" onclick="this.select()">
+      <div class="contest-share-grid">
+        <button type="button" class="contest-share-plat-btn" onclick="shareContestToPlatform('whatsapp')">💬 WhatsApp</button>
+        <button type="button" class="contest-share-plat-btn" onclick="shareContestToPlatform('facebook')">📘 Facebook</button>
+        <button type="button" class="contest-share-plat-btn" onclick="shareContestToPlatform('x')">𝕏 Twitter</button>
+        <button type="button" class="contest-share-plat-btn" onclick="shareContestToPlatform('telegram')">✈️ Telegram</button>
+        <button type="button" class="contest-share-plat-btn" onclick="shareContestToPlatform('tiktok')">🎵 TikTok</button>
+        <button type="button" class="contest-share-plat-btn" onclick="shareContestToPlatform('instagram')">📸 Instagram</button>
+        <button type="button" class="contest-share-plat-btn" onclick="shareContestToPlatform('native')">📲 Native</button>
+        <button type="button" class="contest-share-plat-btn" onclick="shareContestToPlatform('copy')">🔗 Copy</button>
+        <button type="button" class="contest-share-plat-btn" onclick="downloadContestSharePoster()">${escapeHtmlStr(t('contest_share_download_poster'))}</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(wrap);
+
+  const posterUrl = await generateContestSharePosterDataUrl(contestKey, entryId);
+  window._activeContestSharePosterUrl = posterUrl;
+  const imgEl = document.getElementById('remoContestSharePosterImg');
+  if (imgEl && posterUrl) {
+    imgEl.src = posterUrl;
+    imgEl.style.display = 'block';
+  }
+}
+window.openContestShareSheet = openContestShareSheet;
 
 function citizenVoteOrNominateMayor(cityId, candidateUid = '') {
   const isFr = REMO_I18N.getLang() === 'fr';

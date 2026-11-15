@@ -699,11 +699,19 @@
 
       <!-- ══ TAB 8: 🏆🎤⚽🕵️🎟️⚡ REMO CONTESTS COMMAND CENTER ══ -->
       <section class="adm-panel" id="adm-panel-contests">
+        <div class="exec-card" style="padding:10px 14px;border-color:rgba(56,189,248,0.45);background:rgba(15,23,42,0.85);margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+          <label class="check-pill" style="margin:0;"><input type="checkbox" id="admAnnounceInFeed"> 📢 Auto-Publish Bilingual Announcement Post in REMO Feed when Launching Contests</label>
+          <span style="font-size:0.76rem;color:#94a3b8;">Every contest &amp; system below also has a direct <b>📣 Share</b> button for WhatsApp, Facebook, X, Telegram &amp; Copy Link.</span>
+        </div>
+
         <!-- 1. 🎤 REMO MUSIC CONTEST (World Cities 60s Song Contest) -->
         <div class="exec-card" style="border-color:#fbbf24;background:linear-gradient(135deg,rgba(15,23,42,0.95),rgba(49,16,68,0.75));">
           <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
             <h3 style="color:#fde047;margin:0;">🎤 1. REMO Music Contest — 60s City Sounds &amp; Anthems</h3>
-            <span id="admEuroStatusPill" style="font-size:0.76rem;font-weight:900;padding:4px 10px;border-radius:99px;background:rgba(255,255,255,0.08);">IDLE</span>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+              <span id="admEuroStatusPill" style="font-size:0.76rem;font-weight:900;padding:4px 10px;border-radius:99px;background:rgba(255,255,255,0.08);">IDLE</span>
+              <button class="adm-btn indigo" style="padding:4px 10px;font-size:0.74rem;" onclick="adminShareContestPromoFromOffice('eurovision')">📣 Share</button>
+            </div>
           </div>
           <div class="adm-row-2" style="margin-bottom:10px;">
             <div class="adm-field"><label>Edition Title (EN)</label><input type="text" id="admEuroTitleEn" class="adm-inp" value="REMO Music Contest — 60s City Sounds &amp; Anthems"></div>
@@ -737,7 +745,7 @@
               <div class="adm-field"><label>Song Title (60s)</label><input type="text" id="admEuroAddTitle" class="adm-inp" placeholder="e.g. Chisinau Golden Horizon"></div>
               <div class="adm-field"><label>Artist / Creator</label><input type="text" id="admEuroAddArtist" class="adm-inp" value="REMO Official"></div>
               <div class="adm-field"><label>External Link (YouTube, Suno, SoundCloud...)</label><input type="url" id="admEuroAddLink" class="adm-inp" placeholder="https://..."></div>
-              <div class="adm-field"><label>Upload MP3/Audio (Max 60s, Optional)</label><input type="file" accept="audio/*,video/mp4" class="adm-inp" onchange="handleAdminEuroAudioFile(event)"></div>
+              <div class="adm-field"><label>Upload MP3/Audio (Max 60s, Optional)</label><input type="file" accept="audio/*,video/mp4" class="adm-inp" onchange="handleAdminEuroAudioFile(event)"><span id="admEuroAudioStatus" style="font-size:0.72rem;color:#94a3b8;"></span></div>
               <div class="adm-field">
                 <label>60s Synth Preset (Backup)</label>
                 <select id="admEuroAddPreset" class="adm-inp">
@@ -759,7 +767,10 @@
         <div class="exec-card" style="border-color:#38bdf8;">
           <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
             <h3 style="color:#38bdf8;margin:0;">📸 2. World Cities Photo &amp; Video Grand Prix (🥇 🥈 🥉 Top 3 Podium)</h3>
-            <span id="admPgpStatusPill" style="font-size:0.76rem;font-weight:900;padding:4px 10px;border-radius:99px;background:rgba(255,255,255,0.08);">IDLE</span>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+              <span id="admPgpStatusPill" style="font-size:0.76rem;font-weight:900;padding:4px 10px;border-radius:99px;background:rgba(255,255,255,0.08);">IDLE</span>
+              <button class="adm-btn indigo" style="padding:4px 10px;font-size:0.74rem;" onclick="adminShareContestPromoFromOffice('photoGrandPrix')">📣 Share</button>
+            </div>
           </div>
           <div class="adm-row-2" style="margin-bottom:10px;">
             <div class="adm-field"><label>Theme Title (EN)</label><input type="text" id="admPgpTitleEn" class="adm-inp" value="Best Night Skyline &amp; Street Vibe"></div>
@@ -769,10 +780,20 @@
             <div class="adm-field"><label>🥉 3rd Place Prize (🪙)</label><input type="number" id="admPgpPrize3" class="adm-inp" value="750"></div>
             <div class="adm-field"><label>Duration (Hours)</label><input type="number" id="admPgpHours" class="adm-inp" value="48"></div>
           </div>
-          <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+          <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;">
             <button class="adm-btn gold" onclick="adminStartPgpFromOffice()">🚀 Launch Photo/Video Grand Prix</button>
             <button class="adm-btn emerald" onclick="adminConcludePgpFromOffice()">🏆 Conclude &amp; Pay Top 3 Podium</button>
             <button class="adm-btn rose" onclick="adminResetPgpFromOffice()">🗑️ Stop / Reset Grand Prix</button>
+          </div>
+          <div style="padding:10px;border-radius:10px;background:rgba(0,0,0,0.3);border:1px solid rgba(56,189,248,0.28);margin-bottom:10px;">
+            <div style="font-weight:800;font-size:0.8rem;color:#7dd3fc;margin-bottom:6px;">➕ Add Official Grand Prix Demo / Entry</div>
+            <div class="adm-row-2" style="margin-bottom:8px;">
+              <div class="adm-field"><label>City</label><select id="admPgpAddCity" class="adm-inp"></select></div>
+              <div class="adm-field"><label>Entry Title</label><input type="text" id="admPgpAddTitle" class="adm-inp" placeholder="e.g. Old Port Dusk"></div>
+              <div class="adm-field"><label>Photo / Video URL (or upload)</label><input type="text" id="admPgpAddMediaUrl" class="adm-inp" placeholder="https://..."></div>
+              <div class="adm-field"><label>Upload Photo / 60s Video</label><input type="file" accept="image/*,video/mp4,video/webm" class="adm-inp" onchange="handleAdminPgpMediaFile(event)"><span id="admPgpMediaStatus" style="font-size:0.72rem;color:#94a3b8;"></span></div>
+            </div>
+            <button class="adm-btn indigo" style="padding:6px 12px;font-size:0.78rem;" onclick="adminAddPgpEntryFromOffice()">📸 Add Entry to Grand Prix</button>
           </div>
           <table class="adm-table"><tbody id="admPgpEntriesTable"></tbody></table>
         </div>
@@ -781,7 +802,10 @@
         <div class="exec-card" style="border-color:#10b981;">
           <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
             <h3 style="color:#34d399;margin:0;">⚽ 3. 8-City World Knockout Cup Bracket (QF ➔ SF ➔ Final)</h3>
-            <span id="admWcStatusPill" style="font-size:0.76rem;font-weight:900;padding:4px 10px;border-radius:99px;background:rgba(255,255,255,0.08);">IDLE</span>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+              <span id="admWcStatusPill" style="font-size:0.76rem;font-weight:900;padding:4px 10px;border-radius:99px;background:rgba(255,255,255,0.08);">IDLE</span>
+              <button class="adm-btn indigo" style="padding:4px 10px;font-size:0.74rem;" onclick="adminShareContestPromoFromOffice('worldCupBracket')">📣 Share</button>
+            </div>
           </div>
           <div class="adm-row-2" style="margin-bottom:10px;">
             <div class="adm-field"><label>Cup Title (EN)</label><input type="text" id="admWcTitleEn" class="adm-inp" value="8-City World Knockout Cup"></div>
@@ -789,57 +813,91 @@
             <div class="adm-field"><label>Champion City Cup Bonus PTS</label><input type="number" id="admWcPrizePool" class="adm-inp" value="5000"></div>
             <div class="adm-field"><label>Hours per Round</label><input type="number" id="admWcRoundHours" class="adm-inp" value="24"></div>
           </div>
+          <div style="padding:10px;border-radius:10px;background:rgba(0,0,0,0.3);border:1px solid rgba(16,185,129,0.28);margin-bottom:10px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
+              <span style="font-size:0.78rem;font-weight:800;color:#6ee7b7;">🏟️ Pick 8 Participating Cities (<span id="admWcPickedCount">8</span>/8 selected)</span>
+              <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                <button type="button" class="adm-btn outline" style="padding:3px 9px;font-size:0.72rem;" onclick="adminSelectWorldCupPreset('random')">🎲 Random 8</button>
+                <button type="button" class="adm-btn outline" style="padding:3px 9px;font-size:0.72rem;" onclick="adminSelectWorldCupPreset('top')">🏆 Top 8 Cities</button>
+              </div>
+            </div>
+            <div id="admWcCitiesGrid" style="display:flex;flex-wrap:wrap;gap:6px;max-height:110px;overflow:auto;"></div>
+          </div>
           <div style="display:flex;gap:10px;flex-wrap:wrap;">
             <button class="adm-btn gold" onclick="adminStartWorldCupFromOffice()">🚀 Launch 8-City Quarter-Finals</button>
             <button class="adm-btn emerald" onclick="adminAdvanceWorldCupFromOffice()">⏩ Advance to Next Round (QF ➔ SF ➔ Final ➔ Champion)</button>
             <button class="adm-btn rose" onclick="adminResetWorldCupFromOffice()">🗑️ Stop / Reset Bracket</button>
           </div>
+          <table class="adm-table" style="margin-top:10px;"><tbody id="admWcMatchesTable"></tbody></table>
         </div>
 
         <!-- 4. 🕵️ MYSTERY CITY DETECTIVE (1-Attempt Secret Landmark Quiz) -->
         <div class="exec-card" style="border-color:#a855f7;">
           <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
             <h3 style="color:#c084fc;margin:0;">🕵️ 4. Mystery City Detective (1-Attempt Secret Landmark Quiz)</h3>
-            <span id="admMdStatusPill" style="font-size:0.76rem;font-weight:900;padding:4px 10px;border-radius:99px;background:rgba(255,255,255,0.08);">IDLE</span>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+              <span id="admMdStatusPill" style="font-size:0.76rem;font-weight:900;padding:4px 10px;border-radius:99px;background:rgba(255,255,255,0.08);">IDLE</span>
+              <button class="adm-btn indigo" style="padding:4px 10px;font-size:0.74rem;" onclick="adminShareContestPromoFromOffice('mysteryDetective')">📣 Share</button>
+            </div>
           </div>
           <div class="adm-row-2" style="margin-bottom:10px;">
             <div class="adm-field"><label>Secret Correct City</label><select id="admMdCity" class="adm-inp"></select></div>
-            <div class="adm-field"><label>Mystery Photo URL (Optional)</label><input type="text" id="admMdImage" class="adm-inp" placeholder="https://... or leave empty for clue-only"></div>
+            <div class="adm-field">
+              <label>Mystery Photo URL (Optional)</label>
+              <div style="display:flex;gap:6px;">
+                <input type="text" id="admMdImage" class="adm-inp" placeholder="https://... or click City Photo">
+                <button type="button" class="adm-btn outline" style="white-space:nowrap;padding:6px 10px;font-size:0.74rem;" onclick="adminFillMysteryCityPhoto()">🖼️ City Photo</button>
+              </div>
+            </div>
             <div class="adm-field"><label>Secret Clue (EN)</label><input type="text" id="admMdClueEn" class="adm-inp" placeholder="e.g. Famous iron tower on the Champ de Mars..."></div>
             <div class="adm-field"><label>Secret Clue (FR)</label><input type="text" id="admMdClueFr" class="adm-inp" placeholder="ex: Célèbre tour de fer sur le Champ-de-Mars..."></div>
             <div class="adm-field"><label>Reward per Winner (🪙)</label><input type="number" id="admMdReward" class="adm-inp" value="500"></div>
             <div class="adm-field"><label>Max First Winners</label><input type="number" id="admMdMaxWinners" class="adm-inp" value="15"></div>
+            <div class="adm-field"><label>Duration (Hours)</label><input type="number" id="admMdHours" class="adm-inp" value="24"></div>
+            <div class="adm-field" style="display:flex;align-items:flex-end;">
+              <label class="check-pill" style="margin:0;"><input type="checkbox" id="admMdBlur" checked> 🌫️ Blur Photo Until Solved / Revealed</label>
+            </div>
           </div>
           <div style="display:flex;gap:10px;flex-wrap:wrap;">
             <button class="adm-btn gold" onclick="adminStartMysteryFromOffice()">🚀 Launch Mystery City Detective</button>
+            <button class="adm-btn emerald" onclick="adminConcludeMysteryFromOffice()">👁️ Conclude &amp; Reveal Answer</button>
             <button class="adm-btn rose" onclick="adminResetMysteryFromOffice()">🗑️ Stop / Reset Mystery</button>
           </div>
+          <table class="adm-table" style="margin-top:10px;"><tbody id="admMdWinnersTable"></tbody></table>
         </div>
 
         <!-- 5. 🎟️ FOUNDER'S GOLDEN TICKET RAFFLE -->
         <div class="exec-card" style="border-color:#f59e0b;">
           <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
             <h3 style="color:#fbbf24;margin:0;">🎟️ 5. Founder’s Golden Ticket Raffle</h3>
-            <span id="admGrStatusPill" style="font-size:0.76rem;font-weight:900;padding:4px 10px;border-radius:99px;background:rgba(255,255,255,0.08);">IDLE</span>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+              <span id="admGrStatusPill" style="font-size:0.76rem;font-weight:900;padding:4px 10px;border-radius:99px;background:rgba(255,255,255,0.08);">IDLE</span>
+              <button class="adm-btn indigo" style="padding:4px 10px;font-size:0.74rem;" onclick="adminShareContestPromoFromOffice('goldenRaffle')">📣 Share</button>
+            </div>
           </div>
           <div class="adm-row-2" style="margin-bottom:10px;">
             <div class="adm-field"><label>Raffle Title (EN)</label><input type="text" id="admGrTitleEn" class="adm-inp" value="Founder’s Golden Ticket Raffle"></div>
             <div class="adm-field"><label>Raffle Title (FR)</label><input type="text" id="admGrTitleFr" class="adm-inp" value="Grande Tombola Ticket d’Or du Fondateur"></div>
             <div class="adm-field"><label>Prize per Winner (🪙)</label><input type="number" id="admGrPrize" class="adm-inp" value="2500"></div>
             <div class="adm-field"><label>Number of Winners to Draw</label><input type="number" id="admGrCount" class="adm-inp" value="3"></div>
+            <div class="adm-field"><label>Duration (Hours)</label><input type="number" id="admGrHours" class="adm-inp" value="48"></div>
           </div>
           <div style="display:flex;gap:10px;flex-wrap:wrap;">
             <button class="adm-btn gold" onclick="adminStartRaffleFromOffice()">🚀 Open Golden Ticket Raffle</button>
             <button class="adm-btn emerald" onclick="adminDrawRaffleFromOffice()">🎰 Draw Lucky Winner(s) &amp; Pay Coins Now</button>
             <button class="adm-btn rose" onclick="adminResetRaffleFromOffice()">🗑️ Stop / Reset Raffle</button>
           </div>
+          <table class="adm-table" style="margin-top:10px;"><tbody id="admGrTicketsTable"></tbody></table>
         </div>
 
         <!-- 6. ⚡ FOUNDER'S FLASH TREASURE HUNT -->
         <div class="exec-card" style="border-color:#f43f5e;">
           <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
             <h3 style="color:#fb7185;margin:0;">⚡ 6. Founder’s Flash Treasure Hunt (First N Citizens)</h3>
-            <span id="admFhStatusPill" style="font-size:0.76rem;font-weight:900;padding:4px 10px;border-radius:99px;background:rgba(255,255,255,0.08);">IDLE</span>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+              <span id="admFhStatusPill" style="font-size:0.76rem;font-weight:900;padding:4px 10px;border-radius:99px;background:rgba(255,255,255,0.08);">IDLE</span>
+              <button class="adm-btn indigo" style="padding:4px 10px;font-size:0.74rem;" onclick="adminShareContestPromoFromOffice('flashHunt')">📣 Share</button>
+            </div>
           </div>
           <div class="adm-row-2" style="margin-bottom:10px;">
             <div class="adm-field"><label>Secret Target City</label><select id="admFhCity" class="adm-inp"></select></div>
@@ -847,11 +905,13 @@
             <div class="adm-field"><label>Riddle Clue (EN)</label><input type="text" id="admFhRiddleEn" class="adm-inp" placeholder="e.g. The city of Mount Royal and poutine..."></div>
             <div class="adm-field"><label>Riddle Clue (FR)</label><input type="text" id="admFhRiddleFr" class="adm-inp" placeholder="ex: La métropole du Mont-Royal..."></div>
             <div class="adm-field"><label>Instant Reward (🪙)</label><input type="number" id="admFhReward" class="adm-inp" value="300"></div>
+            <div class="adm-field"><label>Duration (Hours, 0 = until claimed)</label><input type="number" id="admFhHours" class="adm-inp" value="24"></div>
           </div>
           <div style="display:flex;gap:10px;flex-wrap:wrap;">
             <button class="adm-btn gold" onclick="adminStartFlashHuntFromOffice()">🚀 Launch Flash Treasure Hunt</button>
             <button class="adm-btn rose" onclick="adminResetFlashHuntFromOffice()">🗑️ Stop / Reset Flash Hunt</button>
           </div>
+          <table class="adm-table" style="margin-top:10px;"><tbody id="admFhClaimsTable"></tbody></table>
         </div>
 
         <!-- ═══════════════════════════════════════════════════════════════
@@ -870,7 +930,10 @@
         <div class="exec-card" style="border-color:#f97316;">
           <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
             <h3 style="color:#fb923c;margin:0;">🔥 1. 4D World Torch Relay™ around the Earth</h3>
-            <span id="admWsTorchPill" style="font-size:0.76rem;font-weight:900;padding:4px 10px;border-radius:99px;background:rgba(255,255,255,0.08);">IDLE</span>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+              <span id="admWsTorchPill" style="font-size:0.76rem;font-weight:900;padding:4px 10px;border-radius:99px;background:rgba(255,255,255,0.08);">IDLE</span>
+              <button class="adm-btn indigo" style="padding:4px 10px;font-size:0.74rem;" onclick="adminShareContestPromoFromOffice('torchRelay')">📣 Share</button>
+            </div>
           </div>
           <div class="adm-row-2" style="margin-bottom:10px;">
             <div class="adm-field"><label>Starting City (Ignite Torch)</label><select id="admTorchStartCity" class="adm-inp"></select></div>
@@ -883,13 +946,17 @@
             <button class="adm-btn emerald" onclick="adminConcludeWorldTorchFromOffice()">🏆 Conclude &amp; Distribute Jackpot Now</button>
             <button class="adm-btn rose" onclick="adminStopWorldTorchFromOffice()">🗑️ Extinguish / Reset Torch</button>
           </div>
+          <div id="admWsTorchInfo" style="margin-top:10px;font-size:0.78rem;color:#cbd5e1;"></div>
         </div>
 
         <!-- 🌍 SYSTEM 2: GLOBAL SYNC FLASH™ (Simultaneous Planetary Live) -->
         <div class="exec-card" style="border-color:#38bdf8;">
           <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
             <h3 style="color:#38bdf8;margin:0;">🌍 2. Global Sync Flash™ — Simultaneous Planetary Live Window</h3>
-            <span id="admWsSyncPill" style="font-size:0.76rem;font-weight:900;padding:4px 10px;border-radius:99px;background:rgba(255,255,255,0.08);">IDLE</span>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+              <span id="admWsSyncPill" style="font-size:0.76rem;font-weight:900;padding:4px 10px;border-radius:99px;background:rgba(255,255,255,0.08);">IDLE</span>
+              <button class="adm-btn indigo" style="padding:4px 10px;font-size:0.74rem;" onclick="adminShareContestPromoFromOffice('globalSync')">📣 Share</button>
+            </div>
           </div>
           <div class="adm-row-2" style="margin-bottom:10px;">
             <div class="adm-field"><label>Live Prompt (EN)</label><input type="text" id="admSyncPromptEn" class="adm-inp" value="Show the sky or your view in your city right now!"></div>
@@ -901,13 +968,17 @@
             <button class="adm-btn gold" onclick="adminStartGlobalSyncFromOffice()">🚨 Trigger Global Sync Flash Live</button>
             <button class="adm-btn rose" onclick="adminStopGlobalSyncFromOffice()">🗑️ Stop / Reset Global Sync</button>
           </div>
+          <div id="admWsSyncInfo" style="margin-top:10px;font-size:0.78rem;color:#cbd5e1;"></div>
         </div>
 
         <!-- 🏛️ SYSTEM 3: WORLD CITY MAYOR & ROYAL KEY™ -->
         <div class="exec-card" style="border-color:#fbbf24;">
           <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
             <h3 style="color:#fde047;margin:0;">🏛️ 3. World City Mayor Elections &amp; 4D Royal Key™</h3>
-            <span id="admWsMayorPill" style="font-size:0.76rem;font-weight:900;padding:4px 10px;border-radius:99px;background:rgba(255,255,255,0.08);">IDLE</span>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+              <span id="admWsMayorPill" style="font-size:0.76rem;font-weight:900;padding:4px 10px;border-radius:99px;background:rgba(255,255,255,0.08);">IDLE</span>
+              <button class="adm-btn indigo" style="padding:4px 10px;font-size:0.74rem;" onclick="adminShareContestPromoFromOffice('mayorElections')">📣 Share</button>
+            </div>
           </div>
           <div class="adm-row-2" style="margin-bottom:10px;">
             <div class="adm-field"><label>Select City</label><select id="admMayorCitySel" class="adm-inp"></select></div>
@@ -919,13 +990,17 @@
             <button class="adm-btn emerald" onclick="adminCrownCityMayorFromOffice()">👑 1-Click Appoint Mayor &amp; Royal Key</button>
             <button class="adm-btn rose" onclick="adminToggleMayorHubFromOffice(false)">🗑️ Hide Mayor Elections Hub</button>
           </div>
+          <table class="adm-table" style="margin-top:10px;"><tbody id="admMayorDecreesTable"></tbody></table>
         </div>
 
         <!-- 🤝 SYSTEM 4: SISTER CITIES 2X ALLIANCE™ -->
         <div class="exec-card" style="border-color:#10b981;">
           <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
             <h3 style="color:#34d399;margin:0;">🤝 4. Sister Cities 48h 2X Alliance Treaties™</h3>
-            <span id="admWsAlliancePill" style="font-size:0.76rem;font-weight:900;padding:4px 10px;border-radius:99px;background:rgba(255,255,255,0.08);">IDLE</span>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+              <span id="admWsAlliancePill" style="font-size:0.76rem;font-weight:900;padding:4px 10px;border-radius:99px;background:rgba(255,255,255,0.08);">IDLE</span>
+              <button class="adm-btn indigo" style="padding:4px 10px;font-size:0.74rem;" onclick="adminShareContestPromoFromOffice('sisterAlliances')">📣 Share</button>
+            </div>
           </div>
           <div class="adm-row-2" style="margin-bottom:10px;">
             <div class="adm-field"><label>Sister City A</label><select id="admAllyCityA" class="adm-inp"></select></div>
@@ -937,13 +1012,17 @@
             <button class="adm-btn gold" onclick="adminCreateSisterAllianceFromOffice()">🤝 Unite Sister Cities in 2X Alliance</button>
             <button class="adm-btn rose" onclick="adminClearSisterAlliancesFromOffice()">🗑️ End All Sister Alliances</button>
           </div>
+          <table class="adm-table" style="margin-top:10px;"><tbody id="admAlliancesTable"></tbody></table>
         </div>
 
         <!-- 🎨 SYSTEM 5: REMO WORLD PIXEL CANVAS™ -->
         <div class="exec-card" style="border-color:#a855f7;">
           <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
             <h3 style="color:#c084fc;margin:0;">🎨 5. REMO World Pixel-Art Fresco™ (24×14 Live Canvas)</h3>
-            <span id="admWsPixelPill" style="font-size:0.76rem;font-weight:900;padding:4px 10px;border-radius:99px;background:rgba(255,255,255,0.08);">IDLE</span>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+              <span id="admWsPixelPill" style="font-size:0.76rem;font-weight:900;padding:4px 10px;border-radius:99px;background:rgba(255,255,255,0.08);">IDLE</span>
+              <button class="adm-btn indigo" style="padding:4px 10px;font-size:0.74rem;" onclick="adminShareContestPromoFromOffice('pixelCanvas')">📣 Share</button>
+            </div>
           </div>
           <div style="display:flex;gap:10px;flex-wrap:wrap;">
             <button class="adm-btn gold" onclick="adminTogglePixelCanvasFromOffice(true)">🎨 Open World Pixel Canvas</button>
@@ -959,7 +1038,10 @@
         <div class="exec-card" style="border-color:#f59e0b;">
           <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
             <h3 style="color:#fbbf24;margin:0;">⏳ 6. City Monument Time-Vault™ (Sealed Future Capsules)</h3>
-            <span id="admWsVaultPill" style="font-size:0.76rem;font-weight:900;padding:4px 10px;border-radius:99px;background:rgba(255,255,255,0.08);">IDLE</span>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+              <span id="admWsVaultPill" style="font-size:0.76rem;font-weight:900;padding:4px 10px;border-radius:99px;background:rgba(255,255,255,0.08);">IDLE</span>
+              <button class="adm-btn indigo" style="padding:4px 10px;font-size:0.74rem;" onclick="adminShareContestPromoFromOffice('monumentVault')">📣 Share</button>
+            </div>
           </div>
           <div class="adm-row-2" style="margin-bottom:10px;">
             <div class="adm-field"><label>Vault Title (EN)</label><input type="text" id="admVaultTitleEn" class="adm-inp" value="City Monument Time-Vault™ — Wishes &amp; Predictions"></div>
@@ -978,7 +1060,10 @@
         <div class="exec-card" style="border-color:#38bdf8;">
           <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
             <h3 style="color:#7dd3fc;margin:0;">📈 7. Creator Shares &amp; Fan Dividends Exchange™</h3>
-            <span id="admWsBoursePill" style="font-size:0.76rem;font-weight:900;padding:4px 10px;border-radius:99px;background:rgba(255,255,255,0.08);">IDLE</span>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+              <span id="admWsBoursePill" style="font-size:0.76rem;font-weight:900;padding:4px 10px;border-radius:99px;background:rgba(255,255,255,0.08);">IDLE</span>
+              <button class="adm-btn indigo" style="padding:4px 10px;font-size:0.74rem;" onclick="adminShareContestPromoFromOffice('creatorBourse')">📣 Share</button>
+            </div>
           </div>
           <div class="adm-row-2" style="margin-bottom:10px;">
             <div class="adm-field"><label>Add / Update Creator (@Name)</label><input type="text" id="admBourseCreatorName" class="adm-inp" placeholder="e.g. Elena_KIV"></div>
@@ -1001,6 +1086,18 @@
   <!-- Admin Toast Notifications -->
   <div id="admToastBox" style="position:fixed;bottom:20px;right:20px;z-index:600;"></div>
 
+  <!-- Admin Contest Promo Share Modal -->
+  <div id="admContestShareModal" style="display:none;position:fixed;inset:0;z-index:750;background:rgba(2,6,23,0.82);backdrop-filter:blur(8px);align-items:center;justify-content:center;padding:16px;" onclick="if(event.target===this)this.style.display='none';">
+    <div class="exec-card" style="max-width:460px;width:100%;border-color:#38bdf8;margin:0;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+        <h3 id="admShareModalTitle" style="color:#38bdf8;margin:0;">📣 Share REMO Event</h3>
+        <button class="adm-btn outline" style="padding:3px 9px;" onclick="document.getElementById('admContestShareModal').style.display='none'">✕</button>
+      </div>
+      <p id="admShareModalUrl" style="font-size:0.74rem;color:#94a3b8;word-break:break-all;background:rgba(0,0,0,0.35);padding:8px 10px;border-radius:8px;margin-bottom:10px;"></p>
+      <div id="admShareModalActions" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;"></div>
+    </div>
+  </div>
+
   <!-- Firebase v9 Compat SDK (SRI Integrity Verified) -->
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js" integrity="sha384-ajMUFBUFMCyjh8uxJg6bkGcKe9RTolyjwbxB3yES0QQMenP3Oztj/W9vA2SJPcIh" crossorigin="anonymous"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js" integrity="sha384-xD1t9dGSVKobUztxDkv6xUI0H4AnFz0NxwlgDJJ7FDlblG9xxr1Z9iauCZuJYj6p" crossorigin="anonymous"></script>
@@ -1008,10 +1105,10 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js" integrity="sha384-oFrOL1TiREYNET0lsYF3LjQuyi2gL7vhjH1X8vFr+umcmzAdPELopeSgbcrv4uRm" crossorigin="anonymous"></script>
 
   <!-- Shared REMO Core + Admin Controller -->
-  <script src="js/remo-i18n.js?v=131"></script>
-  <script src="js/remo-cities-data.js?v=131"></script>
-  <script src="js/remo-store.js?v=131"></script>
-  <script src="js/remo-card-engine.js?v=131"></script>
-  <script src="js/remo-admin.js?v=131"></script>
+  <script src="js/remo-i18n.js?v=132"></script>
+  <script src="js/remo-cities-data.js?v=132"></script>
+  <script src="js/remo-store.js?v=132"></script>
+  <script src="js/remo-card-engine.js?v=132"></script>
+  <script src="js/remo-admin.js?v=132"></script>
 </body>
 </html>
