@@ -6279,12 +6279,19 @@ select.remo-input option {
   max-width: 215px;
 }
 .hdr-radio-st-lbl {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  overflow: hidden;
+  max-width: 128px;
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+.hdr-radio-st-name {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  max-width: 118px;
-  font-size: 0.76rem;
-  font-weight: 800;
+  min-width: 0;
 }
 .hdr-radio-mini-act {
   display: inline-flex;
@@ -6996,24 +7003,48 @@ select.remo-input option {
   border-color: rgba(244, 63, 94, 0.55);
   color: #fda4af;
 }
+.ftv-mode-btn.active {
+  border-color: rgba(56, 189, 248, 0.72);
+  color: #bae6fd;
+  background: rgba(14, 165, 233, 0.24);
+}
 .ftv-center-title {
   text-align: center;
   pointer-events: none;
-  margin-top: 6px;
+  margin-top: 2px;
 }
 .ftv-center-flag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
   font-family: 'Orbitron', sans-serif;
   font-size: clamp(1.3rem, 3.2vw, 2.3rem);
   font-weight: 900;
   letter-spacing: 2px;
   color: #fff;
-  text-shadow: 0 4px 28px rgba(56, 189, 248, 0.45);
+  text-shadow: 0 4px 24px rgba(0, 0, 0, 0.85), 0 0 28px rgba(56, 189, 248, 0.45);
+}
+.ftv-waving-flag-cv {
+  display: block;
+  flex-shrink: 0;
+  filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.58));
+}
+.remo-flag-svg {
+  display: inline-block;
+  vertical-align: middle;
+  border-radius: 3px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  flex-shrink: 0;
 }
 .ftv-center-sub {
-  font-size: 0.84rem;
-  color: #bae6fd;
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: #e0f2fe;
   margin-top: 4px;
-  opacity: 0.9;
+  opacity: 0.94;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.88);
 }
 .ftv-bottom-dock {
   display: flex;
@@ -7115,11 +7146,22 @@ select.remo-input option {
   height: 38px;
   border-radius: 12px;
   background: rgba(56, 189, 248, 0.16);
+  border: 1px solid rgba(56, 189, 248, 0.28);
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 1.25rem;
   flex-shrink: 0;
+  transition: box-shadow 0.3s ease, border-color 0.3s ease;
+}
+.ftv-st-icon.is-live {
+  border-color: rgba(16, 185, 129, 0.78);
+  box-shadow: 0 0 14px rgba(16, 185, 129, 0.48), inset 0 0 8px rgba(56, 189, 248, 0.25);
+  animation: ftvVinylPulse 2.2s ease-in-out infinite;
+}
+@keyframes ftvVinylPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
 }
 .ftv-st-meta {
   min-width: 0;

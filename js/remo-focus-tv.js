@@ -22,11 +22,27 @@
     vinyl: 'ftvAmbVinylBtn'
   };
 
+  let _savedVisualMode = 'photo';
+  try {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('remo_ftv_mode') === 'neon') {
+      _savedVisualMode = 'neon';
+    }
+  } catch (e) {}
+
   const state = {
     isOpen: false,
     cityId: 'montreal',
+    prevCityId: '',
+    citySwitchTs: 0,
+    visualMode: _savedVisualMode,
+    parallaxX: 0,
+    parallaxY: 0,
+    targetParallaxX: 0,
+    targetParallaxY: 0,
     rafId: null,
     particles: [],
+    glassDrops: [],
+    bokehOrbs: [],
     stars: [],
     phase: 0,
     ambient: {
@@ -113,6 +129,81 @@
     return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
   }
 
+  function _cityCountry(city) {
+    if (typeof window.getCityCountry === 'function') return window.getCityCountry(city, _lang());
+    return _lang() === 'fr' ? (city.country_fr || city.country_en || '') : (city.country_en || city.country_fr || '');
+  }
+
+  function _flagHtml(iconOrObj, fallback, w, h) {
+    if (window.REMO_FLAGS && typeof window.REMO_FLAGS.renderFlagOrIconHtml === 'function') {
+      return window.REMO_FLAGS.renderFlagOrIconHtml(iconOrObj, fallback, w, h);
+    }
+    if (typeof iconOrObj === 'object' && iconOrObj) {
+      return _escapeHtml(iconOrObj.flag || iconOrObj.icon || fallback || '📻');
+    }
+    return _escapeHtml(iconOrObj || fallback || '📻');
+  }
+
+  const _cityPhotoCache = {};
+  function _getCityPhotoImg(city) {
+    if (!city || !city.id) return null;
+    const cid = String(city.id).toLowerCase();
+    if (_cityPhotoCache[cid]) return _cityPhotoCache[cid];
+    if (typeof Image === 'undefined') return null;
+
+    let src = city.cardImageUrl || city.imageUrl || '';
+    if (!src && typeof window.getDefaultCityCardImageUrl === 'function') {
+      src = window.getDefaultCityCardImageUrl(cid);
+    } else if (!src && window.REMO_BUNDLED_CITY_IMAGE_IDS && typeof window.REMO_BUNDLED_CITY_IMAGE_IDS.has === 'function' && window.REMO_BUNDLED_CITY_IMAGE_IDS.has(cid)) {
+      src = `./img/cities/${cid}.jpg`;
+    }
+    if (!src || src.startsWith('data:')) return null;
+
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.decoding = 'async';
+    img.src = src;
+    _cityPhotoCache[cid] = img;
+    return img;
+  }
+
+  function _drawCoverPhoto(ctx, img, w, h, zoom, panX, panY) {
+    if (!img || !img.complete || !(img.naturalWidth > 0 && img.naturalHeight > 0)) return false;
+    const iw = img.naturalWidth;
+    const ih = img.naturalHeight;
+    const scale = Math.max(w / iw, h / ih) * (zoom || 1);
+    const dw = iw * scale;
+    const dh = ih * scale;
+    const dx = (w - dw) * 0.5 + (panX || 0);
+    const dy = (h - dh) * 0.5 + (panY || 0);
+    ctx.drawImage(img, dx, dy, dw, dh);
+    return true;
+  }
+
+  function _syncVisualModeBtn() {
+    const btn = document.getElementById('ftvVisualModeBtn');
+    if (!btn) return;
+    const isPhoto = state.visualMode !== 'neon';
+    btn.classList.toggle('active', isPhoto);
+    btn.setAttribute('data-i18n', isPhoto ? 'ftv_view_real' : 'ftv_view_neon');
+    btn.textContent = _t(isPhoto ? 'ftv_view_real' : 'ftv_view_neon');
+  }
+
+  window.toggleFocusTvVisualMode = function (forceMode) {
+    if (forceMode === 'photo' || forceMode === 'neon') {
+      state.visualMode = forceMode;
+    } else {
+      state.visualMode = state.visualMode === 'neon' ? 'photo' : 'neon';
+    }
+    try {
+      if (typeof localStorage !== 'undefined') localStorage.setItem('remo_ftv_mode', state.visualMode);
+    } catch (e) {}
+    _syncVisualModeBtn();
+    if (typeof window.remoToast === 'function') {
+      window.remoToast(_t(state.visualMode === 'neon' ? 'ftv_mode_neon_toast' : 'ftv_mode_photo_toast'), 'info');
+    }
+  };
+
   /* ── 1. INJECT OVERLAY DOM (SINGLETON) ── */
   function ensureFocusTvDom() {
     if (document.getElementById('remoFocusTvOverlay')) return;
@@ -178,6 +269,9 @@
                 </div>
               </div>
             </div>
+            <button type="button" class="ftv-hud-btn ftv-mode-btn active" id="ftvVisualModeBtn" onclick="toggleFocusTvVisualMode()" data-i18n="ftv_view_real">
+              📷 4D Real
+            </button>
             <button type="button" class="ftv-hud-btn ftv-zen-btn" id="ftvZenBtn" onclick="toggleFocusTvZenMode()" data-i18n="ftv_zen_btn">
               🕰️ Zen
             </button>
@@ -192,8 +286,11 @@
 
         <!-- CENTER FLOATING CITY HERO CALLOUT & ZEN SCREENSAVER CLOCK -->
         <div class="ftv-center-title">
-          <div class="ftv-center-flag" id="ftvHeroCityName">⚜️ MONTRÉAL</div>
-          <div class="ftv-center-sub" id="ftvHeroCitySub">Cyber-Creative Capital</div>
+          <div class="ftv-center-flag" id="ftvHeroCityName">
+            <canvas id="ftvHeroFlagCanvas" class="ftv-waving-flag-cv" width="76" height="52"></canvas>
+            <span id="ftvHeroCityLabel">MONTRÉAL</span>
+          </div>
+          <div class="ftv-center-sub" id="ftvHeroCitySub">Canada · Cyber-Creative Capital</div>
           <div class="ftv-zen-clock-wrap" id="ftvZenClockWrap">
             <div class="ftv-zen-time" id="ftvZenTime">--:--:--</div>
             <div class="ftv-zen-meta" id="ftvZenMeta">📻 REMO Cyber-LoFi</div>
@@ -290,7 +387,20 @@
       roomCodeInp.addEventListener('input', () => _syncRoomPopoverUI());
     }
 
+    wrap.addEventListener('mousemove', (e) => {
+      if (!state.isOpen) return;
+      const w = window.innerWidth || 1280;
+      const h = window.innerHeight || 720;
+      state.targetParallaxX = ((e.clientX / w) - 0.5) * 26;
+      state.targetParallaxY = ((e.clientY / h) - 0.5) * 16;
+    });
+    wrap.addEventListener('mouseleave', () => {
+      state.targetParallaxX = 0;
+      state.targetParallaxY = 0;
+    });
+
     document.body.appendChild(wrap);
+    _syncVisualModeBtn();
   }
 
   /* ── 2. SAFE WEBAUDIO LOCAL AMBIENT SYNTHESIZER (NO CORS TOUCH ON RADIO) ── */
@@ -561,6 +671,24 @@
       vx: -0.001 - Math.random() * 0.0015,
       size: 1.5 + Math.random() * 2.5
     }));
+
+    state.glassDrops = Array.from({ length: 28 }, () => ({
+      x: Math.random(),
+      y: Math.random(),
+      r: 2.2 + Math.random() * 3.4,
+      vy: 0.00035 + Math.random() * 0.0009,
+      trail: 14 + Math.random() * 28,
+      stall: Math.floor(Math.random() * 45)
+    }));
+
+    state.bokehOrbs = Array.from({ length: 22 }, () => ({
+      x: Math.random(),
+      y: 0.42 + Math.random() * 0.45,
+      r: 8 + Math.random() * 26,
+      sp: 0.00025 + Math.random() * 0.00045,
+      ph: Math.random() * Math.PI * 2,
+      warm: Math.random() > 0.4
+    }));
   }
 
   function _getLiveWx(city) {
@@ -572,7 +700,7 @@
 
   function _startCanvasLoop() {
     if (state.rafId) cancelAnimationFrame(state.rafId);
-    if (!state.stars.length) _initSceneParticles();
+    if (!state.stars.length || !state.glassDrops.length || !state.bokehOrbs.length) _initSceneParticles();
 
     const canvas = document.getElementById('ftvSceneCanvas');
     if (!canvas) return;
@@ -600,109 +728,9 @@
       const energy = isPlaying ? Math.max(0.35, 0.45 + vol * 0.55) : 0.14;
       state.phase += isPlaying ? 0.045 : 0.014;
 
-      // Sky Gradient synced to real city local hour
-      const sky = ctx.createLinearGradient(0, 0, 0, h);
-      if (hr >= 6 && hr <= 9) {
-        sky.addColorStop(0, '#0f172a');
-        sky.addColorStop(0.55, '#4c1d95');
-        sky.addColorStop(1, '#9d174d');
-      } else if (hr >= 10 && hr <= 16) {
-        sky.addColorStop(0, '#040b1f');
-        sky.addColorStop(0.5, '#0c234b');
-        sky.addColorStop(1, '#1e1b4b');
-      } else if (hr >= 17 && hr <= 19) {
-        sky.addColorStop(0, '#09091f');
-        sky.addColorStop(0.52, '#581c87');
-        sky.addColorStop(1, '#be185d');
-      } else {
-        sky.addColorStop(0, '#02040d');
-        sky.addColorStop(0.58, '#0b1029');
-        sky.addColorStop(1, `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.24)`);
-      }
-      ctx.fillStyle = sky;
-      ctx.fillRect(0, 0, w, h);
+      state.parallaxX += (state.targetParallaxX - state.parallaxX) * 0.06;
+      state.parallaxY += (state.targetParallaxY - state.parallaxY) * 0.06;
 
-      // Night Stars & Celestial Moon/Sun Orb
-      const showStars = hr < 7 || hr >= 18;
-      if (showStars) {
-        for (let i = 0; i < state.stars.length; i++) {
-          const st = state.stars[i];
-          st.tw += st.sp;
-          const alpha = 0.25 + 0.65 * (0.5 + 0.5 * Math.sin(st.tw));
-          ctx.fillStyle = `rgba(226, 232, 240, ${alpha.toFixed(2)})`;
-          ctx.beginPath();
-          ctx.arc(st.x * w, st.y * h, st.r, 0, Math.PI * 2);
-          ctx.fill();
-        }
-      }
-
-      // Cyberpunk Neon Horizon Aura behind Landmark
-      const horizonY = h * 0.68;
-      const auraR = Math.min(w, h) * (0.34 + 0.04 * Math.sin(state.phase * 1.4) * energy);
-      const aura = ctx.createRadialGradient(w * 0.5, horizonY - 60, 10, w * 0.5, horizonY - 60, auraR);
-      aura.addColorStop(0, `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${(0.42 * energy + 0.16).toFixed(2)})`);
-      aura.addColorStop(0.6, `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.1)`);
-      aura.addColorStop(1, 'rgba(0,0,0,0)');
-      ctx.fillStyle = aura;
-      ctx.fillRect(0, 0, w, h);
-
-      // Perspective 4D Synthwave Horizon Grid
-      ctx.save();
-      ctx.strokeStyle = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.2)`;
-      ctx.lineWidth = 1;
-      for (let i = -8; i <= 8; i++) {
-        ctx.beginPath();
-        ctx.moveTo(w * 0.5 + i * 24, horizonY);
-        ctx.lineTo(w * 0.5 + i * 155, h);
-        ctx.stroke();
-      }
-      const gridShift = (state.phase * 14) % 32;
-      for (let g = 0; g < 9; g++) {
-        const t = (g * 32 + gridShift) / 288;
-        const gy = horizonY + Math.pow(t, 1.8) * (h - horizonY);
-        ctx.beginPath();
-        ctx.moveTo(0, gy);
-        ctx.lineTo(w, gy);
-        ctx.stroke();
-      }
-      ctx.restore();
-
-      // Draw Authentic City Landmark Silhouette
-      if (typeof window.drawCityLandmark === 'function') {
-        const lmkSize = Math.max(150, Math.min(280, Math.min(w, h) * 0.34));
-        ctx.save();
-        ctx.globalAlpha = 0.92;
-        window.drawCityLandmark(ctx, city.id, city.themeColor || '#38bdf8', w * 0.5, horizonY - lmkSize * 0.28, lmkSize);
-        ctx.restore();
-      }
-
-      // Safe Procedural 3D Stereo Audio Spectrum Visualizer
-      const bars = 42;
-      const barSpan = Math.min(w * 0.72, 680);
-      const startX = (w - barSpan) * 0.5;
-      const step = barSpan / bars;
-      for (let b = 0; b < bars; b++) {
-        const centerDist = Math.abs(b - (bars - 1) / 2) / ((bars - 1) / 2);
-        const envelope = 1 - centerDist * 0.58;
-        const wave =
-          0.5 +
-          0.28 * Math.sin(state.phase * 2.3 + b * 0.48) +
-          0.22 * Math.cos(state.phase * 3.7 - b * 0.72);
-        const bh = Math.max(4, wave * envelope * 78 * energy);
-        const bx = startX + b * step + step * 0.2;
-        const bw = Math.max(3, step * 0.6);
-
-        const grad = ctx.createLinearGradient(bx, horizonY - bh, bx, horizonY + bh * 0.32);
-        grad.addColorStop(0, `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.92)`);
-        grad.addColorStop(1, 'rgba(244, 114, 182, 0.25)');
-        ctx.fillStyle = grad;
-        ctx.fillRect(bx, horizonY - bh, bw, bh);
-        ctx.globalAlpha = 0.24;
-        ctx.fillRect(bx, horizonY + 2, bw, bh * 0.32);
-        ctx.globalAlpha = 1;
-      }
-
-      // Live Real-Weather & 4D Atmospheric Effects (Rain, Storm, Snow, Ocean, Fire, Petals, Cyber)
       const condLow = String(wx.cond_en || '').toLowerCase();
       const showStorm = Boolean(state.ambient.storm || condLow.includes('thunder') || condLow.includes('storm'));
       const showSnow = Boolean(state.ambient.snow || condLow.includes('snow') || Number(wx.tempC) <= 0);
@@ -711,6 +739,222 @@
       const showFire = Boolean(state.ambient.fire);
       const showPetals = Boolean(state.ambient.petals);
       const showCyber = Boolean(state.ambient.cyber);
+      const showStars = hr < 7 || hr >= 18;
+      const isDawn = hr >= 6 && hr <= 8;
+      const isDusk = hr >= 17 && hr <= 19;
+      const isNight = hr < 6 || hr >= 20;
+      const horizonY = h * 0.68;
+
+      const photoImg = state.visualMode !== 'neon' ? _getCityPhotoImg(city) : null;
+      const hasPhoto = Boolean(photoImg && photoImg.complete && photoImg.naturalWidth > 0);
+
+      if (hasPhoto) {
+        const kbZoom = 1.07 + 0.028 * Math.sin(state.phase * 0.22) + (isPlaying ? 0.01 * Math.sin(state.phase * 0.85) : 0);
+        const kbPanX = Math.sin(state.phase * 0.16) * (w * 0.015) - state.parallaxX;
+        const kbPanY = Math.cos(state.phase * 0.13) * (h * 0.012) - state.parallaxY;
+
+        ctx.fillStyle = '#030712';
+        ctx.fillRect(0, 0, w, h);
+
+        let drawnFade = false;
+        if (state.prevCityId && state.prevCityId !== city.id && state.citySwitchTs) {
+          const elapsed = Date.now() - state.citySwitchTs;
+          if (elapsed < 850) {
+            const prevImg = _getCityPhotoImg(_getCity(state.prevCityId));
+            if (prevImg && prevImg.complete && prevImg.naturalWidth > 0) {
+              _drawCoverPhoto(ctx, prevImg, w, h, kbZoom, kbPanX, kbPanY);
+              const tNorm = Math.min(1, Math.max(0, elapsed / 850));
+              const smooth = tNorm * tNorm * (3 - 2 * tNorm);
+              ctx.save();
+              ctx.globalAlpha = smooth;
+              _drawCoverPhoto(ctx, photoImg, w, h, kbZoom, kbPanX, kbPanY);
+              ctx.restore();
+              drawnFade = true;
+            }
+          }
+        }
+        if (!drawnFade) {
+          _drawCoverPhoto(ctx, photoImg, w, h, kbZoom, kbPanX, kbPanY);
+        }
+
+        // Time-of-day atmospheric light grading synced to live city hour
+        if (isDawn) {
+          const dawnG = ctx.createLinearGradient(0, 0, w * 0.6, h);
+          dawnG.addColorStop(0, 'rgba(251, 146, 60, 0.24)');
+          dawnG.addColorStop(0.5, 'rgba(56, 189, 248, 0.10)');
+          dawnG.addColorStop(1, 'rgba(15, 23, 42, 0.34)');
+          ctx.fillStyle = dawnG;
+          ctx.fillRect(0, 0, w, h);
+        } else if (isDusk) {
+          const duskG = ctx.createLinearGradient(0, 0, 0, h);
+          duskG.addColorStop(0, 'rgba(109, 40, 217, 0.28)');
+          duskG.addColorStop(0.55, 'rgba(244, 114, 182, 0.16)');
+          duskG.addColorStop(1, 'rgba(245, 158, 11, 0.18)');
+          ctx.fillStyle = duskG;
+          ctx.fillRect(0, 0, w, h);
+        } else if (isNight) {
+          ctx.fillStyle = 'rgba(2, 6, 23, 0.44)';
+          ctx.fillRect(0, 0, w, h);
+
+          // Twinkling upper-sky stars over night cities
+          for (let i = 0; i < state.stars.length; i++) {
+            const st = state.stars[i];
+            if (st.y > 0.38) continue;
+            st.tw += st.sp;
+            const alpha = 0.18 + 0.55 * (0.5 + 0.5 * Math.sin(st.tw));
+            ctx.fillStyle = `rgba(226, 232, 240, ${alpha.toFixed(2)})`;
+            ctx.beginPath();
+            ctx.arc(st.x * w, st.y * h, st.r * 0.9, 0, Math.PI * 2);
+            ctx.fill();
+          }
+
+          // Music-reactive soft foreground bokeh lights
+          for (let i = 0; i < state.bokehOrbs.length; i++) {
+            const b = state.bokehOrbs[i];
+            b.y -= b.sp;
+            if (b.y < 0.35) b.y = 0.92;
+            const pulse = 0.72 + 0.28 * Math.sin(state.phase * 1.4 + b.ph);
+            const bx = (b.x * w + Math.sin(state.phase * 0.5 + b.ph) * 14);
+            const by = b.y * h;
+            const br = b.r * (0.85 + 0.32 * energy) * pulse;
+            const bGrad = ctx.createRadialGradient(bx, by, 0, bx, by, br);
+            const col = b.warm ? '253, 224, 71' : `${rgb.r}, ${rgb.g}, ${rgb.b}`;
+            bGrad.addColorStop(0, `rgba(${col}, ${(0.12 + 0.1 * energy).toFixed(2)})`);
+            bGrad.addColorStop(1, `rgba(${col}, 0)`);
+            ctx.fillStyle = bGrad;
+            ctx.beginPath();
+            ctx.arc(bx, by, br, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        } else {
+          ctx.fillStyle = 'rgba(6, 12, 28, 0.16)';
+          ctx.fillRect(0, 0, w, h);
+        }
+
+        // Top & bottom contrast framing gradient (keeps center city crystal-clear)
+        const frameVig = ctx.createLinearGradient(0, 0, 0, h);
+        frameVig.addColorStop(0, 'rgba(2, 6, 20, 0.58)');
+        frameVig.addColorStop(0.18, 'rgba(2, 6, 20, 0.16)');
+        frameVig.addColorStop(0.55, 'rgba(2, 6, 20, 0.08)');
+        frameVig.addColorStop(0.8, 'rgba(2, 6, 20, 0.52)');
+        frameVig.addColorStop(1, 'rgba(2, 6, 20, 0.78)');
+        ctx.fillStyle = frameVig;
+        ctx.fillRect(0, 0, w, h);
+      } else {
+        // Sky Gradient synced to real city local hour (4D Neon Mode / Fallback)
+        const sky = ctx.createLinearGradient(0, 0, 0, h);
+        if (hr >= 6 && hr <= 9) {
+          sky.addColorStop(0, '#0f172a');
+          sky.addColorStop(0.55, '#4c1d95');
+          sky.addColorStop(1, '#9d174d');
+        } else if (hr >= 10 && hr <= 16) {
+          sky.addColorStop(0, '#040b1f');
+          sky.addColorStop(0.5, '#0c234b');
+          sky.addColorStop(1, '#1e1b4b');
+        } else if (hr >= 17 && hr <= 19) {
+          sky.addColorStop(0, '#09091f');
+          sky.addColorStop(0.52, '#581c87');
+          sky.addColorStop(1, '#be185d');
+        } else {
+          sky.addColorStop(0, '#02040d');
+          sky.addColorStop(0.58, '#0b1029');
+          sky.addColorStop(1, `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.24)`);
+        }
+        ctx.fillStyle = sky;
+        ctx.fillRect(0, 0, w, h);
+
+        // Night Stars & Celestial Moon/Sun Orb
+        if (showStars) {
+          for (let i = 0; i < state.stars.length; i++) {
+            const st = state.stars[i];
+            st.tw += st.sp;
+            const alpha = 0.25 + 0.65 * (0.5 + 0.5 * Math.sin(st.tw));
+            ctx.fillStyle = `rgba(226, 232, 240, ${alpha.toFixed(2)})`;
+            ctx.beginPath();
+            ctx.arc(st.x * w, st.y * h, st.r, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+
+        // Cyberpunk Neon Horizon Aura behind Landmark
+        const auraR = Math.min(w, h) * (0.34 + 0.04 * Math.sin(state.phase * 1.4) * energy);
+        const aura = ctx.createRadialGradient(w * 0.5, horizonY - 60, 10, w * 0.5, horizonY - 60, auraR);
+        aura.addColorStop(0, `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${(0.42 * energy + 0.16).toFixed(2)})`);
+        aura.addColorStop(0.6, `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.1)`);
+        aura.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = aura;
+        ctx.fillRect(0, 0, w, h);
+
+        // Perspective 4D Synthwave Horizon Grid
+        ctx.save();
+        ctx.strokeStyle = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.2)`;
+        ctx.lineWidth = 1;
+        for (let i = -8; i <= 8; i++) {
+          ctx.beginPath();
+          ctx.moveTo(w * 0.5 + i * 24, horizonY);
+          ctx.lineTo(w * 0.5 + i * 155, h);
+          ctx.stroke();
+        }
+        const gridShift = (state.phase * 14) % 32;
+        for (let g = 0; g < 9; g++) {
+          const t = (g * 32 + gridShift) / 288;
+          const gy = horizonY + Math.pow(t, 1.8) * (h - horizonY);
+          ctx.beginPath();
+          ctx.moveTo(0, gy);
+          ctx.lineTo(w, gy);
+          ctx.stroke();
+        }
+        ctx.restore();
+
+        // Draw Authentic City Landmark Silhouette
+        if (typeof window.drawCityLandmark === 'function') {
+          const lmkSize = Math.max(150, Math.min(280, Math.min(w, h) * 0.34));
+          ctx.save();
+          ctx.globalAlpha = 0.92;
+          window.drawCityLandmark(ctx, city.id, city.themeColor || '#38bdf8', w * 0.5, horizonY - lmkSize * 0.28, lmkSize);
+          ctx.restore();
+        }
+      }
+
+      // Render Real Waving National Flag next to Hero City Name
+      const flagCv = document.getElementById('ftvHeroFlagCanvas');
+      if (flagCv && window.REMO_FLAGS && typeof window.REMO_FLAGS.drawWavingFlag === 'function') {
+        const fctx = flagCv.getContext && flagCv.getContext('2d');
+        if (fctx) {
+          fctx.clearRect(0, 0, flagCv.width, flagCv.height);
+          const wind = showStorm ? 1.85 : (showRain || showOcean ? 1.35 : 0.92);
+          window.REMO_FLAGS.drawWavingFlag(fctx, city, 3, 4, flagCv.width - 6, flagCv.height - 8, state.phase, wind, true);
+        }
+      }
+
+      // Low-Profile Bottom Stereo Spectrum Equalizer (keeps center monument/photo clear)
+      const visBaseY = state.zenMode ? h - 22 : Math.max(h * 0.72, h - (w <= 760 ? 236 : 196));
+      const bars = 48;
+      const barSpan = Math.min(w * 0.78, 760);
+      const startX = (w - barSpan) * 0.5;
+      const step = barSpan / bars;
+      ctx.save();
+      ctx.fillStyle = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.22)`;
+      ctx.fillRect(startX, visBaseY, barSpan, 1.5);
+      for (let b = 0; b < bars; b++) {
+        const centerDist = Math.abs(b - (bars - 1) / 2) / ((bars - 1) / 2);
+        const envelope = 1 - centerDist * 0.52;
+        const wave =
+          0.45 +
+          0.3 * Math.sin(state.phase * 2.4 + b * 0.45) +
+          0.25 * Math.cos(state.phase * 3.8 - b * 0.68);
+        const bh = Math.max(3, wave * envelope * 28 * energy);
+        const bx = startX + b * step + step * 0.22;
+        const bw = Math.max(2.5, step * 0.56);
+
+        const grad = ctx.createLinearGradient(bx, visBaseY - bh, bx, visBaseY);
+        grad.addColorStop(0, `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.92)`);
+        grad.addColorStop(1, 'rgba(56, 189, 248, 0.35)');
+        ctx.fillStyle = grad;
+        ctx.fillRect(bx, visBaseY - bh, bw, bh);
+      }
+      ctx.restore();
+
       const particleCap = w <= 860 ? Math.min(55, state.particles.length) : state.particles.length;
 
       // Aurora Borealis northern lights ribbon during Snow
@@ -873,6 +1117,58 @@
             ctx.lineTo(lx, ly + p.len * 1.8);
             ctx.stroke();
           }
+        }
+        ctx.restore();
+      }
+
+      // Foreground Window-Glass Condensation & Sliding Raindrops (when Rain / Storm active)
+      if (showRain && state.glassDrops.length) {
+        ctx.save();
+        for (let i = 0; i < state.glassDrops.length; i++) {
+          const d = state.glassDrops[i];
+          if (d.stall > 0) {
+            d.stall -= 1;
+          } else {
+            d.y += d.vy * (showStorm ? 1.85 : 1.05);
+            d.x += Math.sin(state.phase * 1.5 + i) * 0.00018;
+            if (Math.random() < 0.014) d.stall = 18 + Math.floor(Math.random() * 36);
+            if (d.y > 1.04) {
+              d.y = -0.03;
+              d.x = Math.random();
+              d.stall = Math.floor(Math.random() * 35);
+            }
+          }
+          const gx = d.x * w;
+          const gy = d.y * h;
+          const dr = d.r;
+
+          // Faint vertical water trail behind sliding drop
+          ctx.strokeStyle = 'rgba(203, 213, 225, 0.14)';
+          ctx.lineWidth = Math.max(0.9, dr * 0.45);
+          ctx.beginPath();
+          ctx.moveTo(gx, gy - d.trail);
+          ctx.lineTo(gx, gy);
+          ctx.stroke();
+
+          // Dark refraction rim under droplet + soft translucent glass bead
+          ctx.fillStyle = 'rgba(15, 23, 42, 0.28)';
+          ctx.beginPath();
+          ctx.arc(gx + 0.6, gy + 1.0, dr * 1.06, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.fillStyle = 'rgba(224, 242, 254, 0.24)';
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.42)';
+          ctx.lineWidth = 0.7;
+          ctx.beginPath();
+          ctx.arc(gx, gy, dr, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+
+          // Crisp white window highlight glint
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.78)';
+          ctx.beginPath();
+          ctx.arc(gx - dr * 0.3, gy - dr * 0.3, Math.max(0.7, dr * 0.32), 0, Math.PI * 2);
+          ctx.fill();
         }
         ctx.restore();
       }
@@ -1332,7 +1628,7 @@
       }
       feed.innerHTML = recentRoomMsgs.map((m) => `
         <div class="ftv-chat-line">
-          <span class="ftv-chat-author">${_escapeHtml(m.cityFlag || city.flag || '🌍')} @${_escapeHtml(m.author || 'Citizen')}:</span>
+          <span class="ftv-chat-author">${_flagHtml(m.cityFlag || city.flag || '🌍', '🌍', 16, 11)} @${_escapeHtml(m.author || 'Citizen')}:</span>
           <span class="ftv-chat-text">${_escapeHtml(m.text || '')}</span>
         </div>
       `).join('');
@@ -1347,15 +1643,15 @@
 
     if (!recent.length) {
       const fallback = lang === 'fr'
-        ? `${city.flag || '🌍'} Fenêtre ouverte sur ${_cityName(city)} — écoutez en direct et laissez un mot.`
-        : `${city.flag || '🌍'} Tuned into ${_cityName(city)} — enjoy the live atmosphere and drop a hello.`;
-      feed.innerHTML = `<div class="ftv-chat-line ftv-chat-welcome">${_escapeHtml(fallback)}</div>`;
+        ? `Fenêtre ouverte sur ${_cityName(city)} — écoutez en direct et laissez un mot.`
+        : `Tuned into ${_cityName(city)} — enjoy the live atmosphere and drop a hello.`;
+      feed.innerHTML = `<div class="ftv-chat-line ftv-chat-welcome">${_flagHtml(city.flag || '🌍', '🌍', 16, 11)} ${_escapeHtml(fallback)}</div>`;
       return;
     }
 
     feed.innerHTML = recent.map((m) => `
       <div class="ftv-chat-line">
-        <span class="ftv-chat-author">${_escapeHtml(m.cityFlag || city.flag || '🌍')} @${_escapeHtml(m.author || 'Citizen')}:</span>
+        <span class="ftv-chat-author">${_flagHtml(m.cityFlag || city.flag || '🌍', '🌍', 16, 11)} @${_escapeHtml(m.author || 'Citizen')}:</span>
         <span class="ftv-chat-text">${_escapeHtml(m.text || '')}</span>
       </div>
     `).join('');
@@ -1420,7 +1716,7 @@
       starBar.innerHTML = STAR_CITY_IDS.map((cid) => {
         const c = _getCity(cid);
         const active = state.cityId === cid ? 'active' : '';
-        return `<button type="button" class="ftv-star-chip ${active}" onclick="focusTvSwitchCity('${cid}')">${c.flag} ${_escapeHtml(_cityName(c))}</button>`;
+        return `<button type="button" class="ftv-star-chip ${active}" onclick="focusTvSwitchCity('${cid}')">${_flagHtml(c.flag, '🌍', 16, 11)} ${_escapeHtml(_cityName(c))}</button>`;
       }).join('');
     }
 
@@ -1484,10 +1780,19 @@
       wp.textContent = `🕒 ${wx.timeStr || '--:--'} · ${wx.icon || '🌤️'} ${wx.tempC ?? 20}°C ${cond}`;
     }
 
+    const heroLabel = document.getElementById('ftvHeroCityLabel');
     const heroName = document.getElementById('ftvHeroCityName');
     const heroSub = document.getElementById('ftvHeroCitySub');
-    if (heroName) heroName.textContent = `${city.flag || '🌍'} ${_cityName(city).toUpperCase()}`;
-    if (heroSub) heroSub.textContent = lang === 'fr' ? (city.tagline_fr || city.tagline_en || '') : (city.tagline_en || '');
+    if (heroLabel) {
+      heroLabel.textContent = _cityName(city).toUpperCase();
+    } else if (heroName) {
+      heroName.textContent = _cityName(city).toUpperCase();
+    }
+    if (heroSub) {
+      const country = _cityCountry(city);
+      const tag = lang === 'fr' ? (city.tagline_fr || city.tagline_en || '') : (city.tagline_en || '');
+      heroSub.textContent = country && tag ? `${country} · ${tag}` : (tag || country || '');
+    }
     _updateZenClockDisplay();
   }
 
@@ -1544,7 +1849,10 @@
     const volSlider = document.getElementById('ftvVolSlider');
 
     if (st) {
-      if (stIcon) stIcon.textContent = st.flag || st.icon || '📻';
+      if (stIcon) {
+        stIcon.innerHTML = _flagHtml(st, st.icon || '📻', 26, 18);
+        stIcon.classList.toggle('is-live', Boolean(radio && radio.isPlaying));
+      }
       if (stName) stName.textContent = st.name || 'REMO Radio';
       if (stDesc) {
         stDesc.textContent = (lang === 'fr'
@@ -1602,7 +1910,13 @@
 
   /* ── 7. RADIO BRIDGE CONTROLS ── */
   window.focusTvSwitchCity = function (cityId) {
-    state.cityId = String(cityId || 'montreal').toLowerCase();
+    const nextId = String(cityId || 'montreal').toLowerCase();
+    if (nextId !== state.cityId) {
+      state.prevCityId = state.cityId;
+      state.citySwitchTs = Date.now();
+    }
+    state.cityId = nextId;
+    _getCityPhotoImg(_getCity(state.cityId));
     _renderCitySelectors();
     _updateCityHeroAndWeather();
     _renderChatStrip();
@@ -1693,21 +2007,42 @@
     const rgb = _hexToRgb(city.themeColor || '#38bdf8');
     const isFr = _lang() === 'fr';
 
-    const grad = ctx.createLinearGradient(0, 0, 0, 960);
-    grad.addColorStop(0, '#040818');
-    grad.addColorStop(0.55, `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.42)`);
-    grad.addColorStop(1, '#050816');
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, 540, 960);
+    const vPhoto = state.visualMode !== 'neon' ? _getCityPhotoImg(city) : null;
+    const hasVPhoto = Boolean(vPhoto && vPhoto.complete && vPhoto.naturalWidth > 0);
+    if (hasVPhoto) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(14, 14, 512, 932);
+      ctx.clip();
+      const vScale = animT > 0 ? (1.05 + 0.03 * Math.sin(animT * 2)) : 1.05;
+      _drawCoverPhoto(ctx, vPhoto, 540, 960, vScale, 0, 0);
+      const pv = ctx.createLinearGradient(0, 0, 0, 960);
+      pv.addColorStop(0, 'rgba(4, 8, 24, 0.72)');
+      pv.addColorStop(0.28, 'rgba(4, 8, 24, 0.25)');
+      pv.addColorStop(0.7, 'rgba(4, 8, 24, 0.28)');
+      pv.addColorStop(1, 'rgba(5, 8, 22, 0.85)');
+      ctx.fillStyle = pv;
+      ctx.fillRect(0, 0, 540, 960);
+      ctx.restore();
+    } else {
+      const grad = ctx.createLinearGradient(0, 0, 0, 960);
+      grad.addColorStop(0, '#040818');
+      grad.addColorStop(0.55, `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.42)`);
+      grad.addColorStop(1, '#050816');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 540, 960);
+    }
 
     const glow = animT > 0 ? (0.55 + 0.35 * Math.sin(animT * 3)) : 0.65;
     ctx.strokeStyle = `rgba(56, 189, 248, ${glow.toFixed(2)})`;
     ctx.lineWidth = 4;
     ctx.strokeRect(14, 14, 512, 932);
 
-    const pulseSize = animT > 0 ? (256 + Math.sin(animT * 3.2) * 12) : 260;
-    if (typeof window.drawCityLandmark === 'function') {
-      window.drawCityLandmark(ctx, city.id, city.themeColor || '#38bdf8', 270, 465, pulseSize);
+    if (!hasVPhoto) {
+      const pulseSize = animT > 0 ? (256 + Math.sin(animT * 3.2) * 12) : 260;
+      if (typeof window.drawCityLandmark === 'function') {
+        window.drawCityLandmark(ctx, city.id, city.themeColor || '#38bdf8', 270, 465, pulseSize);
+      }
     }
 
     ctx.textAlign = 'center';
@@ -1715,9 +2050,21 @@
     ctx.font = 'bold 20px Orbitron, sans-serif';
     ctx.fillText('REMO 4D FOCUS TV · LIVE', 270, 82);
 
+    const cityUpper = _cityName(city).toUpperCase();
     ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 40px Orbitron, sans-serif';
-    ctx.fillText(`${city.flag} ${_cityName(city).toUpperCase()}`, 270, 146);
+    ctx.font = 'bold 38px Orbitron, sans-serif';
+    if (window.REMO_FLAGS && typeof window.REMO_FLAGS.drawWavingFlag === 'function' && window.REMO_FLAGS.getCountryCode(city)) {
+      const tw = typeof ctx.measureText === 'function' ? ctx.measureText(cityUpper).width : cityUpper.length * 22;
+      const fw = 48;
+      const gap = 12;
+      const startX = Math.max(24, 270 - (fw + gap + tw) * 0.5);
+      window.REMO_FLAGS.drawWavingFlag(ctx, city, startX, 114, fw, 34, animT * 4, 1.0, true);
+      ctx.textAlign = 'left';
+      ctx.fillText(cityUpper, startX + fw + gap, 145);
+      ctx.textAlign = 'center';
+    } else {
+      ctx.fillText(`${city.flag} ${cityUpper}`, 270, 146);
+    }
 
     ctx.fillStyle = '#e2e8f0';
     ctx.font = 'bold 22px sans-serif';
@@ -1864,6 +2211,7 @@
       if (u && u.homeCity) state.cityId = u.homeCity;
     }
 
+    _getCityPhotoImg(_getCity(state.cityId));
     state.isOpen = true;
     overlay.classList.add('open');
     document.body.classList.add('ftv-active');
@@ -1871,6 +2219,7 @@
     if (window.REMO_I18N && typeof window.REMO_I18N.applyDOM === 'function') {
       window.REMO_I18N.applyDOM(overlay);
     }
+    _syncVisualModeBtn();
 
     const opts = options && typeof options === 'object' ? options : {};
     if (window.REMO_RADIO) {
@@ -1953,6 +2302,7 @@
   window.addEventListener('remo:langchange', () => {
     if (!document.getElementById('remoFocusTvOverlay')) return;
     _renderCitySelectors();
+    _syncVisualModeBtn();
     syncFocusTvUI();
     _updateZenClockDisplay();
   });

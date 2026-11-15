@@ -702,6 +702,16 @@
       .replace(/"/g, '&quot;');
   }
 
+  function _radioFlagHtml(iconOrObj, fallback, w, h) {
+    if (window.REMO_FLAGS && typeof window.REMO_FLAGS.renderFlagOrIconHtml === 'function') {
+      return window.REMO_FLAGS.renderFlagOrIconHtml(iconOrObj, fallback, w, h);
+    }
+    if (iconOrObj && typeof iconOrObj === 'object') {
+      return escHtml(iconOrObj.flag || iconOrObj.icon || fallback || '📻');
+    }
+    return escHtml(iconOrObj || fallback || '📻');
+  }
+
   class RemoRadioEngine {
     constructor() {
       this.stations = REMO_RADIO_STATIONS;
@@ -1276,7 +1286,7 @@
                 <span class="bar b2"></span>
                 <span class="bar b3"></span>
               </span>
-              <span class="hdr-radio-st-lbl">${st.icon} ${escHtml(st.name)}</span>
+              <span class="hdr-radio-st-lbl">${_radioFlagHtml(st, '📻', 16, 11)}<span class="hdr-radio-st-name">${escHtml(st.name)}</span></span>
               <span class="hdr-radio-mini-act" onclick="headerRadioPlayPauseInline(event)" title="Pause">⏸️</span>
               <span class="hdr-radio-mini-act" onclick="headerRadioNextInline(event)" title="Next">⏭️</span>
             </span>
@@ -1300,7 +1310,7 @@
       const mbTxt = document.getElementById('mbRadioBtnTxt');
       if (mbTxt) {
         mbTxt.innerHTML = this.isPlaying
-          ? `🟢 ${st.icon} ${escHtml(st.name)}`
+          ? `🟢 ${_radioFlagHtml(st, '📻', 16, 11)} ${escHtml(st.name)}`
           : (lang === 'fr' ? `📻 Radio & Jukebox` : `📻 Radio & Jukebox`);
       }
 
@@ -1313,7 +1323,7 @@
       const volSlider = document.getElementById('radioVolumeSlider');
       const volValue = document.getElementById('radioVolumeVal');
 
-      if (npIcon) npIcon.textContent = st.icon || '📻';
+      if (npIcon) npIcon.innerHTML = _radioFlagHtml(st, '📻', 28, 19);
       if (npName) npName.textContent = st.name || 'REMO Radio';
       if (npDesc) npDesc.textContent = lang === 'fr' ? st.desc_fr : st.desc_en;
       if (npBadge) {
@@ -1487,7 +1497,7 @@
       return `
         <div class="radio-station-card ${isActive ? 'active' : ''}" data-station-id="${s.id}" onclick="selectRadioStation('${s.id}')">
           <div style="display:flex;align-items:center;gap:12px;">
-            <div class="st-icon">${s.icon}</div>
+            <div class="st-icon">${_radioFlagHtml(s, '📻', 24, 16)}</div>
             <div style="flex:1;min-width:0;">
               <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
                 <b style="color:#fff;font-size:0.9rem;">${escHtml(s.name)}</b>
@@ -1553,7 +1563,7 @@
             <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
               <span style="font-weight:900;color:#fbbf24;">${medals[idx] || `#${idx + 1}`}</span>
               <b style="color:#fff;font-size:0.87rem;">${escHtml(tr.title)}</b>
-              <span class="st-badge">${c.flag} ${escHtml(cname)}</span>
+              <span class="st-badge">${_radioFlagHtml(c.flag, '🌍', 15, 10)} ${escHtml(cname)}</span>
             </div>
             <div style="font-size:0.74rem;color:#94a3b8;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
               🎤 ${escHtml(tr.artist || 'Artist')} · @${escHtml(tr.addedBy || 'Citizen')}
