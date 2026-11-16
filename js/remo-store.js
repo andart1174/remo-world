@@ -3384,6 +3384,8 @@ const REMO_STORE = {
         cleanUser.role = user.role || 'citizen';
         cleanUser.verified = Boolean(user.verified);
         cleanUser.banned = Boolean(user.banned);
+      } else if (!user.banned) {
+        cleanUser.banned = false;
       }
       this.fbDb.collection('remo_users').doc(cleanUser.uid).set(cleanUser, { merge: true })
         .catch((err) => {
@@ -5293,6 +5295,10 @@ const REMO_STORE = {
           const uData = doc.data();
           if (!uData) return;
           if (!uData.uid) uData.uid = doc.id;
+          if (isAdm0 && !Object.prototype.hasOwnProperty.call(uData, 'banned') && uData.uid) {
+            uData.banned = false;
+            this.fbDb.collection('remo_users').doc(uData.uid).set({ banned: false }, { merge: true }).catch(() => {});
+          }
 
           const isFakeCitizen = this.isFakeOrGuestUser(uData);
           const isDeleted = (this.deletedUserIds && this.deletedUserIds.has(uData.uid));
@@ -6192,12 +6198,14 @@ const REMO_STORE = {
         const msg = `Document too large (${Math.round(approxBytes / 1024)} KB / max 950 KB)`;
         post._cloudSyncError = 'doc-too-large: ' + msg;
         post._cloudSyncPending = false;
+        this._flushLocalSave();
         console.warn('Firestore post size guard:', msg);
         return { ok: false, code: 'doc-too-large', message: msg };
       }
       await this.fbDb.collection('remo_posts').doc(post.id).set(cleanPost, { merge: true });
       if (post._cloudSyncError) delete post._cloudSyncError;
       if (post._cloudSyncPending) delete post._cloudSyncPending;
+      this._flushLocalSave();
       if (this._cloudLiveTopPostsMap && !this._cloudLiveTopPostsMap.has(post.id)) {
         this._cloudLiveTopPostsMap.set(post.id, cleanPost);
       }
@@ -6208,6 +6216,7 @@ const REMO_STORE = {
       console.warn('Firestore post sync notice:', code, message);
       post._cloudSyncError = `${code}: ${message}`.slice(0, 140);
       post._cloudSyncPending = false;
+      this._flushLocalSave();
       return { ok: false, code, message };
     }
   },

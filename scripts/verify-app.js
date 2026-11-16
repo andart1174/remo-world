@@ -232,7 +232,15 @@ async function runStoreSimulations() {
   assert.ok(!comms.includes("mediaType = 'before_after';\n    mediaUrl = mediaUrls[0];"), 'before_after must not blindly duplicate base64 mediaUrl');
   assert.ok(comms.includes("'city_score'"), 'city_score must be in singlePostOrNonFeedReasons');
 
-  console.log('PASS: REMO_STORE auth alignment, error preservation, size guard & pagination verified.');
+  // 5. Verify firestore.rules isNotBanned guards missing banned key & syncUserToCloud defaults banned: false
+  const rules = read('firestore.rules');
+  const bannedGuardMatches = rules.match(/!\('banned'\s+in\s+get\(/g) || [];
+  assert.ok(bannedGuardMatches.length >= 2, 'isNotBanned() must check !("banned" in get(...).data) for both uid and u_fb_uid');
+  assert.ok(storeSrc.includes('cleanUser.banned = false;'), 'syncUserToCloud must include banned: false for non-banned citizens');
+  const headers = read('_headers');
+  assert.ok(headers.includes('/index.html') && headers.includes('/sw.js') && headers.includes('no-cache'), '_headers must configure no-cache for index.html and sw.js');
+
+  console.log('PASS: REMO_STORE auth alignment, error preservation, size guard, pagination & Firestore rules verified.');
 }
 
 (async () => {
