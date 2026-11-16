@@ -687,19 +687,18 @@ async function compressImageFileToDataUrl(fileOrBlob, maxDim = 1080, quality = 0
   });
 }
 
-async function uploadMediaToCloudOrDataUrl(blobOrFile, folder = 'posts') {
+async function uploadMediaToCloudOrDataUrl(blobOrFile, folder = 'posts', opts = {}) {
   if (!blobOrFile) return '';
   const isImage = (blobOrFile.type && blobOrFile.type.startsWith('image/')) || (typeof blobOrFile === 'string' && blobOrFile.startsWith('data:image'));
-  
+
   if (isImage) {
-    // 1. Downscale & compress to high-res mobile-optimized JPEG dataUrl (~60-90KB, CORS-free for 9:16 Story Canvas)
-    const dataUrl = await compressImageFileToDataUrl(blobOrFile, 1080, 0.76);
-    if (dataUrl && dataUrl.length < 380000) {
-      return dataUrl;
-    }
-    
-    // 2. Upload to Firebase Storage if larger
-    if (typeof firebase !== 'undefined' && firebase.storage) {
+    const maxDim = Number(opts.maxDim || 1080);
+    const quality = Number(opts.quality || 0.76);
+    const inlineLimit = Number(opts.inlineMaxChars || 110000);
+    let dataUrl = await compressImageFileToDataUrl(blobOrFile, maxDim, quality);
+
+    const hasFbAuth = Boolean(typeof firebase !== 'undefined' && firebase.auth && firebase.auth().currentUser);
+    if (hasFbAuth && typeof firebase.storage === 'function' && (!dataUrl || dataUrl.length >= inlineLimit)) {
       try {
         const storage = firebase.storage();
         const ref = storage.ref().child(`remo_${folder}/${Date.now()}_${Math.random().toString(36).slice(2, 7)}.jpg`);
@@ -709,8 +708,16 @@ async function uploadMediaToCloudOrDataUrl(blobOrFile, folder = 'posts') {
         const downloadUrl = await snap.ref.getDownloadURL();
         if (downloadUrl) return downloadUrl;
       } catch (err) {
-        console.log('Firebase storage upload notice (using optimized dataUrl):', err.message);
+        console.log('Firebase storage upload notice (using compact fallback):', err.message);
       }
+    }
+
+    // Fallback when unauthenticated / offline / Storage blocked: tighten JPEG size so document stays well under Firestore 1MB limit
+    if (dataUrl && dataUrl.length > inlineLimit) {
+      dataUrl = await compressImageFileToDataUrl(dataUrl, 820, 0.64);
+    }
+    if (dataUrl && dataUrl.length > 190000) {
+      dataUrl = await compressImageFileToDataUrl(dataUrl, 640, 0.54);
     }
     return dataUrl;
   }
@@ -3070,11 +3077,16 @@ const REMO_STORE = {
     // Self-heal session mismatch between Firebase Auth and local USER_KEY
     if (fbU && fbVerified) {
       const fbEmail = this._getFbEmail(fbU).toLowerCase().trim();
-      const needsSwitch = !u || this.isFakeOrGuestUser(u) || (u.fbUid && u.fbUid !== fbU.uid) || (u.email && fbEmail && u.email.toLowerCase().trim() !== fbEmail);
+      const expectedFbUid = 'u_fb_' + fbU.uid;
+      const needsSwitch = !u ||
+        this.isFakeOrGuestUser(u) ||
+        (u.fbUid && u.fbUid !== fbU.uid) ||
+        (!u.fbUid && u.uid !== expectedFbUid && u.uid !== 'u_admin_founder') ||
+        (u.email && fbEmail && u.email.toLowerCase().trim() !== fbEmail);
       if (needsSwitch) {
-        const match = (this.state.users || []).find((x) =>
-          x && (x.uid === ('u_fb_' + fbU.uid) || x.fbUid === fbU.uid || (fbEmail && x.email && x.email.toLowerCase().trim() === fbEmail))
-        );
+        const match = (this.state.users || []).find((x) => x && x.uid === expectedFbUid) ||
+          (this.state.users || []).find((x) => x && x.fbUid === fbU.uid) ||
+          (this.state.users || []).find((x) => x && fbEmail && x.email && x.email.toLowerCase().trim() === fbEmail);
         if (match) {
           if (fbEmail && (!match.email || /^citizen\d+@remo\.world$/i.test(match.email))) match.email = this._getFbEmail(fbU);
           if (!match.fbUid) match.fbUid = fbU.uid;
@@ -3091,8 +3103,8 @@ const REMO_STORE = {
         if (!u.fbUid) u.fbUid = fbU.uid;
         u.emailVerified = true;
       }
-    } else if (this.fbAuth && !fbU && u && u.uid === 'u_admin_founder') {
-      // Never impersonate Founder Admin when Firebase Auth is signed out
+    } else if (this.fbAuth && !fbU && u && (u.uid === 'u_admin_founder' || (this._fbAuthResolved && (u.uid.startsWith('u_fb_') || Boolean(u.fbUid))))) {
+      // Never impersonate Founder Admin or stale Firebase-linked profile when Firebase Auth is definitively signed out
       localStorage.removeItem(this.USER_KEY);
       u = null;
     }
@@ -3251,7 +3263,10 @@ const REMO_STORE = {
     );
 
     if (!Array.isArray(this.state.users)) this.state.users = [];
-    let u = fbUid ? this.state.users.find((x) => x && (x.uid === ('u_fb_' + fbUid) || x.fbUid === fbUid)) : null;
+    let u = fbUid
+      ? (this.state.users.find((x) => x && x.uid === ('u_fb_' + fbUid)) ||
+         this.state.users.find((x) => x && x.fbUid === fbUid))
+      : null;
     if (!u && cleanEmail) {
       u = this.state.users.find((x) => x && x.email && x.email.toLowerCase().trim() === cleanEmail.toLowerCase() && (!fbUid || !x.fbUid || x.fbUid === fbUid));
     }
@@ -4967,7 +4982,9 @@ const REMO_STORE = {
             }
           });
         }
+        this._fbAuthResolved = false;
         this.fbAuth.onAuthStateChanged((fbU) => {
+          this._fbAuthResolved = true;
           if (fbU) {
             const isVerified = this._isFbUserVerified(fbU);
             if (!isVerified) {
@@ -6029,7 +6046,8 @@ const REMO_STORE = {
 
     const activePosts = [];
     (this.state.posts || []).forEach((lp) => {
-      if (lp && lp.id && !combinedCloud.has(lp.id) && !this.deletedPostIds?.has(lp.id) && (now - (lp.createdAt || 0) < 12000)) {
+      const keepLocal = Boolean(lp._cloudSyncPending || lp._cloudSyncError || (now - (lp.createdAt || 0) < 20000));
+      if (lp && lp.id && !combinedCloud.has(lp.id) && !this.deletedPostIds?.has(lp.id) && keepLocal) {
         activePosts.push(lp);
       }
     });
@@ -6147,17 +6165,50 @@ const REMO_STORE = {
     return null;
   },
 
-  syncPostToCloud(post) {
-    if (!this.fbDb || !post || !post.id || post.isShowcase) return;
+  getCloudAuthorUid(u = null) {
+    const fbU = this.fbAuth && this.fbAuth.currentUser;
+    if (fbU && fbU.uid) return 'u_fb_' + fbU.uid;
+    return (u && (u.authorUid || u.uid)) || '';
+  },
+
+  async syncPostToCloud(post) {
+    if (!this.fbDb || !post || !post.id || post.isShowcase) return { ok: true, skipped: true };
     try {
-      // Sanitize undefined fields so Firestore doesn't reject write
       const cleanPost = JSON.parse(JSON.stringify(post));
+      delete cleanPost._cloudSyncError;
+      delete cleanPost._cloudSyncPending;
       if (!cleanPost.createdAt) cleanPost.createdAt = Date.now();
-      if (cleanPost.uid && !cleanPost.authorUid) cleanPost.authorUid = cleanPost.uid;
-      this.fbDb.collection('remo_posts').doc(post.id).set(cleanPost, { merge: true })
-        .catch((err) => console.warn('Firestore post sync notice:', err.message));
-    } catch (e) {
-      console.warn('syncPostToCloud exception:', e);
+      const fbU = this.fbAuth && this.fbAuth.currentUser;
+      const curU = this.getCurrentUser();
+      const isMine = Boolean(curU && (cleanPost.uid === curU.uid || cleanPost.authorUid === curU.uid));
+      if (fbU && fbU.uid && (isMine || !cleanPost.authorUid)) {
+        cleanPost.authorUid = 'u_fb_' + fbU.uid;
+        if (!cleanPost.uid) cleanPost.uid = cleanPost.authorUid;
+      } else if (cleanPost.uid && !cleanPost.authorUid) {
+        cleanPost.authorUid = cleanPost.uid;
+      }
+      const approxBytes = JSON.stringify(cleanPost).length;
+      if (approxBytes > 950000) {
+        const msg = `Document too large (${Math.round(approxBytes / 1024)} KB / max 950 KB)`;
+        post._cloudSyncError = 'doc-too-large: ' + msg;
+        post._cloudSyncPending = false;
+        console.warn('Firestore post size guard:', msg);
+        return { ok: false, code: 'doc-too-large', message: msg };
+      }
+      await this.fbDb.collection('remo_posts').doc(post.id).set(cleanPost, { merge: true });
+      if (post._cloudSyncError) delete post._cloudSyncError;
+      if (post._cloudSyncPending) delete post._cloudSyncPending;
+      if (this._cloudLiveTopPostsMap && !this._cloudLiveTopPostsMap.has(post.id)) {
+        this._cloudLiveTopPostsMap.set(post.id, cleanPost);
+      }
+      return { ok: true };
+    } catch (err) {
+      const code = (err && err.code) || 'sync-error';
+      const message = (err && err.message) || String(err || 'Sync failed');
+      console.warn('Firestore post sync notice:', code, message);
+      post._cloudSyncError = `${code}: ${message}`.slice(0, 140);
+      post._cloudSyncPending = false;
+      return { ok: false, code, message };
     }
   },
 

@@ -10415,3 +10415,23 @@ select.remo-input option {
     transform: translateX(-50%);
   }
 }
+.post-sync-retry-banner {
+  width: 100%;
+  margin: 0 0 8px;
+  padding: 7px 11px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, rgba(244, 63, 94, 0.2), rgba(245, 158, 11, 0.16));
+  border: 1px solid rgba(251, 146, 60, 0.55);
+  color: #fed7aa;
+  font-size: 0.74rem;
+  font-weight: 800;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.post-sync-retry-banner:hover {
+  border-color: #fb923c;
+  color: #fff;
+}

@@ -2135,7 +2135,7 @@ function computePostRenderSig(p, u, lang) {
   const chSig = p.gameChallenge ? `${p.gameChallenge.targetScore || 0}:${p.gameChallenge.holderUid || ''}:${p.gameChallenge.crownSteals || 0}` : '';
   const liked = (u && (p.likes || []).includes(u.uid)) ? 1 : 0;
   const boostMins = isPostBoostActive(p) ? Math.floor(Math.max(0, Number(p.boostedUntil) - Date.now()) / 60000) : 0;
-  return `${p.id}_${lang}_${(p.likes || []).length}_${liked}_${(p.comments || []).length}_${p.tipsTotal || 0}_${p.pinned ? 1 : 0}_${boostMins}_${p.founderAward ? 1 : 0}_${p.mintedCard ? 1 : 0}_${dualOpen}_${vSig}_${pollSig}_${btySig}_${capSig}_${lookSig}_${mboxSig}_${chSig}_${Object.keys(p.cityGuesses || {}).length}_${p.leaderboard?.[0]?.score || 0}_${isPostCapsuleSealed(p) ? 1 : 0}_${isAdminXrayOpen(p.id) ? 1 : 0}`;
+  return `${p.id}_${lang}_${(p.likes || []).length}_${liked}_${(p.comments || []).length}_${p.tipsTotal || 0}_${p.pinned ? 1 : 0}_${boostMins}_${p.founderAward ? 1 : 0}_${p.mintedCard ? 1 : 0}_${dualOpen}_${vSig}_${pollSig}_${btySig}_${capSig}_${lookSig}_${mboxSig}_${chSig}_${Object.keys(p.cityGuesses || {}).length}_${p.leaderboard?.[0]?.score || 0}_${isPostCapsuleSealed(p) ? 1 : 0}_${isAdminXrayOpen(p.id) ? 1 : 0}_${p._cloudSyncError ? 1 : 0}_${p._cloudSyncPending ? 1 : 0}`;
 }
 
 function renderSinglePostCardHtml(p, lang, u, isAdm) {
@@ -2261,6 +2261,7 @@ function renderSinglePostCardHtml(p, lang, u, isAdm) {
           ${mysteryMasked ? '' : getInterCityDistanceBridge(city, lang)}
           ${!hiddenByCapsule && typeof renderMysteryCityWidget === 'function' ? renderMysteryCityWidget(p, city, lang, u, isPostOwner) : ''}
           ${!hiddenByCapsule && !mysteryMasked && typeof renderWorldWindowActionsBar === 'function' ? renderWorldWindowActionsBar(p, lang) : ''}
+          ${p._cloudSyncError ? `<button type="button" class="post-sync-retry-banner" onclick="retrySyncPostToCloud('${escapeJsSingleArg(p.id)}')" title="${escapeHtmlStr(p._cloudSyncError)}">${escapeHtmlStr(t('post_sync_retry_btn'))}</button>` : ''}
 
           <div class="post-actions-bar">
             <button type="button" class="pact-btn ${liked ? 'liked' : ''}" onclick="toggleLikePost('${p.id}')" title="Like">
@@ -3125,11 +3126,38 @@ function toggleLikePost(postId) {
       });
     }
   }
-  REMO_STORE.syncPostToCloud(p);
+  REMO_STORE.syncPostToCloud(p).then((res) => {
+    if (res && !res.ok && p._cloudSyncError) {
+      rerenderSinglePostCard(p.id);
+    }
+  });
   REMO_STORE.save(true, 'like');
   rerenderSinglePostCard(p.id);
   syncHeaderAndSidebars();
 }
+
+async function retrySyncPostToCloud(postId) {
+  const p = findFeedPostById(postId);
+  if (!p) return;
+  const curFb = REMO_STORE.fbAuth && REMO_STORE.fbAuth.currentUser;
+  if (REMO_STORE.fbAuth && !curFb && !REMO_STORE.isCurrentUserAdmin()) {
+    remoToast(t('auth_need_signin_post'));
+    if (typeof openAuthModal === 'function') openAuthModal(false);
+    return;
+  }
+  remoToast(t('post_sync_retrying'), 'coin');
+  p._cloudSyncPending = true;
+  const res = await REMO_STORE.syncPostToCloud(p);
+  if (res && res.ok) {
+    REMO_STORE.save(true, 'post_retry_ok');
+    rerenderSinglePostCard(p.id);
+    remoToast(t('post_sync_ok'), 'fanfare');
+  } else {
+    rerenderSinglePostCard(p.id);
+    remoToast(t('post_cloud_sync_err', { err: (res && (res.code || res.message)) || 'error' }));
+  }
+}
+window.retrySyncPostToCloud = retrySyncPostToCloud;
 
 function tipPostAuthor(postId) {
   const lang = REMO_I18N.getLang();
@@ -7245,6 +7273,13 @@ async function publishNewRemoPost() {
     remoToast(t('auth_err_banned'));
     return;
   }
+  const curUAuth = REMO_STORE.getCurrentUser();
+  const curFbUser = REMO_STORE.fbAuth && REMO_STORE.fbAuth.currentUser;
+  if (!curUAuth || curUAuth.role === 'guest' || (REMO_STORE.fbAuth && !curFbUser && !REMO_STORE.isCurrentUserAdmin())) {
+    remoToast(t('auth_need_signin_post'));
+    if (typeof openAuthModal === 'function') openAuthModal(false);
+    return;
+  }
   const cityId = document.getElementById('createCitySelect')?.value || 'montreal';
   const vibe = document.getElementById('createVibeSelect')?.value || 'energy';
   let cap = document.getElementById('createCaptionInp')?.value.trim() || '';
@@ -7299,11 +7334,11 @@ async function publishNewRemoPost() {
       const blob = (wantWindowStamp && typeof stampPhotoWithLiveCityWindow === 'function')
         ? await stampPhotoWithLiveCityWindow(rawBlob, cityId, lang)
         : rawBlob;
-      const url = await uploadMediaToCloudOrDataUrl(blob, 'posts');
+      const url = await uploadMediaToCloudOrDataUrl(blob, 'posts', { inlineMaxChars: 90000 });
       mediaUrls.push(url);
     }
     mediaType = 'before_after';
-    mediaUrl = mediaUrls[0];
+    mediaUrl = (mediaUrls[0] && String(mediaUrls[0]).startsWith('http')) ? mediaUrls[0] : '';
     const wantLookMeter = document.getElementById('createBaLookRatingToggle')?.checked !== false;
     baMeta = {
       beforeFilter: pendingBaBeforeFilter || 'flt-none',
@@ -7315,20 +7350,21 @@ async function publishNewRemoPost() {
   } else if (activeCreateStudioTab === 'photo') {
     soundtrackId = document.getElementById('createPhotoSoundSelect')?.value || '';
     if (pendingStudioPhotoBlobs.length > 0) {
+      const multiInlineLimit = pendingStudioPhotoBlobs.length >= 2 ? 90000 : 120000;
       for (const rawBlob of pendingStudioPhotoBlobs) {
         const blob = (wantWindowStamp && typeof stampPhotoWithLiveCityWindow === 'function')
           ? await stampPhotoWithLiveCityWindow(rawBlob, cityId, lang)
           : rawBlob;
-        const url = await uploadMediaToCloudOrDataUrl(blob, 'posts');
+        const url = await uploadMediaToCloudOrDataUrl(blob, 'posts', { inlineMaxChars: multiInlineLimit });
         mediaUrls.push(url);
       }
       const wantBeforeAfter = pendingStudioPhotoBlobs.length === 2 && document.getElementById('studioCompareToggle')?.checked;
       if (wantBeforeAfter) {
         mediaType = 'before_after';
-        mediaUrl = mediaUrls[0];
+        mediaUrl = (mediaUrls[0] && String(mediaUrls[0]).startsWith('http')) ? mediaUrls[0] : '';
       } else if (mediaUrls.length > 1) {
         mediaType = 'carousel';
-        mediaUrl = mediaUrls[0];
+        mediaUrl = (mediaUrls[0] && String(mediaUrls[0]).startsWith('http')) ? mediaUrls[0] : '';
       } else {
         mediaType = 'image';
         mediaUrl = mediaUrls[0];
@@ -7474,14 +7510,15 @@ async function publishNewRemoPost() {
   const rawSpotTitle = document.getElementById('createSecretSpotTitleInp')?.value.trim() || '';
   const rawSpotClue = document.getElementById('createSecretSpotClueInp')?.value.trim() || '';
 
+  const cloudAuthorUid = (typeof REMO_STORE.getCloudAuthorUid === 'function') ? REMO_STORE.getCloudAuthorUid(u) : u.uid;
   const newPost = {
     id: 'post_' + Date.now(),
     uid: u.uid,
-    authorUid: u.uid,
+    authorUid: cloudAuthorUid || u.uid,
     authorName: u.name,
     authorAvatar: u.avatarUrl || '',
     authorEmail: u.email || '',
-    authorVerified: true,
+    authorVerified: Boolean(REMO_STORE.fbAuth && REMO_STORE.fbAuth.currentUser),
     authorPassport: u.passportNum,
     cityId,
     vibe,
@@ -7615,7 +7652,15 @@ async function publishNewRemoPost() {
   const reward = baseReward * surgeMult;
   const cityPts = (pendingPostGpsVerified ? 45 : 25) * surgeMult;
   REMO_STORE.addCoins(u.uid, reward, cityPts);
-  REMO_STORE.syncPostToCloud(newPost);
+  newPost._cloudSyncPending = true;
+  REMO_STORE.syncPostToCloud(newPost).then((res) => {
+    if (res && !res.ok) {
+      remoToast(t('post_cloud_sync_err', { err: res.code || res.message || 'error' }), 7500);
+    }
+    if (typeof rerenderSinglePostCard === 'function' && document.getElementById('post_card_' + newPost.id)) {
+      rerenderSinglePostCard(newPost.id);
+    }
+  });
   REMO_STORE.save(true, 'new_post');
   closeCreatePostModal();
   spawnRemoCoinsFX(wxStatus.isSurge ? 16 : 10);
@@ -9449,22 +9494,40 @@ async function submitUniversalAuth(ev) {
     return;
   }
 
+  let sendErr = null;
   try {
     await fbUser.sendEmailVerification({ url: window.location.origin + '/' });
   } catch (e) {
     try {
       await fbUser.sendEmailVerification();
     } catch (e2) {
-      console.warn('sendEmailVerification notice:', e2.message);
+      sendErr = e2;
+      console.warn('sendEmailVerification notice:', e2.code || e2.message);
     }
   }
 
+  window._lastVerifyEmailSentTs = sendErr ? 0 : Date.now();
   const regForm = document.getElementById('authRegisterForm');
   const otpBox = document.getElementById('authOtpBox');
   const emailDisplay = document.getElementById('authOtpEmailDisplay');
+  const sendWarnEl = document.getElementById('authOtpSendWarn');
   if (regForm) regForm.style.display = 'none';
   if (otpBox) otpBox.style.display = 'block';
   if (emailDisplay) emailDisplay.textContent = email;
+
+  if (sendErr) {
+    const errLabel = sendErr.code || sendErr.message || 'blocked';
+    if (sendWarnEl) {
+      sendWarnEl.style.display = 'block';
+      sendWarnEl.textContent = t('auth_verify_send_err', { err: errLabel });
+    }
+    remoToast(t('auth_verify_send_err', { err: errLabel }), 8000);
+    return;
+  }
+  if (sendWarnEl) {
+    sendWarnEl.style.display = 'none';
+    sendWarnEl.textContent = '';
+  }
 
   remoToast(
     lang === 'fr'
@@ -9602,20 +9665,46 @@ async function resendAuthOtpCode() {
   const lang = REMO_I18N.getLang();
   const curFb = REMO_STORE.fbAuth && REMO_STORE.fbAuth.currentUser;
   if (!curFb) return;
+  const elapsed = Date.now() - Number(window._lastVerifyEmailSentTs || 0);
+  if (elapsed < 60000) {
+    const waitSec = Math.max(1, Math.ceil((60000 - elapsed) / 1000));
+    remoToast(lang === 'fr'
+      ? `⏳ Patientez encore ${waitSec}s avant de renvoyer l’email (ou utilisez Continuer avec Google).`
+      : `⏳ Please wait ${waitSec}s before resending (or click Continue with Google).`);
+    return;
+  }
 
+  let resendErr = null;
   try {
     await curFb.sendEmailVerification({ url: window.location.origin + '/' });
   } catch (e) {
     try {
       await curFb.sendEmailVerification();
     } catch (err) {
-      remoToast(
-        lang === 'fr'
-          ? '⏳ Un email a déjà été envoyé récemment. Vérifiez votre dossier Spam ou patientez 1 minute.'
-          : '⏳ An email was already sent recently. Check your Spam folder or wait 1 minute.'
-      );
-      return;
+      resendErr = err;
     }
+  }
+
+  const sendWarnEl = document.getElementById('authOtpSendWarn');
+  if (resendErr) {
+    const errCode = (resendErr && resendErr.code) || '';
+    const errMsg = errCode === 'auth/too-many-requests'
+      ? (lang === 'fr'
+        ? '⏳ Limite atteinte : attendez 2-3 minutes ou utilisez « Continuer avec Google » ci-dessous.'
+        : '⏳ Rate limit reached: wait 2-3 minutes or click "Continue with Google" below.')
+      : t('auth_verify_send_err', { err: errCode || resendErr.message || 'error' });
+    if (sendWarnEl) {
+      sendWarnEl.style.display = 'block';
+      sendWarnEl.textContent = errMsg;
+    }
+    remoToast(errMsg, 7500);
+    return;
+  }
+
+  window._lastVerifyEmailSentTs = Date.now();
+  if (sendWarnEl) {
+    sendWarnEl.style.display = 'none';
+    sendWarnEl.textContent = '';
   }
 
   remoToast(
@@ -10294,11 +10383,11 @@ window.addEventListener('remo:stateupdate', (ev) => {
     return;
   }
   const singlePostOrNonFeedReasons = new Set([
-    'like', 'tip', 'versus_vote', 'versus_claim_bonus', 'admin_conclude_duel',
+    'like', 'city_score', 'tip', 'versus_vote', 'versus_claim_bonus', 'admin_conclude_duel',
     'poll_vote', 'capsule_unlock', 'bounty_feed_claimed', 'reaction', 'card_save',
     'dm', 'cloud_dms', 'notification', 'notif_read_all', 'city_stock_buy', 'city_stock_sell',
     'vip_order', 'vip_equip', 'vip_item_added', 'vip_item_del', 'vip_order_delivered',
-    'bounty_new', 'bounty_sub', 'bounty_paid', 'bounty_del'
+    'bounty_new', 'bounty_sub', 'bounty_paid', 'bounty_del', 'post_retry_ok'
   ]);
   if (singlePostOrNonFeedReasons.has(reason) && currentRemoView === 'feed') {
     return;
@@ -14777,14 +14866,15 @@ function challengeFeedFromGamesHub() {
   const city = getCityById(cityId);
   const gEn = game.title_en || 'REMO Arcade';
   const gFr = game.title_fr || gEn;
+  const cloudAuthorUid = (typeof REMO_STORE.getCloudAuthorUid === 'function') ? REMO_STORE.getCloudAuthorUid(u) : u.uid;
   const newPost = {
     id: 'post_' + Date.now(),
     uid: u.uid,
-    authorUid: u.uid,
+    authorUid: cloudAuthorUid || u.uid,
     authorName: u.name,
     authorAvatar: u.avatarUrl || '',
     authorEmail: u.email || '',
-    authorVerified: true,
+    authorVerified: Boolean(REMO_STORE.fbAuth && REMO_STORE.fbAuth.currentUser),
     authorPassport: u.passportNum,
     cityId,
     vibe: '🔥',

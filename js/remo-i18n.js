@@ -1231,7 +1231,16 @@ const REMO_DICT = {
     feed_loading_more: '✨ Loading more moments...',
     feed_caught_up: '🌍 You’re all caught up!',
     feed_back_to_top: '↑ Top',
-    feed_new_posts_pill: '↑ New Moments'
+    feed_new_posts_pill: '↑ New Moments',
+    auth_need_signin_post: '🔐 Please sign in with Google or Email before publishing to REMO!',
+    auth_otp_change_email: '← Change email',
+    auth_otp_yahoo_warn: '⚠️ Yahoo / Hotmail / Outlook often block Firebase automated emails before Spam. If nothing arrives in 60s, use "Continue with Google" below or Gmail!',
+    auth_verify_send_err: '⚠️ Verification email blocked ({err}). Try again in 60s or use Continue with Google.',
+    auth_otp_google_btn: '🌐 Continue with Google Instead',
+    post_cloud_sync_err: '⚠️ Cloud sync failed ({err}). Tap Retry on the post or re-sign in!',
+    post_sync_retry_btn: '⚠️ Cloud Sync Failed · Tap to Retry',
+    post_sync_retrying: '⏳ Syncing to REMO Cloud...',
+    post_sync_ok: '☁️ Synced to REMO Cloud! Everyone can now see this post.'
   },
 
   fr: {
@@ -2459,7 +2468,16 @@ const REMO_DICT = {
     feed_loading_more: '✨ Chargement de nouveaux moments...',
     feed_caught_up: '🌍 Vous avez tout vu !',
     feed_back_to_top: '↑ Haut',
-    feed_new_posts_pill: '↑ Nouveaux'
+    feed_new_posts_pill: '↑ Nouveaux',
+    auth_need_signin_post: '🔐 Connectez-vous avec Google ou par Email avant de publier sur REMO !',
+    auth_otp_change_email: '← Changer d’email',
+    auth_otp_yahoo_warn: '⚠️ Yahoo / Hotmail / Outlook bloquent souvent les emails automatiques Firebase avant même les Spams. Sans réponse sous 60s, cliquez sur « Continuer avec Google » ci-dessous ou utilisez Gmail !',
+    auth_verify_send_err: '⚠️ Envoi de l’email bloqué ({err}). Réessayez dans 60s ou utilisez Continuer avec Google.',
+    auth_otp_google_btn: '🌐 Continuer avec Google à la place',
+    post_cloud_sync_err: '⚠️ Échec de sauvegarde Cloud ({err}). Touchez Réessayer sur le post ou reconnectez-vous !',
+    post_sync_retry_btn: '⚠️ Échec Sync Cloud · Réessayer',
+    post_sync_retrying: '⏳ Synchronisation vers le Cloud...',
+    post_sync_ok: '☁️ Synchronisé dans le Cloud REMO ! Tout le monde peut le voir.'
   }
 };
 
