@@ -243,7 +243,7 @@ const REMO_DICT = {
     flash_drop_claim: 'Locate & Claim',
 
     // Feed Filters & Moods
-    filter_all: '🌍 All World',
+    filter_all: '🌍 For You',
     filter_html: '💻 HTML & Mini-Apps',
     filter_videos: '🎬 Videos & Links',
     filter_photos: '📷 Photos',
@@ -861,7 +861,7 @@ const REMO_DICT = {
     beat_remix_btn: '🎛️ Remix Beat (+10 🪙)',
     beat_badge_live: '🎛️ REMO BEAT-PAD 4D',
     beat_empty_err: 'Tap a few pads or click 🎲 Auto-Hit first!',
-    clean_pulse_bar_lbl: '⚡ City Pulse (Weather · Live War · Daily Challenge)',
+    clean_pulse_bar_lbl: '⚡ Pulse',
     clean_pulse_open: 'Show ▾',
     clean_pulse_hide: 'Hide ▴',
     filter_beats: '🎛️ Beats',
@@ -1044,7 +1044,7 @@ const REMO_DICT = {
     showcase_comment_notice: '💬 Comment saved locally on this Editorial Showcase. Publish your own City Moment to chat globally!',
 
     // 🧠 Daily World Blitz (EN)
-    feed_blitz_pill: '🧠 Daily Blitz',
+    feed_blitz_pill: '🧠 Blitz',
     nav_world_blitz: 'World Blitz 60s',
     blitz_badge_daily: 'DAILY',
     blitz_title: 'Daily World Blitz',
@@ -1240,7 +1240,27 @@ const REMO_DICT = {
     post_cloud_sync_err: '⚠️ Cloud sync failed ({err}). Tap Retry on the post or re-sign in!',
     post_sync_retry_btn: '⚠️ Cloud Sync Failed · Tap to Retry',
     post_sync_retrying: '⏳ Syncing to REMO Cloud...',
-    post_sync_ok: '☁️ Synced to REMO Cloud! Everyone can now see this post.'
+    post_sync_ok: '☁️ Synced to REMO Cloud! Everyone can now see this post.',
+    feed_online_btn: 'Online',
+    feed_view_stage: '📱 Stage',
+    feed_view_grid: '▦ Grid',
+    feed_guide_btn: '❓ How it works',
+    guide_modal_title: '🌐 How REMO Works (3 Seconds)',
+    guide_modal_sub: 'Real moments across 24+ world cities — explore, vote, play & earn.',
+    guide_step1_t: '1. Travel City to City',
+    guide_step1_d: 'Scroll up/down (or use ▲▼) through real photos, Before/After sliders, City Duels, and live 4D Focus TV windows.',
+    guide_step2_t: '2. Tip 🪙 & Push Your City #1',
+    guide_step2_d: 'Like moments, send REMO Coins (🪙) to creators, and boost your favorite city to #1 in the World City Cup.',
+    guide_step3_t: '3. Play Games & Collect 4D Cards',
+    guide_step3_d: 'Open Hub (or Explore Apps) for World Blitz 60s, live Radio, Radar treasure chests, and free daily 4D City Cards.',
+    guide_got_it: '🚀 Got it — Start Exploring',
+    stage_hint_bar: '↕ Scroll or use ▲▼ for next moment · 🪙 Tip creators to support their city',
+    right_tab_cup: '🏆 Cup',
+    right_tab_tv: '📺 TV',
+    right_tab_id: '🪪 ID',
+    right_panel_hide: 'Hide',
+    right_panel_show: '◀ Panels',
+    mob_search_ph: '🔍 Search city, creator, #tag...'
   },
 
   fr: {
@@ -1482,7 +1502,7 @@ const REMO_DICT = {
     flash_drop_claim: 'Localiser & Réclamer',
 
     // Feed Filters & Moods
-    filter_all: '🌍 Monde Entier',
+    filter_all: '🌍 Pour toi',
     filter_html: '💻 HTML & Mini-Apps',
     filter_videos: '🎬 Vidéos & Liens',
     filter_photos: '📷 Photos',
@@ -2100,7 +2120,7 @@ const REMO_DICT = {
     beat_remix_btn: '🎛️ Remixer Beat (+10 🪙)',
     beat_badge_live: '🎛️ BEAT-PAD REMO 4D',
     beat_empty_err: 'Activez quelques pads ou cliquez sur 🎲 Hit Auto !',
-    clean_pulse_bar_lbl: '⚡ Pouls Urbain (Météo · Guerre Live · Défi du Jour)',
+    clean_pulse_bar_lbl: '⚡ Pouls',
     clean_pulse_open: 'Ouvrir ▾',
     clean_pulse_hide: 'Réduire ▴',
     filter_beats: '🎛️ Beats',
@@ -2281,7 +2301,7 @@ const REMO_DICT = {
     showcase_comment_notice: '💬 Commentaire enregistré localement sur ce guide. Publiez un vrai moment pour échanger mondialement !',
 
     // 🧠 Daily World Blitz (FR)
-    feed_blitz_pill: '🧠 Blitz du Jour',
+    feed_blitz_pill: '🧠 Blitz',
     nav_world_blitz: 'World Blitz 60s',
     blitz_badge_daily: 'JOUR',
     blitz_title: 'Daily World Blitz',
@@ -2477,7 +2497,27 @@ const REMO_DICT = {
     post_cloud_sync_err: '⚠️ Échec de sauvegarde Cloud ({err}). Touchez Réessayer sur le post ou reconnectez-vous !',
     post_sync_retry_btn: '⚠️ Échec Sync Cloud · Réessayer',
     post_sync_retrying: '⏳ Synchronisation vers le Cloud...',
-    post_sync_ok: '☁️ Synchronisé dans le Cloud REMO ! Tout le monde peut le voir.'
+    post_sync_ok: '☁️ Synchronisé dans le Cloud REMO ! Tout le monde peut le voir.',
+    feed_online_btn: 'En ligne',
+    feed_view_stage: '📱 Scène',
+    feed_view_grid: '▦ Grille',
+    feed_guide_btn: '❓ Guide',
+    guide_modal_title: '🌐 Comment fonctionne REMO (3 sec)',
+    guide_modal_sub: 'De vrais moments dans 24+ villes du monde — explorez, votez, jouez.',
+    guide_step1_t: '1. Voyagez de Ville en Ville',
+    guide_step1_d: 'Défilez (ou ▲▼) entre photos réelles, Avant/Après, Duels de Villes et fenêtres Focus TV 4D en direct.',
+    guide_step2_t: '2. Offrez 🪙 & Hissez votre Ville #1',
+    guide_step2_d: 'Aimez les moments, envoyez des Pièces REMO (🪙) et propulsez votre ville #1 à la Coupe du Monde.',
+    guide_step3_t: '3. Jeux, Radar & Cartes 4D',
+    guide_step3_d: 'Ouvrez le Hub pour World Blitz 60s, la Radio en direct, les coffres Radar et vos Cartes 4D gratuites.',
+    guide_got_it: '🚀 Compris — Explorer',
+    stage_hint_bar: '↕ Défilez ou utilisez ▲▼ · 🪙 Soutenez les créateurs et leur ville',
+    right_tab_cup: '🏆 Coupe',
+    right_tab_tv: '📺 TV',
+    right_tab_id: '🪪 ID',
+    right_panel_hide: 'Masquer',
+    right_panel_show: '◀ Panneaux',
+    mob_search_ph: '🔍 Chercher ville, créateur, #tag...'
   }
 };
 

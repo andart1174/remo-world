@@ -124,7 +124,7 @@
   <noscript><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha384-sHL9NAb7lN7rfvG5lfHpm643Xkcjzp4jFvuavGOndn6pjVqS6ny56CAt3nsEVT4H" crossorigin="anonymous"></noscript>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha384-cxOPjt7s7Iz04uaHJceBmS+qpjv2JkIHNVcuOrM+YHwZOmJGBXI00mdUXEq65HTH" crossorigin="anonymous" defer></script>
 
-  <link rel="stylesheet" href="css/remo-core.css?v=140">
+  <link rel="stylesheet" href="css/remo-core.css?v=141">
 </head>
 <body>
 
@@ -147,7 +147,7 @@
 
     <div class="header-search">
       <span class="header-search-ic">🔍</span>
-      <input type="text" data-i18n-placeholder="search_placeholder" placeholder="Search cities, creators, #hashtags..." oninput="renderSocialFeed(this.value)">
+      <input type="text" id="desktopHeaderSearchInp" data-i18n-placeholder="search_placeholder" placeholder="Search cities, creators, #hashtags..." oninput="handleFeedSearchInput(this.value)">
     </div>
 
     <div class="header-right">
@@ -160,6 +160,7 @@
       <span class="happy-hour-pill" id="hdrHappyHourBadge" style="display:none;" data-i18n="happy_hour_badge">⚡ 2X REWARDS HAPPY HOUR</span>
 
       <button class="btn-ghost" id="btnRadioToggle" onclick="toggleHeaderRadio()">📺 Focus TV</button>
+      <button type="button" class="btn-ghost mobile-search-trigger" id="btnMobileSearchToggle" onclick="toggleMobileFeedSearchBar()" title="Search" aria-label="Search">🔍</button>
       <button class="btn-ghost hdr-apps-btn hide-mobile" id="btnHeaderAppsLauncher" onclick="openAppLauncherModal()" title="All REMO Apps">
         <span class="hdr-apps-dots" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
         <span data-i18n="hdr_apps_btn">Apps</span>
@@ -182,6 +183,14 @@
       <a href="admin.html" class="btn-ghost hide-mobile" id="hdrAdminOfficeLink" style="display:none;border-color:rgba(251,191,36,0.5);color:#fbbf24;" data-i18n="btn_admin_office">🛡️ Admin Office</a>
     </div>
   </header>
+
+  <!-- 🔍 Mobile Slide-Down Search Drawer -->
+  <div class="mobile-feed-search-drawer" id="mobileFeedSearchDrawer">
+    <div class="mobile-feed-search-inner">
+      <input type="text" id="mobileFeedSearchInp" class="remo-input" data-i18n-placeholder="mob_search_ph" placeholder="🔍 Search city, creator, #tag..." oninput="handleFeedSearchInput(this.value)">
+      <button type="button" class="btn-ghost" onclick="clearAndCloseMobileSearch()">✕</button>
+    </div>
+  </div>
 
   <!-- 🔥 Genesis Passports Urgency Ticker (#0001–#0500 Allocation) -->
   <div class="genesis-fomo-bar" id="genesisFomoBar" style="display:none;">
@@ -271,10 +280,10 @@
     <!-- ══ CENTER STAGE (All Interactive Views) ══ -->
     <section class="center-stage">
 
-      <!-- 1. WORLD SOCIAL FEED (2-Col Holo Grid on PC / Full-Screen TikTok Snap on Mobile) -->
+      <!-- 1. WORLD SOCIAL FEED (TikTok Stage View on PC & Mobile + Optional 2-Col Grid on PC) -->
       <div class="remo-view active" id="view-feed">
         <div class="feed-top-widgets">
-          <!-- Crisp 3-Second Welcome Hero Strip -->
+          <!-- Crisp 3-Second Welcome Hero Strip (Compact & Dismissible) -->
           <div id="remoWelcomeHeroStrip" class="welcome-hero-strip">
             <div class="welcome-hero-copy">
               <div class="welcome-hero-kicker" data-i18n="hero_welcome_kicker">LIVE GLOBAL CITY NETWORK · MONTRÉAL · PARIS · NEW YORK · TOKYO</div>
@@ -284,52 +293,72 @@
               <button type="button" class="btn-cyber" style="background:linear-gradient(135deg,#0284c7,#6366f1);" onclick="openFocusTvModal()" data-i18n="hero_cta_tv">📺 4D Focus TV</button>
               <button type="button" class="btn-cyber btn-gold" onclick="switchRemoView('cards')" data-i18n="hero_cta_card">🎴 Free 4D Card</button>
               <button type="button" class="btn-ghost" style="border-color:rgba(244,63,94,0.5);color:#fda4af;" onclick="voteCityDuelShortcut()" data-i18n="hero_cta_duel">⚔️ Vote City Duel</button>
+              <button type="button" class="btn-ghost" style="border-color:rgba(56,189,248,0.5);color:#bae6fd;" onclick="openRemoQuickGuideModal()" data-i18n="feed_guide_btn">❓ How it works</button>
             </div>
             <button type="button" class="welcome-hero-close" onclick="dismissWelcomeHeroStrip()" aria-label="Dismiss">✕</button>
           </div>
 
           <div id="newCitizenWelcomeBar" class="new-citizen-welcome-bar" style="display:none;"></div>
-          <div id="livePresenceStrip" class="live-presence-strip"></div>
           <div id="gameChallengeHeroBar" class="game-challenge-hero-bar" style="display:none;"></div>
           <div class="flash-banner" id="flashDropBannerEl" style="display:none;"></div>
-          <div id="feedActiveContestsBanner" style="display:none;margin-bottom:10px;"></div>
+          <div id="feedActiveContestsBanner" style="display:none;margin-bottom:8px;"></div>
           <div class="glass-box stories-bar" id="storiesBarEl" style="display:none;"></div>
 
-          <!-- Clean Feed 1-Line Collapsible City Pulse Bar + Mini #1 Stage Pill -->
-          <div class="feed-pulse-num1-row">
-            <button type="button" class="clean-feed-pulse-toggle" id="cleanFeedPulseToggle" onclick="toggleCleanFeedPulseDrawer()" style="flex:1;min-width:0;margin-bottom:0;">
-              <span data-i18n="clean_pulse_bar_lbl" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">⚡ City Pulse (Weather · Live War · Daily Challenge)</span>
-              <span id="cleanFeedPulseArrow" style="color:#38bdf8;font-size:0.72rem;flex-shrink:0;" data-i18n="clean_pulse_open">Show ▾</span>
-            </button>
-            <button type="button" class="wspot-num1-pill" id="wspotMiniNum1Btn" onclick="handleWorldSpotlightMiniClick()" title="World Spotlight Stage #1">
-              <span>🌟</span>
-              <b id="wspotMiniNum1Txt">#1</b>
-              <span id="wspotMiniDot" class="wspot-mini-dot"></span>
-            </button>
-            <button type="button" class="mobile-only-layout-btn" id="mobileFeedLayoutToggleBtn" onclick="toggleMobileFeedLayoutMode()" title="Switch Mobile Feed View">
-              📰 <span>Classic View</span>
-            </button>
+          <!-- Unified Single-Row Feed Toolbar (Clean Tabs + Compact Utilities + Stage/Grid Switch) -->
+          <div class="clean-feed-toolbar">
+            <div class="filter-row" id="feedModeChips">
+              <button class="fchip active" onclick="setFeedMode('all', this)" data-i18n="filter_all">🌍 For You</button>
+              <button class="fchip" onclick="openStoriesHubModal()" style="border-color:rgba(236,72,153,0.65);color:#f472b6;font-weight:900;" data-i18n="hdr_story_btn">📸 Story</button>
+              <button type="button" class="fchip blitz-feed-pill" id="feedWorldBlitzPill" onclick="openWorldBlitzModal()"><span data-i18n="feed_blitz_pill">🧠 Blitz</span><span class="blitz-pill-status" id="feedBlitzPillStatus">5/5</span></button>
+              <button class="fchip" onclick="setFeedMode('duets', this)" data-i18n="filter_duets">⚔️ City Duels</button>
+              <button class="fchip" id="feedChipAdminPromoBtn" onclick="openViralPromoStudioModal()" style="display:none;border-color:rgba(56,189,248,0.65);color:#7dd3fc;font-weight:900;">👑 <span data-i18n="promo_studio_chip">📣 Promo Studio</span></button>
+              <button type="button" class="fchip" id="btnToggleMoreFilters" onclick="toggleMoreFeedFilters()" data-i18n="filter_more_btn">+ Filters ▾</button>
+            </div>
+
+            <div class="clean-toolbar-utils feed-pulse-num1-row">
+              <button type="button" class="toolbar-util-pill online-mini-pill" id="feedOnlineToggleBtn" onclick="toggleFeedPresenceDrawer()" title="Online Citizens">
+                <span class="online-pulse-dot"></span>
+                <b id="feedOnlineMiniCount">1</b>
+                <span class="util-lbl-desktop" data-i18n="feed_online_btn">Online</span>
+              </button>
+              <button type="button" class="toolbar-util-pill clean-feed-pulse-toggle" id="cleanFeedPulseToggle" onclick="toggleCleanFeedPulseDrawer()">
+                <span data-i18n="clean_pulse_bar_lbl">⚡ Pulse</span>
+                <span id="cleanFeedPulseArrow" style="color:#38bdf8;font-size:0.68rem;flex-shrink:0;" data-i18n="clean_pulse_open">Show ▾</span>
+              </button>
+              <button type="button" class="wspot-num1-pill" id="wspotMiniNum1Btn" onclick="handleWorldSpotlightMiniClick()" title="World Spotlight Stage #1">
+                <span>🌟</span>
+                <b id="wspotMiniNum1Txt">#1</b>
+                <span id="wspotMiniDot" class="wspot-mini-dot"></span>
+              </button>
+              <div class="desktop-view-switch" id="desktopFeedModeSwitch">
+                <button type="button" class="dv-btn active" id="btnDesktopStageMode" onclick="setDesktopFeedMode('stage')" data-i18n="feed_view_stage">📱 Stage</button>
+                <button type="button" class="dv-btn" id="btnDesktopGridMode" onclick="setDesktopFeedMode('grid')" data-i18n="feed_view_grid">▦ Grid</button>
+              </div>
+              <button type="button" class="toolbar-util-pill desktop-panels-reopen-btn" id="reopenRightRailPill" style="display:none;" onclick="toggleDesktopRightRail(true)" data-i18n="right_panel_show">◀ Panels</button>
+              <button type="button" class="mobile-only-layout-btn" id="mobileFeedLayoutToggleBtn" onclick="toggleMobileFeedLayoutMode()" style="display:none;" title="Switch Mobile Feed View">
+                📰 <span>Classic View</span>
+              </button>
+            </div>
           </div>
+
+          <!-- Collapsible Live Citizens Online Drawer -->
+          <div class="clean-feed-online-drawer" id="cleanFeedOnlineDrawer">
+            <div id="livePresenceStrip" class="live-presence-strip"></div>
+          </div>
+
+          <!-- Collapsible City Pulse Drawer (Weather, Live War, Daily Challenge, City Crown) -->
           <div class="clean-feed-pulse-drawer" id="cleanFeedPulseDrawer">
             <div id="feedDailyMatchPill" class="feed-daily-match-pill" style="display:none;"></div>
             <div id="mobileCityWarStrip" class="mobile-war-strip"></div>
             <div class="weather-ticker-bar" id="worldWeatherTickerBar"></div>
             <div class="pulse-banner" id="dailyPulseBox"></div>
-          </div>
-
-          <div class="filter-row" id="feedModeChips">
-            <button class="fchip active" onclick="setFeedMode('all', this)" data-i18n="filter_all">🌍 All World</button>
-            <button class="fchip" onclick="openStoriesHubModal()" style="border-color:rgba(236,72,153,0.65);color:#f472b6;font-weight:900;" data-i18n="hdr_story_btn">📸 Story</button>
-            <button type="button" class="fchip blitz-feed-pill" id="feedWorldBlitzPill" onclick="openWorldBlitzModal()"><span data-i18n="feed_blitz_pill">🧠 Daily Blitz</span><span class="blitz-pill-status" id="feedBlitzPillStatus">5/5</span></button>
-            <button class="fchip" id="feedChipAdminPromoBtn" onclick="openViralPromoStudioModal()" style="display:none;border-color:rgba(56,189,248,0.65);color:#7dd3fc;font-weight:900;">👑 <span data-i18n="promo_studio_chip">📣 Promo Studio</span></button>
-            <button class="fchip" onclick="setFeedMode('mystery', this)" data-i18n="filter_mystery">🕵️ Guess City</button>
-            <button class="fchip" onclick="setFeedMode('duets', this)" data-i18n="filter_duets">⚔️ City Duels</button>
-            <button class="fchip" onclick="setFeedMode('html', this)" data-i18n="filter_html">💻 HTML &amp; Mini-Apps</button>
-            <button type="button" class="fchip" id="btnToggleMoreFilters" onclick="toggleMoreFeedFilters()" data-i18n="filter_more_btn">+ Filters ▾</button>
+            <div id="feedCitySpotlightBar" class="feed-city-spotlight-bar" style="display:none;"></div>
           </div>
 
           <div id="moreFeedFiltersWrap" class="more-feed-filters-wrap">
             <div class="more-feed-chips-subrow">
+              <button class="fchip" onclick="setFeedMode('mystery', this)" data-i18n="filter_mystery">🕵️ Guess City</button>
+              <button class="fchip" onclick="setFeedMode('html', this)" data-i18n="filter_html">💻 HTML &amp; Mini-Apps</button>
               <button class="fchip" onclick="switchRemoView('contests')" style="border-color:rgba(251,191,36,0.55);color:#fde047;font-weight:900;" data-i18n="nav_contests">🏆 REMO Contests</button>
               <button class="fchip" onclick="setFeedMode('following', this)" data-i18n="filter_following">👥 Following</button>
               <button class="fchip" onclick="setFeedMode('bounties', this)" data-i18n="filter_bounties">🎁 Bounties</button>
@@ -352,10 +381,16 @@
           </div>
 
           <div id="worldSpotlightBar" class="world-spotlight-bar" style="display:none;"></div>
-          <div id="feedCitySpotlightBar" class="feed-city-spotlight-bar" style="display:none;"></div>
         </div>
 
-        <div class="posts-grid" id="remoPostsGrid"></div>
+        <div class="feed-stage-wrap" id="feedStageWrap">
+          <div class="posts-grid" id="remoPostsGrid"></div>
+          <aside class="desktop-stage-rail" id="desktopStageRail" aria-label="Post actions and navigation"></aside>
+        </div>
+        <div class="stage-onboarding-hint" id="stageOnboardingHint" style="display:none;">
+          <span data-i18n="stage_hint_bar">↕ Scroll or use ▲▼ for next moment · 🪙 Tip creators to support their city</span>
+          <button type="button" class="stage-hint-close" onclick="dismissStageOnboardingHint()" aria-label="Dismiss">✕</button>
+        </div>
       </div>
 
       <!-- 2. REMO EARTH™ LIVE RADAR MAP -->
@@ -710,43 +745,55 @@
 
     </section>
 
-    <!-- ══ RIGHT SIDEBAR (Desktop — 3 High-Signal Cards) ══ -->
-    <aside class="right-rail">
-      <!-- 1. 4D Focus TV Live City Window -->
-      <div class="glass-box" style="border-color:rgba(56,189,248,0.42);background:linear-gradient(135deg,rgba(10,18,40,0.92),rgba(30,27,75,0.72));">
-        <div style="font-family:'Orbitron',sans-serif;font-weight:900;font-size:0.86rem;color:#38bdf8;margin-bottom:4px;" data-i18n="right_tv_title">📺 4D Focus TV Window</div>
-        <div style="font-size:0.73rem;color:#cbd5e1;line-height:1.35;" data-i18n="right_tv_sub">Ambient Cyber-LoFi radio + real weather &amp; local clock — zero sign-in needed.</div>
-        <div class="right-tv-cities-row">
-          <button type="button" class="right-tv-city-pill" onclick="openFocusTvModal('montreal')">⚜️ Montréal</button>
-          <button type="button" class="right-tv-city-pill" onclick="openFocusTvModal('paris')">🗼 Paris</button>
-          <button type="button" class="right-tv-city-pill" onclick="openFocusTvModal('newyork')">🗽 New York</button>
-          <button type="button" class="right-tv-city-pill" onclick="openFocusTvModal('tokyo')">🏯 Tokyo</button>
+    <!-- ══ RIGHT SIDEBAR (Desktop — Compact Tabbed Panel, Never Clips) ══ -->
+    <aside class="right-rail" id="desktopRightRail">
+      <div class="glass-box right-rail-tabbed-card">
+        <div class="right-rail-tabs-hdr">
+          <div class="right-rail-tabs">
+            <button type="button" class="rr-tab active" data-rr-tab="cup" onclick="setDesktopRightTab('cup')" data-i18n="right_tab_cup">🏆 Cup</button>
+            <button type="button" class="rr-tab" data-rr-tab="tv" onclick="setDesktopRightTab('tv')" data-i18n="right_tab_tv">📺 TV</button>
+            <button type="button" class="rr-tab" data-rr-tab="id" onclick="setDesktopRightTab('id')" data-i18n="right_tab_id">🪪 ID</button>
+          </div>
+          <button type="button" class="rr-hide-btn" onclick="toggleDesktopRightRail(false)" data-i18n-title="right_panel_hide" title="Hide">✕</button>
         </div>
-        <button type="button" class="btn-cyber" style="width:100%;justify-content:center;background:linear-gradient(135deg,#0284c7,#6366f1);font-size:0.76rem;padding:8px;" onclick="openFocusTvModal()" data-i18n="right_tv_open_btn">📺 Open Fullscreen Window</button>
-      </div>
 
-      <!-- 2. World City Cup & Live Wars -->
-      <div class="glass-box">
-        <div style="font-family:'Orbitron',sans-serif;font-weight:900;font-size:0.88rem;color:#fbbf24;margin-bottom:4px;" data-i18n="cup_title">🏆 World City Cup</div>
-        <div style="font-size:0.72rem;color:var(--muted);margin-bottom:10px;" data-i18n="cup_subtitle"></div>
-        <div id="rightCityCupList"></div>
-        <div style="margin-top:12px;padding-top:10px;border-top:1px solid rgba(255,255,255,0.08);">
-          <div style="font-weight:900;font-size:0.82rem;color:#f43f5e;margin-bottom:8px;" data-i18n="arena_tab_wars">🏙️ Live City Wars</div>
-          <div id="rightQuickWarBox"></div>
+        <!-- Tab 1: World City Cup & Live Wars -->
+        <div class="right-tab-pane active" id="rightPaneCup">
+          <div style="font-family:'Orbitron',sans-serif;font-weight:900;font-size:0.84rem;color:#fbbf24;margin-bottom:4px;" data-i18n="cup_title">🏆 World City Cup</div>
+          <div style="font-size:0.7rem;color:var(--muted);margin-bottom:8px;" data-i18n="cup_subtitle"></div>
+          <div id="rightCityCupList"></div>
+          <div style="margin-top:10px;padding-top:9px;border-top:1px solid rgba(255,255,255,0.08);">
+            <div style="font-weight:900;font-size:0.8rem;color:#f43f5e;margin-bottom:6px;" data-i18n="arena_tab_wars">🏙️ Live City Wars</div>
+            <div id="rightQuickWarBox"></div>
+          </div>
         </div>
-      </div>
 
-      <!-- 3. Citizen ID, Free Daily Pack & Promo Code -->
-      <div class="glass-box" style="border-color:rgba(244,114,182,0.4);background:linear-gradient(135deg,rgba(15,23,42,0.9),rgba(49,16,68,0.62));">
-        <div style="font-weight:900;font-size:0.84rem;color:#f472b6;margin-bottom:8px;">🪪 Citizen ID &amp; 4D Gold</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px;">
-          <button class="btn-cyber" style="justify-content:center;padding:7px 8px;font-size:0.74rem;" onclick="switchRemoView('passport')">🪪 My ID &amp; QR</button>
-          <button class="btn-cyber btn-gold" style="justify-content:center;padding:7px 8px;font-size:0.74rem;" onclick="switchRemoView('cards')" data-i18n="btn_daily_pack">🎁 Daily Pack</button>
+        <!-- Tab 2: 4D Focus TV Live City Window -->
+        <div class="right-tab-pane" id="rightPaneTv">
+          <div style="font-family:'Orbitron',sans-serif;font-weight:900;font-size:0.86rem;color:#38bdf8;margin-bottom:4px;" data-i18n="right_tv_title">📺 4D Focus TV Window</div>
+          <div style="font-size:0.73rem;color:#cbd5e1;line-height:1.35;" data-i18n="right_tv_sub">Ambient Cyber-LoFi radio + real weather &amp; local clock — zero sign-in needed.</div>
+          <div class="right-tv-cities-row">
+            <button type="button" class="right-tv-city-pill" onclick="openFocusTvModal('montreal')">⚜️ Montréal</button>
+            <button type="button" class="right-tv-city-pill" onclick="openFocusTvModal('paris')">🗼 Paris</button>
+            <button type="button" class="right-tv-city-pill" onclick="openFocusTvModal('newyork')">🗽 New York</button>
+            <button type="button" class="right-tv-city-pill" onclick="openFocusTvModal('tokyo')">🏯 Tokyo</button>
+          </div>
+          <button type="button" class="btn-cyber" style="width:100%;justify-content:center;background:linear-gradient(135deg,#0284c7,#6366f1);font-size:0.76rem;padding:8px;" onclick="openFocusTvModal()" data-i18n="right_tv_open_btn">📺 Open Fullscreen Window</button>
         </div>
-        <button class="btn-ghost" style="width:100%;justify-content:center;padding:6px 8px;font-size:0.74rem;border-color:#ec4899;color:#fbcfe8;margin-bottom:8px;" onclick="exportPassportStory()">📲 Story 9:16 (TikTok &amp; Insta)</button>
-        <div style="display:flex;gap:6px;">
-          <input type="text" id="rightPromoInput" class="remo-input" style="padding:7px 10px;font-size:0.76rem;text-transform:uppercase;" data-i18n-placeholder="promo_redeem_ph" placeholder="REMO2026">
-          <button class="btn-cyber" style="padding:7px 11px;font-size:0.76rem;" onclick="redeemPromoCodeInput('rightPromoInput')" data-i18n="promo_redeem_btn">Claim</button>
+
+        <!-- Tab 3: Citizen ID, Free Daily Pack & Promo Code -->
+        <div class="right-tab-pane" id="rightPaneId">
+          <div style="font-weight:900;font-size:0.84rem;color:#f472b6;margin-bottom:8px;">🪪 Citizen ID &amp; 4D Gold</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px;">
+            <button class="btn-cyber" style="justify-content:center;padding:7px 8px;font-size:0.74rem;" onclick="switchRemoView('passport')">🪪 My ID &amp; QR</button>
+            <button class="btn-cyber btn-gold" style="justify-content:center;padding:7px 8px;font-size:0.74rem;" onclick="switchRemoView('cards')" data-i18n="btn_daily_pack">🎁 Daily Pack</button>
+          </div>
+          <button class="btn-ghost" style="width:100%;justify-content:center;padding:6px 8px;font-size:0.74rem;border-color:#ec4899;color:#fbcfe8;margin-bottom:8px;" onclick="exportPassportStory()">📲 Story 9:16 (TikTok &amp; Insta)</button>
+          <div style="display:flex;gap:6px;margin-bottom:8px;">
+            <input type="text" id="rightPromoInput" class="remo-input" style="padding:7px 10px;font-size:0.76rem;text-transform:uppercase;" data-i18n-placeholder="promo_redeem_ph" placeholder="REMO2026">
+            <button class="btn-cyber" style="padding:7px 11px;font-size:0.76rem;" onclick="redeemPromoCodeInput('rightPromoInput')" data-i18n="promo_redeem_btn">Claim</button>
+          </div>
+          <button type="button" class="btn-ghost" style="width:100%;justify-content:center;font-size:0.74rem;border-color:rgba(56,189,248,0.45);color:#bae6fd;" onclick="openRemoQuickGuideModal()" data-i18n="feed_guide_btn">❓ How it works</button>
         </div>
       </div>
     </aside>
@@ -989,6 +1036,43 @@
   <!-- ⋯ Post Actions & Creator Tools Bottom-Sheet Modal -->
   <div class="remo-modal-backdrop" id="postActionsModal" onclick="if(event.target===this)closePostActionsModal()">
     <div class="remo-modal" style="max-width:440px;" id="postActionsModalContent"></div>
+  </div>
+
+  <!-- ❓ 3-Second "How REMO Works" Visual Quick Guide Modal -->
+  <div class="remo-modal-backdrop" id="remoQuickGuideModal" onclick="if(event.target===this)closeRemoQuickGuideModal()">
+    <div class="remo-modal" style="max-width:460px;">
+      <div class="modal-hdr">
+        <div>
+          <b style="font-family:'Orbitron',sans-serif;font-size:0.98rem;color:#38bdf8;" data-i18n="guide_modal_title">🌐 How REMO Works (3 Seconds)</b>
+          <div style="font-size:0.74rem;color:var(--muted);margin-top:2px;" data-i18n="guide_modal_sub">Real moments across 24+ world cities — explore, vote, play &amp; earn.</div>
+        </div>
+        <button type="button" class="modal-close" onclick="closeRemoQuickGuideModal()">✕</button>
+      </div>
+      <div class="guide-steps-list">
+        <div class="guide-step-card">
+          <div class="guide-step-ic">🏙️</div>
+          <div>
+            <b data-i18n="guide_step1_t">1. Travel City to City</b>
+            <p data-i18n="guide_step1_d">Scroll up/down (or use ▲▼) through real photos, Before/After sliders, City Duels, and live 4D Focus TV windows.</p>
+          </div>
+        </div>
+        <div class="guide-step-card">
+          <div class="guide-step-ic">🪙</div>
+          <div>
+            <b data-i18n="guide_step2_t">2. Tip 🪙 &amp; Push Your City #1</b>
+            <p data-i18n="guide_step2_d">Like moments, send REMO Coins (🪙) to creators, and boost your favorite city to #1 in the World City Cup.</p>
+          </div>
+        </div>
+        <div class="guide-step-card">
+          <div class="guide-step-ic">✨</div>
+          <div>
+            <b data-i18n="guide_step3_t">3. Play Games &amp; Collect 4D Cards</b>
+            <p data-i18n="guide_step3_d">Open Hub (or Explore Apps) for World Blitz 60s, live Radio, Radar treasure chests, and free daily 4D City Cards.</p>
+          </div>
+        </div>
+      </div>
+      <button type="button" class="btn-cyber" style="width:100%;justify-content:center;padding:11px;margin-top:12px;" onclick="closeRemoQuickGuideModal()" data-i18n="guide_got_it">🚀 Got it — Start Exploring</button>
+    </div>
   </div>
 
   <!-- 📲 9:16 Viral Story Export Modal (TikTok, Instagram, WhatsApp) -->
@@ -2871,15 +2955,15 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js" integrity="sha384-oFrOL1TiREYNET0lsYF3LjQuyi2gL7vhjH1X8vFr+umcmzAdPELopeSgbcrv4uRm" crossorigin="anonymous"></script>
 
   <!-- REMO Modular Engines -->
-  <script src="js/remo-i18n.js?v=140"></script>
-  <script src="js/remo-cities-data.js?v=140"></script>
-  <script src="js/remo-store.js?v=140"></script>
-  <script src="js/remo-card-engine.js?v=140"></script>
-  <script src="js/remo-radar-arena.js?v=140"></script>
-  <script src="js/remo-social-comms.js?v=140"></script>
-  <script src="js/remo-radio-engine.js?v=140"></script>
-  <script src="js/remo-focus-tv.js?v=140"></script>
-  <script src="js/remo-world-blitz.js?v=140"></script>
+  <script src="js/remo-i18n.js?v=141"></script>
+  <script src="js/remo-cities-data.js?v=141"></script>
+  <script src="js/remo-store.js?v=141"></script>
+  <script src="js/remo-card-engine.js?v=141"></script>
+  <script src="js/remo-radar-arena.js?v=141"></script>
+  <script src="js/remo-social-comms.js?v=141"></script>
+  <script src="js/remo-radio-engine.js?v=141"></script>
+  <script src="js/remo-focus-tv.js?v=141"></script>
+  <script src="js/remo-world-blitz.js?v=141"></script>
 
   <noscript>
     <nav aria-label="REMO World Static Directory" style="padding:20px;background:#050816;color:#f8fafc;">

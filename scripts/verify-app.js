@@ -243,12 +243,49 @@ async function runStoreSimulations() {
   console.log('PASS: REMO_STORE auth alignment, error preservation, size guard, pagination & Firestore rules verified.');
 }
 
+function runCleanStageLayoutAudit() {
+  const idx = read('index.html');
+  const css = read('css/remo-core.css');
+  const comms = read('js/remo-social-comms.js');
+
+  const requiredDomIds = [
+    'remoWelcomeHeroStrip', 'livePresenceStrip', 'feedCitySpotlightBar', 'worldSpotlightBar',
+    'feedModeChips', 'moreFeedFiltersWrap', 'cleanFeedPulseToggle', 'wspotMiniNum1Btn',
+    'rightCityCupList', 'rightQuickWarBox', 'rightPromoInput', 'remoPostsGrid',
+    'desktopStageRail', 'desktopFeedModeSwitch', 'mobileFeedSearchDrawer', 'remoQuickGuideModal',
+    'cleanFeedOnlineDrawer', 'cleanFeedPulseDrawer', 'stageOnboardingHint'
+  ];
+  for (const id of requiredDomIds) {
+    assert.ok(idx.includes(`id="${id}"`), `Missing preserved/stage DOM id="${id}" in index.html`);
+  }
+
+  const requiredWindowFns = [
+    'setDesktopFeedMode', 'setDesktopRightTab', 'toggleDesktopRightRail',
+    'toggleFeedPresenceDrawer', 'toggleMobileFeedSearchBar', 'clearAndCloseMobileSearch',
+    'handleFeedSearchInput', 'openRemoQuickGuideModal', 'closeRemoQuickGuideModal',
+    'dismissStageOnboardingHint', 'stepDesktopStagePost', 'syncDesktopStageRail',
+    'syncDesktopStageLayoutUI', 'toggleTkCaptionExpand', 'toggleTkWidgetTray'
+  ];
+  for (const fn of requiredWindowFns) {
+    assert.ok(new RegExp(`function\\s+${fn}\\b`).test(comms), `Missing function ${fn} in js/remo-social-comms.js`);
+    assert.ok(comms.includes(`window.${fn} =`), `Missing window.${fn} export in js/remo-social-comms.js`);
+  }
+
+  assert.ok(css.includes('body.desktop-stage-active'), 'Missing desktop-stage-active styles in css/remo-core.css');
+  assert.ok(css.includes('#view-feed.active .tiktok-overlay-info'), 'Missing restored mobile .tiktok-overlay-info styles');
+  assert.ok(!css.includes('.filter-row::-webkit-scrollbar {\n    display: block !important;'), 'Desktop filter-row must keep scrollbars hidden');
+  assert.ok(comms.includes('class="tiktok-overlay-info"') && comms.includes('class="sheet-quick-tools-grid"'), 'Missing clean card overlay & sheet quick tools');
+
+  console.log(`PASS: Clean Stage & Mobile TikTok UI layout (${requiredDomIds.length} IDs, ${requiredWindowFns.length} window handlers) verified.`);
+}
+
 (async () => {
   runSyntaxChecks();
   runCssBalanceCheck();
   runVersionAudit();
   runAppLauncherAudit();
   runI18nAudit();
+  runCleanStageLayoutAudit();
   await runStoreSimulations();
   console.log('ALL REGRESSION CHECKS PASSED.');
 })().catch((err) => {

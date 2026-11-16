@@ -80,6 +80,10 @@ function switchRemoView(viewId) {
   });
 
   document.getElementById('appLauncherModal')?.classList.remove('open');
+  if (viewId !== 'feed') {
+    document.getElementById('mobileFeedSearchDrawer')?.classList.remove('open');
+  }
+  if (typeof syncDesktopStageLayoutUI === 'function') syncDesktopStageLayoutUI();
   if (typeof _syncFeedBackToTopPill === 'function') _syncFeedBackToTopPill();
   if (viewId !== 'feed') {
     document.querySelectorAll('#remoPostsGrid video').forEach((v) => { try { v.pause(); } catch (e) {} });
@@ -550,6 +554,7 @@ function flipPost3DCard(postId) {
     inner.classList.toggle('flipped');
     RemoAudio.play('hit');
     RemoAudio.haptic(25);
+    if (typeof syncDesktopStageRail === 'function') syncDesktopStageRail(true);
   }
 }
 
@@ -2059,14 +2064,14 @@ function getInterCityDistanceBridge(postCity, lang) {
       }));
 
   const km = Math.round(fnHaversine(postCity.lat, postCity.lng, viewerCity.lat, viewerCity.lng));
-  const sub = lang === 'fr' ? 'Une fenêtre ouverte sur le monde' : 'Live window across the world';
+  const sub = lang === 'fr' ? 'Générer un Billet 4D' : 'Generate 4D Ticket';
 
   return `
-    <div class="city-distance-bridge" title="${sub}">
+    <div class="city-distance-bridge compact-distance-pill" title="${sub}">
       <span class="bridge-plane">✈️</span>
-      <span class="bridge-route"><b>${postCity.flag} ${getCityName(postCity, lang)}</b> ➔ <b>${viewerCity.flag} ${getCityName(viewerCity, lang)}</b></span>
-      <span class="bridge-km">(${km.toLocaleString()} km)</span>
-      <button type="button" class="bridge-ticket-btn" onclick="openBoardingPassModal('${viewerCity.id}', '${postCity.id}')" title="${lang === 'fr' ? 'Générer Billet 4D' : 'Generate 4D Boarding Pass'}">🎫 ${lang === 'fr' ? 'Billet 4D' : '4D Ticket'}</button>
+      <span class="bridge-route">${postCity.flag} ${getCityName(postCity, lang)} → ${viewerCity.flag} ${getCityName(viewerCity, lang)}</span>
+      <span class="bridge-km">${km.toLocaleString()} km</span>
+      <button type="button" class="bridge-ticket-btn" onclick="openBoardingPassModal('${viewerCity.id}', '${postCity.id}')" title="${sub}">🎫 4D</button>
     </div>
   `;
 }
@@ -2138,6 +2143,33 @@ function computePostRenderSig(p, u, lang) {
   return `${p.id}_${lang}_${(p.likes || []).length}_${liked}_${(p.comments || []).length}_${p.tipsTotal || 0}_${p.pinned ? 1 : 0}_${boostMins}_${p.founderAward ? 1 : 0}_${p.mintedCard ? 1 : 0}_${dualOpen}_${vSig}_${pollSig}_${btySig}_${capSig}_${lookSig}_${mboxSig}_${chSig}_${Object.keys(p.cityGuesses || {}).length}_${p.leaderboard?.[0]?.score || 0}_${isPostCapsuleSealed(p) ? 1 : 0}_${isAdminXrayOpen(p.id) ? 1 : 0}_${p._cloudSyncError ? 1 : 0}_${p._cloudSyncPending ? 1 : 0}`;
 }
 
+function toggleTkCaptionExpand(postId, ev) {
+  if (ev) ev.stopPropagation();
+  window._openTkCaptions = window._openTkCaptions || {};
+  window._openTkCaptions[postId] = !window._openTkCaptions[postId];
+  const card = document.getElementById('post_card_' + postId);
+  if (card) {
+    const capEl = card.querySelector('.tk-ov-caption');
+    const btnEl = card.querySelector('.tk-ov-more-btn');
+    const expanded = Boolean(window._openTkCaptions[postId]);
+    if (capEl) capEl.classList.toggle('expanded', expanded);
+    if (btnEl) {
+      const fr = REMO_I18N.getLang() === 'fr';
+      btnEl.textContent = expanded ? (fr ? 'moins' : 'less') : (fr ? 'plus' : 'more');
+    }
+  }
+}
+window.toggleTkCaptionExpand = toggleTkCaptionExpand;
+
+function toggleTkWidgetTray(postId, ev) {
+  if (ev) ev.stopPropagation();
+  window._openTkWidgetTrays = window._openTkWidgetTrays || {};
+  window._openTkWidgetTrays[postId] = !window._openTkWidgetTrays[postId];
+  const tray = document.getElementById('tk_widget_tray_' + postId);
+  if (tray) tray.classList.toggle('open', Boolean(window._openTkWidgetTrays[postId]));
+}
+window.toggleTkWidgetTray = toggleTkWidgetTray;
+
 function renderSinglePostCardHtml(p, lang, u, isAdm) {
   try {
     if (!p || !p.id) return '';
@@ -2168,13 +2200,14 @@ function renderSinglePostCardHtml(p, lang, u, isAdm) {
     const cityMayor = (REMO_STORE && REMO_STORE.getCityMayor) ? REMO_STORE.getCityMayor(p.cityId) : null;
     const isMayor = cityMayor && cityMayor.uid === p.uid;
     const cosm = (REMO_STORE && REMO_STORE.getUserCosmetics) ? REMO_STORE.getUserCosmetics(p.uid) : { frameClass: '', title_fr: '', title_en: '' };
-    const royalTitle = lang === 'fr' ? (cosm.title_fr || '') : (cosm.title_en || '');
     const authorUser = (REMO_STORE.state.users || []).find((usr) => usr && ((p.uid && usr.uid === p.uid) || (p.authorName && usr.name && usr.name.toLowerCase() === p.authorName.toLowerCase())));
     const authorAvatarUrl = p.authorAvatar || (typeof REMO_STORE.getUserAvatar === 'function' ? REMO_STORE.getUserAvatar(p.uid || p.authorName) : '') || (authorUser && authorUser.avatarUrl) || '';
     const dualPair = hiddenByCapsule
       ? { en: `🔒 ${p.capsuleTeaser_en || teaserTxt}`, fr: `🔒 ${p.capsuleTeaser_fr || teaserTxt}` }
       : buildPostBilingualPair(p);
     const isDualOpen = !!(window._openTranslatedPosts && window._openTranslatedPosts[p.id]);
+    const isTkCapOpen = !!(window._openTkCaptions && window._openTkCaptions[p.id]);
+    const isTkTrayOpen = !!(window._openTkWidgetTrays && window._openTkWidgetTrays[p.id]);
     const isPostOwner = Boolean(u && (
       (p.uid && u.uid === p.uid) ||
       (p.authorUid && u.uid === p.authorUid) ||
@@ -2182,39 +2215,87 @@ function renderSinglePostCardHtml(p, lang, u, isAdm) {
       (u.name && p.authorName && u.name.trim().toLowerCase() === p.authorName.trim().toLowerCase())
     ));
     const mysteryMasked = Boolean(p.mysteryCity && !isPostOwner && typeof isMysteryCityMaskedForViewer === 'function' && isMysteryCityMaskedForViewer(p, u));
-    const cityTagLabel = mysteryMasked
-      ? t('guess_masked_city')
-      : `${city.flag || '🌍'} ${getCityName(city, lang)} · ${wx.icon || '🌤️'} ${wx.tempC ?? 20}°${wx.isSurge ? ' ⚡2X' : ''}`;
+
+    const tcBarHtml = (!hiddenByCapsule && showTcReplyBar) ? `
+      <div class="tc-dedicated-reply-bar">
+        <span class="tc-dedicated-reply-txt">${tcRecipient ? escapeHtmlStr(t('tc_dedicated_banner', { name: tcRecipient })) : `✍️ @${escapeHtmlStr(p.authorName || 'Citizen')}`}</span>
+        <button type="button" class="tc-send-back-btn" onclick="openReplyTextCardTo('${escapeJsSingleArg(p.authorName || '')}', '${escapeJsSingleArg(city.id)}')">${escapeHtmlStr(t('tc_send_back_btn'))}</button>
+      </div>` : '';
+    const mysteryHtml = !hiddenByCapsule && typeof renderMysteryCityWidget === 'function' ? renderMysteryCityWidget(p, city, lang, u, isPostOwner) : '';
+    const winBarHtml = (!hiddenByCapsule && !mysteryMasked && (p.duetOf || p.isWorldWindow) && typeof renderWorldWindowActionsBar === 'function')
+      ? renderWorldWindowActionsBar(p, lang)
+      : '';
+    const secretSpotHtml = p.isSecretSpot ? `
+      <div class="secret-spot-card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;gap:8px;">
+          <span style="font-family:'Orbitron',sans-serif;font-size:0.78rem;font-weight:900;color:#38bdf8;letter-spacing:0.5px;">
+            🗺️ ${lang === 'fr' ? 'LIEU SECRET URBAIN' : 'URBAN SECRET SPOT'}
+          </span>
+          <button type="button" class="btn-cyber" style="padding:4px 9px;font-size:0.72rem;background:#0284c7;" onclick="focusCityOnRadar('${p.cityId}')">
+            🧭 ${lang === 'fr' ? 'Radar GPS' : 'GPS Radar'}
+          </button>
+        </div>
+        <b style="font-size:0.86rem;color:#f8fafc;display:block;">${escapeHtmlStr(p.secretSpotTitle || '')}</b>
+        ${p.secretSpotClue ? `
+          <div style="font-size:0.78rem;color:#94a3b8;margin-top:3px;font-style:italic;">
+            💡 <span style="color:#cbd5e1;">${lang === 'fr' ? 'Indice' : 'Clue'}:</span> "${escapeHtmlStr(p.secretSpotClue)}"
+          </div>
+        ` : ''}
+      </div>` : '';
+    const bountyHtml = renderFeedBountyWidget(p, lang);
+    const lookHtml = hiddenByCapsule ? '' : renderLookRatingWidget(p, lang, u);
+    const pollHtml = hiddenByCapsule ? '' : renderPostPollWidget(p, lang, u);
+    const capsuleHtml = hiddenByCapsule ? '' : renderSecretCapsuleWidget(p, lang, u);
+    const viralHtml = hiddenByCapsule ? '' : renderViralGoalWidget(p, lang, isAdm);
+    const audioHtml = (!hiddenByCapsule && p.voiceUrl) ? `<audio src="${voiceResolved}" ${voiceIdbAttr} controls style="width:100%;height:34px;margin-top:6px;"></audio>` : '';
+    const htmlGameLb = (!hiddenByCapsule && p.mediaType === 'html_app') ? renderHtmlGameLeaderboardWidget(p, lang, u) : '';
+    const adminBarHtml = renderAdminPostBar(p);
+    const syncErrHtml = p._cloudSyncError ? `<button type="button" class="post-sync-retry-banner" onclick="retrySyncPostToCloud('${escapeJsSingleArg(p.id)}')" title="${escapeHtmlStr(p._cloudSyncError)}">${escapeHtmlStr(t('post_sync_retry_btn'))}</button>` : '';
+
+    const tkInteractiveHtml = [syncErrHtml, tcBarHtml, mysteryHtml, pollHtml, bountyHtml, lookHtml, capsuleHtml, viralHtml, secretSpotHtml, winBarHtml, audioHtml, htmlGameLb, adminBarHtml].filter(Boolean).join('');
+    const tkTriggerLabel = mysteryHtml
+      ? (lang === 'fr' ? '🕵️ Deviner la Ville (+10 🪙)' : '🕵️ Guess City (+10 🪙)')
+      : pollHtml
+        ? (lang === 'fr' ? '📊 Voter au Sondage' : '📊 Vote in Poll')
+        : bountyHtml
+          ? (lang === 'fr' ? '🎁 Réclamer Prime 🪙' : '🎁 Claim Bounty 🪙')
+          : lookHtml
+            ? (lang === 'fr' ? '⭐ Noter le Avant/Après' : '⭐ Rate Glow-Up')
+            : htmlGameLb
+              ? (lang === 'fr' ? '🏆 Classement & Défi' : '🏆 Game Scores')
+              : secretSpotHtml
+                ? (lang === 'fr' ? '🗺️ Lieu Secret GPS' : '🗺️ Secret Spot')
+                : adminBarHtml
+                  ? (lang === 'fr' ? '🛡️ Outils Admin' : '🛡️ Admin Tools')
+                  : (lang === 'fr' ? '✨ Activité & Audio' : '✨ Interactive');
 
     return `
-      <article id="post_card_${p.id}" class="post-card ${isPostBoostActive(p) || p.pinned || sealed ? 'boosted' : ''} ${p.mediaType === 'html_app' ? 'is-html-app' : ''} ${p.mediaType === 'city_versus' ? 'is-city-versus' : ''}" ${interactiveNoTilt ? '' : 'onmousemove="applyHoloTilt(event, this)" onmouseleave="resetHoloTilt(this)"'}>
+      <article id="post_card_${p.id}" class="post-card ${isPostBoostActive(p) || p.pinned || sealed ? 'boosted' : ''} ${p.mediaType === 'html_app' ? 'is-html-app' : ''} ${p.mediaType === 'city_versus' ? 'is-city-versus' : ''} ${p.mediaType === 'before_after' ? 'is-before-after' : ''}" ${interactiveNoTilt ? '' : 'onmousemove="applyHoloTilt(event, this)" onmouseleave="resetHoloTilt(this)"'}>
         <div class="post-head">
-          <div style="display:flex;align-items:center;gap:6px;min-width:0;">
-            <div class="post-author" style="cursor:pointer;" onclick="${p.isShowcase ? `openFocusTvModal('${escapeJsSingleArg(city.id)}')` : `openCitizenProfileModal('${escapeJsSingleArg(p.uid || '')}', '${escapeJsSingleArg(p.authorName || '')}')`}" title="🪪 @${escapeHtmlStr(p.authorName)}">
+          <div style="display:flex;align-items:center;gap:6px;min-width:0;flex:1;">
+            <div class="post-author" style="cursor:pointer;min-width:0;" onclick="${p.isShowcase ? `openFocusTvModal('${escapeJsSingleArg(city.id)}')` : `openCitizenProfileModal('${escapeJsSingleArg(p.uid || '')}', '${escapeJsSingleArg(p.authorName || '')}')`}" title="🪪 @${escapeHtmlStr(p.authorName)}">
               <div class="avatar-circle ${cosm.frameClass}" style="overflow:hidden;padding:0;">
                 ${sanitizeSafeMediaUrl(authorAvatarUrl) ? `<img src="${sanitizeSafeMediaUrl(authorAvatarUrl)}" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block;" alt="${escapeHtmlStr(p.authorName)}">` : escapeHtmlStr((p.authorName || 'R')[0].toUpperCase())}
               </div>
-              <div>
-                <div style="font-weight:800;font-size:0.88rem;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
-                  <span>${escapeHtmlStr(p.authorName)}</span>
-                  ${p.authorVerified ? '<span style="color:#38bdf8;">✓</span>' : ''}
-                  ${!mysteryMasked && isMayor ? `<span class="mayor-tag">${t('mayor_badge')}</span>` : ''}
-                  ${royalTitle ? `<span class="royal-title-pill">${escapeHtmlStr(royalTitle)}</span>` : ''}
+              <div style="min-width:0;">
+                <div style="font-weight:800;font-size:0.86rem;display:flex;align-items:center;gap:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                  <span style="overflow:hidden;text-overflow:ellipsis;">${escapeHtmlStr(p.authorName)}</span>
+                  ${p.authorVerified ? '<span style="color:#38bdf8;flex-shrink:0;">✓</span>' : ''}
+                  ${!mysteryMasked && isMayor ? `<span class="mayor-tag" title="${t('mayor_badge')}">👑</span>` : ''}
                 </div>
-                <div style="font-size:0.72rem;color:var(--muted);margin-top:2px;">
+                <div style="font-size:0.71rem;color:var(--muted);margin-top:1px;display:flex;align-items:center;gap:5px;flex-wrap:wrap;">
                   ${mysteryMasked
                     ? `<span class="mystery-masked-tag">${t('guess_masked_city')}</span>`
-                    : `<span>${city.flag} ${escapeHtmlStr(getCityName(city, lang))}</span> · <span>🕒 ${wx.timeStr}</span>`}
+                    : `<span style="cursor:pointer;color:#cbd5e1;" onclick="event.stopPropagation();filterFeedByCityFromMap('${city.id}')">${city.flag} ${escapeHtmlStr(getCityName(city, lang))}</span> · <span>🕒 ${wx.timeStr}</span>`}
                   ${p.remixedFromAuthor ? ` · <span style="color:#34d399;">${t('post_remix_from')} @${escapeHtmlStr(p.remixedFromAuthor)}</span>` : ''}
                 </div>
               </div>
             </div>
-            ${(!isPostOwner && p.uid) ? `<button type="button" class="post-author-dm-mini" onclick="event.stopPropagation();openDirectChatWithUser('${escapeJsSingleArg(p.uid || '')}')" title="💌 @${escapeHtmlStr(p.authorName)}">💌</button>` : ''}
           </div>
-          <div style="display:flex;align-items:center;gap:8px;">
+          <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
             ${mysteryMasked
               ? `<span class="city-tag" style="color:#fde047;border-color:rgba(251,191,36,0.45);">🕵️ ???</span>`
-              : `<span class="city-tag" onclick="filterFeedByCityFromMap('${city.id}')">${wx.icon || '🌤️'} ${wx.tempC ?? 20}°${wx.isSurge ? ' ⚡2X' : ''}</span>`}
+              : `<span class="city-tag ${wx.isSurge ? 'is-surge' : ''}" onclick="filterFeedByCityFromMap('${city.id}')">${wx.icon || '🌤️'} ${wx.tempC ?? 20}°${wx.isSurge ? ' ⚡2X' : ''}</span>`}
             <button type="button" class="post-more-dot-btn" onclick="openPostActionsSheet('${p.id}')" title="${lang === 'fr' ? 'Options de la publication' : 'Post options'}">⋯</button>
           </div>
         </div>
@@ -2227,15 +2308,12 @@ function renderSinglePostCardHtml(p, lang, u, isAdm) {
                   ${sealed ? `<span class="pbadge capsule">${t('capsule_locked_badge')}${xray ? ' · 👁️ X-RAY' : ''}</span>` : (p.wasTimeCapsule ? `<span class="pbadge unsealed">${t('capsule_unsealed_badge')}</span>` : '')}
                   ${!hiddenByCapsule && mboxLocked ? `<span class="pbadge mbox">${t('mbox_badge_locked')}</span>` : (!hiddenByCapsule && p.mysteryBox?.enabled ? `<span class="pbadge unboxed">${t('mbox_badge_unboxed', { n: (p.mysteryBox.unboxedBy || []).length })}</span>` : '')}
                   ${p.duetOf ? `<span class="pbadge duet">${t('post_duet_badge')}</span>` : ''}
-                  ${p.isWorldWindow || (p.duetOf && p.duetOf.isWorldWindow) ? `<span class="window-live-badge">${t('win_badge_live')}</span>` : ''}
-                  ${p.isShowcase ? `<span class="pbadge showcase-guide">${t('showcase_badge')}</span>` : ''}
                   ${p.pinned ? `<span class="pbadge pinned">${t('post_pinned_badge')}</span>` : ''}
                   ${p.founderAward ? `<span class="pbadge founder">${t('post_founder_award_badge')}</span>` : ''}
                   ${getPostBoostBadgeHtml(p, lang)}
                   ${p.bounty && !p.bounty.claimed ? `<span class="pbadge boost" style="background:#f59e0b;color:#000;">🎁 +${p.bounty.coins} 🪙</span>` : ''}
-                  
                   ${!hiddenByCapsule && p.mediaType === 'video' ? `<span class="pbadge vid60">${t('post_video60_badge')} · ${formatDurationMMSS(p.videoDuration || 60)}</span>` : ''}
-                  ${!hiddenByCapsule && (p.mediaType === 'video_link' || p.externalUrl) ? `<span class="pbadge vid60">🔗 ${lang === 'fr' ? 'LIEN VIDÉO / WEB' : 'VIDEO / WEB LINK'}</span>` : ''}
+                  ${!hiddenByCapsule && (p.mediaType === 'video_link' || p.externalUrl) ? `<span class="pbadge vid60">🔗 ${lang === 'fr' ? 'LIEN VIDÉO' : 'VIDEO LINK'}</span>` : ''}
                   ${!hiddenByCapsule && p.mediaType === 'before_after' ? `<span class="pbadge html">${t('post_slider_badge')}</span>` : ''}
                   ${!mysteryMasked && p.verifiedGps ? `<span class="pbadge gps">${t('post_verified_gps')}</span>` : ''}
                   ${p.mintedCard ? `<span class="pbadge mint">${t('post_minted_badge')}</span>` : ''}
@@ -2251,17 +2329,44 @@ function renderSinglePostCardHtml(p, lang, u, isAdm) {
           </div>
         </div>
 
-        <!-- Modern Sleek Post Body -->
+        <!-- Mobile TikTok Bottom-Left Clean Overlay (Restores Caption, Author & Expandable Interactions) -->
+        <div class="tiktok-overlay-info">
+          ${tkInteractiveHtml ? `
+            <button type="button" class="tk-ov-interact-pill" id="tk_widget_btn_${p.id}" onclick="toggleTkWidgetTray('${p.id}', event)">${tkTriggerLabel}</button>
+            <div class="tk-ov-widget-tray ${isTkTrayOpen ? 'open' : ''}" id="tk_widget_tray_${p.id}" onclick="event.stopPropagation()">${tkInteractiveHtml}</div>
+          ` : ''}
+          <div class="tk-ov-author-row">
+            <button type="button" class="tk-ov-author-btn" onclick="${p.isShowcase ? `openFocusTvModal('${escapeJsSingleArg(city.id)}')` : `openCitizenProfileModal('${escapeJsSingleArg(p.uid || '')}', '${escapeJsSingleArg(p.authorName || '')}')`}">
+              <b>@${escapeHtmlStr(p.authorName)}</b>
+              ${p.authorVerified ? '<span style="color:#38bdf8;">✓</span>' : ''}
+              ${!mysteryMasked && isMayor ? '<span>👑</span>' : ''}
+            </button>
+            ${mysteryMasked
+              ? `<span class="tk-ov-city-pill" style="color:#fde047;">🕵️ ???</span>`
+              : `<button type="button" class="tk-ov-city-pill" onclick="filterFeedByCityFromMap('${city.id}')">${city.flag} ${escapeHtmlStr(getCityName(city, lang))} · ${wx.timeStr} · ${wx.icon || '🌤️'} ${wx.tempC ?? 20}°</button>`}
+          </div>
+          ${(formattedCap || p.mediaType === 'text_card') ? `
+            <div class="tk-ov-caption-wrap">
+              <div class="tk-ov-caption ${isTkCapOpen ? 'expanded' : ''}">${formattedCap}</div>
+              <div class="tk-ov-cap-tools">
+                ${(rawCap && rawCap.length > 72) ? `<button type="button" class="tk-ov-more-btn" onclick="toggleTkCaptionExpand('${p.id}', event)">${isTkCapOpen ? (lang === 'fr' ? 'moins' : 'less') : (lang === 'fr' ? 'plus' : 'more')}</button>` : ''}
+                <button type="button" class="tk-ov-tr-btn ${isDualOpen ? 'active' : ''}" onclick="event.stopPropagation();togglePostAutoTranslate('${p.id}')">🌐 EN⇄FR</button>
+              </div>
+              <div class="bilingual-dual-box ${isDualOpen ? 'open' : ''}" style="margin-top:4px;font-size:0.74rem;">
+                <div><b style="color:#38bdf8;">🇬🇧 EN:</b> ${escapeHtmlStr(dualPair.en)}</div>
+                <div><b style="color:#fbbf24;">🇫🇷 FR:</b> ${escapeHtmlStr(dualPair.fr)}</div>
+              </div>
+            </div>
+          ` : ''}
+        </div>
+
+        <!-- Clean Sleek Post Body (Desktop) -->
         <div class="post-body">
-          ${(!hiddenByCapsule && showTcReplyBar) ? `
-            <div class="tc-dedicated-reply-bar">
-              <span class="tc-dedicated-reply-txt">${tcRecipient ? escapeHtmlStr(t('tc_dedicated_banner', { name: tcRecipient })) : `✍️ @${escapeHtmlStr(p.authorName || 'Citizen')}`}</span>
-              <button type="button" class="tc-send-back-btn" onclick="openReplyTextCardTo('${escapeJsSingleArg(p.authorName || '')}', '${escapeJsSingleArg(city.id)}')">${escapeHtmlStr(t('tc_send_back_btn'))}</button>
-            </div>` : ''}
+          ${tcBarHtml}
           ${mysteryMasked ? '' : getInterCityDistanceBridge(city, lang)}
-          ${!hiddenByCapsule && typeof renderMysteryCityWidget === 'function' ? renderMysteryCityWidget(p, city, lang, u, isPostOwner) : ''}
-          ${!hiddenByCapsule && !mysteryMasked && typeof renderWorldWindowActionsBar === 'function' ? renderWorldWindowActionsBar(p, lang) : ''}
-          ${p._cloudSyncError ? `<button type="button" class="post-sync-retry-banner" onclick="retrySyncPostToCloud('${escapeJsSingleArg(p.id)}')" title="${escapeHtmlStr(p._cloudSyncError)}">${escapeHtmlStr(t('post_sync_retry_btn'))}</button>` : ''}
+          ${mysteryHtml}
+          ${winBarHtml}
+          ${syncErrHtml}
 
           <div class="post-actions-bar">
             <button type="button" class="pact-btn ${liked ? 'liked' : ''}" onclick="toggleLikePost('${p.id}')" title="Like">
@@ -2273,66 +2378,43 @@ function renderSinglePostCardHtml(p, lang, u, isAdm) {
             <button type="button" class="pact-btn" onclick="tipPostAuthor('${p.id}')" title="Tip Coins">
               🪙 <span>${p.tipsTotal || 0}</span>
             </button>
-            <button type="button" class="pact-btn pact-flip-btn" onclick="flipPost3DCard('${p.id}')" title="${t('post_3d_flip')}">
-              🔄 <span>3D</span>
-            </button>
-            <button type="button" class="pact-btn pact-fs-btn" onclick="openPostFullscreenMedia('${p.id}')" title="${t('act_fullscreen')}">
-              ⛶
-            </button>
-            <button type="button" class="pact-btn" onclick="sharePostLink('${p.id}')" title="${lang === 'fr' ? 'Partager le lien' : 'Share link'}">
-              🔗
+            <button type="button" class="pact-btn" onclick="sharePostLink('${p.id}')" title="${lang === 'fr' ? 'Partager' : 'Share'}">
+              ↪
             </button>
             ${isPostOwner ? `
             <button type="button" class="pact-btn pact-wspot-btn" onclick="openSpotlightForSpecificPost('${p.id}')" title="${escapeHtmlStr(t('wspot_post_btn_sub'))}">
               🌟 <span>#1</span>
             </button>
             ` : ''}
-            <button type="button" class="pact-btn pact-more-btn" onclick="openPostActionsSheet('${p.id}')" title="${lang === 'fr' ? 'Plus d’actions (Duo, Carte, Boost)' : 'More options'}">
+            <button type="button" class="pact-btn pact-more-btn" onclick="openPostActionsSheet('${p.id}')" title="${lang === 'fr' ? 'Plus d’actions (3D, Duo, Billet, Boost)' : 'More options (3D, Duet, Pass, Boost)'}">
               ⋯
             </button>
           </div>
 
           ${(formattedCap || p.mediaType === 'text_card') ? `
-          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-top:6px;">
+          <div class="post-caption-row">
             <div class="post-caption" style="flex:1;">${formattedCap}</div>
-            <button type="button" class="translate-pill-btn ${isDualOpen ? 'active' : ''}" onclick="togglePostAutoTranslate('${p.id}')">${isDualOpen ? t('post_translate_hide') : t('post_translate_btn')}</button>
+            <button type="button" class="translate-pill-btn subtle-tr-btn ${isDualOpen ? 'active' : ''}" onclick="togglePostAutoTranslate('${p.id}')">${isDualOpen ? t('post_translate_hide') : '🌐 EN⇄FR'}</button>
           </div>
           <div class="bilingual-dual-box ${isDualOpen ? 'open' : ''}">
             <div><b style="color:#38bdf8;">🇬🇧 EN:</b> ${escapeHtmlStr(dualPair.en)}</div>
             <div><b style="color:#fbbf24;">🇫🇷 FR:</b> ${escapeHtmlStr(dualPair.fr)}</div>
           </div>` : ''}
-          ${p.isSecretSpot ? `
-            <div class="secret-spot-card">
-              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;gap:8px;">
-                <span style="font-family:'Orbitron',sans-serif;font-size:0.78rem;font-weight:900;color:#38bdf8;letter-spacing:0.5px;">
-                  🗺️ ${lang === 'fr' ? 'LIEU SECRET URBAIN' : 'URBAN SECRET SPOT'}
-                </span>
-                <button type="button" class="btn-cyber" style="padding:4px 9px;font-size:0.72rem;background:#0284c7;" onclick="focusCityOnRadar('${p.cityId}')">
-                  🧭 ${lang === 'fr' ? 'Radar GPS' : 'GPS Radar'}
-                </button>
-              </div>
-              <b style="font-size:0.86rem;color:#f8fafc;display:block;">${escapeHtmlStr(p.secretSpotTitle || '')}</b>
-              ${p.secretSpotClue ? `
-                <div style="font-size:0.78rem;color:#94a3b8;margin-top:3px;font-style:italic;">
-                  💡 <span style="color:#cbd5e1;">${lang === 'fr' ? 'Indice' : 'Clue'}:</span> "${escapeHtmlStr(p.secretSpotClue)}"
-                </div>
-              ` : ''}
-            </div>
-          ` : ''}
-          ${renderFeedBountyWidget(p, lang)}
-          ${hiddenByCapsule ? '' : renderLookRatingWidget(p, lang, u)}
-          ${hiddenByCapsule ? '' : renderPostPollWidget(p, lang, u)}
-          ${hiddenByCapsule ? '' : renderSecretCapsuleWidget(p, lang, u)}
-          ${hiddenByCapsule ? '' : renderViralGoalWidget(p, lang, isAdm)}
-          ${!hiddenByCapsule && p.voiceUrl ? `<audio src="${voiceResolved}" ${voiceIdbAttr} controls style="width:100%;height:34px;margin-top:6px;"></audio>` : ''}
-          ${!hiddenByCapsule && p.mediaType === 'html_app' ? renderHtmlGameLeaderboardWidget(p, lang, u) : ''}
-          ${renderAdminPostBar(p)}
+          ${secretSpotHtml}
+          ${bountyHtml}
+          ${lookHtml}
+          ${pollHtml}
+          ${capsuleHtml}
+          ${viralHtml}
+          ${audioHtml}
+          ${htmlGameLb}
+          ${adminBarHtml}
         </div>
 
-        <!-- Mobile TikTok Right Floating Rail -->
+        <!-- Mobile Clean 5-Icon TikTok Right Floating Rail -->
         <div class="tiktok-rail">
           <div class="tk-avatar-wrap" onclick="openCitizenProfileModal('${escapeJsSingleArg(p.uid || '')}', '${escapeJsSingleArg(p.authorName || '')}')" title="@${escapeHtmlStr(p.authorName)}">
-            <div class="avatar-circle ${cosm.frameClass}" style="width:42px;height:42px;font-size:0.95rem;border:2px solid #fff;overflow:hidden;padding:0;">
+            <div class="avatar-circle ${cosm.frameClass}" style="width:40px;height:40px;font-size:0.9rem;border:2px solid #fff;overflow:hidden;padding:0;">
               ${sanitizeSafeMediaUrl(authorAvatarUrl) ? `<img src="${sanitizeSafeMediaUrl(authorAvatarUrl)}" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block;" alt="${escapeHtmlStr(p.authorName)}">` : escapeHtmlStr((p.authorName || 'R')[0].toUpperCase())}
             </div>
             <span class="tk-avatar-plus">+</span>
@@ -2349,15 +2431,11 @@ function renderSinglePostCardHtml(p, lang, u, isAdm) {
             <span class="tk-ic">🪙</span>
             <span class="tk-cnt">${p.tipsTotal || 0}</span>
           </button>
-          <button type="button" class="tk-btn" onclick="flipPost3DCard('${p.id}')" title="${t('post_3d_flip')}">
-            <span class="tk-ic">🔄</span>
-            <span class="tk-cnt">3D</span>
-          </button>
           <button type="button" class="tk-btn" onclick="sharePostLink('${p.id}')" title="${lang === 'fr' ? 'Partager' : 'Share'}">
-            <span class="tk-ic">🔗</span>
-            <span class="tk-cnt">${lang === 'fr' ? 'Lien' : 'Share'}</span>
+            <span class="tk-ic">↪</span>
+            <span class="tk-cnt">${lang === 'fr' ? 'Partager' : 'Share'}</span>
           </button>
-          <button type="button" class="tk-btn" onclick="openPostActionsSheet('${p.id}')" title="${lang === 'fr' ? 'Options' : 'More'}">
+          <button type="button" class="tk-btn tk-btn-more" onclick="openPostActionsSheet('${p.id}')" title="${lang === 'fr' ? 'Plus (3D, Duo, Options)' : 'More'}">
             <span class="tk-ic">⋯</span>
           </button>
           <div class="tk-disc" onclick="toggleHeaderRadio()" title="World Radio">🎵</div>
@@ -2529,6 +2607,10 @@ function toggleMoreFeedFilters(forceState) {
   const btn = document.getElementById('btnToggleMoreFilters');
   if (!wrap) return;
   const nextOpen = typeof forceState === 'boolean' ? forceState : !wrap.classList.contains('open');
+  if (nextOpen) {
+    if (typeof toggleFeedPresenceDrawer === 'function') toggleFeedPresenceDrawer(false);
+    if (typeof openCleanFeedPulseDrawer === 'function') openCleanFeedPulseDrawer(false);
+  }
   wrap.classList.toggle('open', nextOpen);
   if (btn) {
     btn.setAttribute('data-i18n', nextOpen ? 'filter_less_btn' : 'filter_more_btn');
@@ -2559,8 +2641,16 @@ window.syncWelcomeHeroVisibility = syncWelcomeHeroVisibility;
 function voteCityDuelShortcut() {
   const chip = document.querySelector('#feedModeChips button[onclick*="duets"]');
   setFeedMode('duets', chip);
-  const duelCard = document.querySelector('#remoPostsGrid .is-city-versus') || document.getElementById('remoPostsGrid');
-  if (duelCard) duelCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  const grid = document.getElementById('remoPostsGrid');
+  const duelCard = document.querySelector('#remoPostsGrid .is-city-versus') || grid;
+  if (duelCard) {
+    if (grid && _isMobileGridScrollActive()) {
+      grid.scrollTo({ top: duelCard.offsetTop || 0, behavior: 'smooth' });
+      setTimeout(() => { if (typeof syncDesktopStageRail === 'function') syncDesktopStageRail(true); }, 180);
+    } else {
+      duelCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }
 }
 window.voteCityDuelShortcut = voteCityDuelShortcut;
 
@@ -2583,6 +2673,9 @@ function _patchSingleFeedCardElement(p, lang, u, isAdm) {
   }
   if (window._renderedCardSigs) {
     window._renderedCardSigs[p.id] = computePostRenderSig(p, u, lang);
+  }
+  if (typeof syncDesktopStageRail === 'function') {
+    syncDesktopStageRail(true);
   }
   return Boolean(updatedEl);
 }
@@ -2701,6 +2794,302 @@ function computeVisibleFeedSignature(searchQuery = '', prefilteredPosts = null) 
     posts.map((p) => computePostRenderSig(p, u, lang)).join('|');
 }
 
+let _desktopFeedMode = (function () {
+  try {
+    return localStorage.getItem('remo_desktop_feed_mode') === 'grid' ? 'grid' : 'stage';
+  } catch (e) {
+    return 'stage';
+  }
+})();
+let _desktopRightTab = (function () {
+  try {
+    const t = localStorage.getItem('remo_desktop_right_tab');
+    return ['cup', 'tv', 'id'].includes(t) ? t : 'cup';
+  } catch (e) {
+    return 'cup';
+  }
+})();
+let _desktopRightHidden = (function () {
+  try {
+    return localStorage.getItem('remo_desktop_right_hidden') === '1';
+  } catch (e) {
+    return false;
+  }
+})();
+let _lastDesktopRailRenderSig = '';
+let _railScrollTickScheduled = false;
+
+function isDesktopFeedStageActive() {
+  const vf = document.getElementById('view-feed');
+  return Boolean(window.innerWidth > 860 && _desktopFeedMode === 'stage' && vf && vf.classList.contains('active'));
+}
+window.isDesktopFeedStageActive = isDesktopFeedStageActive;
+
+function setDesktopFeedMode(mode) {
+  _desktopFeedMode = mode === 'grid' ? 'grid' : 'stage';
+  try { localStorage.setItem('remo_desktop_feed_mode', _desktopFeedMode); } catch (e) {}
+  syncDesktopStageLayoutUI();
+  if (_desktopFeedMode === 'stage') {
+    window.scrollTo({ top: 0, behavior: 'auto' });
+  }
+  scheduleInfiniteFeedCheck();
+}
+window.setDesktopFeedMode = setDesktopFeedMode;
+
+function setDesktopRightTab(tab) {
+  _desktopRightTab = ['cup', 'tv', 'id'].includes(tab) ? tab : 'cup';
+  try { localStorage.setItem('remo_desktop_right_tab', _desktopRightTab); } catch (e) {}
+  document.querySelectorAll('.rr-tab[data-rr-tab]').forEach((b) => {
+    b.classList.toggle('active', b.getAttribute('data-rr-tab') === _desktopRightTab);
+  });
+  const paneMap = { cup: 'rightPaneCup', tv: 'rightPaneTv', id: 'rightPaneId' };
+  Object.keys(paneMap).forEach((k) => {
+    document.getElementById(paneMap[k])?.classList.toggle('active', k === _desktopRightTab);
+  });
+}
+window.setDesktopRightTab = setDesktopRightTab;
+
+function toggleDesktopRightRail(forceShow) {
+  _desktopRightHidden = typeof forceShow === 'boolean' ? !forceShow : !_desktopRightHidden;
+  try { localStorage.setItem('remo_desktop_right_hidden', _desktopRightHidden ? '1' : '0'); } catch (e) {}
+  syncDesktopStageLayoutUI();
+}
+window.toggleDesktopRightRail = toggleDesktopRightRail;
+
+function toggleFeedPresenceDrawer(forceState) {
+  const drawer = document.getElementById('cleanFeedOnlineDrawer');
+  const btn = document.getElementById('feedOnlineToggleBtn');
+  if (!drawer) return;
+  const next = typeof forceState === 'boolean' ? forceState : !drawer.classList.contains('open');
+  if (next) {
+    if (typeof openCleanFeedPulseDrawer === 'function') openCleanFeedPulseDrawer(false);
+    if (typeof toggleMoreFeedFilters === 'function') toggleMoreFeedFilters(false);
+  }
+  drawer.classList.toggle('open', next);
+  if (btn) btn.classList.toggle('active', next);
+  if (next && typeof renderLivePresenceStrip === 'function') {
+    renderLivePresenceStrip();
+  }
+}
+window.toggleFeedPresenceDrawer = toggleFeedPresenceDrawer;
+
+function handleFeedSearchInput(val) {
+  const desk = document.getElementById('desktopHeaderSearchInp');
+  const mob = document.getElementById('mobileFeedSearchInp');
+  if (desk && desk.value !== val) desk.value = val;
+  if (mob && mob.value !== val) mob.value = val;
+  renderSocialFeed(val);
+}
+window.handleFeedSearchInput = handleFeedSearchInput;
+
+function toggleMobileFeedSearchBar(forceState) {
+  const drawer = document.getElementById('mobileFeedSearchDrawer');
+  const btn = document.getElementById('btnMobileSearchToggle');
+  if (!drawer) return;
+  const next = typeof forceState === 'boolean' ? forceState : !drawer.classList.contains('open');
+  drawer.classList.toggle('open', next);
+  if (btn) btn.classList.toggle('active', next);
+  if (next) {
+    setTimeout(() => document.getElementById('mobileFeedSearchInp')?.focus(), 60);
+  }
+}
+window.toggleMobileFeedSearchBar = toggleMobileFeedSearchBar;
+
+function clearAndCloseMobileSearch() {
+  const mob = document.getElementById('mobileFeedSearchInp');
+  const hadText = Boolean(mob && mob.value.trim());
+  if (hadText) handleFeedSearchInput('');
+  toggleMobileFeedSearchBar(false);
+}
+window.clearAndCloseMobileSearch = clearAndCloseMobileSearch;
+
+function openRemoQuickGuideModal() {
+  const modal = document.getElementById('remoQuickGuideModal');
+  if (!modal) return;
+  if (typeof REMO_I18N !== 'undefined' && REMO_I18N.applyDOM) REMO_I18N.applyDOM(modal);
+  modal.classList.add('open');
+}
+window.openRemoQuickGuideModal = openRemoQuickGuideModal;
+
+function closeRemoQuickGuideModal() {
+  document.getElementById('remoQuickGuideModal')?.classList.remove('open');
+}
+window.closeRemoQuickGuideModal = closeRemoQuickGuideModal;
+
+function dismissStageOnboardingHint() {
+  const el = document.getElementById('stageOnboardingHint');
+  if (el) el.style.display = 'none';
+  try { localStorage.setItem('remo_stage_hint_seen', '1'); } catch (e) {}
+}
+window.dismissStageOnboardingHint = dismissStageOnboardingHint;
+
+function getStagePostCards() {
+  return Array.from(document.querySelectorAll('#remoPostsGrid .post-card'));
+}
+
+function getActiveDesktopStageCardIndex() {
+  const grid = document.getElementById('remoPostsGrid');
+  const cards = getStagePostCards();
+  if (!grid || !cards.length) return 0;
+  if (!isDesktopFeedStageActive() && window.innerWidth > 860) return 0;
+  const curTop = grid.scrollTop || 0;
+  let bestIdx = 0;
+  let bestDist = Infinity;
+  for (let i = 0; i < cards.length; i++) {
+    const dist = Math.abs((cards[i].offsetTop || 0) - curTop);
+    if (dist < bestDist) {
+      bestDist = dist;
+      bestIdx = i;
+    }
+  }
+  return bestIdx;
+}
+
+function stepDesktopStagePost(delta) {
+  const grid = document.getElementById('remoPostsGrid');
+  const cards = getStagePostCards();
+  if (!grid || !cards.length) return;
+  const curIdx = getActiveDesktopStageCardIndex();
+  const nextIdx = Math.max(0, Math.min(cards.length - 1, curIdx + delta));
+  const target = cards[nextIdx];
+  if (!target) return;
+  dismissStageOnboardingHint();
+  grid.scrollTo({ top: target.offsetTop || 0, behavior: 'smooth' });
+  if (nextIdx >= cards.length - 3) {
+    triggerInfiniteFeedLoad(true);
+  }
+  setTimeout(() => syncDesktopStageRail(true), 120);
+  setTimeout(() => syncDesktopStageRail(true), 360);
+}
+window.stepDesktopStagePost = stepDesktopStagePost;
+
+function syncDesktopStageLayoutUI() {
+  const stageActive = isDesktopFeedStageActive();
+  document.body.classList.toggle('desktop-stage-active', stageActive);
+  document.body.classList.toggle('desktop-right-hidden', Boolean(window.innerWidth > 860 && _desktopRightHidden));
+
+  const btnStage = document.getElementById('btnDesktopStageMode');
+  const btnGrid = document.getElementById('btnDesktopGridMode');
+  if (btnStage) btnStage.classList.toggle('active', _desktopFeedMode === 'stage');
+  if (btnGrid) btnGrid.classList.toggle('active', _desktopFeedMode === 'grid');
+
+  const reopenPill = document.getElementById('reopenRightRailPill');
+  if (reopenPill) {
+    reopenPill.style.display = (window.innerWidth > 860 && _desktopRightHidden) ? 'inline-flex' : 'none';
+  }
+
+  setDesktopRightTab(_desktopRightTab);
+
+  const hintEl = document.getElementById('stageOnboardingHint');
+  if (hintEl) {
+    let seen = false;
+    try { seen = localStorage.getItem('remo_stage_hint_seen') === '1'; } catch (e) {}
+    hintEl.style.display = (stageActive && !seen && getStagePostCards().length > 1) ? 'inline-flex' : 'none';
+  }
+
+  syncDesktopStageRail(true);
+}
+window.syncDesktopStageLayoutUI = syncDesktopStageLayoutUI;
+
+function syncDesktopStageRail(forceUpdate = false) {
+  const rail = document.getElementById('desktopStageRail');
+  if (!rail) return;
+  if (!isDesktopFeedStageActive()) {
+    rail.style.display = 'none';
+    _lastDesktopRailRenderSig = '';
+    return;
+  }
+
+  const cards = getStagePostCards();
+  if (!cards.length) {
+    rail.style.display = 'none';
+    _lastDesktopRailRenderSig = '';
+    return;
+  }
+  rail.style.display = 'flex';
+
+  const activeIdx = getActiveDesktopStageCardIndex();
+  const activeCard = cards[activeIdx];
+  const postId = activeCard ? String(activeCard.id || '').replace(/^post_card_/, '') : '';
+  const p = findFeedPostById(postId);
+  if (!p) return;
+
+  window._activeDesktopStagePostId = p.id;
+  const u = REMO_STORE.getCurrentUser();
+  const lang = REMO_I18N.getLang();
+  const liked = Boolean(u && (p.likes || []).includes(u.uid));
+  const isFlipped = Boolean(activeCard?.querySelector('.post-flip-inner')?.classList.contains('flipped'));
+  const isPostOwner = Boolean(u && (
+    (p.uid && u.uid === p.uid) ||
+    (p.authorUid && u.uid === p.authorUid) ||
+    (u.email && p.authorEmail && u.email.toLowerCase() === p.authorEmail.toLowerCase()) ||
+    (u.name && p.authorName && u.name.trim().toLowerCase() === p.authorName.trim().toLowerCase())
+  ));
+  const hasMore = Boolean(typeof REMO_STORE !== 'undefined' && REMO_STORE.hasMoreCloudPosts);
+  const sig = `${p.id}|${activeIdx}|${cards.length}|${hasMore ? 1 : 0}|${liked ? 1 : 0}|${isFlipped ? 1 : 0}|${(p.likes || []).length}|${(p.comments || []).length}|${p.tipsTotal || 0}|${lang}|${isPostOwner ? 1 : 0}`;
+  if (!forceUpdate && sig === _lastDesktopRailRenderSig) return;
+  _lastDesktopRailRenderSig = sig;
+
+  const city = getCityById(p.cityId) || { id: 'montreal', flag: '🌍' };
+  const authorUser = (REMO_STORE.state.users || []).find((usr) => usr && ((p.uid && usr.uid === p.uid) || (p.authorName && usr.name && usr.name.toLowerCase() === p.authorName.toLowerCase())));
+  const authorAvatarUrl = p.authorAvatar || (typeof REMO_STORE.getUserAvatar === 'function' ? REMO_STORE.getUserAvatar(p.uid || p.authorName) : '') || (authorUser && authorUser.avatarUrl) || '';
+
+  rail.innerHTML = `
+    <div class="dsr-nav-group">
+      <button type="button" class="dsr-step-btn" onclick="stepDesktopStagePost(-1)" ${activeIdx <= 0 ? 'disabled' : ''} title="${lang === 'fr' ? 'Publication précédente (↑)' : 'Previous post (↑)'}">▲</button>
+      <div class="dsr-counter">${activeIdx + 1}/${cards.length}</div>
+      <button type="button" class="dsr-step-btn" onclick="stepDesktopStagePost(1)" ${(activeIdx >= cards.length - 1 && !hasMore) ? 'disabled' : ''} title="${lang === 'fr' ? 'Publication suivante (↓)' : 'Next post (↓)'}">▼</button>
+    </div>
+
+    <div class="dsr-actions-group">
+      <button type="button" class="dsr-avatar-btn" onclick="${p.isShowcase ? `openFocusTvModal('${escapeJsSingleArg(city.id)}')` : `openCitizenProfileModal('${escapeJsSingleArg(p.uid || '')}', '${escapeJsSingleArg(p.authorName || '')}')`}" title="@${escapeHtmlStr(p.authorName)}">
+        ${sanitizeSafeMediaUrl(authorAvatarUrl) ? `<img src="${sanitizeSafeMediaUrl(authorAvatarUrl)}" alt="${escapeHtmlStr(p.authorName)}">` : `<span>${escapeHtmlStr((p.authorName || 'R')[0].toUpperCase())}</span>`}
+        <span class="dsr-avatar-city">${city.flag || '🌍'}</span>
+      </button>
+
+      <button type="button" class="dsr-act-btn ${liked ? 'liked' : ''}" onclick="toggleLikePost('${p.id}')" title="Like">
+        <span class="dsr-ic">❤️</span>
+        <span class="dsr-lbl">${(p.likes || []).length}</span>
+      </button>
+
+      <button type="button" class="dsr-act-btn" onclick="openCommentsModal('${p.id}')" title="${lang === 'fr' ? 'Commentaires' : 'Comments'}">
+        <span class="dsr-ic">💬</span>
+        <span class="dsr-lbl">${(p.comments || []).length}</span>
+      </button>
+
+      <button type="button" class="dsr-act-btn" onclick="tipPostAuthor('${p.id}')" title="${lang === 'fr' ? 'Offrir des Pièces' : 'Tip Coins'}">
+        <span class="dsr-ic">🪙</span>
+        <span class="dsr-lbl">${p.tipsTotal || 0}</span>
+      </button>
+
+      <button type="button" class="dsr-act-btn ${isFlipped ? 'active' : ''}" onclick="flipPost3DCard('${p.id}')" title="${t('post_3d_flip')}">
+        <span class="dsr-ic">🔄</span>
+        <span class="dsr-lbl">3D</span>
+      </button>
+
+      <button type="button" class="dsr-act-btn" onclick="openPostFullscreenMedia('${p.id}')" title="${t('act_fullscreen')}">
+        <span class="dsr-ic">⛶</span>
+      </button>
+
+      <button type="button" class="dsr-act-btn" onclick="sharePostLink('${p.id}')" title="${lang === 'fr' ? 'Partager' : 'Share'}">
+        <span class="dsr-ic">↪</span>
+      </button>
+
+      ${isPostOwner ? `
+      <button type="button" class="dsr-act-btn is-gold" onclick="openSpotlightForSpecificPost('${p.id}')" title="${escapeHtmlStr(t('wspot_post_btn_sub'))}">
+        <span class="dsr-ic">🌟</span>
+        <span class="dsr-lbl">#1</span>
+      </button>
+      ` : ''}
+
+      <button type="button" class="dsr-act-btn" onclick="openPostActionsSheet('${p.id}')" title="${lang === 'fr' ? 'Plus d’options' : 'More'}">
+        <span class="dsr-ic">⋯</span>
+      </button>
+    </div>
+  `;
+}
+window.syncDesktopStageRail = syncDesktopStageRail;
+
 function toggleMobileFeedLayoutMode() {
   document.body.classList.remove('mobile-feed-classic');
   try {
@@ -2722,7 +3111,10 @@ function syncMobileFeedLayoutModeUI() {
 
 function _isMobileGridScrollActive() {
   const grid = document.getElementById('remoPostsGrid');
-  return Boolean(grid && window.innerWidth <= 860 && grid.scrollHeight > grid.clientHeight + 20);
+  if (!grid) return false;
+  if (window.innerWidth <= 860 && grid.scrollHeight > grid.clientHeight + 20) return true;
+  if (isDesktopFeedStageActive() && grid.scrollHeight > grid.clientHeight + 20) return true;
+  return false;
 }
 
 function scrollFeedToTop() {
@@ -2745,7 +3137,8 @@ function _syncFeedBackToTopPill() {
   const grid = document.getElementById('remoPostsGrid');
   const scrollPos = _isMobileGridScrollActive() && grid ? grid.scrollTop : (window.scrollY || document.documentElement.scrollTop || 0);
   const threshold = window.innerWidth <= 860 ? 1100 : 1400;
-  const shouldShow = Boolean(isActiveView && scrollPos > threshold && (window._renderedFeedPostIds || []).length > 4);
+  const stageHiddenUnlessNew = isDesktopFeedStageActive() && _feedNewTopArrivedCount <= 0;
+  const shouldShow = Boolean(isActiveView && !stageHiddenUnlessNew && scrollPos > threshold && (window._renderedFeedPostIds || []).length > 4);
 
   if (!shouldShow) {
     if (pill) pill.style.display = 'none';
@@ -2877,6 +3270,13 @@ function scheduleInfiniteFeedCheck() {
     _feedScrollRafId = 0;
     _syncFeedBackToTopPill();
     _pauseOffscreenFeedVideos();
+    if (typeof syncDesktopStageRail === 'function') {
+      syncDesktopStageRail(false);
+    }
+    const g = document.getElementById('remoPostsGrid');
+    if (g && g.scrollTop > 40) {
+      dismissStageOnboardingHint();
+    }
     if (_isFeedNearBottom()) {
       triggerInfiniteFeedLoad(false);
     }
@@ -2887,7 +3287,10 @@ function _bindGlobalFeedScrollListeners() {
   if (_feedScrollListenersBound) return;
   _feedScrollListenersBound = true;
   window.addEventListener('scroll', scheduleInfiniteFeedCheck, { passive: true });
-  window.addEventListener('resize', scheduleInfiniteFeedCheck, { passive: true });
+  window.addEventListener('resize', () => {
+    if (typeof syncDesktopStageLayoutUI === 'function') syncDesktopStageLayoutUI();
+    scheduleInfiniteFeedCheck();
+  }, { passive: true });
   const grid = document.getElementById('remoPostsGrid');
   if (grid) {
     grid.addEventListener('scroll', scheduleInfiniteFeedCheck, { passive: true });
@@ -3050,11 +3453,14 @@ function renderSocialFeed(searchQuery = '', forceFull = false) {
   // Asynchronously attach any IndexedDB video/photo/audio Blobs
   RemoMediaDB.hydrateDom(grid);
   initAllMysteryBoxCanvases(grid);
+  if (typeof syncDesktopStageLayoutUI === 'function') {
+    syncDesktopStageLayoutUI();
+  }
   scheduleInfiniteFeedCheck();
 }
 
 function applyHoloTilt(e, cardEl) {
-  if (window.innerWidth <= 860) return;
+  if (window.innerWidth <= 860 || (typeof isDesktopFeedStageActive === 'function' && isDesktopFeedStageActive())) return;
   const r = cardEl.getBoundingClientRect();
   const x = (e.clientX - r.left) / r.width - 0.5;
   const y = (e.clientY - r.top) / r.height - 0.5;
@@ -3074,7 +3480,7 @@ function setFeedMode(mode, chipEl) {
   document.querySelectorAll('#feedVibeChips .fchip').forEach((b) => b.classList.remove('active'));
   document.querySelector('#feedVibeChips .fchip:first-child')?.classList.add('active');
 
-  document.querySelectorAll('#feedModeChips .fchip').forEach((b) => b.classList.remove('active'));
+  document.querySelectorAll('#feedModeChips .fchip, .more-feed-chips-subrow .fchip').forEach((b) => b.classList.remove('active'));
   if (chipEl) chipEl.classList.add('active');
   renderSocialFeed();
 }
@@ -3217,13 +3623,13 @@ function _scrollFeedToBoostedPost(postId) {
   setTimeout(() => {
     const grid = document.getElementById('remoPostsGrid');
     const card = document.getElementById('post_card_' + postId);
-    if (grid && grid.scrollHeight > grid.clientHeight + 20 && window.innerWidth <= 860) {
-      // Mobile TikTok snap-container scrolls inside #remoPostsGrid
+    if (grid && _isMobileGridScrollActive()) {
       if (card) {
-        card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        grid.scrollTo({ top: card.offsetTop || 0, behavior: 'smooth' });
       } else {
         grid.scrollTo({ top: 0, behavior: 'smooth' });
       }
+      setTimeout(() => { if (typeof syncDesktopStageRail === 'function') syncDesktopStageRail(true); }, 180);
       return;
     }
     if (card) {
@@ -10036,9 +10442,15 @@ document.addEventListener('DOMContentLoaded', () => {
     renderSocialFeed('', true);
     const scrollToTargetPost = () => {
       renderSocialFeed('', true);
+      const grid = document.getElementById('remoPostsGrid');
       const card = document.getElementById(`post_card_${targetPost}`);
       if (card) {
-        card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        if (grid && _isMobileGridScrollActive()) {
+          grid.scrollTo({ top: card.offsetTop || 0, behavior: 'smooth' });
+          setTimeout(() => { if (typeof syncDesktopStageRail === 'function') syncDesktopStageRail(true); }, 180);
+        } else {
+          card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
         card.style.transition = 'all 0.5s ease';
         card.style.boxShadow = '0 0 35px rgba(56, 189, 248, 0.7)';
         setTimeout(() => { if (card) card.style.boxShadow = ''; }, 3500);
@@ -10169,7 +10581,7 @@ document.addEventListener('DOMContentLoaded', () => {
           setBoardingPassRoutePreset(destCity === 'montreal' ? 'paris' : 'montreal', destCity);
         }
       } else if (openTarget === 'guess') {
-        const mysteryBtn = document.querySelector('#feedModeChips button[onclick*="mystery"]');
+        const mysteryBtn = document.querySelector('.feed-top-widgets button[onclick*="mystery"]');
         if (typeof setFeedMode === 'function') setFeedMode('mystery', mysteryBtn);
       } else if (openTarget === 'blitz' || openTarget === 'worldblitz') {
         const blitzVs = (params.get('vs') || '').trim();
@@ -10203,9 +10615,22 @@ document.addEventListener('DOMContentLoaded', () => {
     }).catch(() => {});
   }
 
-  // Desktop Keyboard Shortcuts (J/K scroll, M radar, G cards)
+  // Desktop Keyboard Shortcuts (ArrowUp/ArrowDown/J/K stage step, M radar, G cards, A arena)
   document.addEventListener('keydown', (e) => {
     if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return;
+    const anyModalOpen = Boolean(document.querySelector('.remo-modal-backdrop.open'));
+    if (!anyModalOpen && typeof isDesktopFeedStageActive === 'function' && isDesktopFeedStageActive()) {
+      if (e.key === 'ArrowDown' || e.key.toLowerCase() === 'j') {
+        e.preventDefault();
+        stepDesktopStagePost(1);
+        return;
+      }
+      if (e.key === 'ArrowUp' || e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        stepDesktopStagePost(-1);
+        return;
+      }
+    }
     if (e.key.toLowerCase() === 'm') switchRemoView('radar');
     else if (e.key.toLowerCase() === 'g') switchRemoView('cards');
     else if (e.key.toLowerCase() === 'a') switchRemoView('arena');
@@ -10634,6 +11059,33 @@ function openPostActionsSheet(postId) {
         ` : ''}
       </div>
     ` : ''}
+
+    <!-- Quick Studio Action Tools Grid -->
+    <div class="sheet-quick-tools-grid">
+      <button type="button" class="sheet-qt-btn" onclick="closePostActionsModal(); flipPost3DCard('${p.id}');">
+        <span>🔄</span>
+        <b>${lang === 'fr' ? 'Carte 3D' : '3D Flip'}</b>
+      </button>
+      <button type="button" class="sheet-qt-btn" onclick="closePostActionsModal(); openPostFullscreenMedia('${p.id}');">
+        <span>⛶</span>
+        <b>${lang === 'fr' ? 'Plein écran' : 'Fullscreen'}</b>
+      </button>
+      ${['image', 'carousel', 'city_art', 'text_card'].includes(p.mediaType) && !p.duetOf ? `
+      <button type="button" class="sheet-qt-btn" onclick="closePostActionsModal(); startWorldWindowSync('${p.id}');">
+        <span>🪟</span>
+        <b>${lang === 'fr' ? 'Synchro 4D' : 'Sync Window'}</b>
+      </button>
+      ` : `
+      <button type="button" class="sheet-qt-btn" onclick="closePostActionsModal(); sharePostLink('${p.id}');">
+        <span>🔗</span>
+        <b>${lang === 'fr' ? 'Lien' : 'Share Link'}</b>
+      </button>
+      `}
+      <button type="button" class="sheet-qt-btn" onclick="closePostActionsModal(); openBoardingPassModal('${(u && u.homeCity) ? u.homeCity : 'montreal'}', '${p.cityId || 'chisinau'}');">
+        <span>🎫</span>
+        <b>${lang === 'fr' ? 'Billet 4D' : '4D Ticket'}</b>
+      </button>
+    </div>
 
     <!-- Quick Emoji Reactions Row -->
     <div style="margin:12px 0 16px;">
@@ -13824,6 +14276,8 @@ function renderLivePresenceStrip() {
     ? REMO_STORE.getOnlineCitizensList()
     : [];
   const totalOnline = Math.max(1, onlineAll.length);
+  const miniOnlineCnt = document.getElementById('feedOnlineMiniCount');
+  if (miniOnlineCnt) miniOnlineCnt.textContent = String(totalOnline);
   const others = onlineAll.filter((c) => c && c.uid && c.uid !== myUid);
 
   // 1. 🛬 New Citizen Auto-Welcome Bar (joined within last 15 minutes)
@@ -16381,6 +16835,10 @@ function openCleanFeedPulseDrawer(forceOpen = true) {
   const drawer = document.getElementById('cleanFeedPulseDrawer');
   const arrow = document.getElementById('cleanFeedPulseArrow');
   if (!drawer) return;
+  if (forceOpen) {
+    if (typeof toggleFeedPresenceDrawer === 'function') toggleFeedPresenceDrawer(false);
+    if (typeof toggleMoreFeedFilters === 'function') toggleMoreFeedFilters(false);
+  }
   drawer.classList.toggle('open', Boolean(forceOpen));
   if (arrow) {
     arrow.textContent = forceOpen ? t('clean_pulse_hide') : t('clean_pulse_open');
