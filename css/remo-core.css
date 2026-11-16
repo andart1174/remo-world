@@ -10484,6 +10484,16 @@ select.remo-input option {
   border-color: #fb923c;
   color: #fff;
 }
+.tiktok-overlay-info .post-sync-retry-banner {
+  width: auto;
+  max-width: 100%;
+  margin: 0 0 4px;
+  pointer-events: auto;
+  background: rgba(153, 27, 27, 0.9);
+  border-color: #fb923c;
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+}
 
 /* ════════════════════════════════════════════════════════════════════
    🎬 v141 — TIKTOK SIMPLICITY + ZERO-CLUTTER STAGE (DESKTOP & MOBILE)
@@ -11506,4 +11516,20 @@ select.remo-input option {
   #view-feed.active .remo-text-card-stage {
     padding: 88px 58px 94px 16px !important;
   }
+}
+
+/* Scalability: Offscreen layout skip on Desktop + exact-height archived slot preservation for 1,000+ posts */
+@media (min-width: 861px) {
+  #view-feed.active .post-card:not(.boosted) {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 560px;
+  }
+}
+.post-card-archived-stub {
+  width: 100%;
+  box-sizing: border-box;
+  border-radius: 18px;
+  background: rgba(15, 23, 42, 0.35);
+  pointer-events: none;
+  scroll-snap-align: start;
 }

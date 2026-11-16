@@ -580,22 +580,22 @@ function renderAdminCitiesPanel() {
       return `
         <tr>
           <td>
-            ${thumbHtml}<b>${c.flag} ${getCityName(c, lang)}</b> <span style="color:var(--muted);">(${c.code})</span>
-            ${wx ? `<span style="color:#7dd3fc;font-size:0.74rem;font-weight:800;"> · 🕒 ${wx.timeStr} ${wx.icon} ${wx.tempC}°C</span>` : ''}
+            ${thumbHtml}<b>${c.flag} ${escapeHtmlStr(getCityName(c, lang))}</b> <span style="color:var(--muted);">(${escapeHtmlStr(c.code)})</span>
+            ${wx ? `<span style="color:#7dd3fc;font-size:0.74rem;font-weight:800;"> · 🕒 ${escapeHtmlStr(wx.timeStr)} ${wx.icon} ${wx.tempC}°C</span>` : ''}
             ${wx && wx.isSurge ? `<span style="background:rgba(245,158,11,0.25);color:#fde047;padding:2px 6px;border-radius:99px;font-size:0.68rem;font-weight:900;">⚡ 2X SURGE</span>` : ''}
-            ${c.foundedBy ? `<span style="background:rgba(16,185,129,0.2);color:#34d399;padding:2px 6px;border-radius:99px;font-size:0.68rem;font-weight:900;">🌱 @${c.foundedBy}</span>` : ''}
+            ${c.foundedBy ? `<span style="background:rgba(16,185,129,0.2);color:#34d399;padding:2px 6px;border-radius:99px;font-size:0.68rem;font-weight:900;">🌱 @${escapeHtmlStr(c.foundedBy)}</span>` : ''}
             ${hasCustomRadio ? `<span style="background:rgba(56,189,248,0.18);color:#7dd3fc;padding:2px 6px;border-radius:99px;font-size:0.66rem;font-weight:800;">📻 FM</span>` : ''}
           </td>
-          <td>${getCityCountry(c, lang)}</td>
+          <td>${escapeHtmlStr(getCityCountry(c, lang))}</td>
           <td><code>${c.lat.toFixed(2)}, ${c.lng.toFixed(2)}</code></td>
           <td><b style="color:#fbbf24;">${pts.toLocaleString()} PTS</b></td>
           <td style="display:flex;gap:6px;flex-wrap:wrap;">
-            <button class="adm-btn ${wx && wx.isSurge ? 'emerald' : 'outline'}" style="padding:5px 10px;" onclick="adminToggleCityWeatherSurge('${c.id}')">${wx && wx.isSurge ? '⛈️ 2X ON' : '⛈️ 2X Surge'}</button>
-            <button class="adm-btn outline" style="padding:5px 10px;" onclick="adminBoostCityPoints('${c.id}', 250)">+250 PTS</button>
-            <button class="adm-btn gold" style="padding:5px 10px;" onclick="jumpStudioToCity('${c.id}')">🎴 Mint Card</button>
-            <button class="adm-btn outline" style="padding:5px 10px;" onclick="adminEditCityMediaPrompt('${c.id}')">🖼️ Media</button>
-            <button class="adm-btn outline" style="padding:5px 10px;" onclick="adminAutoDiscoverCityMedia('${c.id}')">🌐 Auto</button>
-            ${c.communityAdded ? `<button class="adm-btn rose" style="padding:5px 10px;" onclick="adminDeleteCity('${c.id}')">🗑️</button>` : ''}
+            <button class="adm-btn ${wx && wx.isSurge ? 'emerald' : 'outline'}" style="padding:5px 10px;" onclick="adminToggleCityWeatherSurge('${escapeJsSingleArg(c.id)}')">${wx && wx.isSurge ? '⛈️ 2X ON' : '⛈️ 2X Surge'}</button>
+            <button class="adm-btn outline" style="padding:5px 10px;" onclick="adminBoostCityPoints('${escapeJsSingleArg(c.id)}', 250)">+250 PTS</button>
+            <button class="adm-btn gold" style="padding:5px 10px;" onclick="jumpStudioToCity('${escapeJsSingleArg(c.id)}')">🎴 Mint Card</button>
+            <button class="adm-btn outline" style="padding:5px 10px;" onclick="adminEditCityMediaPrompt('${escapeJsSingleArg(c.id)}')">🖼️ Media</button>
+            <button class="adm-btn outline" style="padding:5px 10px;" onclick="adminAutoDiscoverCityMedia('${escapeJsSingleArg(c.id)}')">🌐 Auto</button>
+            ${c.communityAdded ? `<button class="adm-btn rose" style="padding:5px 10px;" onclick="adminDeleteCity('${escapeJsSingleArg(c.id)}')">🗑️</button>` : ''}
           </td>
         </tr>
       `;
@@ -974,9 +974,9 @@ function renderAdminWarsAndPulsePanel() {
               cB = getCityById(w.cityB) || { flag: '🏙️', name_en: w.cityB, name_fr: w.cityB };
         return `
           <tr>
-            <td><b>${lang === 'fr' ? (w.title_fr || w.title_en) : (w.title_en || w.title_fr)}</b></td>
-            <td>${cA.flag} ${getCityName(cA, lang)} (${w.votesA}) vs ${cB.flag} ${getCityName(cB, lang)} (${w.votesB})</td>
-            <td><button class="adm-btn rose" style="padding:5px 10px;" onclick="adminDeleteWar('${w.id}')">✕</button></td>
+            <td><b>${escapeHtmlStr(lang === 'fr' ? (w.title_fr || w.title_en) : (w.title_en || w.title_fr))}</b></td>
+            <td>${cA.flag} ${escapeHtmlStr(getCityName(cA, lang))} (${Number(w.votesA || 0)}) vs ${cB.flag} ${escapeHtmlStr(getCityName(cB, lang))} (${Number(w.votesB || 0)})</td>
+            <td><button class="adm-btn rose" style="padding:5px 10px;" onclick="adminDeleteWar('${escapeJsSingleArg(w.id)}')">✕</button></td>
           </tr>
         `;
       }).join('');
@@ -1003,8 +1003,8 @@ function renderAdminWarsAndPulsePanel() {
             <td><span class="adm-badge ${isClosed ? 'grey' : 'gold'}">${statusStr}</span></td>
             <td>${(v.voters || []).length} votes</td>
             <td style="display:flex;gap:6px;">
-              ${!isClosed ? `<button class="adm-btn gold" style="padding:4px 8px;font-size:0.75rem;" onclick="adminConcludeVersusFromAdmin('${p.id}')">👑 Conclude</button>` : ''}
-              <button class="adm-btn rose" style="padding:4px 8px;font-size:0.75rem;" onclick="adminDeleteVersusFromAdmin('${p.id}')">✕ Delete</button>
+              ${!isClosed ? `<button class="adm-btn gold" style="padding:4px 8px;font-size:0.75rem;" onclick="adminConcludeVersusFromAdmin('${escapeJsSingleArg(p.id)}')">👑 Conclude</button>` : ''}
+              <button class="adm-btn rose" style="padding:4px 8px;font-size:0.75rem;" onclick="adminDeleteVersusFromAdmin('${escapeJsSingleArg(p.id)}')">✕ Delete</button>
             </td>
           </tr>
         `;
@@ -1163,7 +1163,7 @@ function renderAdminEconomyPanel() {
           <td><span style="color:#38bdf8;font-weight:700;">${sc.ownerName || 'Founder Vault'}</span></td>
           <td><span style="background:${sc.status === 'assigned' ? 'rgba(16,185,129,0.2)' : 'rgba(56,189,248,0.2)'};color:${sc.status === 'assigned' ? '#34d399' : '#7dd3fc'};padding:2px 8px;border-radius:99px;font-size:0.7rem;font-weight:900;">${sc.status ? sc.status.toUpperCase() : 'VAULT'}</span></td>
           <td>
-            <button class="adm-btn outline" style="padding:3px 8px;font-size:0.7rem;border-color:#fbbf24;color:#fbbf24;" onclick="adminExportDuplexPrintCoin('${sc.serial}')">🖨️ Print</button>
+            <button class="adm-btn outline" style="padding:3px 8px;font-size:0.7rem;border-color:#fbbf24;color:#fbbf24;" onclick="adminExportDuplexPrintCoin('${escapeJsSingleArg(sc.serial)}')">🖨️ Print</button>
           </td>
         </tr>
       `;
@@ -1174,10 +1174,10 @@ function renderAdminEconomyPanel() {
   if (promoTbl) {
     promoTbl.innerHTML = (REMO_STORE.state.promoCodes || []).map((pc) => `
       <tr>
-        <td><b style="color:#38bdf8;font-family:monospace;">${pc.code}</b></td>
-        <td><b style="color:#fbbf24;">+${pc.coins} 🪙</b> ${pc.bonusCityCard ? `+ 🎴 ${pc.bonusCityCard.toUpperCase()}` : ''}</td>
+        <td><b style="color:#38bdf8;font-family:monospace;">${escapeHtmlStr(pc.code)}</b></td>
+        <td><b style="color:#fbbf24;">+${Number(pc.coins || 0)} 🪙</b> ${pc.bonusCityCard ? `+ 🎴 ${escapeHtmlStr(String(pc.bonusCityCard).toUpperCase())}` : ''}</td>
         <td>${(pc.redeemedBy || []).length} citizens</td>
-        <td><button class="adm-btn rose" style="padding:4px 9px;" onclick="adminDeletePromoCode('${pc.code}')">✕</button></td>
+        <td><button class="adm-btn rose" style="padding:4px 9px;" onclick="adminDeletePromoCode('${escapeJsSingleArg(pc.code)}')">✕</button></td>
       </tr>
     `).join('');
   }
@@ -1515,6 +1515,17 @@ function escapeHtmlStr(str = '') {
     .replace(/'/g, '&#39;');
 }
 
+function escapeJsSingleArg(str = '') {
+  return String(str)
+    .replace(/\\/g, '\\\\')
+    .replace(/'/g, '\\x27')
+    .replace(/"/g, '\\x22')
+    .replace(/</g, '\\x3c')
+    .replace(/>/g, '\\x3e')
+    .replace(/&/g, '\\x26')
+    .replace(/[\r\n]/g, ' ');
+}
+
 function renderAdminModerationPanel() {
   const lang = REMO_I18N.getLang();
   const uBody = document.getElementById('admUsersTable');
@@ -1522,7 +1533,7 @@ function renderAdminModerationPanel() {
     uBody.innerHTML = getAdminRealUsers().map((u) => {
       const hc = getCityById(u.homeCity);
       const isMayor = REMO_STORE.state.cityMayors && REMO_STORE.state.cityMayors[u.homeCity] === u.uid;
-      const safeUid = escapeHtmlStr(u.uid);
+      const safeUid = escapeJsSingleArg(u.uid);
       return `
         <tr style="${u.banned ? 'opacity:0.5;' : ''}">
           <td>
@@ -1554,7 +1565,7 @@ function renderAdminModerationPanel() {
       const fromU = (REMO_STORE.state.users || []).find((x) => x.uid === d.fromUid) || { name: d.fromName || 'Citizen' };
       const toU = (REMO_STORE.state.users || []).find((x) => x.uid === d.toUid) || { name: d.toUid === 'u_admin_founder' ? 'REMO Founder' : 'Citizen' };
       const dateStr = d.ts ? new Date(d.ts).toLocaleTimeString() : '';
-      const safeDmId = escapeHtmlStr(d.id);
+      const safeDmId = escapeJsSingleArg(d.id);
       return `
         <tr>
           <td><b style="color:#7dd3fc;">@${escapeHtmlStr(fromU.name || d.fromName)}</b></td>
@@ -1590,7 +1601,7 @@ function renderAdminModerationPanel() {
       };
       const fmtBadge = fmtMap[p.mediaType] || fmtMap.city_art;
       const isSealedCapsule = Boolean(p.unlockAt && Number(p.unlockAt) > Date.now());
-      const safePostId = escapeHtmlStr(p.id);
+      const safePostId = escapeJsSingleArg(p.id);
       return `
         <tr>
           <td>
@@ -1735,7 +1746,10 @@ async function adminPurgeFakeUsers() {
 
 function adminTogglePinPost(pid) {
   const p = REMO_STORE.state.posts.find((x) => x.id === pid);
-  if (p) p.pinned = !p.pinned;
+  if (p) {
+    p.pinned = !p.pinned;
+    if (typeof REMO_STORE.syncPostToCloud === 'function') REMO_STORE.syncPostToCloud(p);
+  }
   REMO_STORE.save(true, 'post_pin');
   renderAdminModerationPanel();
   admToast(p && p.pinned ? '📌 Pinned #1 on REMO!' : 'Unpinned');
@@ -1747,6 +1761,7 @@ function adminCrownPostAward(pid) {
   p.founderAward = true;
   if (p.uid) REMO_STORE.adminAdjustUserCoins(p.uid, 'add', 250, '👑 Founder Award!');
   p.tipsTotal = (p.tipsTotal || 0) + 250;
+  if (typeof REMO_STORE.syncPostToCloud === 'function') REMO_STORE.syncPostToCloud(p);
   REMO_STORE.save(true, 'founder_award');
   refreshAllAdminPanels();
   admToast(`👑 Awarded +250 🪙 to @${p.authorName}!`);
@@ -1759,6 +1774,7 @@ function adminEditPostCaption(pid) {
   if (next === null) return;
   p.caption_en = next;
   p.caption_fr = next;
+  if (typeof REMO_STORE.syncPostToCloud === 'function') REMO_STORE.syncPostToCloud(p);
   REMO_STORE.save(true, 'post_edit');
   renderAdminModerationPanel();
 }

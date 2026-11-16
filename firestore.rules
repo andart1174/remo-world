@@ -40,28 +40,45 @@ service cloud.firestore {
       return isAuthenticated() && (val == request.auth.uid || val == 'u_fb_' + request.auth.uid);
     }
 
-    // 1. Social Feed Posts (Strict HTML Mini-App Admin Gate & Citizen Interaction Field Whitelist)
+    function isSafeId(val) {
+      return val is string && val.matches('^[a-zA-Z0-9_-]{3,90}$');
+    }
+
+    // 1. Social Feed Posts (Strict HTML Mini-App & Versus Admin Gate + Safe ID + Anti-Tamper Interactions)
     match /remo_posts/{postId} {
       allow read: if true;
       allow create: if isAdmin() || (
         isNotBanned() &&
+        isSafeId(postId) &&
         (
           isUidMatch(request.resource.data.uid) ||
           isUidMatch(request.resource.data.authorUid) ||
           isUidMatch(request.resource.data.authorId)
         ) &&
-        (!('mediaType' in request.resource.data) || request.resource.data.mediaType != 'html_app')
+        (!('mediaType' in request.resource.data) || (request.resource.data.mediaType != 'html_app' && request.resource.data.mediaType != 'city_versus')) &&
+        (!('htmlCode' in request.resource.data) || request.resource.data.htmlCode == '') &&
+        (!('pinned' in request.resource.data) || request.resource.data.pinned == false) &&
+        (!('founderAward' in request.resource.data) || request.resource.data.founderAward == false)
       );
       allow update: if isAdmin() || (
         isNotBanned() && (
-          isUidMatch(resource.data.uid) ||
-          isUidMatch(resource.data.authorUid) ||
-          isUidMatch(resource.data.authorId) ||
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-            'likes', 'comments', 'versus', 'poll', 'tipsTotal',
-            'cityGuesses', 'leaderboard', 'capsuleWatchers',
-            'bounty', 'secretCapsule', 'views', 'mintedCard'
-          ])
+          (
+            (isUidMatch(resource.data.uid) || isUidMatch(resource.data.authorUid) || isUidMatch(resource.data.authorId)) &&
+            (!('pinned' in request.resource.data) || (('pinned' in resource.data) && request.resource.data.pinned == resource.data.pinned) || request.resource.data.pinned == false) &&
+            (!('founderAward' in request.resource.data) || (('founderAward' in resource.data) && request.resource.data.founderAward == resource.data.founderAward) || request.resource.data.founderAward == false) &&
+            (!('mediaType' in request.resource.data) || (request.resource.data.mediaType != 'html_app' && request.resource.data.mediaType != 'city_versus')) &&
+            (!('uid' in resource.data) || request.resource.data.uid == resource.data.uid) &&
+            (!('authorUid' in resource.data) || request.resource.data.authorUid == resource.data.authorUid)
+          ) || (
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+              'likes', 'comments', 'versus', 'poll', 'tipsTotal',
+              'cityGuesses', 'leaderboard', 'capsuleWatchers',
+              'bounty', 'secretCapsule', 'views', 'mintedCard'
+            ]) &&
+            (!('comments' in resource.data) || !('comments' in request.resource.data) || (request.resource.data.comments is list && request.resource.data.comments.size() >= resource.data.comments.size())) &&
+            (!('likes' in resource.data) || !('likes' in request.resource.data) || (request.resource.data.likes is list && request.resource.data.likes.size() >= resource.data.likes.size() - 1 && request.resource.data.likes.size() <= resource.data.likes.size() + 1)) &&
+            (!('tipsTotal' in resource.data) || !('tipsTotal' in request.resource.data) || request.resource.data.tipsTotal >= resource.data.tipsTotal)
+          )
         )
       );
       allow delete: if isAuthenticated() && (
@@ -75,7 +92,18 @@ service cloud.firestore {
     // 1B. 24h Stories & Focus Study Rooms
     match /remo_stories/{storyId} {
       allow read: if true;
-      allow create, update: if isAdmin() || isNotBanned();
+      allow create: if isAdmin() || (
+        isNotBanned() &&
+        isSafeId(storyId) &&
+        (isUidMatch(request.resource.data.uid) || isUidMatch(request.resource.data.authorUid))
+      );
+      allow update: if isAdmin() || (
+        isNotBanned() && (
+          isUidMatch(resource.data.uid) ||
+          isUidMatch(resource.data.authorUid) ||
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reactions', 'tipsCoins', 'views', 'updatedAt'])
+        )
+      );
       allow delete: if isAdmin() || (
         isAuthenticated() && (
           isUidMatch(resource.data.uid) ||
@@ -86,15 +114,16 @@ service cloud.firestore {
 
     match /remo_focus_rooms/{roomId} {
       allow read: if true;
-      allow create, update: if isAdmin() || isNotBanned();
+      allow create, update: if isAdmin() || (isNotBanned() && isSafeId(roomId));
       allow delete: if isAdmin();
     }
 
-    // 2. Citizen Profiles & Passports (Role, Ban, Verified & Coin Delta Protected)
+    // 2. Citizen Profiles & Passports (Role, Ban, Verified, UID & Coin Delta Protected)
     match /remo_users/{userId} {
       allow read: if true;
       allow create: if isAdmin() || (
         isNotBanned() &&
+        isSafeId(userId) &&
         isUidMatch(userId) &&
         (!('role' in request.resource.data) || request.resource.data.role == 'citizen') &&
         (!('banned' in request.resource.data) || request.resource.data.banned == false) &&
@@ -104,10 +133,12 @@ service cloud.firestore {
       allow update: if isAdmin() || (
         isOwner(userId) &&
         isNotBanned() &&
+        (!('uid' in resource.data) || request.resource.data.uid == resource.data.uid) &&
+        (!('fbUid' in resource.data) || resource.data.fbUid == '' || request.resource.data.fbUid == resource.data.fbUid) &&
         (!('role' in request.resource.data) || (('role' in resource.data) && request.resource.data.role == resource.data.role) || (!('role' in resource.data) && request.resource.data.role == 'citizen')) &&
         (!('banned' in request.resource.data) || (('banned' in resource.data) && request.resource.data.banned == resource.data.banned) || (!('banned' in resource.data) && request.resource.data.banned == false)) &&
         (!('verified' in request.resource.data) || (('verified' in resource.data) && request.resource.data.verified == resource.data.verified) || (!('verified' in resource.data) && request.resource.data.verified == false)) &&
-        (!('coins' in request.resource.data) || !('coins' in resource.data) || (request.resource.data.coins - resource.data.coins) <= 1500)
+        (!('coins' in request.resource.data) || (request.resource.data.coins >= 0 && (!('coins' in resource.data) || (request.resource.data.coins - resource.data.coins) <= 1500)))
       ) || (
         isNotBanned() &&
         !isOwner(userId) &&
@@ -117,7 +148,8 @@ service cloud.firestore {
         (request.resource.data.coins is int || request.resource.data.coins is float) &&
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['coins', 'lifetimeCoins', 'updatedAt']) &&
         (request.resource.data.coins - resource.data.coins) > 0 &&
-        (request.resource.data.coins - resource.data.coins) <= 5000
+        (request.resource.data.coins - resource.data.coins) <= 5000 &&
+        (!('lifetimeCoins' in resource.data) || !('lifetimeCoins' in request.resource.data) || request.resource.data.lifetimeCoins >= resource.data.lifetimeCoins)
       );
       allow delete: if isAdmin();
     }
@@ -132,11 +164,17 @@ service cloud.firestore {
       allow read: if true;
       allow create: if isAdmin() || (
         isNotBanned() &&
-        !request.resource.data.keys().hasAny(['settings', 'supportTickets', 'adminPinHash', 'adminEmail'])
+        !request.resource.data.keys().hasAny([
+          'settings', 'supportTickets', 'adminPinHash', 'adminEmail',
+          'deletedUserIds', 'deletedDuelIds', 'deletedAuctionIds', 'deletedStoryIds'
+        ])
       );
       allow update: if isAdmin() || (
         isNotBanned() &&
-        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['settings', 'supportTickets', 'adminPinHash', 'adminEmail'])
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+          'settings', 'supportTickets', 'adminPinHash', 'adminEmail',
+          'deletedUserIds', 'deletedDuelIds', 'deletedAuctionIds', 'deletedStoryIds'
+        ])
       );
       allow delete: if isAdmin();
     }
@@ -149,7 +187,8 @@ service cloud.firestore {
     // 4. 3D Digital City Cards Pool & Auctions
     match /remo_cards/{cardId} {
       allow read: if true;
-      allow create, update: if isAdmin() || isNotBanned();
+      allow create: if isAdmin() || (isNotBanned() && isSafeId(cardId) && isUidMatch(request.resource.data.ownerUid));
+      allow update: if isAdmin() || (isNotBanned() && (!('ownerUid' in resource.data) || isUidMatch(resource.data.ownerUid)));
       allow delete: if isAdmin();
     }
 
@@ -157,7 +196,8 @@ service cloud.firestore {
     match /remo_direct_messages/{dmId} {
       allow read: if isAdmin() || isUidMatch(resource.data.fromUid) || isUidMatch(resource.data.toUid);
       allow create: if isAdmin() || (
-        isNotBanned() && (
+        isNotBanned() &&
+        isSafeId(dmId) && (
           isUidMatch(request.resource.data.fromUid) ||
           (request.resource.data.fromUid == 'u_system_treasury' && isUidMatch(request.resource.data.toUid)) ||
           (request.resource.data.toUid == 'u_admin_founder' && request.resource.data.fromUid == 'u_support_desk')
@@ -172,10 +212,10 @@ service cloud.firestore {
     match /remo_notifications/{notifId} {
       allow read: if isAdmin() || isUidMatch(resource.data.toUid);
       allow create: if isAdmin() || (
-        isNotBanned() && (
+        isNotBanned() &&
+        isSafeId(notifId) && (
           isUidMatch(request.resource.data.fromUid) ||
-          !('fromUid' in request.resource.data) ||
-          request.resource.data.toUid == 'u_admin_founder'
+          (request.resource.data.toUid == 'u_admin_founder' && ('fromUid' in request.resource.data) && isSafeId(request.resource.data.fromUid))
         )
       );
       allow update: if isAdmin() || (isNotBanned() && isUidMatch(resource.data.toUid));
@@ -184,7 +224,7 @@ service cloud.firestore {
 
     match /remo_support_tickets/{ticketId} {
       allow read: if isAdmin() || isUidMatch(resource.data.uid);
-      allow create: if (
+      allow create: if isSafeId(ticketId) && (
         (isNotBanned() && isUidMatch(request.resource.data.uid)) ||
         (!isAuthenticated() && request.resource.data.uid is string && request.resource.data.uid.matches('^u_visitor_[0-9]+$'))
       ) &&

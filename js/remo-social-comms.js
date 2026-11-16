@@ -1022,15 +1022,15 @@ function renderCityVersusDuelStage(p, lang) {
   return `
     <div class="city-versus-stage ${isExpired ? 'finished' : ''}">
       ${topBarHtml}
-      <div class="versus-pane left ${votedSide === 'left' ? 'voted' : ''} ${isLeftWinner ? 'winner' : ''}" onclick="voteCityVersusDuel('${p.id}', 'left', event)">
-        <img src="${leftSrc}" alt="${nameA}">
+      <div class="versus-pane left ${votedSide === 'left' ? 'voted' : ''} ${isLeftWinner ? 'winner' : ''}" onclick="voteCityVersusDuel('${escapeJsSingleArg(p.id)}', 'left', event)">
+        <img src="${leftSrc}" loading="lazy" decoding="async" alt="${nameA}">
         <div class="versus-city-pill left ${votedSide === 'left' ? 'active' : ''}">${leftPillText}</div>
       </div>
       <div class="versus-bolt-divider">
         <div class="versus-bolt-badge">⚡</div>
       </div>
-      <div class="versus-pane right ${votedSide === 'right' ? 'voted' : ''} ${isRightWinner ? 'winner' : ''}" onclick="voteCityVersusDuel('${p.id}', 'right', event)">
-        <img src="${rightSrc}" alt="${nameB}">
+      <div class="versus-pane right ${votedSide === 'right' ? 'voted' : ''} ${isRightWinner ? 'winner' : ''}" onclick="voteCityVersusDuel('${escapeJsSingleArg(p.id)}', 'right', event)">
+        <img src="${rightSrc}" loading="lazy" decoding="async" alt="${nameB}">
         <div class="versus-city-pill right ${votedSide === 'right' ? 'active' : ''}">${rightPillText}</div>
       </div>
       ${winnerOverlayHtml}
@@ -2029,13 +2029,13 @@ function renderAdminPostBar(p) {
         <span class="adm-trigger-arrow">▾</span>
       </summary>
       <div class="admin-post-bar">
-        <button type="button" class="adm-pbtn danger" onclick="adminDeletePostInline('${p.id}')">${t('adm_bar_delete')}</button>
-        <button type="button" class="adm-pbtn gold" onclick="adminPinPostInline('${p.id}')">${p.pinned ? t('adm_bar_unpin') : t('adm_bar_pin')}</button>
-        ${sealed ? `<button type="button" class="adm-pbtn gold" onclick="adminUnsealCapsuleNow('${p.id}')">${t('capsule_adm_unseal')}</button>` : ''}
-        ${sealed ? `<button type="button" class="adm-pbtn" onclick="adminToggleCapsuleXray('${p.id}')">${t('capsule_adm_xray')}</button>` : ''}
-        <button type="button" class="adm-pbtn gold" onclick="adminAwardFounderCrown('${p.id}')">${t('adm_bar_award')}</button>
-        <button type="button" class="adm-pbtn" onclick="openAdminQuickModal('${p.uid || ''}')">${t('adm_bar_coins')}</button>
-        <button type="button" class="adm-pbtn" onclick="adminEditPostInline('${p.id}')">${t('adm_bar_edit')}</button>
+        <button type="button" class="adm-pbtn danger" onclick="adminDeletePostInline('${escapeJsSingleArg(p.id)}')">${t('adm_bar_delete')}</button>
+        <button type="button" class="adm-pbtn gold" onclick="adminPinPostInline('${escapeJsSingleArg(p.id)}')">${p.pinned ? t('adm_bar_unpin') : t('adm_bar_pin')}</button>
+        ${sealed ? `<button type="button" class="adm-pbtn gold" onclick="adminUnsealCapsuleNow('${escapeJsSingleArg(p.id)}')">${t('capsule_adm_unseal')}</button>` : ''}
+        ${sealed ? `<button type="button" class="adm-pbtn" onclick="adminToggleCapsuleXray('${escapeJsSingleArg(p.id)}')">${t('capsule_adm_xray')}</button>` : ''}
+        <button type="button" class="adm-pbtn gold" onclick="adminAwardFounderCrown('${escapeJsSingleArg(p.id)}')">${t('adm_bar_award')}</button>
+        <button type="button" class="adm-pbtn" onclick="openAdminQuickModal('${escapeJsSingleArg(p.uid || '')}')">${t('adm_bar_coins')}</button>
+        <button type="button" class="adm-pbtn" onclick="adminEditPostInline('${escapeJsSingleArg(p.id)}')">${t('adm_bar_edit')}</button>
       </div>
     </details>
   `;
@@ -2251,7 +2251,7 @@ function renderSinglePostCardHtml(p, lang, u, isAdm) {
     const adminBarHtml = renderAdminPostBar(p);
     const syncErrHtml = p._cloudSyncError ? `<button type="button" class="post-sync-retry-banner" onclick="retrySyncPostToCloud('${escapeJsSingleArg(p.id)}')" title="${escapeHtmlStr(p._cloudSyncError)}">${escapeHtmlStr(t('post_sync_retry_btn'))}</button>` : '';
 
-    const tkInteractiveHtml = [syncErrHtml, tcBarHtml, mysteryHtml, pollHtml, bountyHtml, lookHtml, capsuleHtml, viralHtml, secretSpotHtml, winBarHtml, audioHtml, htmlGameLb, adminBarHtml].filter(Boolean).join('');
+    const tkInteractiveHtml = [tcBarHtml, mysteryHtml, pollHtml, bountyHtml, lookHtml, capsuleHtml, viralHtml, secretSpotHtml, winBarHtml, audioHtml, htmlGameLb, adminBarHtml].filter(Boolean).join('');
     const tkTriggerLabel = mysteryHtml
       ? (lang === 'fr' ? '🕵️ Deviner la Ville (+10 🪙)' : '🕵️ Guess City (+10 🪙)')
       : pollHtml
@@ -2330,6 +2330,7 @@ function renderSinglePostCardHtml(p, lang, u, isAdm) {
 
         <!-- Mobile TikTok Bottom-Left Clean Overlay (Restores Caption, Author & Expandable Interactions) -->
         <div class="tiktok-overlay-info">
+          ${syncErrHtml}
           ${tkInteractiveHtml ? `
             <button type="button" class="tk-ov-interact-pill" id="tk_widget_btn_${p.id}" onclick="toggleTkWidgetTray('${p.id}', event)">${tkTriggerLabel}</button>
             <div class="tk-ov-widget-tray ${isTkTrayOpen ? 'open' : ''}" id="tk_widget_tray_${p.id}" onclick="event.stopPropagation()">${tkInteractiveHtml}</div>
@@ -3059,7 +3060,7 @@ function syncDesktopStageRail(forceUpdate = false) {
 
     <div class="dsr-actions-group">
       <button type="button" class="dsr-avatar-btn" onclick="${p.isShowcase ? `openFocusTvModal('${escapeJsSingleArg(city.id)}')` : `openCitizenProfileModal('${escapeJsSingleArg(p.uid || '')}', '${escapeJsSingleArg(p.authorName || '')}')`}" title="@${escapeHtmlStr(p.authorName)}">
-        ${sanitizeSafeMediaUrl(authorAvatarUrl) ? `<img src="${sanitizeSafeMediaUrl(authorAvatarUrl)}" alt="${escapeHtmlStr(p.authorName)}">` : `<span>${escapeHtmlStr((p.authorName || 'R')[0].toUpperCase())}</span>`}
+        ${sanitizeSafeMediaUrl(authorAvatarUrl) ? `<img src="${sanitizeSafeMediaUrl(authorAvatarUrl)}" loading="lazy" decoding="async" alt="${escapeHtmlStr(p.authorName)}">` : `<span>${escapeHtmlStr((p.authorName || 'R')[0].toUpperCase())}</span>`}
         <span class="dsr-avatar-city">${city.flag || '🌍'}</span>
       </button>
 
@@ -3223,11 +3224,80 @@ function _pauseOffscreenFeedVideos() {
   const grid = document.getElementById('remoPostsGrid');
   if (!grid) return;
   const vh = window.innerHeight || 800;
+
+  // 1. Pause & release heavy buffers on far-offscreen videos, restore when scrolled back near viewport
   grid.querySelectorAll('video').forEach((v) => {
-    if (v.paused) return;
     const r = v.getBoundingClientRect();
+    const farOffscreen = (r.bottom < -vh * 3.8 || r.top > vh * 3.8);
     if (r.bottom < -vh * 1.2 || r.top > vh * 2.2) {
-      try { v.pause(); } catch (e) {}
+      if (!v.paused) {
+        try { v.pause(); } catch (e) {}
+      }
+      if (farOffscreen && v.src && !v.src.startsWith('blob:') && !v.src.startsWith('data:')) {
+        if (!v.dataset.deferredSrc) v.dataset.deferredSrc = v.src;
+        v.removeAttribute('src');
+        try { v.load(); } catch (e) {}
+      }
+    } else if (v.dataset.deferredSrc && !v.getAttribute('src') && r.bottom >= -vh * 2.6 && r.top <= vh * 2.6) {
+      v.src = v.dataset.deferredSrc;
+      delete v.dataset.deferredSrc;
+    }
+  });
+
+  // 2. Suspend offscreen HTML Mini-App iframes so background requestAnimationFrame loops don't burn mobile CPU/RAM
+  grid.querySelectorAll('iframe.html-post-frame').forEach((fr) => {
+    const r = fr.getBoundingClientRect();
+    const pid = fr.getAttribute('data-post-id') || '';
+    if (!pid) return;
+    if (r.bottom < -vh * 2.2 || r.top > vh * 2.2) {
+      if (fr.hasAttribute('srcdoc')) {
+        fr.dataset.suspendedHtmlPid = pid;
+        fr.removeAttribute('srcdoc');
+      }
+    } else if (fr.dataset.suspendedHtmlPid && !fr.hasAttribute('srcdoc') && r.bottom >= -vh * 1.8 && r.top <= vh * 1.8) {
+      const post = findFeedPostById(fr.dataset.suspendedHtmlPid);
+      if (post && post.htmlCode && typeof buildFittedHtmlSrcdoc === 'function') {
+        fr.srcdoc = buildFittedHtmlSrcdoc(post.htmlCode, post.id);
+      }
+      delete fr.dataset.suspendedHtmlPid;
+    }
+  });
+
+  // 3. Lightweight DOM windowing for 48+ cards (archives cards scrolled far above fold without shifting scrollTop)
+  if (typeof isDesktopFeedStageActive === 'function' && isDesktopFeedStageActive()) return;
+  const cards = Array.from(grid.children).filter((el) =>
+    el.id && el.id.startsWith('post_card_') && (el.classList.contains('post-card') || el.classList.contains('post-card-archived-stub'))
+  );
+  if (cards.length <= 48) return;
+  const lang = REMO_I18N.getLang();
+  const u = REMO_STORE.getCurrentUser();
+  const isAdm = REMO_STORE.isAdminUnlocked();
+
+  cards.forEach((card) => {
+    const r = card.getBoundingClientRect();
+    if (card.classList.contains('post-card') && r.bottom < -vh * 4.5 && r.height > 120) {
+      const pid = card.id.slice('post_card_'.length);
+      const h = Math.round(r.height);
+      const stub = document.createElement('div');
+      stub.id = card.id;
+      stub.className = 'post-card-archived-stub';
+      stub.setAttribute('data-archived-post-id', pid);
+      stub.style.height = h + 'px';
+      stub.style.minHeight = h + 'px';
+      card.replaceWith(stub);
+    } else if (card.classList.contains('post-card-archived-stub') && r.bottom >= -vh * 3.0 && r.top <= vh * 3.0) {
+      const pid = card.getAttribute('data-archived-post-id');
+      const post = pid ? findFeedPostById(pid) : null;
+      if (post) {
+        const wrap = document.createElement('div');
+        wrap.innerHTML = renderSinglePostCardHtml(post, lang, u, isAdm);
+        const restored = wrap.firstElementChild;
+        if (restored) {
+          card.replaceWith(restored);
+          RemoMediaDB.hydrateDom(restored);
+          initAllMysteryBoxCanvases(restored);
+        }
+      }
     }
   });
 }
@@ -3266,7 +3336,12 @@ async function triggerInfiniteFeedLoad(forceNextBatch = false) {
     if (remainingBuffer < 8 && typeof REMO_STORE !== 'undefined' && REMO_STORE.hasMoreCloudPosts && !REMO_STORE.loadingOlderCloudPosts) {
       const grid = document.getElementById('remoPostsGrid');
       if (grid) renderFeedInfiniteSentinel(grid, posts.length, afterShown, REMO_I18N.getLang());
-      const fetched = await REMO_STORE.loadOlderCloudPosts(30);
+      const curU = REMO_STORE.getCurrentUser();
+      const useFilteredQuery = (currentFeedCityFilter !== 'all' || ['html', 'mystery', 'videos', 'photos', 'duets', 'my_city'].includes(currentFeedMode))
+        && typeof REMO_STORE.loadFilteredCloudPosts === 'function';
+      const fetched = useFilteredQuery
+        ? await REMO_STORE.loadFilteredCloudPosts({ cityId: currentFeedCityFilter, mode: currentFeedMode, myCity: curU?.homeCity }, 25)
+        : await REMO_STORE.loadOlderCloudPosts(30);
       if (fetched) {
         const latestPosts = getFilteredSortedFeedPosts(qStr);
         if (_feedVisibleLimit < latestPosts.length) {
@@ -3374,9 +3449,12 @@ function renderSocialFeed(searchQuery = '', forceFull = false) {
   const posts = getFilteredSortedFeedPosts(qStr);
 
   if (posts.length === 0) {
-    if (typeof REMO_STORE !== 'undefined' && REMO_STORE.hasMoreCloudPosts && !REMO_STORE.loadingOlderCloudPosts && currentFeedMode !== 'all' && _feedAutoPrefetchCount < 2) {
+    if (typeof REMO_STORE !== 'undefined' && !REMO_STORE.loadingOlderCloudPosts && (currentFeedMode !== 'all' || currentFeedCityFilter !== 'all') && _feedAutoPrefetchCount < 2) {
       _feedAutoPrefetchCount++;
-      REMO_STORE.loadOlderCloudPosts(30).then(() => renderSocialFeed(qStr, true));
+      const loader = (typeof REMO_STORE.loadFilteredCloudPosts === 'function' && (currentFeedCityFilter !== 'all' || ['html', 'mystery', 'videos', 'photos', 'duets', 'my_city'].includes(currentFeedMode)))
+        ? REMO_STORE.loadFilteredCloudPosts({ cityId: currentFeedCityFilter, mode: currentFeedMode, myCity: u?.homeCity }, 25)
+        : (REMO_STORE.hasMoreCloudPosts ? REMO_STORE.loadOlderCloudPosts(30) : Promise.resolve(false));
+      loader.then((got) => { if (got) renderSocialFeed(qStr, true); });
     }
     window._renderedFeedPostIds = [];
     window._renderedCardSigs = {};
@@ -3561,8 +3639,11 @@ function toggleLikePost(postId) {
 async function retrySyncPostToCloud(postId) {
   const p = findFeedPostById(postId);
   if (!p) return;
+  if (typeof REMO_STORE.waitForAuthReady === 'function') {
+    await REMO_STORE.waitForAuthReady(1800);
+  }
   const curFb = REMO_STORE.fbAuth && REMO_STORE.fbAuth.currentUser;
-  if (REMO_STORE.fbAuth && !curFb && !REMO_STORE.isCurrentUserAdmin()) {
+  if (REMO_STORE.fbAuth && !curFb) {
     remoToast(t('auth_need_signin_post'));
     if (typeof openAuthModal === 'function') openAuthModal(false);
     return;
@@ -3916,7 +3997,8 @@ function openCommentsModal(postId) {
     cardSel.innerHTML = `<option value="">${t('cmt_card_none')}</option>` +
       myCards.map((mc) => {
         const cc = getCityById(mc.cityId);
-        return `<option value="${mc.cityId}|${mc.rarity || 'Mythic 4D'}">🎴 ${cc.flag} ${getCityName(cc, lang)} (${mc.rarity || '4D'})</option>`;
+        const safeRarity = escapeHtmlStr(mc.rarity || 'Mythic 4D');
+        return `<option value="${escapeHtmlStr(mc.cityId)}|${safeRarity}">🎴 ${cc.flag} ${escapeHtmlStr(getCityName(cc, lang))} (${escapeHtmlStr(mc.rarity || '4D')})</option>`;
       }).join('');
   }
   const stEl = document.getElementById('commentVoiceReadyStatus');
@@ -3955,7 +4037,7 @@ function openCommentsModal(postId) {
               </div>
             ` : ''}
           </div>
-          ${isAdm ? `<button type="button" class="adm-pbtn danger" onclick="adminDeleteCommentInline('${p.id}', '${c.id}')">🗑️</button>` : ''}
+          ${isAdm ? `<button type="button" class="adm-pbtn danger" onclick="adminDeleteCommentInline('${escapeJsSingleArg(p.id)}', '${escapeJsSingleArg(c.id)}')">🗑️</button>` : ''}
         </div>
       `;
     }).join('') || `<div style="color:var(--muted);text-align:center;padding:18px;">—</div>`;
@@ -7689,15 +7771,32 @@ function checkGpsForNewPost() {
   });
 }
 
+let _publishPostInFlight = false;
 async function publishNewRemoPost() {
+  if (_publishPostInFlight) return;
   const lang = REMO_I18N.getLang();
   if (REMO_STORE.isCurrentUserBanned()) {
     remoToast(t('auth_err_banned'));
     return;
   }
+  const pubBtn = document.getElementById('btnPublishRemoPost');
+  const origPubHtml = pubBtn ? pubBtn.innerHTML : '';
+  const setPubBusy = (busy, label = '') => {
+    _publishPostInFlight = busy;
+    if (pubBtn) {
+      pubBtn.disabled = busy;
+      pubBtn.style.opacity = busy ? '0.65' : '';
+      pubBtn.innerHTML = busy ? label : origPubHtml;
+    }
+  };
+  setPubBusy(true, lang === 'fr' ? '⏳ Connexion & Préparation...' : '⏳ Connecting & Preparing...');
+  try {
+  if (typeof REMO_STORE.waitForAuthReady === 'function') {
+    await REMO_STORE.waitForAuthReady(1800);
+  }
   const curUAuth = REMO_STORE.getCurrentUser();
   const curFbUser = REMO_STORE.fbAuth && REMO_STORE.fbAuth.currentUser;
-  if (!curUAuth || curUAuth.role === 'guest' || (REMO_STORE.fbAuth && !curFbUser && !REMO_STORE.isCurrentUserAdmin())) {
+  if (!curUAuth || curUAuth.role === 'guest' || (REMO_STORE.fbAuth && !curFbUser)) {
     remoToast(t('auth_need_signin_post'));
     if (typeof openAuthModal === 'function') openAuthModal(false);
     return;
@@ -7794,6 +7893,14 @@ async function publishNewRemoPost() {
     }
   } else if (activeCreateStudioTab === 'video') {
     if (pendingStudioVideoBlob) {
+      if (pendingStudioVideoBlob.size && pendingStudioVideoBlob.size > 29.5 * 1024 * 1024) {
+        const mb = Math.round(pendingStudioVideoBlob.size / (1024 * 1024));
+        remoToast(lang === 'fr'
+          ? `⚠️ Vidéo trop volumineuse (${mb} Mo, max Cloud 29 Mo). Filmez plus court ou utilisez un lien vidéo !`
+          : `⚠️ Video too large (${mb} MB, Cloud limit 29 MB). Record shorter or paste a video link!`, 6500);
+        return;
+      }
+      setPubBusy(true, lang === 'fr' ? '⏳ Envoi vidéo vers REMO Cloud...' : '⏳ Uploading video to REMO Cloud...');
       remoToast(lang === 'fr' ? '⏳ Téléversement vidéo vers le Cloud REMO...' : '⏳ Uploading video to REMO Cloud...', 'coin');
       mediaType = 'video';
       mediaUrl = await uploadMediaToCloudOrDataUrl(pendingStudioVideoBlob, 'posts');
@@ -7837,7 +7944,9 @@ async function publishNewRemoPost() {
 
   let voiceKey = pendingPostVoiceDataUrl || '';
   if (pendingPostVoiceBlob) {
-    voiceKey = await RemoMediaDB.saveBlob(pendingPostVoiceBlob, 'voice');
+    voiceKey = (typeof uploadMediaToCloudOrDataUrl === 'function')
+      ? await uploadMediaToCloudOrDataUrl(pendingPostVoiceBlob, 'posts')
+      : await RemoMediaDB.saveBlob(pendingPostVoiceBlob, 'voice');
   }
 
   // Optional 🎁 Mystery Blind-Box Scratch/3-Tap Wrapper
@@ -8010,7 +8119,16 @@ async function publishNewRemoPost() {
     const now = Date.now();
     let leftImg = pendingVersusMedia.left || '';
     let rightImg = pendingVersusMedia.right || '';
-    if (typeof compressImageFileToDataUrl === 'function') {
+    if (typeof uploadMediaToCloudOrDataUrl === 'function') {
+      if (leftImg && leftImg.startsWith('data:image')) {
+        setPubBusy(true, lang === 'fr' ? '⏳ Envoi média Duel (1/2)...' : '⏳ Uploading Duel photo (1/2)...');
+        leftImg = await uploadMediaToCloudOrDataUrl(leftImg, 'posts', { inlineMaxChars: 45000, maxDim: 960, quality: 0.76 });
+      }
+      if (rightImg && rightImg.startsWith('data:image')) {
+        setPubBusy(true, lang === 'fr' ? '⏳ Envoi média Duel (2/2)...' : '⏳ Uploading Duel photo (2/2)...');
+        rightImg = await uploadMediaToCloudOrDataUrl(rightImg, 'posts', { inlineMaxChars: 45000, maxDim: 960, quality: 0.76 });
+      }
+    } else if (typeof compressImageFileToDataUrl === 'function') {
       if (leftImg && leftImg.length > 180000) leftImg = await compressImageFileToDataUrl(leftImg, 960, 0.76);
       if (rightImg && rightImg.length > 180000) rightImg = await compressImageFileToDataUrl(rightImg, 960, 0.76);
     }
@@ -8074,24 +8192,26 @@ async function publishNewRemoPost() {
   const reward = baseReward * surgeMult;
   const cityPts = (pendingPostGpsVerified ? 45 : 25) * surgeMult;
   REMO_STORE.addCoins(u.uid, reward, cityPts);
+  setPubBusy(true, lang === 'fr' ? '☁️ Sauvegarde sur REMO Cloud...' : '☁️ Saving to REMO Cloud...');
   newPost._cloudSyncPending = true;
-  REMO_STORE.syncPostToCloud(newPost).then((res) => {
-    if (res && !res.ok) {
-      remoToast(t('post_cloud_sync_err', { err: res.code || res.message || 'error' }), 7500);
-    }
-    if (typeof rerenderSinglePostCard === 'function' && document.getElementById('post_card_' + newPost.id)) {
-      rerenderSinglePostCard(newPost.id);
-    }
-  });
   REMO_STORE.save(true, 'new_post');
+  const syncRes = await REMO_STORE.syncPostToCloud(newPost);
+  REMO_STORE.save(true, syncRes && !syncRes.ok ? 'new_post_local' : 'new_post_synced');
   closeCreatePostModal();
-  spawnRemoCoinsFX(wxStatus.isSurge ? 16 : 10);
   renderSocialFeed();
-  if (wxStatus.isSurge) {
-    const cityObj = getCityById(cityId);
-    remoToast(t('weather_surge_bonus_toast', { city: getCityName(cityObj, lang), coins: reward }), 'fanfare');
+  if (syncRes && !syncRes.ok) {
+    remoToast(t('post_cloud_sync_err', { err: syncRes.code || syncRes.message || 'error' }), 8000);
   } else {
-    remoToast(lang === 'fr' ? `🚀 Publié sur REMO (+${reward} 🪙) !` : `🚀 Published to REMO (+${reward} 🪙)!`, 'coin');
+    spawnRemoCoinsFX(wxStatus.isSurge ? 16 : 10);
+    if (wxStatus.isSurge) {
+      const cityObj = getCityById(cityId);
+      remoToast(t('weather_surge_bonus_toast', { city: getCityName(cityObj, lang), coins: reward }), 'fanfare');
+    } else {
+      remoToast(lang === 'fr' ? `🚀 Publié sur REMO Cloud (+${reward} 🪙) !` : `🚀 Published to REMO Cloud (+${reward} 🪙)!`, 'coin');
+    }
+  }
+  } finally {
+    setPubBusy(false);
   }
 }
 
@@ -8871,14 +8991,14 @@ function renderCityChatView() {
       <div class="${m.isWalkieTalkie ? 'wt-chat-card' : ''}" style="padding:10px 14px;border-radius:14px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.06);margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:8px;">
         <div style="flex:1;">
           <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
-            <b style="color:#fbbf24;cursor:pointer;" onclick="openDirectChatWithUser('${m.uid || ''}')">${m.cityFlag || '🌐'} @${escapeHtmlStr(m.author)} 💌:</b>
+            <b style="color:#fbbf24;cursor:pointer;" onclick="openDirectChatWithUser('${escapeJsSingleArg(m.uid || '')}')">${escapeHtmlStr(m.cityFlag || '🌐')} @${escapeHtmlStr(m.author)} 💌:</b>
             ${m.isWalkieTalkie ? `<span class="surge-mini-pill" style="background:linear-gradient(135deg,#0ea5e9,#10b981);">${t('wt_msg_badge')}</span>` : ''}
           </div>
           ${m.text ? `<div style="margin-top:3px;color:#f1f5f9;">${escapeHtmlStr(m.text)}</div>` : ''}
           ${altTxt && altTxt.toLowerCase() !== String(m.text || '').toLowerCase() ? `<div style="font-size:0.74rem;color:#94a3b8;margin-top:2px;">🌐 ${escapeHtmlStr(altTxt)}</div>` : ''}
-          ${m.voiceUrl ? `<audio src="${vUrl}" ${vIdb} controls style="width:100%;max-width:340px;height:32px;margin-top:5px;"></audio>` : ''}
+          ${m.voiceUrl ? `<audio src="${sanitizeSafeMediaUrl(vUrl)}" ${vIdb} controls style="width:100%;max-width:340px;height:32px;margin-top:5px;"></audio>` : ''}
         </div>
-        ${isAdm ? `<button class="adm-pbtn danger" onclick="adminDeleteChatMsgInline('${currentChatRoom}', '${m.id}')">🗑️</button>` : ''}
+        ${isAdm ? `<button class="adm-pbtn danger" onclick="adminDeleteChatMsgInline('${escapeJsSingleArg(currentChatRoom)}', '${escapeJsSingleArg(m.id)}')">🗑️</button>` : ''}
       </div>
     `;
   }).join('') || `<div style="text-align:center;color:var(--muted);padding:24px;">${lang === 'fr' ? 'Canal ouvert — envoyez un message ou utilisez le Talkie-Walkie 📻 !' : 'Channel open — type a message or press the Walkie-Talkie 📻!'}</div>`;
@@ -9202,7 +9322,7 @@ function renderDirectMessagesView() {
           const c = getCityById(u.homeCity);
           const cnt = statsMap.get(u.uid)?.unreadCount || 1;
           return `
-            <button type="button" class="dm-unread-jump-pill" onclick="selectDmPartner('${u.uid}')">
+            <button type="button" class="dm-unread-jump-pill" onclick="selectDmPartner('${escapeJsSingleArg(u.uid)}')">
               <span>${c.flag} @${escapeHtmlStr(u.name)}</span>
               <span class="dm-chip-unread-count">${cnt}</span>
             </button>
@@ -9253,7 +9373,7 @@ function renderDirectMessagesView() {
         const relTime = st.lastTs ? formatNotifTimeAgo(st.lastTs, lang) : '';
 
         return `
-          <button type="button" class="dm-contact-chip smart-card ${u.uid === partner.uid ? 'active' : ''} ${effectiveUnread > 0 ? 'unread-glow' : ''}" onclick="selectDmPartner('${u.uid}')">
+          <button type="button" class="dm-contact-chip smart-card ${u.uid === partner.uid ? 'active' : ''} ${effectiveUnread > 0 ? 'unread-glow' : ''}" onclick="selectDmPartner('${escapeJsSingleArg(u.uid)}')">
             <div class="dm-chip-body">
               <div class="dm-chip-top">
                 <span style="width:7px;height:7px;border-radius:50%;background:${effectiveUnread > 0 ? '#ef4444' : '#10b981'};display:inline-block;flex-shrink:0;"></span>
@@ -11080,9 +11200,9 @@ function openPostActionsSheet(postId) {
 
   content.innerHTML = `
     <div class="modal-hdr">
-      <div style="display:flex;align-items:center;gap:10px;min-width:0;cursor:pointer;" onclick="closePostActionsModal();openCitizenProfileModal('${p.uid || ''}', '${escapeHtmlStr(p.authorName || '')}');">
+      <div style="display:flex;align-items:center;gap:10px;min-width:0;cursor:pointer;" onclick="closePostActionsModal();openCitizenProfileModal('${escapeJsSingleArg(p.uid || '')}', '${escapeJsSingleArg(p.authorName || '')}');">
         <div class="avatar-circle" style="width:36px;height:36px;font-size:0.95rem;flex-shrink:0;overflow:hidden;padding:0;">
-          ${authorAvatarUrl ? `<img src="${authorAvatarUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block;" alt="${escapeHtmlStr(p.authorName)}">` : escapeHtmlStr((p.authorName || 'R')[0].toUpperCase())}
+          ${sanitizeSafeMediaUrl(authorAvatarUrl) ? `<img src="${sanitizeSafeMediaUrl(authorAvatarUrl)}" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block;" alt="${escapeHtmlStr(p.authorName)}">` : escapeHtmlStr((p.authorName || 'R')[0].toUpperCase())}
         </div>
         <div style="min-width:0;">
           <div style="font-weight:900;font-size:0.92rem;color:#fff;">@${escapeHtmlStr(p.authorName)}</div>
@@ -14694,6 +14814,18 @@ function resolveCitizenByUidOrName(uidOrName, fallbackName = '') {
 function openCitizenProfileModal(uidOrName, fallbackName = '', silentIfMissing = false) {
   const target = resolveCitizenByUidOrName(uidOrName, fallbackName);
   if (!target) {
+    if (uidOrName && typeof REMO_STORE.fetchUserByUid === 'function' && !window._fetchingProfileUid) {
+      window._fetchingProfileUid = uidOrName;
+      REMO_STORE.fetchUserByUid(uidOrName).then((fetched) => {
+        window._fetchingProfileUid = '';
+        if (fetched) {
+          openCitizenProfileModal(fetched.uid, fetched.name, silentIfMissing);
+        } else if (!silentIfMissing) {
+          remoToast(REMO_I18N.getLang() === 'fr' ? 'Profil citoyen introuvable.' : 'Citizen profile not found.');
+        }
+      }).catch(() => { window._fetchingProfileUid = ''; });
+      return false;
+    }
     if (!silentIfMissing) {
       remoToast(REMO_I18N.getLang() === 'fr' ? 'Profil citoyen introuvable.' : 'Citizen profile not found.');
     }
@@ -15274,7 +15406,7 @@ function renderGamesHubContent() {
             </div>
           ` : ''}
           <div class="game-hub-iframe-wrap">
-            <iframe id="gamesHubIframe" class="game-hub-iframe" data-post-id="${escapeHtmlStr('hub_' + active.id)}" sandbox="allow-scripts allow-same-origin"></iframe>
+            <iframe id="gamesHubIframe" class="game-hub-iframe" data-post-id="${escapeHtmlStr('hub_' + active.id)}" sandbox="allow-scripts"></iframe>
           </div>
         </div>
       `;
@@ -19470,8 +19602,8 @@ function renderInlineAdminSupportInbox() {
         <div style="color:#f8fafc;line-height:1.4;margin-bottom:6px;white-space:pre-wrap;">${escapeHtmlStr(tk.message || '')}</div>
         ${tk.replyText ? `<div style="background:rgba(16,185,129,0.12);border-left:3px solid #10b981;padding:5px 8px;border-radius:6px;color:#a7f3d0;font-size:0.74rem;margin-bottom:6px;">🛡️ <b>REMO Reply:</b> ${escapeHtmlStr(tk.replyText)}</div>` : ''}
         <div style="display:flex;gap:6px;justify-content:flex-end;">
-          <button type="button" class="btn-cyber" style="padding:4px 10px;font-size:0.72rem;" onclick="replySupportTicketInline('${tk.id}')">💬 ${isReplied ? (lang === 'fr' ? 'Répondre encore' : 'Reply Again') : (lang === 'fr' ? 'Répondre dans REMO' : 'Reply in REMO')}</button>
-          <button type="button" class="btn-ghost" style="padding:4px 8px;font-size:0.72rem;border-color:#f43f5e;color:#fda4af;" onclick="deleteSupportTicketInline('${tk.id}')">🗑️</button>
+          <button type="button" class="btn-cyber" style="padding:4px 10px;font-size:0.72rem;" onclick="replySupportTicketInline('${escapeJsSingleArg(tk.id)}')">💬 ${isReplied ? (lang === 'fr' ? 'Répondre encore' : 'Reply Again') : (lang === 'fr' ? 'Répondre dans REMO' : 'Reply in REMO')}</button>
+          <button type="button" class="btn-ghost" style="padding:4px 8px;font-size:0.72rem;border-color:#f43f5e;color:#fda4af;" onclick="deleteSupportTicketInline('${escapeJsSingleArg(tk.id)}')">🗑️</button>
         </div>
       </div>
     `;

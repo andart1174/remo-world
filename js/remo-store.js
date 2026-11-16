@@ -694,36 +694,48 @@ async function uploadMediaToCloudOrDataUrl(blobOrFile, folder = 'posts', opts = 
   if (isImage) {
     const maxDim = Number(opts.maxDim || 1080);
     const quality = Number(opts.quality || 0.76);
-    const inlineLimit = Number(opts.inlineMaxChars || 110000);
+    const inlineLimit = Number(opts.inlineMaxChars || 28000);
     let dataUrl = await compressImageFileToDataUrl(blobOrFile, maxDim, quality);
 
-    const hasFbAuth = Boolean(typeof firebase !== 'undefined' && firebase.auth && firebase.auth().currentUser);
-    if (hasFbAuth && typeof firebase.storage === 'function' && (!dataUrl || dataUrl.length >= inlineLimit)) {
+    const fbU = (typeof firebase !== 'undefined' && firebase.auth) ? firebase.auth().currentUser : null;
+    const hasFbAuth = Boolean(fbU);
+    if (hasFbAuth && typeof firebase.storage === 'function' && (!dataUrl || dataUrl.length >= inlineLimit || opts.forceCloud)) {
       try {
         const storage = firebase.storage();
         const ref = storage.ref().child(`remo_${folder}/${Date.now()}_${Math.random().toString(36).slice(2, 7)}.jpg`);
         const res = await fetch(dataUrl);
         const b = await res.blob();
-        const snap = await ref.put(b, { contentType: 'image/jpeg' });
+        const snap = await ref.put(b, {
+          contentType: 'image/jpeg',
+          customMetadata: { uid: String(fbU.uid || '') }
+        });
         const downloadUrl = await snap.ref.getDownloadURL();
         if (downloadUrl) return downloadUrl;
       } catch (err) {
-        console.log('Firebase storage upload notice (using compact fallback):', err.message);
+        console.warn('Firebase storage image upload notice (falling back to compact JPEG):', err.code || err.message);
       }
     }
 
     // Fallback when unauthenticated / offline / Storage blocked: tighten JPEG size so document stays well under Firestore 1MB limit
     if (dataUrl && dataUrl.length > inlineLimit) {
-      dataUrl = await compressImageFileToDataUrl(dataUrl, 820, 0.64);
+      dataUrl = await compressImageFileToDataUrl(dataUrl, 820, 0.62);
     }
-    if (dataUrl && dataUrl.length > 190000) {
-      dataUrl = await compressImageFileToDataUrl(dataUrl, 640, 0.54);
+    if (dataUrl && dataUrl.length > 160000) {
+      dataUrl = await compressImageFileToDataUrl(dataUrl, 600, 0.50);
     }
     return dataUrl;
   }
 
   // Videos or audio
-  if (typeof firebase !== 'undefined' && firebase.storage) {
+  const maxCloudBytes = Number(opts.maxBytes || (29.5 * 1024 * 1024));
+  if (blobOrFile.size && blobOrFile.size > maxCloudBytes) {
+    console.warn('Media exceeds Firebase Storage 30MB cap:', Math.round(blobOrFile.size / (1024 * 1024)) + 'MB');
+    if (typeof opts.onTooLarge === 'function') opts.onTooLarge(blobOrFile.size);
+    return RemoMediaDB.saveBlob(blobOrFile, folder);
+  }
+
+  const fbU = (typeof firebase !== 'undefined' && firebase.auth) ? firebase.auth().currentUser : null;
+  if (fbU && typeof firebase !== 'undefined' && firebase.storage) {
     try {
       const storage = firebase.storage();
       const rawMime = String(blobOrFile.type || '').toLowerCase();
@@ -749,16 +761,19 @@ async function uploadMediaToCloudOrDataUrl(blobOrFile, folder = 'posts', opts = 
         ext = 'audio';
       }
       const ref = storage.ref().child(`remo_${folder}/${Date.now()}_${Math.random().toString(36).slice(2, 7)}.${ext}`);
-      const snap = await ref.put(blobOrFile, { contentType: mime });
+      const snap = await ref.put(blobOrFile, {
+        contentType: mime,
+        customMetadata: { uid: String(fbU.uid || '') }
+      });
       const downloadUrl = await snap.ref.getDownloadURL();
       if (downloadUrl) return downloadUrl;
     } catch (e) {
-      console.warn('Firebase storage media upload notice:', e);
+      console.warn('Firebase storage media upload notice:', e.code || e.message || e);
     }
   }
 
-  // If storage is unavailable and video is compact (< 1.2MB), convert to base64 Data URL so all users can see it
-  if (blobOrFile.size && blobOrFile.size < 1200000) {
+  // If storage is unavailable and media is compact (< 450KB), convert to base64 Data URL so other devices can play it
+  if (blobOrFile.size && blobOrFile.size < 450000) {
     try {
       const dataUrl = await new Promise((res) => {
         const r = new FileReader();
@@ -2697,6 +2712,21 @@ const REMO_STORE = {
         d && d.id && !legacyMockWarIds.has(d.id) && (!this.deletedDuelIds || !this.deletedDuelIds.has(d.id))
       );
     }
+    // Restore any unsynced posts preserved in dedicated backup slot across localStorage quota overflow
+    try {
+      const rawUnsynced = localStorage.getItem('remo_unsynced_posts_v1');
+      if (rawUnsynced) {
+        const unsyncedArr = JSON.parse(rawUnsynced);
+        if (Array.isArray(unsyncedArr) && unsyncedArr.length > 0) {
+          this.state.posts = Array.isArray(this.state.posts) ? this.state.posts : [];
+          unsyncedArr.forEach((up) => {
+            if (up && up.id && !this.state.posts.some((sp) => sp && sp.id === up.id) && (!this.deletedPostIds || !this.deletedPostIds.has(up.id))) {
+              this.state.posts.unshift(up);
+            }
+          });
+        }
+      }
+    } catch (e) {}
     // Strip out legacy built-in mock posts from previous builds
     const legacyMockIds = new Set(['post_capsule_demo_1', 'post_duet_demo_1', 'post_html_fireworks', 'post_html_racer_kiv', 'post_1', 'post_2', 'post_3', 'post_4', 'post_duet_tokyo_paris', 'post_duet_mtl_chisinau', 'post_capsule_locked', 'post_duo_live_kiv_mtl', 'demo_1']);
     if (Array.isArray(this.state.posts)) {
@@ -2716,13 +2746,24 @@ const REMO_STORE = {
         !this.deletedUserIds.has(u.uid) &&
         (!this.isFakeOrGuestUser(u) || (u.uid === activeUid && u.role === 'guest' && String(u.uid).startsWith('u_guest_')))
       );
-      // Restore any cached avatars or bios from dedicated local storage
+      // Restore cached avatars or bios without letting multi-MB base64 strings choke localStorage quota
+      this._avatarMemCache = this._avatarMemCache || {};
       this.state.users.forEach((u) => {
         if (u && u.uid) {
           if (!u.avatarUrl) {
-            const cachedAvatar = localStorage.getItem('remo_avatar_' + u.uid);
+            const cachedAvatar = this._avatarMemCache[u.uid] || localStorage.getItem('remo_avatar_' + u.uid);
             if (cachedAvatar) u.avatarUrl = cachedAvatar;
+          } else {
+            this._avatarMemCache[u.uid] = u.avatarUrl;
           }
+          // Evict huge base64 avatars (> 8 KB) from localStorage to free space for state/posts
+          try {
+            const lsAv = localStorage.getItem('remo_avatar_' + u.uid);
+            if (lsAv && lsAv.length > 8192) {
+              this._avatarMemCache[u.uid] = this._avatarMemCache[u.uid] || lsAv;
+              localStorage.removeItem('remo_avatar_' + u.uid);
+            }
+          } catch (e) {}
           if (!u.bio) {
             const cachedBio = localStorage.getItem('remo_bio_' + u.uid);
             if (cachedBio) u.bio = cachedBio;
@@ -2997,25 +3038,73 @@ const REMO_STORE = {
     } catch (e) {}
   },
 
+  _prunePostsForLocalSave(maxPosts = 80, stripHeavySyncedMedia = false) {
+    const rawPosts = Array.isArray(this.state.posts) ? this.state.posts : [];
+    const unsynced = rawPosts.filter((p) => p && (p._cloudSyncPending || p._cloudSyncError));
+    let selected = rawPosts.slice(0, maxPosts);
+    unsynced.forEach((up) => {
+      if (up && up.id && !selected.some((sp) => sp && sp.id === up.id)) {
+        if (selected.length >= maxPosts && selected.length > 0) selected.pop();
+        selected.unshift(up);
+      }
+    });
+    if (!stripHeavySyncedMedia) return selected;
+    return selected.map((p) => {
+      if (!p || p._cloudSyncPending || p._cloudSyncError) return p;
+      const copy = Object.assign({}, p);
+      if (typeof copy.mediaUrl === 'string' && copy.mediaUrl.startsWith('data:') && copy.mediaUrl.length > 40000) {
+        copy.mediaUrl = '';
+      }
+      if (Array.isArray(copy.mediaUrls)) {
+        copy.mediaUrls = copy.mediaUrls.map((u) => (typeof u === 'string' && u.startsWith('data:') && u.length > 40000) ? '' : u);
+      }
+      if (copy.versus) {
+        const v = Object.assign({}, copy.versus);
+        if (typeof v.leftMedia === 'string' && v.leftMedia.startsWith('data:') && v.leftMedia.length > 40000) v.leftMedia = '';
+        if (typeof v.rightMedia === 'string' && v.rightMedia.startsWith('data:') && v.rightMedia.length > 40000) v.rightMedia = '';
+        copy.versus = v;
+      }
+      return copy;
+    });
+  },
+
   _flushLocalSave() {
     try {
       const toPersist = Object.assign({}, this.state);
-      if (Array.isArray(toPersist.posts) && toPersist.posts.length > 80) {
-        toPersist.posts = toPersist.posts.slice(0, 80);
-      }
+      toPersist.posts = this._prunePostsForLocalSave(80, false);
       localStorage.setItem(this.KEY, JSON.stringify(toPersist));
     } catch (e) {
-      console.warn('LocalStorage quota limit reached, trimming local cache:', e);
+      console.warn('LocalStorage quota limit reached, trimming stale local cache (preserving unsynced posts):', e);
+      // Evict any oversized legacy base64 avatar keys first so user's unsynced posts stay safe
+      try {
+        for (let i = localStorage.length - 1; i >= 0; i--) {
+          const k = localStorage.key(i);
+          if (k && k.startsWith('remo_avatar_')) {
+            const val = localStorage.getItem(k);
+            if (val && val.length > 4096) localStorage.removeItem(k);
+          }
+        }
+      } catch (eAv) {}
       try {
         const pruned = Object.assign({}, this.state);
-        if (Array.isArray(pruned.posts)) {
-          pruned.posts = pruned.posts.slice(0, 20);
+        pruned.posts = this._prunePostsForLocalSave(25, true);
+        if (Array.isArray(pruned.notifications) && pruned.notifications.length > 25) {
+          pruned.notifications = pruned.notifications.slice(0, 25);
+        }
+        if (Array.isArray(pruned.directMessages) && pruned.directMessages.length > 35) {
+          pruned.directMessages = pruned.directMessages.slice(-35);
         }
         if (Array.isArray(pruned.auctions)) {
-          pruned.auctions = pruned.auctions.map((a) => this.sanitizeAuctionItem(a)).filter(Boolean);
+          pruned.auctions = pruned.auctions.map((a) => this.sanitizeAuctionItem(a)).filter(Boolean).slice(0, 15);
         }
         localStorage.setItem(this.KEY, JSON.stringify(pruned));
-      } catch (e2) {}
+      } catch (e2) {
+        try {
+          // Last-resort safety net: persist at least unsynced posts + core user identity so posts never vanish on refresh
+          const unsyncedOnly = (this.state.posts || []).filter((p) => p && (p._cloudSyncPending || p._cloudSyncError)).slice(0, 8);
+          localStorage.setItem('remo_unsynced_posts_v1', JSON.stringify(unsyncedOnly));
+        } catch (e3) {}
+      }
     }
   },
 
@@ -4491,6 +4580,8 @@ const REMO_STORE = {
     if (addCityPoints > 0 && u.homeCity) {
       const pts = this.state.settings.happyHour2x ? addCityPoints * 2 : addCityPoints;
       this.state.cityScores[u.homeCity] = (this.state.cityScores[u.homeCity] || 1000) + pts;
+      this._pendingCityScoreDeltas = this._pendingCityScoreDeltas || {};
+      this._pendingCityScoreDeltas[u.homeCity] = (this._pendingCityScoreDeltas[u.homeCity] || 0) + pts;
     }
     if (finalDelta > 0) RemoAudio.play('coin');
     this.save(true, 'coins');
@@ -4500,7 +4591,11 @@ const REMO_STORE = {
 
   addCityScore(cityId, pts) {
     if (!cityId) return;
-    this.state.cityScores[cityId] = (this.state.cityScores[cityId] || 1000) + pts;
+    const nPts = Number(pts || 0);
+    if (!nPts) return;
+    this.state.cityScores[cityId] = (this.state.cityScores[cityId] || 1000) + nPts;
+    this._pendingCityScoreDeltas = this._pendingCityScoreDeltas || {};
+    this._pendingCityScoreDeltas[cityId] = (this._pendingCityScoreDeltas[cityId] || 0) + nPts;
     this.save(true, 'city_score');
   },
 
@@ -4935,6 +5030,21 @@ const REMO_STORE = {
     return true;
   },
 
+  waitForAuthReady(timeoutMs = 1800) {
+    if (!this.fbAuth || this._fbAuthResolved) return Promise.resolve(this.fbAuth ? this.fbAuth.currentUser : null);
+    return new Promise((resolve) => {
+      this._authReadyResolvers = this._authReadyResolvers || [];
+      let done = false;
+      const finish = () => {
+        if (done) return;
+        done = true;
+        resolve(this.fbAuth ? this.fbAuth.currentUser : null);
+      };
+      this._authReadyResolvers.push(finish);
+      setTimeout(finish, timeoutMs);
+    });
+  },
+
   initFirebaseIfConfigured() {
     const cfg = this.getFirebaseConfig();
     if (!cfg || !cfg.apiKey || typeof firebase === 'undefined') return false;
@@ -4950,6 +5060,11 @@ const REMO_STORE = {
       }
       if (firebase.auth) {
         this.fbAuth = firebase.auth();
+        try {
+          if (typeof this.fbAuth.setPersistence === 'function' && firebase.auth.Auth?.Persistence?.LOCAL) {
+            this.fbAuth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(() => {});
+          }
+        } catch (ePers) {}
         if (typeof this.fbAuth.getRedirectResult === 'function') {
           this.fbAuth.getRedirectResult().then((res) => {
             if (res && res.user) {
@@ -4987,6 +5102,10 @@ const REMO_STORE = {
         this._fbAuthResolved = false;
         this.fbAuth.onAuthStateChanged((fbU) => {
           this._fbAuthResolved = true;
+          if (Array.isArray(this._authReadyResolvers) && this._authReadyResolvers.length > 0) {
+            const list = this._authReadyResolvers.splice(0);
+            list.forEach((fn) => { try { fn(); } catch (e) {} });
+          }
           if (fbU) {
             const isVerified = this._isFbUserVerified(fbU);
             if (!isVerified) {
@@ -5278,8 +5397,9 @@ const REMO_STORE = {
     if (!this.fbDb || this._fbSyncStarted) return;
     this._fbSyncStarted = true;
     try {
-      // 1. Sync & Watch ACTIVE CITIZEN PROFILES (Capped at 150 for fast startup)
-      this.fbDb.collection('remo_users').limit(150).onSnapshot((snap) => {
+      // 1. Sync & Watch TOP 200 ACTIVE CITIZEN PROFILES (plus on-demand fetchUserByUid for 10,000+ users)
+      this._extraFetchedUsersMap = this._extraFetchedUsersMap || new Map();
+      const handleUsersSnap = (snap) => {
         if (!snap) return;
         const cloudUsers = [];
         const cloudUserIds = new Set();
@@ -5308,15 +5428,20 @@ const REMO_STORE = {
             }
             return;
           }
+          this._avatarMemCache = this._avatarMemCache || {};
           const existingLocal = (this.state.users || []).find((x) => x && x.uid === uData.uid);
-          const cachedAvatar = (existingLocal && existingLocal.avatarUrl) || localStorage.getItem('remo_avatar_' + uData.uid) || '';
+          const cachedAvatar = (existingLocal && existingLocal.avatarUrl) || this._avatarMemCache[uData.uid] || localStorage.getItem('remo_avatar_' + uData.uid) || '';
           if (!uData.avatarUrl && cachedAvatar) {
             uData.avatarUrl = cachedAvatar;
             if (uData.uid === myUid0 || isAdm0) {
               this.fbDb.collection('remo_users').doc(uData.uid).set({ avatarUrl: cachedAvatar }, { merge: true }).catch(() => {});
             }
           } else if (uData.avatarUrl) {
-            try { localStorage.setItem('remo_avatar_' + uData.uid, uData.avatarUrl); } catch (e) {}
+            this._avatarMemCache[uData.uid] = uData.avatarUrl;
+            // Only store compact URLs/micro-thumbnails in localStorage; avoid exhausting mobile 5MB quota
+            if (!String(uData.avatarUrl).startsWith('data:') || uData.avatarUrl.length <= 4096) {
+              try { localStorage.setItem('remo_avatar_' + uData.uid, uData.avatarUrl); } catch (e) {}
+            }
           }
           if (!uData.bio && existingLocal && existingLocal.bio) {
             uData.bio = existingLocal.bio;
@@ -5347,6 +5472,15 @@ const REMO_STORE = {
 
         const curU = this.getCurrentUser();
         const activeUsers = [...cloudUsers];
+        // Preserve on-demand hydrated citizens fetched beyond initial top-200 snapshot
+        if (this._extraFetchedUsersMap && this._extraFetchedUsersMap.size > 0) {
+          this._extraFetchedUsersMap.forEach((eu, euid) => {
+            if (eu && euid && !cloudUserIds.has(euid) && !this.deletedUserIds?.has(euid) && !this.isFakeOrGuestUser(eu)) {
+              activeUsers.push(eu);
+              cloudUserIds.add(euid);
+            }
+          });
+        }
         if (curU) {
           if (!cloudUserIds.has(curU.uid) && !this.deletedUserIds?.has(curU.uid)) {
             if (!this.isFakeOrGuestUser(curU) || (curU.role === 'guest' && String(curU.uid).startsWith('u_guest_'))) {
@@ -5385,8 +5519,12 @@ const REMO_STORE = {
           renderDirectMessagesView();
         }
         if (typeof renderLivePresenceStrip === 'function') renderLivePresenceStrip();
-      }, (err) => {
-        console.warn('Firestore remo_users sync notice:', err.message);
+      };
+
+      this.fbDb.collection('remo_users').orderBy('lastSeenAt', 'desc').limit(200).onSnapshot(handleUsersSnap, () => {
+        this.fbDb.collection('remo_users').limit(200).onSnapshot(handleUsersSnap, (err) => {
+          console.warn('Firestore remo_users sync notice:', err.message);
+        });
       });
 
       // 1B. Sync & Watch LIVE CITIZEN PRESENCE (Capped at 50 most recent for 100k+ user scalability)
@@ -5904,8 +6042,26 @@ const REMO_STORE = {
     return isDemo || isDeleted;
   },
 
+  _sanitizeSafeId(val, fallback = '') {
+    const clean = String(val || '').replace(/[^a-zA-Z0-9_.:@-]/g, '').slice(0, 96);
+    return clean || fallback;
+  },
+
   _mergeSingleCloudPost(rawCp, lp, isInitialPostsSnap, now) {
     const cp = Object.assign({}, rawCp);
+    if (cp.id) cp.id = this._sanitizeSafeId(cp.id, cp.id);
+    if (cp.uid) cp.uid = this._sanitizeSafeId(cp.uid);
+    if (cp.authorUid) cp.authorUid = this._sanitizeSafeId(cp.authorUid);
+    if (cp.cityId) cp.cityId = this._sanitizeSafeId(cp.cityId, 'montreal');
+    if (Array.isArray(cp.comments)) {
+      cp.comments = cp.comments.map((c) => {
+        if (!c || typeof c !== 'object') return c;
+        const sc = Object.assign({}, c);
+        if (sc.id) sc.id = this._sanitizeSafeId(sc.id, 'cmt_' + now);
+        if (sc.uid) sc.uid = this._sanitizeSafeId(sc.uid);
+        return sc;
+      });
+    }
     if (!lp) return cp;
     const curU = this.getCurrentUser();
     const myUid = curU ? curU.uid : null;
@@ -6149,6 +6305,105 @@ const REMO_STORE = {
     }
   },
 
+  async fetchUserByUid(uid) {
+    if (!this.fbDb || !uid) return null;
+    const cleanUid = this._sanitizeSafeId(uid);
+    if (!cleanUid) return null;
+    const localMatch = (this.state.users || []).find((u) => u && (u.uid === cleanUid || u.fbUid === cleanUid));
+    if (localMatch) return localMatch;
+    this._userFetchAttemptTs = this._userFetchAttemptTs || new Map();
+    const lastTry = this._userFetchAttemptTs.get(cleanUid) || 0;
+    if (Date.now() - lastTry < 45000) return null;
+    this._userFetchAttemptTs.set(cleanUid, Date.now());
+    try {
+      const snap = await this.fbDb.collection('remo_users').doc(cleanUid).get();
+      if (snap && snap.exists) {
+        const uData = snap.data();
+        if (uData) {
+          uData.uid = uData.uid || snap.id;
+          if (!this.isFakeOrGuestUser(uData) && !this.deletedUserIds?.has(uData.uid)) {
+            this._extraFetchedUsersMap = this._extraFetchedUsersMap || new Map();
+            this._extraFetchedUsersMap.set(uData.uid, uData);
+            if (!Array.isArray(this.state.users)) this.state.users = [];
+            if (!this.state.users.some((x) => x && x.uid === uData.uid)) {
+              this.state.users.push(uData);
+            }
+            return uData;
+          }
+        }
+      }
+    } catch (e) {}
+    return null;
+  },
+
+  async loadFilteredCloudPosts(filterSpec = {}, batchSize = 25) {
+    this._ensureCloudPostPaginationState();
+    if (!this.fbDb) return false;
+    const cityId = filterSpec.cityId && filterSpec.cityId !== 'all' ? filterSpec.cityId : (filterSpec.mode === 'my_city' ? filterSpec.myCity : '');
+    const mode = filterSpec.mode || 'all';
+    const key = `${cityId || 'all'}|${mode}`;
+    this._filteredCloudCursors = this._filteredCloudCursors || new Map();
+    this._filteredCloudDone = this._filteredCloudDone || new Set();
+    this._filteredCloudFailTs = this._filteredCloudFailTs || new Map();
+    if (this._filteredCloudDone.has(key)) return false;
+    const lastFail = this._filteredCloudFailTs.get(key) || 0;
+    if (Date.now() - lastFail < 5000) return false;
+
+    try {
+      let query = this.fbDb.collection('remo_posts');
+      let appliedWhere = false;
+      if (cityId) {
+        query = query.where('cityId', '==', cityId);
+        appliedWhere = true;
+      } else if (mode === 'html') {
+        query = query.where('mediaType', '==', 'html_app');
+        appliedWhere = true;
+      } else if (mode === 'mystery') {
+        query = query.where('mysteryCity', '==', true);
+        appliedWhere = true;
+      } else if (mode === 'videos') {
+        query = query.where('mediaType', '==', 'video');
+        appliedWhere = true;
+      } else if (mode === 'photos') {
+        query = query.where('mediaType', '==', 'image');
+        appliedWhere = true;
+      } else if (mode === 'duets') {
+        query = query.where('mediaType', '==', 'city_versus');
+        appliedWhere = true;
+      }
+      if (!appliedWhere) return this.loadOlderCloudPosts(batchSize);
+
+      query = query.orderBy('createdAt', 'desc');
+      const cursor = this._filteredCloudCursors.get(key);
+      if (cursor) query = query.startAfter(cursor);
+      const snap = await query.limit(batchSize).get();
+      if (!snap || snap.empty) {
+        this._filteredCloudDone.add(key);
+        return false;
+      }
+      let added = 0;
+      let lastDoc = cursor || null;
+      snap.forEach((doc) => {
+        lastDoc = doc;
+        const cp = doc.data();
+        if (!cp || !cp.id || this._shouldPurgeCloudPost(cp)) return;
+        this._olderCloudPostsMap.set(cp.id, cp);
+        added++;
+      });
+      if (lastDoc) this._filteredCloudCursors.set(key, lastDoc);
+      if (snap.docs.length < batchSize) this._filteredCloudDone.add(key);
+      if (added > 0) this._rebuildStatePostsFromCloudMaps(true);
+      return added > 0;
+    } catch (err) {
+      this._filteredCloudFailTs.set(key, Date.now());
+      // Fallback cleanly to standard ordered cursor scan if composite index is not deployed yet
+      if (err && err.code === 'failed-precondition') {
+        return this.loadOlderCloudPosts(batchSize);
+      }
+      return false;
+    }
+  },
+
   async fetchDeepLinkedPostIfMissing(postId) {
     if (!this.fbDb || !postId) return null;
     const already = (this.state.posts || []).find((p) => p && p.id === postId);
@@ -6180,14 +6435,24 @@ const REMO_STORE = {
   async syncPostToCloud(post) {
     if (!this.fbDb || !post || !post.id || post.isShowcase) return { ok: true, skipped: true };
     try {
+      if (this.fbAuth && !this._fbAuthResolved && typeof this.waitForAuthReady === 'function') {
+        await this.waitForAuthReady(1800);
+      }
+      const fbU = this.fbAuth && this.fbAuth.currentUser;
+      if (this.fbAuth && !fbU) {
+        const msg = 'Firebase Auth session missing — please re-sign in before publishing!';
+        post._cloudSyncError = 'auth-not-signed-in: ' + msg;
+        post._cloudSyncPending = false;
+        this._flushLocalSave();
+        return { ok: false, code: 'auth-not-signed-in', message: msg };
+      }
       const cleanPost = JSON.parse(JSON.stringify(post));
       delete cleanPost._cloudSyncError;
       delete cleanPost._cloudSyncPending;
       if (!cleanPost.createdAt) cleanPost.createdAt = Date.now();
-      const fbU = this.fbAuth && this.fbAuth.currentUser;
       const curU = this.getCurrentUser();
       const isMine = Boolean(curU && (cleanPost.uid === curU.uid || cleanPost.authorUid === curU.uid));
-      if (fbU && fbU.uid && (isMine || !cleanPost.authorUid)) {
+      if (fbU && fbU.uid && (isMine || !cleanPost.authorUid || this.isCurrentUserAdmin())) {
         cleanPost.authorUid = 'u_fb_' + fbU.uid;
         if (!cleanPost.uid) cleanPost.uid = cleanPost.authorUid;
       } else if (cleanPost.uid && !cleanPost.authorUid) {
@@ -6205,6 +6470,14 @@ const REMO_STORE = {
       await this.fbDb.collection('remo_posts').doc(post.id).set(cleanPost, { merge: true });
       if (post._cloudSyncError) delete post._cloudSyncError;
       if (post._cloudSyncPending) delete post._cloudSyncPending;
+      try {
+        const remainingUnsynced = (this.state.posts || []).filter((p) => p && p.id !== post.id && (p._cloudSyncPending || p._cloudSyncError)).slice(0, 8);
+        if (remainingUnsynced.length > 0) {
+          localStorage.setItem('remo_unsynced_posts_v1', JSON.stringify(remainingUnsynced));
+        } else {
+          localStorage.removeItem('remo_unsynced_posts_v1');
+        }
+      } catch (eU) {}
       this._flushLocalSave();
       if (this._cloudLiveTopPostsMap && !this._cloudLiveTopPostsMap.has(post.id)) {
         this._cloudLiveTopPostsMap.set(post.id, cleanPost);
@@ -8380,16 +8653,49 @@ const REMO_STORE = {
 
   syncToFirestore(reason = 'update', immediate = false) {
     if (!this.fbDb) return;
+    const lightweightReasons = new Set(['coins', 'city_score', 'like', 'comment', 'new_post', 'new_post_local', 'new_post_synced', 'post_retry_ok', 'reaction', 'notification', 'auth', 'auth_google']);
+    this._syncNeedsFullLiveState = this._syncNeedsFullLiveState || !lightweightReasons.has(reason);
     clearTimeout(this._fbSyncDebounce);
     const doSync = () => {
       try {
+        const docRef = this.fbDb.collection('remo_ecosystem').doc('live_state');
+        const pendingDeltas = this._pendingCityScoreDeltas && Object.keys(this._pendingCityScoreDeltas).length > 0
+          ? Object.assign({}, this._pendingCityScoreDeltas)
+          : null;
+        const needFull = this._syncNeedsFullLiveState;
+        this._syncNeedsFullLiveState = false;
+
+        // Fast atomic increment path for routine likes, coins, posts & city points (zero overwrite conflicts!)
+        if (!needFull && pendingDeltas && typeof firebase !== 'undefined' && firebase.firestore?.FieldValue?.increment) {
+          this._pendingCityScoreDeltas = {};
+          const deltaPatch = { updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
+          Object.entries(pendingDeltas).forEach(([cid, pts]) => {
+            if (cid && Number(pts)) deltaPatch['cityScores.' + cid] = firebase.firestore.FieldValue.increment(Number(pts));
+          });
+          docRef.update(deltaPatch).catch((err) => {
+            if (err && err.code === 'not-found') {
+              this._syncNeedsFullLiveState = true;
+              this.syncToFirestore('seed_missing', true);
+            }
+          });
+          return;
+        }
+        if (!needFull) return;
+        this._pendingCityScoreDeltas = {};
+
         const cleanAuctions = (this.state.auctions || [])
           .filter((a) => a && a.id && (!this.deletedAuctionIds || !this.deletedAuctionIds.has(a.id)))
           .map((a) => this.sanitizeAuctionItem(a))
           .filter(Boolean)
           .slice(0, 25);
-        const docRef = this.fbDb.collection('remo_ecosystem').doc('live_state');
-        docRef.set({
+        const isAdm = this.isCurrentUserAdmin();
+        const safeGamesHub = JSON.parse(JSON.stringify(this.ensureGamesHub()));
+        if (!isAdm && safeGamesHub && Array.isArray(safeGamesHub.games)) {
+          safeGamesHub.games.forEach((g) => {
+            if (g && !g.isBuiltin && g.customHtml) delete g.customHtml;
+          });
+        }
+        const payloadDoc = {
           cityScores: this.state.cityScores || {},
           cityMayors: this.state.cityMayors || {},
           duels: (this.state.duels || []).slice(0, 15),
@@ -8410,15 +8716,28 @@ const REMO_STORE = {
             .slice(0, 15),
           viralContests: this.state.viralContests || getDefaultViralContests(),
           worldSystems: this.state.worldSystems || getDefaultUniqueWorldSystems(),
-          gamesHub: this.ensureGamesHub(),
+          gamesHub: safeGamesHub,
           worldSpotlight: this.ensureWorldSpotlight(),
           deletedPostIds: [...(this.deletedPostIds || [])].slice(-100),
-          deletedUserIds: [...(this.deletedUserIds || [])].slice(-100),
-          deletedDuelIds: [...(this.deletedDuelIds || [])].slice(-100),
-          deletedAuctionIds: [...(this.deletedAuctionIds || [])].slice(-100),
-          deletedStoryIds: [...(this.deletedStoryIds || [])].slice(-100),
           updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-        }, { merge: true }).catch((err) => {
+        };
+        if (isAdm) {
+          payloadDoc.deletedUserIds = [...(this.deletedUserIds || [])].slice(-100);
+          payloadDoc.deletedDuelIds = [...(this.deletedDuelIds || [])].slice(-100);
+          payloadDoc.deletedAuctionIds = [...(this.deletedAuctionIds || [])].slice(-100);
+          payloadDoc.deletedStoryIds = [...(this.deletedStoryIds || [])].slice(-100);
+        }
+        // Protect Firestore 1MB hard limit on live_state by pruning heavy inline dataUrls if payload nears cap
+        try {
+          if (JSON.stringify(payloadDoc).length > 820000 && Array.isArray(payloadDoc.auctions)) {
+            payloadDoc.auctions.forEach((au) => {
+              if (au?.cardSpec?.customPhotoDataUrl?.startsWith('data:') && au.cardSpec.customPhotoDataUrl.length > 60000) {
+                au.cardSpec.customPhotoDataUrl = '';
+              }
+            });
+          }
+        } catch (eSz) {}
+        docRef.set(payloadDoc, { merge: true }).catch((err) => {
           console.log('Firestore background sync info:', err.message);
         });
         if (this.isCurrentUserAdmin() && this.state.settings) {

@@ -236,11 +236,41 @@ async function runStoreSimulations() {
   const rules = read('firestore.rules');
   const bannedGuardMatches = rules.match(/!\('banned'\s+in\s+get\(/g) || [];
   assert.ok(bannedGuardMatches.length >= 2, 'isNotBanned() must check !("banned" in get(...).data) for both uid and u_fb_uid');
+  assert.ok(rules.includes('function isSafeId(val)'), 'firestore.rules must enforce isSafeId');
   assert.ok(storeSrc.includes('cleanUser.banned = false;'), 'syncUserToCloud must include banned: false for non-banned citizens');
   const headers = read('_headers');
   assert.ok(headers.includes('/index.html') && headers.includes('/sw.js') && headers.includes('no-cache'), '_headers must configure no-cache for index.html and sw.js');
 
-  console.log('PASS: REMO_STORE auth alignment, error preservation, size guard, pagination & Firestore rules verified.');
+  // 6. Security & Scalability Phase 1-4 Guarantees
+  assert.ok(typeof STORE.waitForAuthReady === 'function', 'REMO_STORE.waitForAuthReady must exist');
+  assert.ok(typeof STORE.fetchUserByUid === 'function', 'REMO_STORE.fetchUserByUid must exist');
+  assert.ok(typeof STORE.loadFilteredCloudPosts === 'function', 'REMO_STORE.loadFilteredCloudPosts must exist');
+
+  STORE.fbAuth = { currentUser: null };
+  const unauthSyncRes = await STORE.syncPostToCloud({ id: 'post_unauth_1', createdAt: Date.now(), caption_en: 'Test' });
+  assert.strictEqual(unauthSyncRes.ok, false);
+  assert.strictEqual(unauthSyncRes.code, 'auth-not-signed-in', 'syncPostToCloud must fail cleanly with auth-not-signed-in when fbAuth user is missing');
+
+  // Unsynced post must survive _prunePostsForLocalSave even when 90+ posts exist
+  STORE.state.posts = [];
+  for (let k = 0; k < 85; k++) STORE.state.posts.push({ id: 'post_synced_' + k, createdAt: now - k * 1000 });
+  STORE.state.posts.push({ id: 'post_unsynced_tail', _cloudSyncError: 'offline', createdAt: now - 999999 });
+  STORE._flushLocalSave();
+  const savedAfterPrune = JSON.parse(ls[STORE.KEY]).posts;
+  assert.strictEqual(savedAfterPrune.length, 80);
+  assert.ok(savedAfterPrune.some((p) => p.id === 'post_unsynced_tail'), '_prunePostsForLocalSave must preserve unsynced posts');
+
+  assert.ok(!comms.includes('id="gamesHubIframe" class="game-hub-iframe" data-post-id="${escapeHtmlStr(\'hub_\' + active.id)}" sandbox="allow-scripts allow-same-origin"'), 'gamesHubIframe must NOT use allow-same-origin!');
+  assert.ok(comms.includes('id="gamesHubIframe" class="game-hub-iframe" data-post-id="${escapeHtmlStr(\'hub_\' + active.id)}" sandbox="allow-scripts"'), 'gamesHubIframe must isolate games with sandbox="allow-scripts"');
+  assert.ok(comms.includes("await uploadMediaToCloudOrDataUrl(leftImg, 'posts'"), 'city_versus must upload left/right photos through Cloud Storage');
+
+  const stRules = read('storage.rules');
+  assert.ok(stRules.includes('allow create:') && stRules.includes('allow update, delete: if isStorageAdmin();'), 'storage.rules must prevent non-admin overwrite');
+
+  const idxJson = JSON.parse(read('firestore.indexes.json'));
+  assert.ok(Array.isArray(idxJson.indexes) && idxJson.indexes.length >= 8, 'firestore.indexes.json must define composite query indexes');
+
+  console.log('PASS: REMO_STORE auth alignment, error preservation, size guard, pagination, security & scalability checks verified.');
 }
 
 function runCleanStageLayoutAudit() {
