@@ -2139,7 +2139,8 @@ function computePostRenderSig(p, u, lang) {
   const chSig = p.gameChallenge ? `${p.gameChallenge.targetScore || 0}:${p.gameChallenge.holderUid || ''}:${p.gameChallenge.crownSteals || 0}` : '';
   const liked = (u && (p.likes || []).includes(u.uid)) ? 1 : 0;
   const boostMins = isPostBoostActive(p) ? Math.floor(Math.max(0, Number(p.boostedUntil) - Date.now()) / 60000) : 0;
-  return `${p.id}_${lang}_${(p.likes || []).length}_${liked}_${(p.comments || []).length}_${p.tipsTotal || 0}_${p.pinned ? 1 : 0}_${boostMins}_${p.founderAward ? 1 : 0}_${p.mintedCard ? 1 : 0}_${dualOpen}_${vSig}_${pollSig}_${btySig}_${capSig}_${lookSig}_${mboxSig}_${chSig}_${Object.keys(p.cityGuesses || {}).length}_${p.leaderboard?.[0]?.score || 0}_${isPostCapsuleSealed(p) ? 1 : 0}_${isAdminXrayOpen(p.id) ? 1 : 0}_${p._cloudSyncError ? 1 : 0}_${p._cloudSyncPending ? 1 : 0}`;
+  const mFp = (s) => (s ? `${s.length}:${s.slice(0, 24)}:${s.slice(-16)}` : '');
+  return `${p.id}_${lang}_${p.mediaType || ''}_${mFp(p.mediaUrl)}_${(p.mediaUrls || []).map(mFp).join(',')}_${(p.likes || []).length}_${liked}_${(p.comments || []).length}_${p.tipsTotal || 0}_${p.pinned ? 1 : 0}_${boostMins}_${p.founderAward ? 1 : 0}_${p.mintedCard ? 1 : 0}_${dualOpen}_${vSig}_${pollSig}_${btySig}_${capSig}_${lookSig}_${mboxSig}_${chSig}_${Object.keys(p.cityGuesses || {}).length}_${p.leaderboard?.[0]?.score || 0}_${isPostCapsuleSealed(p) ? 1 : 0}_${isAdminXrayOpen(p.id) ? 1 : 0}_${p._cloudSyncError ? 1 : 0}_${p._cloudSyncPending ? 1 : 0}`;
 }
 
 function toggleTkCaptionExpand(postId, ev) {
@@ -7855,7 +7856,7 @@ async function publishNewRemoPost() {
       const blob = (wantWindowStamp && typeof stampPhotoWithLiveCityWindow === 'function')
         ? await stampPhotoWithLiveCityWindow(rawBlob, cityId, lang)
         : rawBlob;
-      const url = await uploadMediaToCloudOrDataUrl(blob, 'posts', { inlineMaxChars: 90000 });
+      const url = await uploadMediaToCloudOrDataUrl(blob, 'posts', { inlineMaxChars: 15000, forceCloud: true });
       mediaUrls.push(url);
     }
     mediaType = 'before_after';
@@ -7871,12 +7872,11 @@ async function publishNewRemoPost() {
   } else if (activeCreateStudioTab === 'photo') {
     soundtrackId = document.getElementById('createPhotoSoundSelect')?.value || '';
     if (pendingStudioPhotoBlobs.length > 0) {
-      const multiInlineLimit = pendingStudioPhotoBlobs.length >= 2 ? 90000 : 120000;
       for (const rawBlob of pendingStudioPhotoBlobs) {
         const blob = (wantWindowStamp && typeof stampPhotoWithLiveCityWindow === 'function')
           ? await stampPhotoWithLiveCityWindow(rawBlob, cityId, lang)
           : rawBlob;
-        const url = await uploadMediaToCloudOrDataUrl(blob, 'posts', { inlineMaxChars: multiInlineLimit });
+        const url = await uploadMediaToCloudOrDataUrl(blob, 'posts', { inlineMaxChars: 15000, forceCloud: true });
         mediaUrls.push(url);
       }
       const wantBeforeAfter = pendingStudioPhotoBlobs.length === 2 && document.getElementById('studioCompareToggle')?.checked;
@@ -8122,11 +8122,11 @@ async function publishNewRemoPost() {
     if (typeof uploadMediaToCloudOrDataUrl === 'function') {
       if (leftImg && leftImg.startsWith('data:image')) {
         setPubBusy(true, lang === 'fr' ? '⏳ Envoi média Duel (1/2)...' : '⏳ Uploading Duel photo (1/2)...');
-        leftImg = await uploadMediaToCloudOrDataUrl(leftImg, 'posts', { inlineMaxChars: 45000, maxDim: 960, quality: 0.76 });
+        leftImg = await uploadMediaToCloudOrDataUrl(leftImg, 'posts', { inlineMaxChars: 15000, forceCloud: true, maxDim: 960, quality: 0.76 });
       }
       if (rightImg && rightImg.startsWith('data:image')) {
         setPubBusy(true, lang === 'fr' ? '⏳ Envoi média Duel (2/2)...' : '⏳ Uploading Duel photo (2/2)...');
-        rightImg = await uploadMediaToCloudOrDataUrl(rightImg, 'posts', { inlineMaxChars: 45000, maxDim: 960, quality: 0.76 });
+        rightImg = await uploadMediaToCloudOrDataUrl(rightImg, 'posts', { inlineMaxChars: 15000, forceCloud: true, maxDim: 960, quality: 0.76 });
       }
     } else if (typeof compressImageFileToDataUrl === 'function') {
       if (leftImg && leftImg.length > 180000) leftImg = await compressImageFileToDataUrl(leftImg, 960, 0.76);

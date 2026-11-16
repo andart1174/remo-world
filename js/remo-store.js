@@ -3049,8 +3049,8 @@ const REMO_STORE = {
       }
     });
     if (!stripHeavySyncedMedia) return selected;
-    return selected.map((p) => {
-      if (!p || p._cloudSyncPending || p._cloudSyncError) return p;
+    return selected.map((p, idx) => {
+      if (!p || p._cloudSyncPending || p._cloudSyncError || idx < 3) return p;
       const copy = Object.assign({}, p);
       if (typeof copy.mediaUrl === 'string' && copy.mediaUrl.startsWith('data:') && copy.mediaUrl.length > 40000) {
         copy.mediaUrl = '';
@@ -3074,8 +3074,8 @@ const REMO_STORE = {
       toPersist.posts = this._prunePostsForLocalSave(80, false);
       localStorage.setItem(this.KEY, JSON.stringify(toPersist));
     } catch (e) {
-      console.warn('LocalStorage quota limit reached, trimming stale local cache (preserving unsynced posts):', e);
-      // Evict any oversized legacy base64 avatar keys first so user's unsynced posts stay safe
+      console.warn('LocalStorage quota limit reached, trimming stale local cache (preserving recent & unsynced posts):', e);
+      // Evict any oversized legacy base64 avatar keys first so user's posts stay intact
       try {
         for (let i = localStorage.length - 1; i >= 0; i--) {
           const k = localStorage.key(i);
@@ -3086,24 +3086,34 @@ const REMO_STORE = {
         }
       } catch (eAv) {}
       try {
+        // First retry: trim post count to 12 WITHOUT stripping any photo mediaUrl
         const pruned = Object.assign({}, this.state);
-        pruned.posts = this._prunePostsForLocalSave(25, true);
-        if (Array.isArray(pruned.notifications) && pruned.notifications.length > 25) {
-          pruned.notifications = pruned.notifications.slice(0, 25);
+        pruned.posts = this._prunePostsForLocalSave(12, false);
+        if (Array.isArray(pruned.notifications) && pruned.notifications.length > 20) {
+          pruned.notifications = pruned.notifications.slice(0, 20);
         }
-        if (Array.isArray(pruned.directMessages) && pruned.directMessages.length > 35) {
-          pruned.directMessages = pruned.directMessages.slice(-35);
+        if (Array.isArray(pruned.directMessages) && pruned.directMessages.length > 30) {
+          pruned.directMessages = pruned.directMessages.slice(-30);
         }
         if (Array.isArray(pruned.auctions)) {
-          pruned.auctions = pruned.auctions.map((a) => this.sanitizeAuctionItem(a)).filter(Boolean).slice(0, 15);
+          pruned.auctions = pruned.auctions.map((a) => this.sanitizeAuctionItem(a)).filter(Boolean).slice(0, 10);
         }
         localStorage.setItem(this.KEY, JSON.stringify(pruned));
       } catch (e2) {
         try {
-          // Last-resort safety net: persist at least unsynced posts + core user identity so posts never vanish on refresh
-          const unsyncedOnly = (this.state.posts || []).filter((p) => p && (p._cloudSyncPending || p._cloudSyncError)).slice(0, 8);
-          localStorage.setItem('remo_unsynced_posts_v1', JSON.stringify(unsyncedOnly));
-        } catch (e3) {}
+          // Second retry: strip heavy base64 data URLs beyond top-3 & unsynced posts
+          const stripped = Object.assign({}, this.state);
+          stripped.posts = this._prunePostsForLocalSave(12, true);
+          stripped.notifications = [];
+          stripped.directMessages = [];
+          localStorage.setItem(this.KEY, JSON.stringify(stripped));
+        } catch (e3) {
+          try {
+            // Last-resort safety net: persist unsynced posts so nothing vanishes on refresh
+            const unsyncedOnly = (this.state.posts || []).filter((p) => p && (p._cloudSyncPending || p._cloudSyncError)).slice(0, 8);
+            localStorage.setItem('remo_unsynced_posts_v1', JSON.stringify(unsyncedOnly));
+          } catch (e4) {}
+        }
       }
     }
   },
@@ -6241,7 +6251,8 @@ const REMO_STORE = {
       return (b.createdAt || 0) - (a.createdAt || 0);
     });
 
-    const postSig = (p) => `${p.id}_${p.type || ''}_${p.likes?.length || 0}_${p.comments?.length || 0}_${p.tipsTotal || 0}_${Object.keys(p.cityGuesses || {}).length}_${p.leaderboard?.[0]?.score || 0}_${p.pinned ? 1 : 0}_${p.boosted ? 1 : 0}_${p.boostedUntil || 0}_${p.boostedAt || 0}_${p.versus ? `${p.versus.leftVotes || 0}:${p.versus.rightVotes || 0}:${p.versus.closed ? 1 : 0}` : ''}_${p.poll ? (p.poll.voters || []).length : 0}`;
+    const mFp = (s) => (s ? `${s.length}:${s.slice(0, 24)}:${s.slice(-16)}` : '');
+    const postSig = (p) => `${p.id}_${p.mediaType || ''}_${mFp(p.mediaUrl)}_${(p.mediaUrls || []).map(mFp).join(',')}_${p.likes?.length || 0}_${p.comments?.length || 0}_${p.tipsTotal || 0}_${Object.keys(p.cityGuesses || {}).length}_${p.leaderboard?.[0]?.score || 0}_${p.pinned ? 1 : 0}_${p.boosted ? 1 : 0}_${p.boostedUntil || 0}_${p.boostedAt || 0}_${p.versus ? `${p.versus.leftVotes || 0}:${p.versus.rightVotes || 0}:${p.versus.closed ? 1 : 0}:${mFp(p.versus.leftMedia)}:${mFp(p.versus.rightMedia)}` : ''}_${p.poll ? (p.poll.voters || []).length : 0}`;
     const prevSignature = (this.state.posts || []).map(postSig).join('|');
     const nextSignature = activePosts.map(postSig).join('|');
     const hasContentChanged = prevSignature !== nextSignature;
