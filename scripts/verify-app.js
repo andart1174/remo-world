@@ -274,6 +274,10 @@ function runCleanStageLayoutAudit() {
   assert.ok(css.includes('body.desktop-stage-active'), 'Missing desktop-stage-active styles in css/remo-core.css');
   assert.ok(css.includes('#view-feed.active .tiktok-overlay-info'), 'Missing restored mobile .tiktok-overlay-info styles');
   assert.ok(!css.includes('.filter-row::-webkit-scrollbar {\n    display: block !important;'), 'Desktop filter-row must keep scrollbars hidden');
+  assert.ok(!/\#view-feed\.active\s+\#moreFeedFiltersWrap\s*\{\s*display:\s*none\s*!important;/i.test(css), 'Mobile #moreFeedFiltersWrap must not be hardcoded display:none !important');
+  assert.ok(css.includes('justify-content: flex-start !important;') && css.includes('touch-action: pan-x !important;'), 'Missing mobile horizontal scroll & flex-start header-right rules');
+  assert.ok(css.includes('overflow-y: auto !important;') && css.includes('backdrop-filter: none !important;'), 'Missing mobile modal scroll & GPU backdrop-filter safety rules');
+  assert.ok(comms.includes('window.closeTopFeedDrawers =') && comms.includes("pointer: coarse"), 'Missing closeTopFeedDrawers & touch scroll guard');
   assert.ok(comms.includes('class="tiktok-overlay-info"') && comms.includes('class="sheet-quick-tools-grid"'), 'Missing clean card overlay & sheet quick tools');
 
   console.log(`PASS: Clean Stage & Mobile TikTok UI layout (${requiredDomIds.length} IDs, ${requiredWindowFns.length} window handlers) verified.`);

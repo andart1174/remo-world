@@ -2099,34 +2099,62 @@ select.remo-input option {
 @media (max-width: 860px) {
   :root { --header-h: 50px; }
 
+  html, body {
+    max-width: 100vw;
+    overflow-x: clip;
+  }
+
   .remo-megaphone { font-size: 0.68rem; padding: 4px 8px; }
   .remo-header {
     padding: 0 6px;
-    gap: 4px;
+    gap: 6px;
     display: flex;
     align-items: center;
     justify-content: space-between;
     overflow: hidden;
   }
-  .brand-wrap { flex-shrink: 0; gap: 5px; }
+  .brand-wrap {
+    flex-shrink: 0;
+    gap: 5px;
+    position: relative;
+    z-index: 3;
+    padding-right: 2px;
+  }
   .brand-orb { width: 28px; height: 28px; }
   .brand-sub, .header-search, .hide-mobile { display: none !important; }
   .brand-name { font-size: 0.88rem; letter-spacing: 0.4px; }
   .header-right {
     display: flex;
     align-items: center;
-    justify-content: flex-end;
+    justify-content: flex-start !important;
     gap: 4px;
-    flex: 1;
+    flex: 1 1 0%;
+    width: 0;
     min-width: 0;
+    position: relative;
+    z-index: 1;
     overflow-x: auto;
     overflow-y: hidden;
+    touch-action: pan-x !important;
     -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
     scrollbar-width: none;
-    padding: 2px 0;
+    padding: 2px 6px 2px 2px;
   }
   .header-right::-webkit-scrollbar { display: none; }
-  .header-right > * { flex-shrink: 0; }
+  .header-right > * {
+    flex-shrink: 0;
+    touch-action: pan-x !important;
+  }
+  .header-right > :first-child {
+    margin-left: auto;
+  }
+  .header-right button,
+  .header-right .coin-pill,
+  .header-right .lang-switch {
+    touch-action: pan-x !important;
+    -webkit-tap-highlight-color: transparent;
+  }
   .remo-lang-switch { padding: 2px; gap: 1px; }
   .remo-lang-pill { padding: 3px 6px; font-size: 0.65rem; }
   #btnRadioToggle {
@@ -2143,12 +2171,12 @@ select.remo-input option {
   #hdrAuthBtn {
     padding: 4px 7px;
     font-size: 0.66rem;
-    max-width: 84px;
+    max-width: 132px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  .admin-god-pill { padding: 3px 6px; font-size: 0.65rem; }
+  .admin-god-pill { padding: 3px 7px; font-size: 0.65rem; white-space: nowrap; }
 
   .remo-shell {
     grid-template-columns: minmax(0, 1fr);
@@ -2269,7 +2297,6 @@ select.remo-input option {
 
   #view-feed.active #feedActiveContestsBanner,
   #view-feed.active #newCitizenWelcomeBar,
-  #view-feed.active #livePresenceStrip,
   #view-feed.active #gameChallengeHeroBar {
     display: none !important;
   }
@@ -2467,8 +2494,9 @@ select.remo-input option {
     right: 0;
     height: calc(var(--mb-nav-h) + env(safe-area-inset-bottom, 0px));
     padding-bottom: env(safe-area-inset-bottom, 0px);
-    background: rgba(6, 10, 24, 0.96);
-    backdrop-filter: blur(6px);
+    background: rgba(6, 10, 24, 0.97);
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
     border-top: 1px solid var(--border);
     z-index: 200;
   }
@@ -2507,16 +2535,35 @@ select.remo-input option {
     cursor: pointer;
   }
 
-  /* Bottom Sheet Modals on Mobile */
+  /* Bottom Sheet Modals on Mobile (No nested backdrop-filter GPU blackout) */
+  .remo-modal-backdrop,
+  .blitz-backdrop {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    background: rgba(4, 8, 22, 0.74) !important;
+  }
   .remo-modal-backdrop {
     align-items: flex-end;
+    justify-content: center;
     padding: 0;
   }
   .remo-modal {
-    border-radius: 24px 24px 0 0;
-    max-width: 100%;
-    max-height: 88dvh;
+    position: relative;
+    z-index: 2;
+    border-radius: 22px 22px 0 0;
+    width: 100% !important;
+    max-width: 100% !important;
+    max-height: 86dvh !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    -webkit-overflow-scrolling: touch;
     padding-bottom: calc(22px + env(safe-area-inset-bottom, 12px));
+  }
+  .remo-modal > .modal-hdr {
+    position: sticky;
+    top: 0;
+    z-index: 6;
+    background: #0d1428;
   }
 }
 
@@ -7586,8 +7633,7 @@ select.remo-input option {
 }
 
 @media (max-width: 860px) {
-  #view-feed.active #remoWelcomeHeroStrip,
-  #view-feed.active #moreFeedFiltersWrap {
+  #view-feed.active #remoWelcomeHeroStrip {
     display: none !important;
   }
   .ftv-hud {
@@ -11087,9 +11133,10 @@ select.remo-input option {
     right: 0;
     z-index: 125;
     padding: 8px 10px;
-    background: rgba(6, 10, 24, 0.95);
+    background: rgba(6, 10, 24, 0.97);
     border-bottom: 1px solid rgba(56, 189, 248, 0.3);
-    backdrop-filter: blur(12px);
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
     display: none;
   }
   .mobile-feed-search-drawer.open {
@@ -11113,31 +11160,28 @@ select.remo-input option {
     left: 0;
     right: 0;
     height: 44px;
-    background: linear-gradient(180deg, rgba(3, 6, 18, 0.86) 0%, rgba(3, 6, 18, 0.36) 100%) !important;
+    background: linear-gradient(180deg, rgba(3, 6, 18, 0.94) 0%, rgba(3, 6, 18, 0.72) 100%) !important;
     border-bottom: none !important;
-    backdrop-filter: blur(4px) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
     z-index: 120;
-    padding: 0 8px !important;
+    padding: 0 6px !important;
   }
   body:has(#view-feed.active) #btnRadioToggle {
     padding: 3px 7px !important;
-    font-size: 0.65rem !important;
-    max-width: 82px;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    font-size: 0.66rem !important;
+    max-width: none;
   }
   body:has(#view-feed.active) #hdrAuthBtn {
-    max-width: 70px !important;
-    padding: 3px 6px !important;
-    font-size: 0.64rem !important;
+    max-width: 132px !important;
+    padding: 3px 7px !important;
+    font-size: 0.66rem !important;
   }
   body:has(#view-feed.active) .admin-god-pill {
-    max-width: 68px;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    max-width: none;
     white-space: nowrap;
-    padding: 3px 6px !important;
-    font-size: 0.62rem !important;
+    padding: 3px 7px !important;
+    font-size: 0.64rem !important;
   }
 
   body:has(#view-feed.active) .center-stage,
@@ -11157,15 +11201,15 @@ select.remo-input option {
     display: none !important;
   }
 
-  /* Top Filter Overlay Floats Transparently Directly Over Media */
+  /* Top Filter Overlay Floats Directly Over Media Without Nested GPU Blur Blackout */
   #view-feed.active .feed-top-widgets {
     position: fixed !important;
     top: 44px;
     left: 0;
     right: 0;
     z-index: 112;
-    background: linear-gradient(180deg, rgba(3, 6, 18, 0.36) 0%, rgba(3, 6, 18, 0) 100%) !important;
-    padding: 3px 8px 6px !important;
+    background: linear-gradient(180deg, rgba(3, 6, 18, 0.45) 0%, rgba(3, 6, 18, 0) 100%) !important;
+    padding: 3px 6px 6px !important;
     pointer-events: none;
   }
   #view-feed.active .feed-top-widgets .clean-feed-toolbar,
@@ -11177,28 +11221,45 @@ select.remo-input option {
     pointer-events: auto;
   }
   #view-feed.active .clean-feed-toolbar {
-    overflow-x: auto;
+    display: flex !important;
+    align-items: center;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    touch-action: pan-x !important;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
     scrollbar-width: none;
-    gap: 5px;
+    gap: 4px;
     margin-bottom: 0;
+    padding: 1px 14px 2px 1px;
     justify-content: flex-start;
   }
   #view-feed.active .clean-feed-toolbar::-webkit-scrollbar {
     display: none;
   }
-  #view-feed.active .clean-feed-toolbar .filter-row {
+  #view-feed.active .clean-feed-toolbar .filter-row,
+  #view-feed.active .clean-feed-toolbar .clean-toolbar-utils {
     flex: 0 0 auto;
     width: auto;
-    overflow-x: visible;
+    overflow: visible !important;
+    touch-action: pan-x !important;
+  }
+  #view-feed.active .clean-feed-toolbar *,
+  #view-feed.active .clean-feed-toolbar .fchip,
+  #view-feed.active .clean-feed-toolbar .toolbar-util-pill,
+  #view-feed.active .clean-feed-toolbar .wspot-num1-pill {
+    touch-action: pan-x !important;
+    -webkit-tap-highlight-color: transparent;
   }
   #view-feed.active .fchip,
   #view-feed.active .toolbar-util-pill,
   #view-feed.active .wspot-num1-pill {
-    background: rgba(6, 10, 24, 0.56);
-    border-color: rgba(255, 255, 255, 0.18);
-    padding: 4px 9px !important;
-    font-size: 0.67rem !important;
-    backdrop-filter: blur(8px);
+    background: rgba(6, 10, 24, 0.84);
+    border-color: rgba(255, 255, 255, 0.22);
+    padding: 4px 8px !important;
+    font-size: 0.66rem !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
   }
   #view-feed.active .fchip.active {
     background: linear-gradient(135deg, var(--accent), var(--accent2));
@@ -11210,15 +11271,27 @@ select.remo-input option {
   #view-feed.active .clean-feed-online-drawer.open,
   #view-feed.active .clean-feed-pulse-drawer.open,
   #view-feed.active .more-feed-filters-wrap.open {
-    background: rgba(6, 10, 24, 0.94);
-    border: 1px solid rgba(56, 189, 248, 0.32);
+    background: rgba(6, 10, 24, 0.96);
+    border: 1px solid rgba(56, 189, 248, 0.35);
     border-radius: 14px;
     padding: 8px;
     margin-top: 6px;
     max-height: 56dvh;
     overflow-y: auto;
-    backdrop-filter: blur(14px);
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
     box-shadow: 0 12px 32px rgba(0, 0, 0, 0.72);
+  }
+  #view-feed.active .more-feed-filters-wrap.open .more-feed-chips-subrow,
+  #view-feed.active .more-feed-filters-wrap.open .filter-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    overflow: visible !important;
+    touch-action: pan-y !important;
+  }
+  #view-feed.active .more-feed-filters-wrap.open .fchip {
+    touch-action: manipulation !important;
   }
 
   #view-feed.active .feed-stage-wrap {
@@ -11325,7 +11398,7 @@ select.remo-input option {
     padding: 0;
   }
   .tk-ov-city-pill {
-    background: rgba(6, 10, 24, 0.58);
+    background: rgba(6, 10, 24, 0.82);
     border: 1px solid rgba(255, 255, 255, 0.18);
     color: #bae6fd;
     font-size: 0.68rem;
@@ -11333,7 +11406,7 @@ select.remo-input option {
     padding: 2px 8px;
     border-radius: 99px;
     cursor: pointer;
-    backdrop-filter: blur(6px);
+    backdrop-filter: none;
   }
   .tk-ov-caption-wrap {
     width: 100%;
@@ -11392,9 +11465,9 @@ select.remo-input option {
     overflow-y: auto;
     padding: 8px;
     border-radius: 14px;
-    background: rgba(6, 10, 24, 0.92);
+    background: rgba(6, 10, 24, 0.95);
     border: 1px solid rgba(56, 189, 248, 0.38);
-    backdrop-filter: blur(12px);
+    backdrop-filter: none;
     box-shadow: 0 10px 28px rgba(0, 0, 0, 0.78);
     margin-bottom: 4px;
   }

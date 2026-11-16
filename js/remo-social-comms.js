@@ -80,9 +80,8 @@ function switchRemoView(viewId) {
   });
 
   document.getElementById('appLauncherModal')?.classList.remove('open');
-  if (viewId !== 'feed') {
-    document.getElementById('mobileFeedSearchDrawer')?.classList.remove('open');
-  }
+  if (typeof closeTopFeedDrawers === 'function') closeTopFeedDrawers();
+  if (window.scrollX) window.scrollTo(0, window.scrollY);
   if (typeof syncDesktopStageLayoutUI === 'function') syncDesktopStageLayoutUI();
   if (typeof _syncFeedBackToTopPill === 'function') _syncFeedBackToTopPill();
   if (viewId !== 'feed') {
@@ -2607,9 +2606,8 @@ function toggleMoreFeedFilters(forceState) {
   const btn = document.getElementById('btnToggleMoreFilters');
   if (!wrap) return;
   const nextOpen = typeof forceState === 'boolean' ? forceState : !wrap.classList.contains('open');
-  if (nextOpen) {
-    if (typeof toggleFeedPresenceDrawer === 'function') toggleFeedPresenceDrawer(false);
-    if (typeof openCleanFeedPulseDrawer === 'function') openCleanFeedPulseDrawer(false);
+  if (nextOpen && typeof closeTopFeedDrawers === 'function') {
+    closeTopFeedDrawers('filters');
   }
   wrap.classList.toggle('open', nextOpen);
   if (btn) {
@@ -2856,14 +2854,29 @@ function toggleDesktopRightRail(forceShow) {
 }
 window.toggleDesktopRightRail = toggleDesktopRightRail;
 
+function closeTopFeedDrawers(exceptKey = '') {
+  if (exceptKey !== 'online' && document.getElementById('cleanFeedOnlineDrawer')?.classList.contains('open')) {
+    toggleFeedPresenceDrawer(false);
+  }
+  if (exceptKey !== 'pulse' && document.getElementById('cleanFeedPulseDrawer')?.classList.contains('open')) {
+    if (typeof openCleanFeedPulseDrawer === 'function') openCleanFeedPulseDrawer(false);
+  }
+  if (exceptKey !== 'filters' && document.getElementById('moreFeedFiltersWrap')?.classList.contains('open')) {
+    if (typeof toggleMoreFeedFilters === 'function') toggleMoreFeedFilters(false);
+  }
+  if (exceptKey !== 'search' && document.getElementById('mobileFeedSearchDrawer')?.classList.contains('open')) {
+    toggleMobileFeedSearchBar(false);
+  }
+}
+window.closeTopFeedDrawers = closeTopFeedDrawers;
+
 function toggleFeedPresenceDrawer(forceState) {
   const drawer = document.getElementById('cleanFeedOnlineDrawer');
   const btn = document.getElementById('feedOnlineToggleBtn');
   if (!drawer) return;
   const next = typeof forceState === 'boolean' ? forceState : !drawer.classList.contains('open');
   if (next) {
-    if (typeof openCleanFeedPulseDrawer === 'function') openCleanFeedPulseDrawer(false);
-    if (typeof toggleMoreFeedFilters === 'function') toggleMoreFeedFilters(false);
+    closeTopFeedDrawers('online');
   }
   drawer.classList.toggle('open', next);
   if (btn) btn.classList.toggle('active', next);
@@ -2887,6 +2900,9 @@ function toggleMobileFeedSearchBar(forceState) {
   const btn = document.getElementById('btnMobileSearchToggle');
   if (!drawer) return;
   const next = typeof forceState === 'boolean' ? forceState : !drawer.classList.contains('open');
+  if (next) {
+    closeTopFeedDrawers('search');
+  }
   drawer.classList.toggle('open', next);
   if (btn) btn.classList.toggle('active', next);
   if (next) {
@@ -10299,6 +10315,7 @@ function toggleHeaderRadio() {
 /* ── DESKTOP HORIZONTAL SCROLL ENGINE (Wheel Scroll & Smooth Drag Rail) ── */
 function makeHorizontalScrollable(el) {
   if (!el || el._hScrollAttached) return;
+  if (typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(pointer: coarse)').matches) return;
   el._hScrollAttached = true;
 
   // 1. Mouse wheel horizontal scrolling (translates normal vertical mouse wheel to smooth horizontal scroll)
@@ -10358,6 +10375,8 @@ function makeHorizontalScrollable(el) {
 
 function initDesktopHorizontalScrollRails() {
   const selectors = [
+    '.header-right',
+    '.clean-feed-toolbar',
     '#worldWeatherTickerBar',
     '#feedModeChips',
     '#feedVibeChips',
@@ -10615,8 +10634,32 @@ document.addEventListener('DOMContentLoaded', () => {
     }).catch(() => {});
   }
 
-  // Desktop Keyboard Shortcuts (ArrowUp/ArrowDown/J/K stage step, M radar, G cards, A arena)
+  // Auto-collapse top filter drawer on mobile after picking a chip, and close orphaned drawers when tapping feed/modals
+  const moreFiltersWrapEl = document.getElementById('moreFeedFiltersWrap');
+  if (moreFiltersWrapEl) {
+    moreFiltersWrapEl.addEventListener('click', (ev) => {
+      if (window.innerWidth <= 860 && ev.target && ev.target.closest('.fchip')) {
+        setTimeout(() => toggleMoreFeedFilters(false), 60);
+      }
+    });
+  }
+  document.addEventListener('click', (ev) => {
+    const tEl = ev.target;
+    if (!tEl) return;
+    if (!tEl.closest('.feed-top-widgets') && !tEl.closest('#mobileFeedSearchDrawer') && !tEl.closest('#btnMobileSearchToggle')) {
+      closeTopFeedDrawers();
+    }
+  });
+
+  // Global Escape + Desktop Keyboard Shortcuts (ArrowUp/ArrowDown/J/K stage step, M radar, G cards, A arena)
   document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      const openCoin = document.getElementById('remoCoin3DModal')?.classList.contains('open');
+      if (openCoin && typeof closeRemoCoin3DModal === 'function') closeRemoCoin3DModal();
+      document.querySelectorAll('.remo-modal-backdrop.open').forEach((m) => m.classList.remove('open'));
+      closeTopFeedDrawers();
+      return;
+    }
     if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return;
     const anyModalOpen = Boolean(document.querySelector('.remo-modal-backdrop.open'));
     if (!anyModalOpen && typeof isDesktopFeedStageActive === 'function' && isDesktopFeedStageActive()) {
@@ -16836,8 +16879,7 @@ function openCleanFeedPulseDrawer(forceOpen = true) {
   const arrow = document.getElementById('cleanFeedPulseArrow');
   if (!drawer) return;
   if (forceOpen) {
-    if (typeof toggleFeedPresenceDrawer === 'function') toggleFeedPresenceDrawer(false);
-    if (typeof toggleMoreFeedFilters === 'function') toggleMoreFeedFilters(false);
+    if (typeof closeTopFeedDrawers === 'function') closeTopFeedDrawers('pulse');
   }
   drawer.classList.toggle('open', Boolean(forceOpen));
   if (arrow) {
