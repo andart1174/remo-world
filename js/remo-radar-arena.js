@@ -2095,15 +2095,17 @@ function openEditProfileModal() {
 
   // Set avatar photo preview
   window._pendingProfileAvatar = undefined;
+  window._pendingProfileAvatarUploadPromise = null;
   const imgEl = document.getElementById('editProfAvatarImg');
   const phEl = document.getElementById('editProfAvatarPlaceholder');
   const rmBtn = document.getElementById('editProfRemovePhotoBtn');
   const fileInp = document.getElementById('editProfAvatarFileInput');
   if (fileInp) fileInp.value = '';
+  const existingAv = u.avatarUrl || (typeof REMO_STORE.getUserAvatar === 'function' ? REMO_STORE.getUserAvatar(u.uid) : '') || '';
 
-  if (u.avatarUrl) {
+  if (existingAv) {
     if (imgEl) {
-      imgEl.src = u.avatarUrl;
+      imgEl.src = existingAv;
       imgEl.style.display = 'block';
     }
     if (phEl) phEl.style.display = 'none';
@@ -2153,6 +2155,7 @@ async function handleProfileAvatarSelect(event) {
     }
 
     window._pendingProfileAvatar = compressedUrl;
+    window._pendingProfileAvatarUploadPromise = null;
     const imgEl = document.getElementById('editProfAvatarImg');
     const phEl = document.getElementById('editProfAvatarPlaceholder');
     const rmBtn = document.getElementById('editProfRemovePhotoBtn');
@@ -2163,6 +2166,30 @@ async function handleProfileAvatarSelect(event) {
     }
     if (phEl) phEl.style.display = 'none';
     if (rmBtn) rmBtn.style.display = 'inline-flex';
+
+    // Upload to Firebase Storage in background so cross-device persistence never depends on localStorage limits
+    if (typeof REMO_STORE !== 'undefined' && REMO_STORE.fbAuth && REMO_STORE.fbAuth.currentUser && typeof REMO_STORE.uploadMediaToCloudOrDataUrl === 'function') {
+      const selectedToken = compressedUrl;
+      window._pendingProfileAvatarUploadPromise = (async () => {
+        try {
+          const uploadedUrl = await REMO_STORE.uploadMediaToCloudOrDataUrl(selectedToken, 'avatars', {
+            forceCloud: true,
+            inlineMaxChars: 6000,
+            maxDim: 256,
+            quality: 0.82
+          });
+          if (uploadedUrl && typeof uploadedUrl === 'string' && /^https?:\/\//i.test(uploadedUrl) && window._pendingProfileAvatar === selectedToken) {
+            window._pendingProfileAvatar = uploadedUrl;
+            const curImg = document.getElementById('editProfAvatarImg');
+            if (curImg) curImg.src = uploadedUrl;
+          }
+          return uploadedUrl || selectedToken;
+        } catch (upErr) {
+          console.warn('Avatar cloud upload fallback to compressed local image:', upErr);
+          return selectedToken;
+        }
+      })();
+    }
 
     if (typeof RemoAudio !== 'undefined' && RemoAudio.play) RemoAudio.play('click');
     remoToast(isFr ? '📷 Photo sélectionnée ! Cliquez sur Enregistrer pour confirmer.' : '📷 Photo selected! Click Save Changes to confirm.', 'coin');
@@ -2177,6 +2204,7 @@ function removeProfileAvatarPhoto() {
   const lang = REMO_I18N.getLang();
   const isFr = (lang === 'fr');
   window._pendingProfileAvatar = null;
+  window._pendingProfileAvatarUploadPromise = null;
   const imgEl = document.getElementById('editProfAvatarImg');
   const phEl = document.getElementById('editProfAvatarPlaceholder');
   const rmBtn = document.getElementById('editProfRemovePhotoBtn');
@@ -2205,7 +2233,7 @@ function closeEditProfileModal() {
   if (modal) modal.classList.remove('open');
 }
 
-function saveUserProfile(event) {
+async function saveUserProfile(event) {
   event.preventDefault();
   const lang = REMO_I18N.getLang();
   const u = REMO_STORE.getCurrentUser();
@@ -2224,94 +2252,141 @@ function saveUserProfile(event) {
     return;
   }
 
-  const oldName = u.name;
-  u.name = newName;
-  u.bio = newBio;
-  u.homeCity = newCity;
-
-  // Apply new avatar photo or removal
-  if (window._pendingProfileAvatar === null) {
-    delete u.avatarUrl;
-    window._cachedCitizenAvatarImg = null;
-    try { localStorage.removeItem('remo_avatar_' + u.uid); } catch (e) {}
-  } else if (typeof window._pendingProfileAvatar === 'string' && window._pendingProfileAvatar) {
-    u.avatarUrl = window._pendingProfileAvatar;
-    window._cachedCitizenAvatarImg = null;
-    try { localStorage.setItem('remo_avatar_' + u.uid, u.avatarUrl); } catch (e) {}
-  }
-  window._pendingProfileAvatar = undefined;
-
-  if (u.bio) {
-    try { localStorage.setItem('remo_bio_' + u.uid, u.bio); } catch (e) {}
-  }
-
-  // Sync user object in state.users
-  if (Array.isArray(REMO_STORE.state.users)) {
-    const targetU = REMO_STORE.state.users.find((x) => x && x.uid === u.uid);
-    if (targetU) {
-      targetU.name = u.name;
-      targetU.bio = u.bio;
-      targetU.homeCity = u.homeCity;
-      if (u.avatarUrl) targetU.avatarUrl = u.avatarUrl;
-      else delete targetU.avatarUrl;
+  const saveBtn = document.getElementById('editProfSaveBtn');
+  const origSaveTxt = saveBtn ? saveBtn.textContent : '';
+  if (saveBtn) {
+    saveBtn.disabled = true;
+    if (window._pendingProfileAvatarUploadPromise || (typeof window._pendingProfileAvatar === 'string' && window._pendingProfileAvatar.startsWith('data:'))) {
+      saveBtn.textContent = lang === 'fr' ? '⏳ Enregistrement...' : '⏳ Saving...';
     }
   }
 
-  // Add home city to visas if not present
-  u.visas = Array.isArray(u.visas) ? u.visas : [];
-  if (!u.visas.includes(newCity)) {
-    u.visas.push(newCity);
-  }
+  try {
+    if (window._pendingProfileAvatarUploadPromise) {
+      await Promise.race([
+        window._pendingProfileAvatarUploadPromise,
+        new Promise((r) => setTimeout(r, 8000))
+      ]).catch(() => null);
+    }
+    if (
+      typeof window._pendingProfileAvatar === 'string' &&
+      window._pendingProfileAvatar.startsWith('data:') &&
+      typeof REMO_STORE !== 'undefined' &&
+      REMO_STORE.fbAuth &&
+      REMO_STORE.fbAuth.currentUser &&
+      typeof REMO_STORE.uploadMediaToCloudOrDataUrl === 'function'
+    ) {
+      try {
+        const upRes = await Promise.race([
+          REMO_STORE.uploadMediaToCloudOrDataUrl(window._pendingProfileAvatar, 'avatars', {
+            forceCloud: true,
+            inlineMaxChars: 6000,
+            maxDim: 256,
+            quality: 0.82
+          }),
+          new Promise((r) => setTimeout(() => r(window._pendingProfileAvatar), 8000))
+        ]);
+        if (upRes && typeof upRes === 'string') window._pendingProfileAvatar = upRes;
+      } catch (_) {}
+    }
 
-  // Update authorName & authorAvatar on user's own posts, comments, bottles & DMs
-  (REMO_STORE.state.posts || []).forEach((p) => {
-    if (p) {
-      if (p.uid === u.uid || p.authorName === oldName) {
-        p.authorName = newName;
-        if (u.avatarUrl) p.authorAvatar = u.avatarUrl;
-        else delete p.authorAvatar;
-        if (typeof REMO_STORE.syncPostToCloud === 'function') {
-          REMO_STORE.syncPostToCloud(p);
+    const oldName = u.name;
+    u.name = newName;
+    u.bio = newBio;
+    u.homeCity = newCity;
+
+    // Apply new avatar photo or removal
+    if (window._pendingProfileAvatar === null) {
+      delete u.avatarUrl;
+      window._cachedCitizenAvatarImg = null;
+      if (REMO_STORE._avatarMemCache) delete REMO_STORE._avatarMemCache[u.uid];
+      try { localStorage.removeItem('remo_avatar_' + u.uid); } catch (e) {}
+    } else if (typeof window._pendingProfileAvatar === 'string' && window._pendingProfileAvatar) {
+      u.avatarUrl = window._pendingProfileAvatar;
+      window._cachedCitizenAvatarImg = null;
+      if (REMO_STORE._avatarMemCache) REMO_STORE._avatarMemCache[u.uid] = u.avatarUrl;
+      try { localStorage.setItem('remo_avatar_' + u.uid, u.avatarUrl); } catch (e) {}
+    }
+    window._pendingProfileAvatar = undefined;
+    window._pendingProfileAvatarUploadPromise = null;
+
+    if (u.bio) {
+      try { localStorage.setItem('remo_bio_' + u.uid, u.bio); } catch (e) {}
+    }
+
+    // Sync user object in state.users
+    if (Array.isArray(REMO_STORE.state.users)) {
+      const targetU = REMO_STORE.state.users.find((x) => x && x.uid === u.uid);
+      if (targetU) {
+        targetU.name = u.name;
+        targetU.bio = u.bio;
+        targetU.homeCity = u.homeCity;
+        if (u.avatarUrl) targetU.avatarUrl = u.avatarUrl;
+        else delete targetU.avatarUrl;
+      }
+    }
+
+    // Add home city to visas if not present
+    u.visas = Array.isArray(u.visas) ? u.visas : [];
+    if (!u.visas.includes(newCity)) {
+      u.visas.push(newCity);
+    }
+
+    // Update authorName & authorAvatar on user's own posts, comments, bottles & DMs
+    (REMO_STORE.state.posts || []).forEach((p) => {
+      if (p) {
+        if (p.uid === u.uid || p.authorName === oldName) {
+          p.authorName = newName;
+          if (u.avatarUrl) p.authorAvatar = u.avatarUrl;
+          else delete p.authorAvatar;
+          if (typeof REMO_STORE.syncPostToCloud === 'function') {
+            REMO_STORE.syncPostToCloud(p);
+          }
+        }
+        if (Array.isArray(p.comments)) {
+          p.comments.forEach((c) => {
+            if (c && (c.uid === u.uid || c.author === oldName)) {
+              c.author = newName;
+              if (u.avatarUrl) c.authorAvatar = u.avatarUrl;
+              else delete c.authorAvatar;
+            }
+          });
         }
       }
-      if (Array.isArray(p.comments)) {
-        p.comments.forEach((c) => {
-          if (c && (c.uid === u.uid || c.author === oldName)) {
-            c.author = newName;
-            if (u.avatarUrl) c.authorAvatar = u.avatarUrl;
-            else delete c.authorAvatar;
-          }
-        });
+    });
+
+    (REMO_STORE.state.bottles || []).forEach((b) => {
+      if (b && (b.fromUid === u.uid || b.fromName === oldName)) b.fromName = newName;
+    });
+
+    (REMO_STORE.state.directMessages || []).forEach((m) => {
+      if (m) {
+        if (m.fromUid === u.uid || m.fromName === oldName) m.fromName = newName;
+        if (m.toUid === u.uid || m.toName === oldName) m.toName = newName;
       }
+    });
+
+    REMO_STORE.save(true, 'profile_updated');
+    if (typeof REMO_STORE.syncUserToCloud === 'function') {
+      REMO_STORE.syncUserToCloud(u);
     }
-  });
-
-  (REMO_STORE.state.bottles || []).forEach((b) => {
-    if (b && (b.fromUid === u.uid || b.fromName === oldName)) b.fromName = newName;
-  });
-
-  (REMO_STORE.state.directMessages || []).forEach((m) => {
-    if (m) {
-      if (m.fromUid === u.uid || m.fromName === oldName) m.fromName = newName;
-      if (m.toUid === u.uid || m.toName === oldName) m.toName = newName;
+    if (typeof REMO_STORE.syncToFirestore === 'function') {
+      REMO_STORE.syncToFirestore('profile_updated', true);
     }
-  });
 
-  REMO_STORE.save(true, 'profile_updated');
-  if (typeof REMO_STORE.syncUserToCloud === 'function') {
-    REMO_STORE.syncUserToCloud(u);
+    closeEditProfileModal();
+    syncHeaderAndSidebars();
+    renderPassportView();
+    if (typeof renderSocialFeed === 'function') renderSocialFeed();
+
+    RemoAudio.play('coin');
+    remoToast(lang === 'fr' ? '✓ Profil mis à jour avec succès !' : '✓ Profile updated successfully!', 'coin');
+  } finally {
+    if (saveBtn) {
+      saveBtn.disabled = false;
+      if (origSaveTxt) saveBtn.textContent = origSaveTxt;
+    }
   }
-  if (typeof REMO_STORE.syncToFirestore === 'function') {
-    REMO_STORE.syncToFirestore('profile_updated', true);
-  }
-
-  closeEditProfileModal();
-  syncHeaderAndSidebars();
-  renderPassportView();
-  if (typeof renderSocialFeed === 'function') renderSocialFeed();
-
-  RemoAudio.play('coin');
-  remoToast(lang === 'fr' ? '✓ Profil mis à jour avec succès !' : '✓ Profile updated successfully!', 'coin');
 }
 
 window.openEditProfileModal = openEditProfileModal;
@@ -2343,9 +2418,18 @@ function renderPassportView() {
   const refCode = u.referralCode || `REMO-${u.passportNum}`;
   const activeTab = window._activeProfileTab || 'posts';
 
+  const aliasUids = new Set([u.uid]);
+  if (u.fbUid) {
+    aliasUids.add(u.fbUid);
+    aliasUids.add('u_fb_' + u.fbUid);
+  }
+  if (u.role === 'admin' || (typeof REMO_STORE.isAdminEmail === 'function' && REMO_STORE.isAdminEmail(u.email))) {
+    aliasUids.add('u_admin_founder');
+  }
+
   // My Posts
   const myPosts = (REMO_STORE.state.posts || []).filter(
-    (p) => p && (p.uid === u.uid || (u.email && p.authorEmail && u.email.toLowerCase() === p.authorEmail.toLowerCase()) || p.authorName === u.name)
+    (p) => p && (aliasUids.has(p.uid) || (u.email && p.authorEmail && u.email.toLowerCase() === p.authorEmail.toLowerCase()) || p.authorName === u.name)
   );
 
   // My Discussions / Direct Messages

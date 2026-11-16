@@ -2746,7 +2746,7 @@ const REMO_STORE = {
         !this.deletedUserIds.has(u.uid) &&
         (!this.isFakeOrGuestUser(u) || (u.uid === activeUid && u.role === 'guest' && String(u.uid).startsWith('u_guest_')))
       );
-      // Restore cached avatars or bios without letting multi-MB base64 strings choke localStorage quota
+      // Restore cached avatars or bios into RAM & keep user avatars intact in localStorage
       this._avatarMemCache = this._avatarMemCache || {};
       this.state.users.forEach((u) => {
         if (u && u.uid) {
@@ -2756,14 +2756,6 @@ const REMO_STORE = {
           } else {
             this._avatarMemCache[u.uid] = u.avatarUrl;
           }
-          // Evict huge base64 avatars (> 8 KB) from localStorage to free space for state/posts
-          try {
-            const lsAv = localStorage.getItem('remo_avatar_' + u.uid);
-            if (lsAv && lsAv.length > 8192) {
-              this._avatarMemCache[u.uid] = this._avatarMemCache[u.uid] || lsAv;
-              localStorage.removeItem('remo_avatar_' + u.uid);
-            }
-          } catch (e) {}
           if (!u.bio) {
             const cachedBio = localStorage.getItem('remo_bio_' + u.uid);
             if (cachedBio) u.bio = cachedBio;
@@ -2828,6 +2820,12 @@ const REMO_STORE = {
       return fbU.providerData.some((p) => p && (p.providerId === 'google.com' || p.providerId === 'apple.com'));
     }
     return false;
+  },
+
+  isAdminEmail(email) {
+    if (!email) return false;
+    const adminEmail = (this.state && this.state.settings && this.state.settings.adminEmail) || 'andart1174@gmail.com';
+    return String(email).toLowerCase().trim() === adminEmail.toLowerCase().trim();
   },
 
   isCurrentUserAdmin() {
@@ -3075,13 +3073,14 @@ const REMO_STORE = {
       localStorage.setItem(this.KEY, JSON.stringify(toPersist));
     } catch (e) {
       console.warn('LocalStorage quota limit reached, trimming stale local cache (preserving recent & unsynced posts):', e);
-      // Evict any oversized legacy base64 avatar keys first so user's posts stay intact
+      // Evict only stale third-party oversized base64 avatar keys (> 48 KB), NEVER current user or Admin avatar
       try {
+        const curUidKeep = localStorage.getItem(this.USER_KEY) || '';
         for (let i = localStorage.length - 1; i >= 0; i--) {
           const k = localStorage.key(i);
-          if (k && k.startsWith('remo_avatar_')) {
+          if (k && k.startsWith('remo_avatar_') && k !== ('remo_avatar_' + curUidKeep) && k !== 'remo_avatar_u_admin_founder') {
             const val = localStorage.getItem(k);
-            if (val && val.length > 4096) localStorage.removeItem(k);
+            if (val && val.length > 48000) localStorage.removeItem(k);
           }
         }
       } catch (eAv) {}
@@ -3176,30 +3175,41 @@ const REMO_STORE = {
     // Self-heal session mismatch between Firebase Auth and local USER_KEY
     if (fbU && fbVerified) {
       const fbEmail = this._getFbEmail(fbU).toLowerCase().trim();
+      const adminEmail = (this.state?.settings?.adminEmail || 'andart1174@gmail.com').toLowerCase().trim();
+      const isAdminFb = Boolean(fbEmail && fbEmail === adminEmail && fbU.emailVerified === true);
       const expectedFbUid = 'u_fb_' + fbU.uid;
+      const hasPrimaryFounder = isAdminFb && (this.state.users || []).some((x) => x && x.uid === 'u_admin_founder');
       const needsSwitch = !u ||
         this.isFakeOrGuestUser(u) ||
+        (hasPrimaryFounder && u.uid !== 'u_admin_founder') ||
         (u.fbUid && u.fbUid !== fbU.uid) ||
         (!u.fbUid && u.uid !== expectedFbUid && u.uid !== 'u_admin_founder') ||
         (u.email && fbEmail && u.email.toLowerCase().trim() !== fbEmail);
       if (needsSwitch) {
-        const match = (this.state.users || []).find((x) => x && x.uid === expectedFbUid) ||
-          (this.state.users || []).find((x) => x && x.fbUid === fbU.uid) ||
-          (this.state.users || []).find((x) => x && fbEmail && x.email && x.email.toLowerCase().trim() === fbEmail);
+        let match = null;
+        if (isAdminFb) {
+          match = (this.state.users || []).find((x) => x && x.uid === 'u_admin_founder') ||
+            (this.state.users || []).filter((x) => x && x.email && x.email.toLowerCase().trim() === adminEmail)
+              .sort((a, b) => Number(b.coins || 0) - Number(a.coins || 0))[0] || null;
+        }
+        if (!match) {
+          match = (this.state.users || []).find((x) => x && x.uid === expectedFbUid) ||
+            (this.state.users || []).find((x) => x && x.fbUid === fbU.uid) ||
+            (this.state.users || []).find((x) => x && fbEmail && x.email && x.email.toLowerCase().trim() === fbEmail);
+        }
         if (match) {
           if (fbEmail && (!match.email || /^citizen\d+@remo\.world$/i.test(match.email))) match.email = this._getFbEmail(fbU);
-          if (!match.fbUid) match.fbUid = fbU.uid;
+          if (!match.fbUid || isAdminFb) match.fbUid = fbU.uid;
           match.emailVerified = true;
-          if (!match.role || match.role === 'guest') {
-            const adminEmail = (this.state?.settings?.adminEmail || 'andart1174@gmail.com').toLowerCase().trim();
-            match.role = (fbEmail === adminEmail && fbU.emailVerified === true) ? 'admin' : 'citizen';
+          if (!match.role || match.role === 'guest' || isAdminFb) {
+            match.role = isAdminFb ? 'admin' : 'citizen';
           }
           localStorage.setItem(this.USER_KEY, match.uid);
           u = match;
         }
       } else if (u) {
         if (fbEmail && (!u.email || /^citizen\d+@remo\.world$/i.test(u.email))) u.email = this._getFbEmail(fbU);
-        if (!u.fbUid) u.fbUid = fbU.uid;
+        if (!u.fbUid || isAdminFb) u.fbUid = fbU.uid;
         u.emailVerified = true;
       }
     } else if (this.fbAuth && !fbU && u && (u.uid === 'u_admin_founder' || (this._fbAuthResolved && (u.uid.startsWith('u_fb_') || Boolean(u.fbUid))))) {
@@ -3210,7 +3220,7 @@ const REMO_STORE = {
 
     if (!u) return null;
     if (!u.avatarUrl) {
-      const cachedAvatar = localStorage.getItem('remo_avatar_' + u.uid);
+      const cachedAvatar = (this._avatarMemCache && this._avatarMemCache[u.uid]) || localStorage.getItem('remo_avatar_' + u.uid);
       if (cachedAvatar) u.avatarUrl = cachedAvatar;
     }
     return u;
@@ -3362,12 +3372,49 @@ const REMO_STORE = {
     );
 
     if (!Array.isArray(this.state.users)) this.state.users = [];
-    let u = fbUid
-      ? (this.state.users.find((x) => x && x.uid === ('u_fb_' + fbUid)) ||
-         this.state.users.find((x) => x && x.fbUid === fbUid))
-      : null;
+    let u = null;
+    if (isAdminTarget) {
+      u = this.state.users.find((x) => x && x.uid === 'u_admin_founder') ||
+        this.state.users.filter((x) => x && x.email && x.email.toLowerCase().trim() === adminEmail.toLowerCase().trim())
+          .sort((a, b) => Number(b.coins || 0) - Number(a.coins || 0))[0] || null;
+    }
+    if (!u && fbUid) {
+      u = this.state.users.find((x) => x && x.uid === ('u_fb_' + fbUid)) ||
+        this.state.users.find((x) => x && x.fbUid === fbUid) || null;
+    }
     if (!u && cleanEmail) {
-      u = this.state.users.find((x) => x && x.email && x.email.toLowerCase().trim() === cleanEmail.toLowerCase() && (!fbUid || !x.fbUid || x.fbUid === fbUid));
+      u = this.state.users.find((x) => x && x.email && x.email.toLowerCase().trim() === cleanEmail.toLowerCase() && (!fbUid || !x.fbUid || x.fbUid === fbUid)) || null;
+    }
+
+    // Reconcile accidental low-balance duplicate Admin account (e.g. u_fb_<uid>) into primary u_admin_founder
+    if (isAdminTarget && u && u.uid === 'u_admin_founder' && fbUid) {
+      const dupUid = 'u_fb_' + fbUid;
+      const dup = this.state.users.find((x) => x && x.uid === dupUid && x.uid !== 'u_admin_founder');
+      if (dup && dup.passportNum !== '0001' && Number(u.coins || 0) >= Number(dup.coins || 0)) {
+        if (!u.avatarUrl && dup.avatarUrl) u.avatarUrl = dup.avatarUrl;
+        if (Array.isArray(this.state.droppedCardsPool)) {
+          this.state.droppedCardsPool.forEach((c) => {
+            if (c && c.ownerUid === dupUid) {
+              c.ownerUid = 'u_admin_founder';
+              c.ownerName = u.name || 'REMO Founder';
+            }
+          });
+        }
+        if (Array.isArray(dup.cards) && dup.cards.length > 0) {
+          u.cards = Array.isArray(u.cards) ? u.cards : [];
+          dup.cards.forEach((dc) => {
+            if (dc && dc.id && !u.cards.some((uc) => uc && uc.id === dc.id)) {
+              u.cards.push(Object.assign({}, dc, { ownerUid: 'u_admin_founder' }));
+            }
+          });
+        }
+        this._suppressedDuplicateUids = this._suppressedDuplicateUids || new Set();
+        this._suppressedDuplicateUids.add(dupUid);
+        this.state.users = this.state.users.filter((x) => x && x.uid !== dupUid);
+        if (this.fbDb && matchesVerifiedFbAdmin) {
+          this.fbDb.collection('remo_users').doc(dupUid).delete().catch(() => {});
+        }
+      }
     }
 
     if (!u) {
@@ -3416,10 +3463,10 @@ const REMO_STORE = {
       if (cleanEmail && (!u.email || /^citizen\d+@remo\.world$/i.test(u.email))) {
         u.email = cleanEmail;
       }
-      if (fbUid && !u.fbUid) u.fbUid = fbUid;
+      if (fbUid && (!u.fbUid || isAdminTarget)) u.fbUid = fbUid;
       u.emailVerified = true;
       u.verified = true;
-      if (!u.role || u.role === 'guest') {
+      if (!u.role || u.role === 'guest' || isAdminTarget) {
         u.role = isAdminTarget ? 'admin' : 'citizen';
       }
     }
@@ -3455,11 +3502,23 @@ const REMO_STORE = {
     try {
       const isAdm = this.isCurrentUserAdmin();
       const fbUid = user.fbUid || (this.fbAuth && this.fbAuth.currentUser ? this.fbAuth.currentUser.uid : '');
+      const compactCards = Array.isArray(user.cards)
+        ? user.cards.filter(Boolean).slice(0, 60).map((c) => {
+            const cc = Object.assign({}, c);
+            if (typeof cc.customPhotoDataUrl === 'string' && cc.customPhotoDataUrl.startsWith('data:') && cc.customPhotoDataUrl.length > 40000) {
+              cc.customPhotoDataUrl = '';
+            }
+            return cc;
+          })
+        : undefined;
+      const serverTs = (typeof firebase !== 'undefined' && firebase && firebase.firestore && firebase.firestore.FieldValue)
+        ? firebase.firestore.FieldValue.serverTimestamp()
+        : Date.now();
       const cleanUser = {
         uid: user.uid,
         fbUid: fbUid || '',
         name: user.name || 'Citizen',
-        avatarUrl: user.avatarUrl || localStorage.getItem('remo_avatar_' + user.uid) || '',
+        avatarUrl: user.avatarUrl || (this._avatarMemCache && this._avatarMemCache[user.uid]) || localStorage.getItem('remo_avatar_' + user.uid) || '',
         bio: user.bio || localStorage.getItem('remo_bio_' + user.uid) || '',
         homeCity: user.homeCity || 'montreal',
         passportNum: user.passportNum || '0000',
@@ -3477,8 +3536,9 @@ const REMO_STORE = {
         equippedFrame: user.equippedFrame || '',
         equippedTitleId: user.equippedTitleId || '',
         lastPhotoCardMintMonth: user.lastPhotoCardMintMonth || '',
-        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        updatedAt: serverTs
       };
+      if (compactCards !== undefined) cleanUser.cards = compactCards;
       if (isAdm) {
         cleanUser.role = user.role || 'citizen';
         cleanUser.verified = Boolean(user.verified);
@@ -3496,7 +3556,7 @@ const REMO_STORE = {
           uid: cleanUser.uid,
           fbUid: fbUid || '',
           email: user.email,
-          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+          updatedAt: serverTs
         }, { merge: true }).catch(() => {});
       }
     } catch (e) {
@@ -4637,8 +4697,23 @@ const REMO_STORE = {
       mintedAt: Date.now()
     };
     this.state.droppedCardsPool.unshift(card);
-    if (u && !u.visas.includes(city.id)) {
-      u.visas.push(city.id);
+    if (u) {
+      u.cards = Array.isArray(u.cards) ? u.cards : [];
+      if (!u.cards.some((x) => x && x.id === card.id)) {
+        const cloudCardCopy = Object.assign({}, card);
+        if (typeof cloudCardCopy.customPhotoDataUrl === 'string' && cloudCardCopy.customPhotoDataUrl.startsWith('data:') && cloudCardCopy.customPhotoDataUrl.length > 40000) {
+          cloudCardCopy.customPhotoDataUrl = '';
+        }
+        u.cards.unshift(cloudCardCopy);
+        if (u.cards.length > 60) u.cards = u.cards.slice(0, 60);
+      }
+      u.visas = Array.isArray(u.visas) ? u.visas : [];
+      if (!u.visas.includes(city.id)) {
+        u.visas.push(city.id);
+      }
+      if (!this.isFakeOrGuestUser(u) && this.fbDb) {
+        this.syncUserToCloud(u);
+      }
     }
     this.addCityScore(city.id, 30);
     this.save(true, 'card_minted', card);
@@ -4650,9 +4725,17 @@ const REMO_STORE = {
     const pool = Array.isArray(this.state.droppedCardsPool) ? this.state.droppedCardsPool : [];
     const u = (this.state.users || []).find((x) => x && x.uid === uid) || (this.getCurrentUser()?.uid === uid ? this.getCurrentUser() : null);
     const uName = u ? (u.name || '').trim().toLowerCase() : '';
+    const aliasUids = new Set([uid]);
+    if (u && u.fbUid) {
+      aliasUids.add(u.fbUid);
+      aliasUids.add('u_fb_' + u.fbUid);
+    }
+    if (u && u.role === 'admin') {
+      aliasUids.add('u_admin_founder');
+    }
     const poolCards = pool.filter((c) => {
       if (!c) return false;
-      if (c.ownerUid && c.ownerUid === uid) return true;
+      if (c.ownerUid && aliasUids.has(c.ownerUid)) return true;
       if (uName && c.owner && String(c.owner).trim().toLowerCase() === uName) return true;
       if (uName && c.ownerName && String(c.ownerName).trim().toLowerCase() === uName) return true;
       if (uName && c.subtitle && String(c.subtitle).toLowerCase().includes('moment by ' + uName)) return true;
@@ -5110,7 +5193,7 @@ const REMO_STORE = {
           });
         }
         this._fbAuthResolved = false;
-        this.fbAuth.onAuthStateChanged((fbU) => {
+        this.fbAuth.onAuthStateChanged(async (fbU) => {
           this._fbAuthResolved = true;
           if (Array.isArray(this._authReadyResolvers) && this._authReadyResolvers.length > 0) {
             const list = this._authReadyResolvers.splice(0);
@@ -5125,6 +5208,37 @@ const REMO_STORE = {
             const fbEmail = this._getFbEmail(fbU);
             const adminEmail = (this.state?.settings?.adminEmail || 'andart1174@gmail.com').toLowerCase().trim();
             const isAdminEmail = Boolean(fbU.emailVerified === true && fbEmail.toLowerCase() === adminEmail);
+
+            // Hydrate authoritative Cloud profile BEFORE creating/updating local profile so default values never overwrite Cloud coins/avatar/cards
+            if (this.fbDb && !this._usersCloudSyncedOnce) {
+              try {
+                const targetDocId = isAdminEmail ? 'u_admin_founder' : ('u_fb_' + fbU.uid);
+                let cloudSnap = await this.fbDb.collection('remo_users').doc(targetDocId).get().catch(() => null);
+                if ((!cloudSnap || !cloudSnap.exists) && !isAdminEmail) {
+                  const qSnap = await this.fbDb.collection('remo_users').where('fbUid', '==', fbU.uid).limit(1).get().catch(() => null);
+                  if (qSnap && !qSnap.empty) cloudSnap = qSnap.docs[0];
+                }
+                if (this.fbAuth && this.fbAuth.currentUser?.uid !== fbU.uid) return;
+                if (cloudSnap && cloudSnap.exists) {
+                  const cUser = cloudSnap.data();
+                  if (cUser) {
+                    cUser.uid = cUser.uid || cloudSnap.id;
+                    this.state.users = Array.isArray(this.state.users) ? this.state.users : [];
+                    const exIdx = this.state.users.findIndex((x) => x && x.uid === cUser.uid);
+                    if (exIdx >= 0) {
+                      const prev = this.state.users[exIdx];
+                      if (!cUser.avatarUrl && prev.avatarUrl) cUser.avatarUrl = prev.avatarUrl;
+                      if (!Array.isArray(cUser.cards) && Array.isArray(prev.cards)) cUser.cards = prev.cards;
+                      this.state.users[exIdx] = Object.assign({}, prev, cUser);
+                    } else {
+                      this.state.users.push(cUser);
+                    }
+                  }
+                }
+              } catch (eHyd) {}
+              if (this.fbAuth && this.fbAuth.currentUser?.uid !== fbU.uid) return;
+            }
+
             let pendingName = fbU.displayName || '';
             let pendingCity = 'montreal';
             try {
@@ -5407,10 +5521,11 @@ const REMO_STORE = {
     if (!this.fbDb || this._fbSyncStarted) return;
     this._fbSyncStarted = true;
     try {
-      // 1. Sync & Watch TOP 200 ACTIVE CITIZEN PROFILES (plus on-demand fetchUserByUid for 10,000+ users)
+      // 1. Sync & Watch ALL ACTIVE CITIZEN PROFILES (no orderBy filter that excludes legacy docs lacking lastSeenAt)
       this._extraFetchedUsersMap = this._extraFetchedUsersMap || new Map();
       const handleUsersSnap = (snap) => {
         if (!snap) return;
+        this._usersCloudSyncedOnce = true;
         const cloudUsers = [];
         const cloudUserIds = new Set();
         const curU0 = this.getCurrentUser();
@@ -5425,6 +5540,7 @@ const REMO_STORE = {
           const uData = doc.data();
           if (!uData) return;
           if (!uData.uid) uData.uid = doc.id;
+          if (this._suppressedDuplicateUids && this._suppressedDuplicateUids.has(uData.uid)) return;
           if (isAdm0 && !Object.prototype.hasOwnProperty.call(uData, 'banned') && uData.uid) {
             uData.banned = false;
             this.fbDb.collection('remo_users').doc(uData.uid).set({ banned: false }, { merge: true }).catch(() => {});
@@ -5448,13 +5564,20 @@ const REMO_STORE = {
             }
           } else if (uData.avatarUrl) {
             this._avatarMemCache[uData.uid] = uData.avatarUrl;
-            // Only store compact URLs/micro-thumbnails in localStorage; avoid exhausting mobile 5MB quota
-            if (!String(uData.avatarUrl).startsWith('data:') || uData.avatarUrl.length <= 4096) {
+            // Cache avatars up to 64 KB safely in localStorage so 256px coin/profile photos never vanish on refresh
+            if (!String(uData.avatarUrl).startsWith('data:') || uData.avatarUrl.length <= 65536) {
               try { localStorage.setItem('remo_avatar_' + uData.uid, uData.avatarUrl); } catch (e) {}
             }
           }
           if (!uData.bio && existingLocal && existingLocal.bio) {
             uData.bio = existingLocal.bio;
+          }
+          if (existingLocal && Array.isArray(existingLocal.cards) && existingLocal.cards.length > 0) {
+            const cardMap = new Map();
+            (Array.isArray(uData.cards) ? uData.cards : []).concat(existingLocal.cards).forEach((c) => {
+              if (c && (c.id || c.serial)) cardMap.set(c.id || (c.cityId + '_' + c.serial), c);
+            });
+            uData.cards = Array.from(cardMap.values()).slice(0, 60);
           }
           // Preserve owner's private email & auth identity fields across public profile sync
           if (existingLocal) {
@@ -5467,11 +5590,12 @@ const REMO_STORE = {
             if (existingLocal.verified && uData.verified === undefined) uData.verified = existingLocal.verified;
           }
           if (curFb && curFbVerified && (uData.uid === ('u_fb_' + curFb.uid) || uData.fbUid === curFb.uid || (curFbEmail && uData.email && uData.email.toLowerCase().trim() === curFbEmail.toLowerCase()) || (uData.uid === 'u_admin_founder' && curFb.emailVerified === true && curFbEmail.toLowerCase() === adminEmail))) {
+            const isVerifiedFounderDoc = Boolean(uData.uid === 'u_admin_founder' && curFb.emailVerified === true && curFbEmail.toLowerCase() === adminEmail);
             if (curFbEmail && !uData.email) uData.email = curFbEmail;
-            if (!uData.fbUid) uData.fbUid = curFb.uid;
+            if (!uData.fbUid || isVerifiedFounderDoc) uData.fbUid = curFb.uid;
             uData.emailVerified = true;
             uData.verified = true;
-            if (!uData.role || uData.role === 'guest') {
+            if (!uData.role || uData.role === 'guest' || isVerifiedFounderDoc) {
               uData.role = (curFb.emailVerified === true && curFbEmail.toLowerCase() === adminEmail) ? 'admin' : 'citizen';
             }
           }
@@ -5479,6 +5603,43 @@ const REMO_STORE = {
           cloudUsers.push(uData);
           cloudUserIds.add(uData.uid);
         });
+
+        // Clean up any accidental duplicate Admin u_fb_<uid> profile when u_admin_founder is present
+        if (curFb && curFbVerified && curFb.emailVerified === true && curFbEmail.toLowerCase() === adminEmail) {
+          const founder = cloudUsers.find((x) => x && x.uid === 'u_admin_founder');
+          const dupIdx = cloudUsers.findIndex((x) => x && x.uid === ('u_fb_' + curFb.uid) && x.uid !== 'u_admin_founder' && x.passportNum !== '0001');
+          if (founder && dupIdx >= 0 && Number(founder.coins || 0) >= Number(cloudUsers[dupIdx].coins || 0)) {
+            const dup = cloudUsers[dupIdx];
+            if (!founder.avatarUrl && dup.avatarUrl) founder.avatarUrl = dup.avatarUrl;
+            if (Array.isArray(this.state.droppedCardsPool)) {
+              this.state.droppedCardsPool.forEach((c) => {
+                if (c && c.ownerUid === dup.uid) {
+                  c.ownerUid = 'u_admin_founder';
+                  c.ownerName = founder.name || 'REMO Founder';
+                }
+              });
+            }
+            if (Array.isArray(dup.cards) && dup.cards.length > 0) {
+              founder.cards = Array.isArray(founder.cards) ? founder.cards : [];
+              dup.cards.forEach((dc) => {
+                if (dc && dc.id && !founder.cards.some((fc) => fc && fc.id === dc.id)) {
+                  founder.cards.push(Object.assign({}, dc, { ownerUid: 'u_admin_founder' }));
+                }
+              });
+            }
+            founder.fbUid = curFb.uid;
+            founder.email = curFbEmail;
+            founder.role = 'admin';
+            founder.emailVerified = true;
+            this._suppressedDuplicateUids = this._suppressedDuplicateUids || new Set();
+            this._suppressedDuplicateUids.add(dup.uid);
+            cloudUsers.splice(dupIdx, 1);
+            cloudUserIds.delete(dup.uid);
+            localStorage.setItem(this.USER_KEY, 'u_admin_founder');
+            this.fbDb.collection('remo_users').doc(dup.uid).delete().catch(() => {});
+            this.syncUserToCloud(founder);
+          }
+        }
 
         const curU = this.getCurrentUser();
         const activeUsers = [...cloudUsers];
@@ -5531,10 +5692,8 @@ const REMO_STORE = {
         if (typeof renderLivePresenceStrip === 'function') renderLivePresenceStrip();
       };
 
-      this.fbDb.collection('remo_users').orderBy('lastSeenAt', 'desc').limit(200).onSnapshot(handleUsersSnap, () => {
-        this.fbDb.collection('remo_users').limit(200).onSnapshot(handleUsersSnap, (err) => {
-          console.warn('Firestore remo_users sync notice:', err.message);
-        });
+      this.fbDb.collection('remo_users').limit(250).onSnapshot(handleUsersSnap, (err) => {
+        console.warn('Firestore remo_users sync notice:', err.message);
       });
 
       // 1B. Sync & Watch LIVE CITIZEN PRESENCE (Capped at 50 most recent for 100k+ user scalability)

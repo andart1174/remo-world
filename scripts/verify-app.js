@@ -105,14 +105,32 @@ function runI18nAudit() {
 async function runStoreSimulations() {
   const storeSrc = read('js/remo-store.js');
   const ls = {};
+  const ss = {};
+  let throwQuotaKey = '';
   const sb = {
     console, setTimeout, clearTimeout,
+    setInterval: () => 0, clearInterval: () => {},
     window: { addEventListener: () => {}, dispatchEvent: () => {}, location: { search: '' } },
     document: { addEventListener: () => {}, getElementById: () => null },
     navigator: { language: 'en' },
+    sessionStorage: {
+      getItem: (k) => (k in ss ? ss[k] : null),
+      setItem: (k, v) => { ss[k] = String(v); },
+      removeItem: (k) => { delete ss[k]; }
+    },
     localStorage: {
+      get length() { return Object.keys(ls).length; },
+      key: (i) => Object.keys(ls)[i] ?? null,
       getItem: (k) => (k in ls ? ls[k] : null),
-      setItem: (k, v) => { ls[k] = String(v); },
+      setItem: (k, v) => {
+        if (throwQuotaKey && k === throwQuotaKey) {
+          throwQuotaKey = '';
+          const qe = new Error('QuotaExceededError');
+          qe.name = 'QuotaExceededError';
+          throw qe;
+        }
+        ls[k] = String(v);
+      },
       removeItem: (k) => { delete ls[k]; }
     },
     CustomEvent: function (t, o) { this.type = t; this.detail = o && o.detail; },
@@ -270,7 +288,79 @@ async function runStoreSimulations() {
   const idxJson = JSON.parse(read('firestore.indexes.json'));
   assert.ok(Array.isArray(idxJson.indexes) && idxJson.indexes.length >= 8, 'firestore.indexes.json must define composite query indexes');
 
-  console.log('PASS: REMO_STORE auth alignment, error preservation, size guard, pagination, security & scalability checks verified.');
+  // 4. Duplicate Admin reconciliation (u_admin_founder 25527 vs Andrei #0002 u_fb_adm123 135) & 4D Cards alias retention
+  const deletedDocs = [];
+  let syncedFounderDoc = null;
+  STORE.fbAuth = { currentUser: { uid: 'adm123', email: 'andart1174@gmail.com', emailVerified: true } };
+  STORE.fbDb = {
+    collection: (col) => ({
+      doc: (id) => ({
+        delete: async () => { deletedDocs.push(`${col}/${id}`); },
+        set: async (data) => { if (col === 'remo_users' && id === 'u_admin_founder') syncedFounderDoc = data; }
+      })
+    })
+  };
+  STORE.state.settings = { adminEmail: 'andart1174@gmail.com', rewards: { signupBonus: 150 } };
+  STORE.state.droppedCardsPool = [
+    { id: 'c_founder_1', cityId: 'montreal', serial: '0001', ownerUid: 'u_admin_founder', ownerName: 'REMO Founder' },
+    { id: 'c_dup_2', cityId: 'paris', serial: '0002', ownerUid: 'u_fb_adm123', ownerName: 'Andrei' }
+  ];
+  STORE.state.users = [
+    {
+      uid: 'u_fb_adm123',
+      fbUid: 'adm123',
+      name: 'Andrei',
+      email: 'andart1174@gmail.com',
+      role: 'admin',
+      passportNum: '0002',
+      coins: 135,
+      cards: [{ id: 'c_dup_2', cityId: 'paris', serial: '0002', ownerUid: 'u_fb_adm123' }]
+    },
+    {
+      uid: 'u_admin_founder',
+      fbUid: '',
+      name: 'REMO Founder',
+      email: 'andart1174@gmail.com',
+      role: 'admin',
+      passportNum: '0001',
+      coins: 25527,
+      cards: [{ id: 'c_founder_1', cityId: 'montreal', serial: '0001', ownerUid: 'u_admin_founder' }]
+    }
+  ];
+  ls[STORE.USER_KEY] = 'u_fb_adm123';
+  const reconciled = STORE.ensureGuestOrCitizen('Andrei', 'andart1174@gmail.com', 'montreal', true, 'adm123');
+  assert.strictEqual(reconciled.uid, 'u_admin_founder', 'Admin login must reconcile to primary u_admin_founder');
+  assert.strictEqual(reconciled.coins, 25527, 'Admin balance 25527 must never be replaced by duplicate 135 balance');
+  ls[STORE.USER_KEY] = reconciled.uid;
+  assert.strictEqual(STORE.getCurrentUser().uid, 'u_admin_founder');
+  assert.strictEqual(STORE.isCurrentUserAdmin(), true, 'isCurrentUserAdmin() must stay true after reconciliation');
+  assert.ok(!STORE.state.users.some((x) => x && x.uid === 'u_fb_adm123'), 'Low-balance duplicate Andrei #0002 must be removed from state.users');
+  assert.ok(deletedDocs.includes('remo_users/u_fb_adm123'), 'Duplicate doc u_fb_adm123 must be queued for Firestore cleanup');
+  const retainedCards = STORE.getUserCards('u_admin_founder');
+  assert.strictEqual(retainedCards.length, 2, 'getUserCards(u_admin_founder) must retain both founder and migrated cards');
+  await STORE.syncUserToCloud(reconciled);
+  assert.ok(syncedFounderDoc && Array.isArray(syncedFounderDoc.cards) && syncedFounderDoc.cards.length >= 2, 'syncUserToCloud must persist user cards array');
+
+  // 5. Avatar preservation across init() and QuotaExceededError inside _flushLocalSave()
+  const adminAvatar20k = 'data:image/jpeg;base64,' + 'A'.repeat(20480);
+  const thirdPartyHuge = 'data:image/jpeg;base64,' + 'B'.repeat(55000);
+  ls['remo_avatar_u_admin_founder'] = adminAvatar20k;
+  ls['remo_avatar_u_other_999'] = thirdPartyHuge;
+  ls[STORE.USER_KEY] = 'u_admin_founder';
+  STORE.init();
+  assert.strictEqual(ls['remo_avatar_u_admin_founder'], adminAvatar20k, '20KB Admin avatar must survive REMO_STORE.init()');
+  throwQuotaKey = STORE.KEY;
+  STORE._flushLocalSave();
+  assert.strictEqual(throwQuotaKey, '', 'QuotaExceededError must have triggered during _flushLocalSave() test');
+  assert.strictEqual(ls['remo_avatar_u_admin_founder'], adminAvatar20k, '20KB Admin avatar must survive QuotaExceededError inside _flushLocalSave()');
+  assert.strictEqual(ls['remo_avatar_u_other_999'], undefined, 'Stale >48KB third-party avatar should be evicted before current/founder avatar');
+
+  // 6. Verify startFirestoreSync queries remo_users WITHOUT orderBy('lastSeenAt') that excludes legacy docs
+  const usersQueryMatch = storeSrc.match(/this\.fbDb\.collection\('remo_users'\)([^\n;]+)/);
+  assert.ok(usersQueryMatch, 'Must find remo_users query in js/remo-store.js');
+  assert.ok(!usersQueryMatch[1].includes("orderBy('lastSeenAt'"), 'remo_users query must NOT filter/orderBy lastSeenAt so legacy u_admin_founder is never excluded');
+
+  console.log('PASS: REMO_STORE auth alignment, Admin reconciliation, 4D cards, avatar retention & scalability checks verified.');
 }
 
 function runCleanStageLayoutAudit() {

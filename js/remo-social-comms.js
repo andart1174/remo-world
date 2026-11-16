@@ -14853,10 +14853,24 @@ function openCitizenProfileModal(uidOrName, fallbackName = '', silentIfMissing =
   const tier = REMO_STORE.getUserPassportTier ? REMO_STORE.getUserPassportTier(target.passportNum) : null;
   const onlineNow = (REMO_STORE.getOnlineCitizensList ? REMO_STORE.getOnlineCitizensList() : []).some((x) => x.uid === target.uid);
 
+  const targetAliases = new Set([target.uid]);
+  if (target.fbUid) {
+    targetAliases.add(target.fbUid);
+    targetAliases.add('u_fb_' + target.fbUid);
+  }
+  if (target.role === 'admin' || (typeof REMO_STORE.isAdminEmail === 'function' && REMO_STORE.isAdminEmail(target.email))) {
+    targetAliases.add('u_admin_founder');
+  }
   const userPosts = (REMO_STORE.state.posts || []).filter((p) =>
-    p && ((p.uid && p.uid === target.uid) || (p.authorName && target.name && p.authorName.trim().toLowerCase() === target.name.trim().toLowerCase()))
+    p && (
+      (p.uid && targetAliases.has(p.uid)) ||
+      (target.email && p.authorEmail && p.authorEmail.toLowerCase() === target.email.toLowerCase()) ||
+      (p.authorName && target.name && p.authorName.trim().toLowerCase() === target.name.trim().toLowerCase())
+    )
   );
-  const userCards = (REMO_STORE.state.droppedCardsPool || []).filter((c) => c && c.ownerUid === target.uid);
+  const userCards = (typeof REMO_STORE.getUserCards === 'function')
+    ? REMO_STORE.getUserCards(target.uid)
+    : (REMO_STORE.state.droppedCardsPool || []).filter((c) => c && c.ownerUid === target.uid);
   const followersCount = REMO_STORE.getFollowersCount ? REMO_STORE.getFollowersCount(target.uid) : 0;
   const followingCount = Array.isArray(target.following) ? target.following.length : 0;
 
