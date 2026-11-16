@@ -2520,12 +2520,6 @@ window.openAppLauncherModal = openAppLauncherModal;
 
 function closeAppLauncherModal() {
   document.getElementById('appLauncherModal')?.classList.remove('open');
-  if (typeof _syncFeedBackToTopPill === 'function') _syncFeedBackToTopPill();
-  if (viewId !== 'feed') {
-    document.querySelectorAll('#remoPostsGrid video').forEach((v) => { try { v.pause(); } catch (e) {} });
-  } else if (typeof scheduleInfiniteFeedCheck === 'function') {
-    scheduleInfiniteFeedCheck();
-  }
 }
 window.closeAppLauncherModal = closeAppLauncherModal;
 
