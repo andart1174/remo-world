@@ -80,6 +80,12 @@ function switchRemoView(viewId) {
   });
 
   document.getElementById('appLauncherModal')?.classList.remove('open');
+  if (typeof _syncFeedBackToTopPill === 'function') _syncFeedBackToTopPill();
+  if (viewId !== 'feed') {
+    document.querySelectorAll('#remoPostsGrid video').forEach((v) => { try { v.pause(); } catch (e) {} });
+  } else if (typeof scheduleInfiniteFeedCheck === 'function') {
+    scheduleInfiniteFeedCheck();
+  }
 
   if (viewId === 'messages') {
     if (!_explicitDmPartnerSelected) {
@@ -2514,6 +2520,12 @@ window.openAppLauncherModal = openAppLauncherModal;
 
 function closeAppLauncherModal() {
   document.getElementById('appLauncherModal')?.classList.remove('open');
+  if (typeof _syncFeedBackToTopPill === 'function') _syncFeedBackToTopPill();
+  if (viewId !== 'feed') {
+    document.querySelectorAll('#remoPostsGrid video').forEach((v) => { try { v.pause(); } catch (e) {} });
+  } else if (typeof scheduleInfiniteFeedCheck === 'function') {
+    scheduleInfiniteFeedCheck();
+  }
 }
 window.closeAppLauncherModal = closeAppLauncherModal;
 
@@ -2557,6 +2569,29 @@ function voteCityDuelShortcut() {
 }
 window.voteCityDuelShortcut = voteCityDuelShortcut;
 
+function _patchSingleFeedCardElement(p, lang, u, isAdm) {
+  if (!p || !p.id) return false;
+  const existingEl = document.getElementById('post_card_' + p.id);
+  if (!existingEl) return false;
+  const wasFlipped = Boolean(existingEl.querySelector('.post-flip-inner')?.classList.contains('flipped'));
+  const newHtml = renderSinglePostCardHtml(p, lang, u, isAdm);
+  if (!newHtml) return false;
+
+  existingEl.outerHTML = newHtml;
+  const updatedEl = document.getElementById('post_card_' + p.id);
+  if (updatedEl) {
+    if (wasFlipped) {
+      updatedEl.querySelector('.post-flip-inner')?.classList.add('flipped');
+    }
+    RemoMediaDB.hydrateDom(updatedEl);
+    initAllMysteryBoxCanvases(updatedEl);
+  }
+  if (window._renderedCardSigs) {
+    window._renderedCardSigs[p.id] = computePostRenderSig(p, u, lang);
+  }
+  return Boolean(updatedEl);
+}
+
 function rerenderSinglePostCard(postId) {
   if (!postId) return;
   const existingEl = document.getElementById('post_card_' + postId);
@@ -2565,22 +2600,10 @@ function rerenderSinglePostCard(postId) {
     renderSocialFeed('', true);
     return;
   }
-  const wasFlipped = Boolean(existingEl.querySelector('.post-flip-inner')?.classList.contains('flipped'));
   const lang = REMO_I18N.getLang();
   const u = REMO_STORE.getCurrentUser();
   const isAdm = REMO_STORE.isAdminUnlocked();
-  const newHtml = renderSinglePostCardHtml(p, lang, u, isAdm);
-  if (!newHtml) return;
-
-  existingEl.outerHTML = newHtml;
-  const updatedEl = document.getElementById('post_card_' + postId);
-  if (updatedEl) {
-    if (wasFlipped) {
-      updatedEl.querySelector('.post-flip-inner')?.classList.add('flipped');
-    }
-    RemoMediaDB.hydrateDom(updatedEl);
-    initAllMysteryBoxCanvases(updatedEl);
-  }
+  _patchSingleFeedCardElement(p, lang, u, isAdm);
   // Keep feed signature synchronized so subsequent cloud snapshots don't trigger a redundant full rebuild
   window._lastRenderedFeedSignature = computeVisibleFeedSignature('');
 }
@@ -2660,14 +2683,25 @@ function getFilteredSortedFeedPosts(searchQuery = '') {
   return posts;
 }
 
-let _feedVisibleLimit = 10;
+const FEED_BATCH_SIZE = 12;
+let _feedVisibleLimit = FEED_BATCH_SIZE;
 let _lastFeedFilterKey = '';
+let _lastFeedBaseCtx = '';
+let _feedAutoPrefetchCount = 0;
+let _feedSentinelObserver = null;
+let _feedScrollListenersBound = false;
+let _feedScrollRafId = 0;
+let _feedInfiniteBusy = false;
+let _feedKnownFirstPostId = '';
+let _feedNewTopArrivedCount = 0;
+window._renderedFeedPostIds = [];
+window._renderedCardSigs = {};
 
 function computeVisibleFeedSignature(searchQuery = '', prefilteredPosts = null) {
   const lang = REMO_I18N.getLang();
   const u = REMO_STORE.getCurrentUser();
   const isAdm = REMO_STORE.isAdminUnlocked();
-  const posts = prefilteredPosts || getFilteredSortedFeedPosts(searchQuery);
+  const posts = prefilteredPosts || getFilteredSortedFeedPosts(searchQuery).slice(0, _feedVisibleLimit);
   return `${lang}_${isAdm ? 1 : 0}_${u?.uid || 'guest'}_${u?.homeCity || ''}_${currentFeedMode}_${currentFeedCityFilter}_${currentFeedVibeFilter}_${searchQuery || ''}_${posts.length}::` +
     posts.map((p) => computePostRenderSig(p, u, lang)).join('|');
 }
@@ -2691,36 +2725,206 @@ function syncMobileFeedLayoutModeUI() {
   }
 }
 
-function renderFeedLoadMoreBox(grid, totalCount, shownCount, lang) {
-  let box = document.getElementById('remoFeedLoadMoreBox');
-  if (!box && grid && grid.parentNode) {
-    box = document.createElement('div');
-    box.id = 'remoFeedLoadMoreBox';
-    box.style.cssText = 'display:flex;justify-content:center;padding:16px 8px 24px;';
-    grid.parentNode.insertBefore(box, grid.nextSibling);
+function _isMobileGridScrollActive() {
+  const grid = document.getElementById('remoPostsGrid');
+  return Boolean(grid && window.innerWidth <= 860 && grid.scrollHeight > grid.clientHeight + 20);
+}
+
+function scrollFeedToTop() {
+  const grid = document.getElementById('remoPostsGrid');
+  _feedNewTopArrivedCount = 0;
+  _syncFeedBackToTopPill();
+  if (_isMobileGridScrollActive() && grid) {
+    grid.scrollTo({ top: 0, behavior: 'smooth' });
+  } else {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
-  if (!box) return;
-  const remaining = Math.max(0, totalCount - shownCount);
-  if (remaining <= 0) {
-    box.style.display = 'none';
-    box.innerHTML = '';
+}
+window.scrollFeedToTop = scrollFeedToTop;
+
+function _syncFeedBackToTopPill() {
+  const viewFeed = document.getElementById('view-feed');
+  if (!viewFeed) return;
+  let pill = document.getElementById('remoFeedBackToTopBtn');
+  const isActiveView = viewFeed.classList.contains('active');
+  const grid = document.getElementById('remoPostsGrid');
+  const scrollPos = _isMobileGridScrollActive() && grid ? grid.scrollTop : (window.scrollY || document.documentElement.scrollTop || 0);
+  const threshold = window.innerWidth <= 860 ? 1100 : 1400;
+  const shouldShow = Boolean(isActiveView && scrollPos > threshold && (window._renderedFeedPostIds || []).length > 4);
+
+  if (!shouldShow) {
+    if (pill) pill.style.display = 'none';
     return;
   }
-  box.style.display = 'flex';
-  const lbl = lang === 'fr'
-    ? `✨ Charger plus de moments (${remaining} restant${remaining > 1 ? 's' : ''})`
-    : `✨ Load More Moments (${remaining} remaining)`;
-  box.innerHTML = `<button type="button" class="btn-cyber btn-gold" style="padding:11px 22px;font-size:0.84rem;" onclick="loadMoreFeedPosts()">${escapeHtmlStr(lbl)}</button>`;
+  if (!pill) {
+    pill = document.createElement('button');
+    pill.id = 'remoFeedBackToTopBtn';
+    pill.type = 'button';
+    pill.className = 'feed-back-to-top-pill';
+    pill.onclick = scrollFeedToTop;
+    document.body.appendChild(pill);
+  }
+  const hasNew = _feedNewTopArrivedCount > 0;
+  pill.classList.toggle('has-new', hasNew);
+  pill.textContent = hasNew ? REMO_I18N.t('feed_new_posts_pill') : REMO_I18N.t('feed_back_to_top');
+  pill.style.display = 'inline-flex';
+}
+
+function _ensureFeedSentinelElement(grid) {
+  if (!grid) return null;
+  let sentinel = document.getElementById('remoFeedInfiniteSentinel');
+  if (!sentinel) {
+    sentinel = document.createElement('div');
+    sentinel.id = 'remoFeedInfiniteSentinel';
+    sentinel.className = 'feed-scroll-sentinel is-trigger';
+  }
+  if (sentinel.parentNode !== grid || grid.lastElementChild !== sentinel) {
+    grid.appendChild(sentinel);
+  }
+  return sentinel;
+}
+
+function renderFeedInfiniteSentinel(grid, totalCount, shownCount, lang) {
+  document.getElementById('remoFeedLoadMoreBox')?.remove();
+  if (!grid) return;
+  const existing = document.getElementById('remoFeedInfiniteSentinel');
+  if (shownCount <= 0) {
+    if (existing) existing.remove();
+    return;
+  }
+  const sentinel = _ensureFeedSentinelElement(grid);
+  const hasMoreLocal = shownCount < totalCount;
+  const hasMoreCloud = Boolean(typeof REMO_STORE !== 'undefined' && REMO_STORE.hasMoreCloudPosts);
+  const isLoadingCloud = Boolean(typeof REMO_STORE !== 'undefined' && REMO_STORE.loadingOlderCloudPosts);
+
+  if (isLoadingCloud) {
+    sentinel.className = 'feed-scroll-sentinel is-loading';
+    sentinel.innerHTML = `<span class="feed-sentinel-spinner"></span><span>${escapeHtmlStr(REMO_I18N.t('feed_loading_more'))}</span>`;
+  } else if (hasMoreLocal || hasMoreCloud) {
+    sentinel.className = 'feed-scroll-sentinel is-trigger';
+    sentinel.innerHTML = '';
+  } else {
+    sentinel.className = 'feed-scroll-sentinel is-caught-up';
+    const caughtTxt = escapeHtmlStr(REMO_I18N.t('feed_caught_up'));
+    const topTxt = escapeHtmlStr(REMO_I18N.t('feed_back_to_top'));
+    sentinel.innerHTML = `<div class="feed-caught-up-inner">
+      <span>${caughtTxt}</span>
+      ${shownCount > 3 ? `<button type="button" class="btn-ghost feed-end-top-btn" onclick="scrollFeedToTop()">${topTxt}</button>` : ''}
+    </div>`;
+  }
+  _observeFeedSentinel(sentinel);
+}
+
+function _pauseOffscreenFeedVideos() {
+  const grid = document.getElementById('remoPostsGrid');
+  if (!grid) return;
+  const vh = window.innerHeight || 800;
+  grid.querySelectorAll('video').forEach((v) => {
+    if (v.paused) return;
+    const r = v.getBoundingClientRect();
+    if (r.bottom < -vh * 1.2 || r.top > vh * 2.2) {
+      try { v.pause(); } catch (e) {}
+    }
+  });
+}
+
+function _isFeedNearBottom() {
+  const grid = document.getElementById('remoPostsGrid');
+  if (!grid) return false;
+  if (_isMobileGridScrollActive()) {
+    const dist = grid.scrollHeight - (grid.scrollTop + grid.clientHeight);
+    return dist < Math.max(900, grid.clientHeight * 2.2);
+  }
+  const rect = grid.getBoundingClientRect();
+  return rect.bottom <= (window.innerHeight || 800) + 1100;
+}
+
+async function triggerInfiniteFeedLoad(forceNextBatch = false) {
+  if (_feedInfiniteBusy) return;
+  const viewFeed = document.getElementById('view-feed');
+  if (!viewFeed || !viewFeed.classList.contains('active')) return;
+  const searchInp = document.querySelector('.header-search input');
+  const qStr = searchInp ? searchInp.value : '';
+  const posts = getFilteredSortedFeedPosts(qStr);
+  const hasMoreLocal = _feedVisibleLimit < posts.length;
+  const hasMoreCloud = Boolean(typeof REMO_STORE !== 'undefined' && REMO_STORE.hasMoreCloudPosts);
+  if (!hasMoreLocal && !hasMoreCloud) return;
+  if (!forceNextBatch && !_isFeedNearBottom()) return;
+
+  _feedInfiniteBusy = true;
+  try {
+    if (hasMoreLocal) {
+      _feedVisibleLimit += FEED_BATCH_SIZE;
+      renderSocialFeed(qStr, false);
+    }
+    const afterShown = Math.min(posts.length, _feedVisibleLimit);
+    const remainingBuffer = posts.length - afterShown;
+    if (remainingBuffer < 8 && typeof REMO_STORE !== 'undefined' && REMO_STORE.hasMoreCloudPosts && !REMO_STORE.loadingOlderCloudPosts) {
+      const grid = document.getElementById('remoPostsGrid');
+      if (grid) renderFeedInfiniteSentinel(grid, posts.length, afterShown, REMO_I18N.getLang());
+      const fetched = await REMO_STORE.loadOlderCloudPosts(30);
+      if (fetched) {
+        const latestPosts = getFilteredSortedFeedPosts(qStr);
+        if (_feedVisibleLimit < latestPosts.length) {
+          _feedVisibleLimit += FEED_BATCH_SIZE;
+        }
+      }
+      renderSocialFeed(qStr, false);
+    }
+  } finally {
+    _feedInfiniteBusy = false;
+  }
+}
+
+function scheduleInfiniteFeedCheck() {
+  if (_feedScrollRafId) return;
+  _feedScrollRafId = requestAnimationFrame(() => {
+    _feedScrollRafId = 0;
+    _syncFeedBackToTopPill();
+    _pauseOffscreenFeedVideos();
+    if (_isFeedNearBottom()) {
+      triggerInfiniteFeedLoad(false);
+    }
+  });
+}
+
+function _bindGlobalFeedScrollListeners() {
+  if (_feedScrollListenersBound) return;
+  _feedScrollListenersBound = true;
+  window.addEventListener('scroll', scheduleInfiniteFeedCheck, { passive: true });
+  window.addEventListener('resize', scheduleInfiniteFeedCheck, { passive: true });
+  const grid = document.getElementById('remoPostsGrid');
+  if (grid) {
+    grid.addEventListener('scroll', scheduleInfiniteFeedCheck, { passive: true });
+  }
+  window.addEventListener('remo:feedpaging', () => {
+    const g = document.getElementById('remoPostsGrid');
+    if (g && (window._renderedFeedPostIds || []).length > 0) {
+      const searchInp = document.querySelector('.header-search input');
+      const total = getFilteredSortedFeedPosts(searchInp ? searchInp.value : '').length;
+      renderFeedInfiniteSentinel(g, total, Math.min(total, _feedVisibleLimit), REMO_I18N.getLang());
+    }
+  });
+}
+
+function _observeFeedSentinel(sentinelEl) {
+  if (!sentinelEl || typeof IntersectionObserver === 'undefined') return;
+  if (_feedSentinelObserver) _feedSentinelObserver.disconnect();
+  _feedSentinelObserver = new IntersectionObserver((entries) => {
+    if (entries.some((e) => e.isIntersecting)) {
+      triggerInfiniteFeedLoad(true);
+    }
+  }, { root: null, rootMargin: '1200px 0px', threshold: 0 });
+  _feedSentinelObserver.observe(sentinelEl);
 }
 
 function loadMoreFeedPosts() {
-  _feedVisibleLimit += 10;
-  const searchInp = document.querySelector('.header-search input');
-  renderSocialFeed(searchInp ? searchInp.value : '', true);
+  triggerInfiniteFeedLoad(true);
 }
 window.loadMoreFeedPosts = loadMoreFeedPosts;
 
 function renderSocialFeed(searchQuery = '', forceFull = false) {
+  _bindGlobalFeedScrollListeners();
   renderStoriesAndBanners();
   if (typeof renderWorldSpotlightBar === 'function') {
     renderWorldSpotlightBar();
@@ -2737,46 +2941,121 @@ function renderSocialFeed(searchQuery = '', forceFull = false) {
 
   const lang = REMO_I18N.getLang();
   const qStr = String(searchQuery || '');
-  const filterKey = `${currentFeedMode}|${currentFeedCityFilter}|${currentFeedVibeFilter}|${qStr.trim().toLowerCase()}`;
-  if (filterKey !== _lastFeedFilterKey) {
-    _lastFeedFilterKey = filterKey;
-    _feedVisibleLimit = 10;
-  }
-
   const u = REMO_STORE.getCurrentUser();
   const isAdm = REMO_STORE.isAdminUnlocked();
+  const filterKey = `${currentFeedMode}|${currentFeedCityFilter}|${currentFeedVibeFilter}|${qStr.trim().toLowerCase()}`;
+  const baseCtx = `${lang}|${isAdm ? 1 : 0}|${u?.uid || 'guest'}|${u?.homeCity || ''}|${filterKey}`;
+
+  if (filterKey !== _lastFeedFilterKey) {
+    _lastFeedFilterKey = filterKey;
+    _feedVisibleLimit = FEED_BATCH_SIZE;
+    _feedAutoPrefetchCount = 0;
+    window._renderedFeedPostIds = [];
+    window._renderedCardSigs = {};
+    _feedKnownFirstPostId = '';
+    _feedNewTopArrivedCount = 0;
+    if (_isMobileGridScrollActive()) grid.scrollTop = 0;
+  }
+
   const posts = getFilteredSortedFeedPosts(qStr);
 
   if (posts.length === 0) {
+    if (typeof REMO_STORE !== 'undefined' && REMO_STORE.hasMoreCloudPosts && !REMO_STORE.loadingOlderCloudPosts && currentFeedMode !== 'all' && _feedAutoPrefetchCount < 2) {
+      _feedAutoPrefetchCount++;
+      REMO_STORE.loadOlderCloudPosts(30).then(() => renderSocialFeed(qStr, true));
+    }
+    window._renderedFeedPostIds = [];
+    window._renderedCardSigs = {};
     window._lastRenderedFeedSignature = 'empty_' + lang + '_' + filterKey;
     grid.innerHTML = `<div class="glass-box" style="grid-column:1/-1;text-align:center;padding:40px;">
       ${lang === 'fr' ? 'Aucun moment trouvé pour ce filtre. Soyez le premier à publier ! ✨' : 'No moments match this filter yet. Be the first to post! ✨'}
     </div>`;
-    renderFeedLoadMoreBox(grid, 0, 0, lang);
+    renderFeedInfiniteSentinel(grid, 0, 0, lang);
+    _syncFeedBackToTopPill();
     return;
   }
 
   if (window._deepLinkedPostId) {
     const deepIdx = posts.findIndex((x) => x && x.id === window._deepLinkedPostId);
-    if (deepIdx >= _feedVisibleLimit) {
-      _feedVisibleLimit = deepIdx + 1;
+    if (deepIdx < 0 && typeof REMO_STORE !== 'undefined' && typeof REMO_STORE.fetchDeepLinkedPostIfMissing === 'function') {
+      REMO_STORE.fetchDeepLinkedPostIfMissing(window._deepLinkedPostId);
+    } else if (deepIdx >= _feedVisibleLimit) {
+      _feedVisibleLimit = deepIdx + 4;
     }
   }
 
   const visiblePosts = posts.slice(0, Math.min(posts.length, _feedVisibleLimit));
+  const nextIds = visiblePosts.map((p) => p.id);
+  const prevIds = window._renderedFeedPostIds || [];
   const nextSig = computeVisibleFeedSignature(qStr, visiblePosts) + `_tot:${posts.length}`;
-  if (!forceFull && grid.children.length === visiblePosts.length && window._lastRenderedFeedSignature === nextSig) {
-    renderFeedLoadMoreBox(grid, posts.length, visiblePosts.length, lang);
+
+  if (_feedKnownFirstPostId && nextIds[0] && nextIds[0] !== _feedKnownFirstPostId) {
+    const scrollPos = _isMobileGridScrollActive() ? grid.scrollTop : (window.scrollY || 0);
+    if (scrollPos > 700) {
+      _feedNewTopArrivedCount++;
+    }
+  }
+  _feedKnownFirstPostId = nextIds[0] || '';
+
+  const canIncrementalPatchOrAppend = !forceFull &&
+    prevIds.length > 0 &&
+    baseCtx === _lastFeedBaseCtx &&
+    nextIds.length >= prevIds.length &&
+    prevIds.every((id, idx) => id === nextIds[idx]) &&
+    Boolean(document.getElementById('post_card_' + prevIds[0]));
+
+  if (canIncrementalPatchOrAppend) {
+    if (prevIds.length === nextIds.length && window._lastRenderedFeedSignature === nextSig) {
+      renderFeedInfiniteSentinel(grid, posts.length, visiblePosts.length, lang);
+      scheduleInfiniteFeedCheck();
+      return;
+    }
+    // 1. In-place patch ONLY existing cards whose content changed (keeps playing videos & scroll smooth!)
+    for (let i = 0; i < prevIds.length; i++) {
+      const p = visiblePosts[i];
+      const newCardSig = computePostRenderSig(p, u, lang);
+      if (window._renderedCardSigs[p.id] !== newCardSig) {
+        _patchSingleFeedCardElement(p, lang, u, isAdm);
+      }
+    }
+    // 2. Append ONLY newly revealed posts cleanly before the sentinel
+    if (visiblePosts.length > prevIds.length) {
+      const sentinel = _ensureFeedSentinelElement(grid);
+      const newlyVisible = visiblePosts.slice(prevIds.length);
+      const tempWrap = document.createElement('div');
+      tempWrap.innerHTML = newlyVisible.map((p) => renderSinglePostCardHtml(p, lang, u, isAdm)).join('');
+      const addedNodes = Array.from(tempWrap.children);
+      addedNodes.forEach((node) => {
+        grid.insertBefore(node, sentinel);
+        RemoMediaDB.hydrateDom(node);
+        initAllMysteryBoxCanvases(node);
+      });
+      newlyVisible.forEach((p) => {
+        window._renderedCardSigs[p.id] = computePostRenderSig(p, u, lang);
+      });
+    }
+    window._renderedFeedPostIds = nextIds;
+    window._lastRenderedFeedSignature = nextSig;
+    renderFeedInfiniteSentinel(grid, posts.length, visiblePosts.length, lang);
+    scheduleInfiniteFeedCheck();
     return;
   }
+
+  _lastFeedBaseCtx = baseCtx;
   window._lastRenderedFeedSignature = nextSig;
+  window._renderedFeedPostIds = nextIds;
+  window._renderedCardSigs = {};
+  visiblePosts.forEach((p) => {
+    window._renderedCardSigs[p.id] = computePostRenderSig(p, u, lang);
+  });
 
   grid.innerHTML = visiblePosts.map((p) => renderSinglePostCardHtml(p, lang, u, isAdm)).join('');
-  renderFeedLoadMoreBox(grid, posts.length, visiblePosts.length, lang);
+  renderFeedInfiniteSentinel(grid, posts.length, visiblePosts.length, lang);
 
   // Asynchronously attach any IndexedDB video/photo/audio Blobs
   RemoMediaDB.hydrateDom(grid);
   initAllMysteryBoxCanvases(grid);
+  scheduleInfiniteFeedCheck();
 }
 
 function applyHoloTilt(e, cardEl) {

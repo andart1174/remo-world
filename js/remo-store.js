@@ -2992,7 +2992,11 @@ const REMO_STORE = {
 
   _flushLocalSave() {
     try {
-      localStorage.setItem(this.KEY, JSON.stringify(this.state));
+      const toPersist = Object.assign({}, this.state);
+      if (Array.isArray(toPersist.posts) && toPersist.posts.length > 80) {
+        toPersist.posts = toPersist.posts.slice(0, 80);
+      }
+      localStorage.setItem(this.KEY, JSON.stringify(toPersist));
     } catch (e) {
       console.warn('LocalStorage quota limit reached, trimming local cache:', e);
       try {
@@ -5404,222 +5408,87 @@ const REMO_STORE = {
         console.log('Firestore public settings watch status:', err.message);
       });
 
-      // 3. Sync & Watch ALL SOCIAL POSTS in Real Time across all devices (Cloud is Authoritative Source of Truth)
-      let isInitialPostsSnap = true;
-      this.fbDb.collection('remo_posts').limit(80).onSnapshot((snap) => {
+      // 3. Sync & Watch SOCIAL POSTS in Real Time with Ordered Cursor Pagination (Supports 10,000+ posts)
+      this._ensureCloudPostPaginationState();
+      this.hasMoreCloudPosts = true;
+      this.loadingOlderCloudPosts = false;
+      this._postsLastCursorDoc = null;
+
+      let isInitialTopSnap = true;
+      this.fbDb.collection('remo_posts').orderBy('createdAt', 'desc').limit(40).onSnapshot((snap) => {
         if (!snap) return;
-        const cloudPosts = [];
-        const cloudPostIds = new Set();
+        const incomingIds = new Set();
+        let minTopCreatedAt = Infinity;
+        let lastDoc = null;
+
         snap.forEach((doc) => {
+          lastDoc = doc;
           const cp = doc.data();
-          if (cp && cp.id) {
-            // Discard and delete any demo posts or posts deleted by admin
-            const isDemo = cp.id === 'demo_1' || cp.id.startsWith('demo_') || cp.id.includes('demo') || cp.id === 'post_capsule_demo_1' || cp.id === 'post_duet_demo_1';
-            const isDeleted = (this.deletedPostIds && this.deletedPostIds.has(cp.id));
-            if (isDemo || isDeleted) {
-              this.fbDb.collection('remo_posts').doc(cp.id).delete().catch(() => {});
-              return;
-            }
-            cloudPosts.push(cp);
-            cloudPostIds.add(cp.id);
+          if (!cp || !cp.id) return;
+          if (this._shouldPurgeCloudPost(cp)) {
+            this.fbDb.collection('remo_posts').doc(cp.id).delete().catch(() => {});
+            return;
           }
+          incomingIds.add(cp.id);
+          const cTs = Number(cp.createdAt || 0);
+          if (cTs > 0 && cTs < minTopCreatedAt) minTopCreatedAt = cTs;
+          this._cloudLiveTopPostsMap.set(cp.id, cp);
         });
 
-        const now = Date.now();
-        const curU = this.getCurrentUser();
-        const myUid = curU ? curU.uid : null;
-        // Preserve only freshly created local drafts (< 4000ms old) that haven't hit the cloud yet
-        const freshLocal = (this.state.posts || []).filter((lp) =>
-          lp && lp.id && !cloudPostIds.has(lp.id) && !this.deletedPostIds?.has(lp.id) && (now - (lp.createdAt || 0) < 4000)
-        );
-
-        // Active posts with smart-merge for likes, reactions and comments
-        const activePosts = [...freshLocal];
-        cloudPosts.forEach((cp) => {
-          const lp = (this.state.posts || []).find((x) => x && x.id === cp.id);
-          if (lp) {
-            const prevCommentIds = new Set((lp.comments || []).map((c) => c && c.id).filter(Boolean));
-            // Keep union of likes
-            const mergedLikes = Array.from(new Set([...(cp.likes || []), ...(lp.likes || [])]));
-            cp.likes = mergedLikes;
-            // Merge reactions & mystery city guesses
-            cp.reactions = Object.assign({}, cp.reactions || {}, lp.reactions || {});
-            if (cp.cityGuesses || lp.cityGuesses) {
-              cp.cityGuesses = Object.assign({}, cp.cityGuesses || {}, lp.cityGuesses || {});
+        // Reconcile items that left the live top-40 window (archive if pushed older, drop if deleted)
+        for (const [prevId, prevPost] of Array.from(this._cloudLiveTopPostsMap.entries())) {
+          if (!incomingIds.has(prevId)) {
+            this._cloudLiveTopPostsMap.delete(prevId);
+            const prevTs = Number(prevPost?.createdAt || 0);
+            const pushedBeyondTop40 = snap.docs.length >= 40 && minTopCreatedAt < Infinity && prevTs <= minTopCreatedAt;
+            if (pushedBeyondTop40 && !this.deletedPostIds?.has(prevId)) {
+              this._olderCloudPostsMap.set(prevId, prevPost);
             }
-            // Merge comments
-            const cmtMap = new Map();
-            (cp.comments || []).forEach((c) => {
-              if (c && c.id) {
-                cmtMap.set(c.id, c);
-                // Detect live comment on my post if remo_notifications has not arrived yet
-                if (!isInitialPostsSnap && myUid && cp.uid === myUid && c.uid && c.uid !== myUid && !prevCommentIds.has(c.id) && (now - (c.createdAt || 0) < 120000)) {
-                  const alreadyNotified = (this.state.notifications || []).some(
-                    (n) => n.type === 'comment' && n.postId === cp.id && n.fromUid === c.uid && Math.abs((n.ts || 0) - (c.createdAt || now)) < 15000
-                  );
-                  if (!alreadyNotified) {
-                    const synthId = 'notif_cmt_' + c.id;
-                    if (!this.getLocalReadNotifIds().has(synthId)) {
-                      const snippet = c.text ? (c.text.length > 50 ? c.text.slice(0, 47) + '...' : c.text) : '';
-                      const synthNotif = {
-                        id: synthId,
-                        toUid: myUid,
-                        fromUid: c.uid,
-                        fromName: c.author || 'Citizen',
-                        fromCity: c.cityId || '',
-                        type: 'comment',
-                        postId: cp.id,
-                        rawPreview: snippet,
-                        text: snippet,
-                        read: false,
-                        ts: c.createdAt || now
-                      };
-                      this.state.notifications = this.state.notifications || [];
-                      this.state.notifications.unshift(synthNotif);
-                      try { RemoAudio.play('goldchime'); } catch (e) {}
-                      if (typeof showHeadsUpNotification === 'function') {
-                        const formattedDesc = (typeof formatNotificationDesc === 'function') ? formatNotificationDesc(synthNotif) : snippet;
-                        showHeadsUpNotification({
-                          type: 'comment',
-                          title: `@${c.author || 'Citizen'}`,
-                          text: formattedDesc,
-                          postId: cp.id,
-                          partnerUid: c.uid
-                        });
-                      }
-                    }
-                  }
-                }
-              }
-            });
-            (lp.comments || []).forEach((c) => { if (c && c.id && !cmtMap.has(c.id)) cmtMap.set(c.id, c); });
-            cp.comments = Array.from(cmtMap.values());
-            if ((lp.tipsTotal || 0) > (cp.tipsTotal || 0)) cp.tipsTotal = lp.tipsTotal;
-            // Smart-merge City Versus Duel votes, voters, bonus claims & conclusion state
-            if (cp.versus || lp.versus) {
-              const cv = cp.versus || {};
-              const lv = lp.versus || {};
-              const mergedVoters = Array.from(new Set([...(cv.voters || []), ...(lv.voters || [])]));
-              const mergedClaimed = Array.from(new Set([...(cv.claimedBonus || []), ...(lv.claimedBonus || [])]));
-              const mergedSides = Object.assign({}, cv.voterSides || {}, lv.voterSides || {});
-              const sideValues = Object.values(mergedSides);
-              const sideLeft = sideValues.filter((s) => s === 'left').length;
-              const sideRight = sideValues.filter((s) => s === 'right').length;
-              const useExactMap = (sideLeft + sideRight) > 0 && mergedVoters.length <= (sideLeft + sideRight);
-              cp.versus = Object.assign({}, lv, cv, {
-                leftVotes: useExactMap ? sideLeft : Math.max(Number(cv.leftVotes || 0), Number(lv.leftVotes || 0), sideLeft),
-                rightVotes: useExactMap ? sideRight : Math.max(Number(cv.rightVotes || 0), Number(lv.rightVotes || 0), sideRight),
-                voters: mergedVoters,
-                voterSides: mergedSides,
-                claimedBonus: mergedClaimed,
-                closed: Boolean(cv.closed || lv.closed),
-                winnerSide: cv.winnerSide || lv.winnerSide || null
-              });
-            }
-            // Smart-merge Poll votes & voters
-            if (cp.poll || lp.poll) {
-              const cPoll = cp.poll || {};
-              const lPoll = lp.poll || {};
-              const mergedPollVoters = Array.from(new Set([...(cPoll.voters || []), ...(lPoll.voters || [])]));
-              const baseOpts = Array.isArray(cPoll.options) ? cPoll.options : (lPoll.options || []);
-              const lOpts = Array.isArray(lPoll.options) ? lPoll.options : [];
-              const mergedOpts = baseOpts.map((opt, idx) => {
-                const lOpt = lOpts[idx] || {};
-                return Object.assign({}, lOpt, opt, {
-                  votes: Math.max(Number(opt?.votes || 0), Number(lOpt?.votes || 0))
-                });
-              });
-              cp.poll = Object.assign({}, lPoll, cPoll, {
-                voters: mergedPollVoters,
-                options: mergedOpts
-              });
-            }
-            // Smart-merge Secret Capsule & Feed Bounty claims
-            if (cp.secretCapsule || lp.secretCapsule) {
-              const cSc = cp.secretCapsule || {};
-              const lSc = lp.secretCapsule || {};
-              cp.secretCapsule = Object.assign({}, lSc, cSc, {
-                unlockedBy: Array.from(new Set([...(cSc.unlockedBy || []), ...(lSc.unlockedBy || [])]))
-              });
-            }
-            if (cp.bounty || lp.bounty) {
-              const cB = cp.bounty || {};
-              const lB = lp.bounty || {};
-              cp.bounty = Object.assign({}, lB, cB, {
-                claimed: Boolean(cB.claimed || lB.claimed),
-                claimedBy: cB.claimedBy || lB.claimedBy || '',
-                claimedAt: cB.claimedAt || lB.claimedAt || 0
-              });
-            }
-            // Smart-merge HTML Arcade Leaderboard (keep highest score per citizen)
-            if (Array.isArray(cp.leaderboard) || Array.isArray(lp.leaderboard)) {
-              const lbMap = new Map();
-              [...(cp.leaderboard || []), ...(lp.leaderboard || [])].forEach((entry) => {
-                if (!entry || !entry.uid) return;
-                const prevE = lbMap.get(entry.uid);
-                if (!prevE || Number(entry.score || 0) > Number(prevE.score || 0)) {
-                  lbMap.set(entry.uid, entry);
-                }
-              });
-              cp.leaderboard = Array.from(lbMap.values()).sort((a, b) => (b.score || 0) - (a.score || 0)).slice(0, 10);
-            }
-            // Smart-merge active Boost 24h status (preserve newer local boost/unboost while async write settles)
-            const lBoostTs = Number(lp.boostedUpdatedAt || lp.boostedAt || 0);
-            const cBoostTs = Number(cp.boostedUpdatedAt || cp.boostedAt || 0);
-            if (lBoostTs > cBoostTs && (now - lBoostTs < 60000 || (lp.boosted && Number(lp.boostedUntil || 0) > now))) {
-              cp.boosted = Boolean(lp.boosted);
-              cp.boostedAt = Number(lp.boostedAt || 0);
-              cp.boostedUntil = Number(lp.boostedUntil || 0);
-              cp.boostedUpdatedAt = lBoostTs;
-            }
-          }
-          if (!activePosts.some((m) => m.id === cp.id) && (!this.deletedPostIds || !this.deletedPostIds.has(cp.id))) {
-            activePosts.push(cp);
-          }
-        });
-        isInitialPostsSnap = false;
-
-        const postSig = (p) => `${p.id}_${p.type || ''}_${p.likes?.length || 0}_${p.comments?.length || 0}_${p.tipsTotal || 0}_${Object.keys(p.cityGuesses || {}).length}_${p.leaderboard?.[0]?.score || 0}_${p.pinned ? 1 : 0}_${p.boosted ? 1 : 0}_${p.boostedUntil || 0}_${p.boostedAt || 0}_${p.versus ? `${p.versus.leftVotes || 0}:${p.versus.rightVotes || 0}:${p.versus.closed ? 1 : 0}` : ''}_${p.poll ? (p.poll.voters || []).length : 0}`;
-        const prevSignature = (this.state.posts || []).map(postSig).join('|');
-        const nextSignature = activePosts.map(postSig).join('|');
-        const hasContentChanged = prevSignature !== nextSignature;
-
-        const nowPostTs = Date.now();
-        const isBoostVal = (p) => {
-          if (!p || !p.boosted) return 0;
-          if (p.boostedUntil && nowPostTs < Number(p.boostedUntil)) return 1;
-          if (!p.boostedUntil && p.createdAt && (nowPostTs - Number(p.createdAt) < 86400000)) return 1;
-          p.boosted = false;
-          return 0;
-        };
-
-        this.state.posts = activePosts;
-        this.state.posts.sort((a, b) => {
-          const pinDiff = (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0);
-          if (pinDiff !== 0) return pinDiff;
-          const bBoost = isBoostVal(b);
-          const aBoost = isBoostVal(a);
-          if (bBoost !== aBoost) return bBoost - aBoost;
-          if (bBoost && aBoost) {
-            return Number(b.boostedAt || b.createdAt || 0) - Number(a.boostedAt || a.createdAt || 0);
-          }
-          return (b.createdAt || 0) - (a.createdAt || 0);
-        });
-
-        this.save(false, 'cloud_posts_sync');
-        if (hasContentChanged) {
-          window.dispatchEvent(new CustomEvent('remo:stateupdate', { detail: { reason: 'cloud_posts' } }));
-          if (typeof renderSocialFeed === 'function' && (typeof currentRemoView === 'undefined' || currentRemoView === 'feed')) {
-            renderSocialFeed();
-          }
-          if (typeof updateUnreadBadges === 'function') updateUnreadBadges();
-          if (typeof refreshAllAdminPanels === 'function') {
-            refreshAllAdminPanels();
           }
         }
+
+        if (!this._postsLastCursorDoc) {
+          this._postsLastCursorDoc = lastDoc;
+          this.hasMoreCloudPosts = snap.docs.length >= 40;
+        }
+
+        this._rebuildStatePostsFromCloudMaps(isInitialTopSnap);
+        isInitialTopSnap = false;
       }, (err) => {
         console.warn('Firestore remo_posts sync notice:', err.message);
       });
+
+      // 3A-Pin & 3A-Boost: Always keep official Pinned & active 24h Boosted posts synced regardless of age
+      const syncSubsetListener = (query, targetMap, isBoostMap) => {
+        query.onSnapshot((snap) => {
+          if (!snap) return;
+          const seenIds = new Set();
+          snap.forEach((doc) => {
+            const cp = doc.data();
+            if (!cp || !cp.id || this._shouldPurgeCloudPost(cp)) return;
+            seenIds.add(cp.id);
+            targetMap.set(cp.id, cp);
+          });
+          for (const oldId of Array.from(targetMap.keys())) {
+            if (!seenIds.has(oldId)) {
+              targetMap.delete(oldId);
+              if (isBoostMap && this._olderCloudPostsMap.has(oldId)) {
+                const cached = this._olderCloudPostsMap.get(oldId);
+                if (cached) {
+                  const ageMs = Date.now() - Number(cached.boostedUpdatedAt || cached.boostedAt || 0);
+                  if (ageMs > 60000) cached.boosted = false;
+                }
+              }
+            }
+          }
+          this._rebuildStatePostsFromCloudMaps(true);
+        }, (err) => {
+          console.warn('Firestore priority posts notice:', err.message);
+        });
+      };
+
+      syncSubsetListener(this.fbDb.collection('remo_posts').where('pinned', '==', true).limit(15), this._cloudPinnedPostsMap, false);
+      syncSubsetListener(this.fbDb.collection('remo_posts').where('boosted', '==', true).limit(25), this._cloudBoostedPostsMap, true);
 
       // 3B. Sync & Watch ALL 24H STORIES in Real Time across all devices (Dedicated Collection: remo_stories)
       this.fbDb.collection('remo_stories').limit(60).onSnapshot((snap) => {
@@ -5998,6 +5867,286 @@ const REMO_STORE = {
     }
   },
 
+  _ensureCloudPostPaginationState() {
+    if (!this._cloudLiveTopPostsMap) this._cloudLiveTopPostsMap = new Map();
+    if (!this._cloudPinnedPostsMap) this._cloudPinnedPostsMap = new Map();
+    if (!this._cloudBoostedPostsMap) this._cloudBoostedPostsMap = new Map();
+    if (!this._olderCloudPostsMap) this._olderCloudPostsMap = new Map();
+  },
+
+  _shouldPurgeCloudPost(cp) {
+    if (!cp || !cp.id) return false;
+    const isDemo = cp.id === 'demo_1' || cp.id.startsWith('demo_') || cp.id.includes('demo') || cp.id === 'post_capsule_demo_1' || cp.id === 'post_duet_demo_1';
+    const isDeleted = Boolean(this.deletedPostIds && this.deletedPostIds.has(cp.id));
+    return isDemo || isDeleted;
+  },
+
+  _mergeSingleCloudPost(rawCp, lp, isInitialPostsSnap, now) {
+    const cp = Object.assign({}, rawCp);
+    if (!lp) return cp;
+    const curU = this.getCurrentUser();
+    const myUid = curU ? curU.uid : null;
+    const prevCommentIds = new Set((lp.comments || []).map((c) => c && c.id).filter(Boolean));
+    cp.likes = Array.from(new Set([...(cp.likes || []), ...(lp.likes || [])]));
+    cp.reactions = Object.assign({}, cp.reactions || {}, lp.reactions || {});
+    if (cp.cityGuesses || lp.cityGuesses) {
+      cp.cityGuesses = Object.assign({}, cp.cityGuesses || {}, lp.cityGuesses || {});
+    }
+    const cmtMap = new Map();
+    (cp.comments || []).forEach((c) => {
+      if (c && c.id) {
+        cmtMap.set(c.id, c);
+        if (!isInitialPostsSnap && myUid && cp.uid === myUid && c.uid && c.uid !== myUid && !prevCommentIds.has(c.id) && (now - (c.createdAt || 0) < 120000)) {
+          const alreadyNotified = (this.state.notifications || []).some(
+            (n) => n.type === 'comment' && n.postId === cp.id && n.fromUid === c.uid && Math.abs((n.ts || 0) - (c.createdAt || now)) < 15000
+          );
+          if (!alreadyNotified) {
+            const synthId = 'notif_cmt_' + c.id;
+            if (!this.getLocalReadNotifIds().has(synthId)) {
+              const snippet = c.text ? (c.text.length > 50 ? c.text.slice(0, 47) + '...' : c.text) : '';
+              const synthNotif = {
+                id: synthId,
+                toUid: myUid,
+                fromUid: c.uid,
+                fromName: c.author || 'Citizen',
+                fromCity: c.cityId || '',
+                type: 'comment',
+                postId: cp.id,
+                rawPreview: snippet,
+                text: snippet,
+                read: false,
+                ts: c.createdAt || now
+              };
+              this.state.notifications = this.state.notifications || [];
+              this.state.notifications.unshift(synthNotif);
+              try { RemoAudio.play('goldchime'); } catch (e) {}
+              if (typeof showHeadsUpNotification === 'function') {
+                const formattedDesc = (typeof formatNotificationDesc === 'function') ? formatNotificationDesc(synthNotif) : snippet;
+                showHeadsUpNotification({
+                  type: 'comment',
+                  title: `@${c.author || 'Citizen'}`,
+                  text: formattedDesc,
+                  postId: cp.id,
+                  partnerUid: c.uid
+                });
+              }
+            }
+          }
+        }
+      }
+    });
+    (lp.comments || []).forEach((c) => { if (c && c.id && !cmtMap.has(c.id)) cmtMap.set(c.id, c); });
+    cp.comments = Array.from(cmtMap.values());
+    if ((lp.tipsTotal || 0) > (cp.tipsTotal || 0)) cp.tipsTotal = lp.tipsTotal;
+    if (cp.versus || lp.versus) {
+      const cv = cp.versus || {};
+      const lv = lp.versus || {};
+      const mergedVoters = Array.from(new Set([...(cv.voters || []), ...(lv.voters || [])]));
+      const mergedClaimed = Array.from(new Set([...(cv.claimedBonus || []), ...(lv.claimedBonus || [])]));
+      const mergedSides = Object.assign({}, cv.voterSides || {}, lv.voterSides || {});
+      const sideValues = Object.values(mergedSides);
+      const sideLeft = sideValues.filter((s) => s === 'left').length;
+      const sideRight = sideValues.filter((s) => s === 'right').length;
+      const useExactMap = (sideLeft + sideRight) > 0 && mergedVoters.length <= (sideLeft + sideRight);
+      cp.versus = Object.assign({}, lv, cv, {
+        leftVotes: useExactMap ? sideLeft : Math.max(Number(cv.leftVotes || 0), Number(lv.leftVotes || 0), sideLeft),
+        rightVotes: useExactMap ? sideRight : Math.max(Number(cv.rightVotes || 0), Number(lv.rightVotes || 0), sideRight),
+        voters: mergedVoters,
+        voterSides: mergedSides,
+        claimedBonus: mergedClaimed,
+        closed: Boolean(cv.closed || lv.closed),
+        winnerSide: cv.winnerSide || lv.winnerSide || null
+      });
+    }
+    if (cp.poll || lp.poll) {
+      const cPoll = cp.poll || {};
+      const lPoll = lp.poll || {};
+      const mergedPollVoters = Array.from(new Set([...(cPoll.voters || []), ...(lPoll.voters || [])]));
+      const baseOpts = Array.isArray(cPoll.options) ? cPoll.options : (lPoll.options || []);
+      const lOpts = Array.isArray(lPoll.options) ? lPoll.options : [];
+      const mergedOpts = baseOpts.map((opt, idx) => {
+        const lOpt = lOpts[idx] || {};
+        return Object.assign({}, lOpt, opt, {
+          votes: Math.max(Number(opt?.votes || 0), Number(lOpt?.votes || 0))
+        });
+      });
+      cp.poll = Object.assign({}, lPoll, cPoll, { voters: mergedPollVoters, options: mergedOpts });
+    }
+    if (cp.secretCapsule || lp.secretCapsule) {
+      const cSc = cp.secretCapsule || {};
+      const lSc = lp.secretCapsule || {};
+      cp.secretCapsule = Object.assign({}, lSc, cSc, {
+        unlockedBy: Array.from(new Set([...(cSc.unlockedBy || []), ...(lSc.unlockedBy || [])]))
+      });
+    }
+    if (cp.bounty || lp.bounty) {
+      const cB = cp.bounty || {};
+      const lB = lp.bounty || {};
+      cp.bounty = Object.assign({}, lB, cB, {
+        claimed: Boolean(cB.claimed || lB.claimed),
+        claimedBy: cB.claimedBy || lB.claimedBy || '',
+        claimedAt: cB.claimedAt || lB.claimedAt || 0
+      });
+    }
+    if (Array.isArray(cp.leaderboard) || Array.isArray(lp.leaderboard)) {
+      const lbMap = new Map();
+      [...(cp.leaderboard || []), ...(lp.leaderboard || [])].forEach((entry) => {
+        if (!entry || !entry.uid) return;
+        const prevE = lbMap.get(entry.uid);
+        if (!prevE || Number(entry.score || 0) > Number(prevE.score || 0)) {
+          lbMap.set(entry.uid, entry);
+        }
+      });
+      cp.leaderboard = Array.from(lbMap.values()).sort((a, b) => (b.score || 0) - (a.score || 0)).slice(0, 10);
+    }
+    const lBoostTs = Number(lp.boostedUpdatedAt || lp.boostedAt || 0);
+    const cBoostTs = Number(cp.boostedUpdatedAt || cp.boostedAt || 0);
+    if (lBoostTs > cBoostTs && (now - lBoostTs < 60000 || (lp.boosted && Number(lp.boostedUntil || 0) > now))) {
+      cp.boosted = Boolean(lp.boosted);
+      cp.boostedAt = Number(lp.boostedAt || 0);
+      cp.boostedUntil = Number(lp.boostedUntil || 0);
+      cp.boostedUpdatedAt = lBoostTs;
+    }
+    return cp;
+  },
+
+  _rebuildStatePostsFromCloudMaps(isInitialPostsSnap = true) {
+    this._ensureCloudPostPaginationState();
+    const now = Date.now();
+    const localMap = new Map();
+    (this.state.posts || []).forEach((lp) => {
+      if (lp && lp.id) localMap.set(lp.id, lp);
+    });
+
+    const combinedCloud = new Map();
+    [this._olderCloudPostsMap, this._cloudBoostedPostsMap, this._cloudPinnedPostsMap, this._cloudLiveTopPostsMap].forEach((srcMap) => {
+      srcMap.forEach((cp, id) => {
+        if (!cp || !id || this.deletedPostIds?.has(id)) return;
+        const prevWinner = combinedCloud.get(id);
+        combinedCloud.set(id, prevWinner ? this._mergeSingleCloudPost(cp, prevWinner, true, now) : cp);
+      });
+    });
+
+    const activePosts = [];
+    (this.state.posts || []).forEach((lp) => {
+      if (lp && lp.id && !combinedCloud.has(lp.id) && !this.deletedPostIds?.has(lp.id) && (now - (lp.createdAt || 0) < 12000)) {
+        activePosts.push(lp);
+      }
+    });
+
+    combinedCloud.forEach((cp, id) => {
+      if (this.deletedPostIds?.has(id)) return;
+      const merged = this._mergeSingleCloudPost(cp, localMap.get(id), isInitialPostsSnap, now);
+      activePosts.push(merged);
+    });
+
+    const nowPostTs = Date.now();
+    const isBoostVal = (p) => {
+      if (!p || !p.boosted) return 0;
+      if (p.boostedUntil && nowPostTs < Number(p.boostedUntil)) return 1;
+      if (!p.boostedUntil && p.createdAt && (nowPostTs - Number(p.createdAt) < 86400000)) return 1;
+      p.boosted = false;
+      return 0;
+    };
+
+    activePosts.sort((a, b) => {
+      const pinDiff = (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0);
+      if (pinDiff !== 0) return pinDiff;
+      const bBoost = isBoostVal(b);
+      const aBoost = isBoostVal(a);
+      if (bBoost !== aBoost) return bBoost - aBoost;
+      if (bBoost && aBoost) {
+        return Number(b.boostedAt || b.createdAt || 0) - Number(a.boostedAt || a.createdAt || 0);
+      }
+      return (b.createdAt || 0) - (a.createdAt || 0);
+    });
+
+    const postSig = (p) => `${p.id}_${p.type || ''}_${p.likes?.length || 0}_${p.comments?.length || 0}_${p.tipsTotal || 0}_${Object.keys(p.cityGuesses || {}).length}_${p.leaderboard?.[0]?.score || 0}_${p.pinned ? 1 : 0}_${p.boosted ? 1 : 0}_${p.boostedUntil || 0}_${p.boostedAt || 0}_${p.versus ? `${p.versus.leftVotes || 0}:${p.versus.rightVotes || 0}:${p.versus.closed ? 1 : 0}` : ''}_${p.poll ? (p.poll.voters || []).length : 0}`;
+    const prevSignature = (this.state.posts || []).map(postSig).join('|');
+    const nextSignature = activePosts.map(postSig).join('|');
+    const hasContentChanged = prevSignature !== nextSignature;
+
+    this.state.posts = activePosts;
+    this.save(false, 'cloud_posts_sync');
+    if (hasContentChanged) {
+      window.dispatchEvent(new CustomEvent('remo:stateupdate', { detail: { reason: 'cloud_posts' } }));
+      if (typeof renderSocialFeed === 'function' && (typeof currentRemoView === 'undefined' || currentRemoView === 'feed')) {
+        renderSocialFeed();
+      }
+      if (typeof updateUnreadBadges === 'function') updateUnreadBadges();
+      if (typeof refreshAllAdminPanels === 'function') {
+        refreshAllAdminPanels();
+      }
+    }
+  },
+
+  async loadOlderCloudPosts(batchSize = 30) {
+    this._ensureCloudPostPaginationState();
+    if (!this.fbDb || this.loadingOlderCloudPosts || !this.hasMoreCloudPosts || !this._postsLastCursorDoc) {
+      return false;
+    }
+    if (this._lastOlderFetchFailTs && (Date.now() - this._lastOlderFetchFailTs < 3500)) {
+      return false;
+    }
+    this.loadingOlderCloudPosts = true;
+    window.dispatchEvent(new CustomEvent('remo:feedpaging', { detail: { loading: true } }));
+    try {
+      const snap = await this.fbDb.collection('remo_posts')
+        .orderBy('createdAt', 'desc')
+        .startAfter(this._postsLastCursorDoc)
+        .limit(batchSize)
+        .get();
+      if (!snap || snap.empty) {
+        this.hasMoreCloudPosts = false;
+        return false;
+      }
+      let addedCount = 0;
+      let lastDoc = this._postsLastCursorDoc;
+      snap.forEach((doc) => {
+        lastDoc = doc;
+        const cp = doc.data();
+        if (!cp || !cp.id || this._shouldPurgeCloudPost(cp)) return;
+        this._olderCloudPostsMap.set(cp.id, cp);
+        addedCount++;
+      });
+      this._postsLastCursorDoc = lastDoc;
+      this.hasMoreCloudPosts = snap.docs.length >= batchSize;
+      if (addedCount > 0) {
+        this._rebuildStatePostsFromCloudMaps(true);
+      }
+      return addedCount > 0;
+    } catch (err) {
+      this._lastOlderFetchFailTs = Date.now();
+      console.warn('Firestore older posts page notice:', err.message);
+      return false;
+    } finally {
+      this.loadingOlderCloudPosts = false;
+      window.dispatchEvent(new CustomEvent('remo:feedpaging', { detail: { loading: false } }));
+    }
+  },
+
+  async fetchDeepLinkedPostIfMissing(postId) {
+    if (!this.fbDb || !postId) return null;
+    const already = (this.state.posts || []).find((p) => p && p.id === postId);
+    if (already) return already;
+    if (!this._deepFetchedIds) this._deepFetchedIds = new Set();
+    if (this._deepFetchedIds.has(postId)) return null;
+    this._deepFetchedIds.add(postId);
+    try {
+      const doc = await this.fbDb.collection('remo_posts').doc(postId).get();
+      if (doc && doc.exists) {
+        const cp = doc.data();
+        if (cp && cp.id && !this._shouldPurgeCloudPost(cp)) {
+          this._ensureCloudPostPaginationState();
+          this._olderCloudPostsMap.set(cp.id, cp);
+          this._rebuildStatePostsFromCloudMaps(true);
+          return cp;
+        }
+      }
+    } catch (e) {}
+    return null;
+  },
+
   syncPostToCloud(post) {
     if (!this.fbDb || !post || !post.id || post.isShowcase) return;
     try {
@@ -6154,6 +6303,10 @@ const REMO_STORE = {
       localStorage.setItem('remo_deleted_posts', JSON.stringify([...this.deletedPostIds]));
     } catch (e) {}
     this.state.posts = (this.state.posts || []).filter((p) => p.id !== postId);
+    if (this._cloudLiveTopPostsMap) this._cloudLiveTopPostsMap.delete(postId);
+    if (this._cloudPinnedPostsMap) this._cloudPinnedPostsMap.delete(postId);
+    if (this._cloudBoostedPostsMap) this._cloudBoostedPostsMap.delete(postId);
+    if (this._olderCloudPostsMap) this._olderCloudPostsMap.delete(postId);
     if (!this.fbDb) return;
     try {
       this.fbDb.collection('remo_posts').doc(postId).delete()
@@ -6164,6 +6317,12 @@ const REMO_STORE = {
 
   async purgeAllPostsFromCloud() {
     this.state.posts = [];
+    if (this._cloudLiveTopPostsMap) this._cloudLiveTopPostsMap.clear();
+    if (this._cloudPinnedPostsMap) this._cloudPinnedPostsMap.clear();
+    if (this._cloudBoostedPostsMap) this._cloudBoostedPostsMap.clear();
+    if (this._olderCloudPostsMap) this._olderCloudPostsMap.clear();
+    this.hasMoreCloudPosts = false;
+    this._postsLastCursorDoc = null;
     if (!this.deletedPostIds) this.deletedPostIds = new Set();
     localStorage.removeItem('remo_deleted_posts');
     this.deletedPostIds.clear();

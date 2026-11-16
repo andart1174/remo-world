@@ -1227,7 +1227,11 @@ const REMO_DICT = {
     apps_add_city_short: '+ Add City (+75 🪙)',
     apps_ambassador_short: 'City Diploma (+25 🪙)',
     apps_story_916_short: 'Story 9:16 Export',
-    apps_sign_out: '🚪 Sign Out'
+    apps_sign_out: '🚪 Sign Out',
+    feed_loading_more: '✨ Loading more moments...',
+    feed_caught_up: '🌍 You’re all caught up!',
+    feed_back_to_top: '↑ Top',
+    feed_new_posts_pill: '↑ New Moments'
   },
 
   fr: {
@@ -2451,7 +2455,11 @@ const REMO_DICT = {
     apps_add_city_short: '+ Ajouter Ville (+75 🪙)',
     apps_ambassador_short: 'Diplôme Ville (+25 🪙)',
     apps_story_916_short: 'Export Story 9:16',
-    apps_sign_out: '🚪 Déconnexion'
+    apps_sign_out: '🚪 Déconnexion',
+    feed_loading_more: '✨ Chargement de nouveaux moments...',
+    feed_caught_up: '🌍 Vous avez tout vu !',
+    feed_back_to_top: '↑ Haut',
+    feed_new_posts_pill: '↑ Nouveaux'
   }
 };
 
