@@ -2989,7 +2989,9 @@ function renderAdminOdysseyPanel() {
   const tbody = document.getElementById('admOdysseyLeaderboardTable');
   if (!tbody || typeof REMO_STORE.ensureRemoOdyssey !== 'function') return;
   const isFr = REMO_I18N.getLang() === 'fr';
-  const od = REMO_STORE.ensureRemoOdyssey();
+  const od = typeof REMO_STORE._pruneOdysseyWithTombstones === 'function'
+    ? REMO_STORE._pruneOdysseyWithTombstones(REMO_STORE.ensureRemoOdyssey())
+    : REMO_STORE.ensureRemoOdyssey();
   const lb = Array.isArray(od.leaderboard) ? od.leaderboard : [];
 
   const btn2x = document.getElementById('admOdyssey2xBtn');
@@ -3031,42 +3033,73 @@ function renderAdminOdysseyPanel() {
         <td>${c ? `${c.flag} ${escapeHtmlStr(isFr ? (c.name_fr || c.name_en) : c.name_en)}` : escapeHtmlStr(e.cityId || 'REMO')}</td>
         <td><b style="color:#fde047;">${Number(e.score || 0).toLocaleString()} PTS</b> · <span style="color:#94a3b8;font-size:0.75rem;">${Number(e.citiesCount || 1)} ${isFr ? 'villes' : 'cities'} · ${Number(e.kmFlown || 0).toLocaleString()} km</span></td>
         <td>
-          <button type="button" class="adm-btn rose" style="padding:4px 9px;font-size:0.72rem;" onclick="adminDeleteOdysseyEntryFromOffice('${escapeHtmlStr(e.uid || '')}')">🗑️ ${isFr ? 'Retirer' : 'Remove'}</button>
+          <button type="button" class="adm-btn rose" style="padding:4px 9px;font-size:0.72rem;" onclick="adminDeleteOdysseyEntryFromOffice('${escapeJsSingleArg(e.uid || '')}')">🗑️ ${isFr ? 'Retirer' : 'Remove'}</button>
         </td>
       </tr>
     `;
   }).join('');
 }
 
-function adminToggleOdyssey2xFromOffice() {
+async function adminToggleOdyssey2xFromOffice() {
+  const isFr = REMO_I18N.getLang() === 'fr';
   const od = REMO_STORE.ensureRemoOdyssey();
   const res = REMO_STORE.adminToggleOdyssey2x(!od.event2x);
-  if (!res.ok) return;
+  if (!res.ok) {
+    admToast(isFr ? '🔒 Session Admin requise pour cette action.' : '🔒 Admin session required for this action.');
+    return;
+  }
   RemoAudio.play('fanfare');
-  const isFr = REMO_I18N.getLang() === 'fr';
+  renderAdminOdysseyPanel();
+  const cloud = res.cloudPromise ? await res.cloudPromise : { ok: true };
+  if (!cloud || cloud.ok === false) {
+    admToast(isFr
+      ? '⚠️ Modifié localement mais refusé par le Cloud (connectez-vous au compte Admin Google).'
+      : '⚠️ Saved locally but Cloud rejected write (sign in with your Admin Google account).');
+    return;
+  }
   admToast(res.event2x
-    ? (isFr ? '⚡ Événement 2X Pièces REMO Odyssey ACTIVÉ !' : '⚡ REMO Odyssey 2X Coins Event ENABLED!')
-    : (isFr ? '⚡ Événement 2X REMO Odyssey désactivé.' : '⚡ REMO Odyssey 2X Event disabled.'));
-  renderAdminOdysseyPanel();
+    ? (isFr ? '⚡ Événement 2X Pièces REMO Odyssey ACTIVÉ (Cloud OK) !' : '⚡ REMO Odyssey 2X Coins Event ENABLED (Cloud OK)!')
+    : (isFr ? '⚡ Événement 2X REMO Odyssey désactivé (Cloud OK).' : '⚡ REMO Odyssey 2X Event disabled (Cloud OK).'));
 }
 
-function adminDeleteOdysseyEntryFromOffice(uid) {
+async function adminDeleteOdysseyEntryFromOffice(uid) {
   if (!uid) return;
+  const isFr = REMO_I18N.getLang() === 'fr';
   const res = REMO_STORE.adminDeleteOdysseyEntry(uid);
-  if (!res.ok) return;
-  admToast(REMO_I18N.getLang() === 'fr' ? '🗑️ Score retiré du classement.' : '🗑️ Score removed from leaderboard.');
+  if (!res.ok) {
+    admToast(isFr ? '🔒 Session Admin requise pour retirer un score.' : '🔒 Admin session required to remove a score.');
+    return;
+  }
   renderAdminOdysseyPanel();
+  const cloud = res.cloudPromise ? await res.cloudPromise : { ok: true };
+  if (!cloud || cloud.ok === false) {
+    admToast(isFr
+      ? '⚠️ Retiré localement mais refusé par le Cloud — connectez-vous au compte Admin sur le site principal.'
+      : '⚠️ Removed locally but Cloud sync failed — sign in to your Admin account on the main site first.');
+    return;
+  }
+  admToast(isFr ? '🗑️ Score supprimé définitivement du classement Cloud !' : '🗑️ Score permanently removed from Cloud leaderboard!');
 }
 
-function adminResetOdysseyLeaderboardFromOffice() {
+async function adminResetOdysseyLeaderboardFromOffice() {
   const isFr = REMO_I18N.getLang() === 'fr';
-  if (typeof confirm === 'function' && !confirm(isFr ? 'Réinitialiser le classement mondial REMO Odyssey ?' : 'Reset the global REMO Odyssey leaderboard?')) {
+  if (typeof confirm === 'function' && !confirm(isFr ? 'Réinitialiser définitivement tout le classement mondial REMO Odyssey ?' : 'Permanently reset the entire global REMO Odyssey leaderboard?')) {
     return;
   }
   const res = REMO_STORE.adminResetOdysseyLeaderboard();
-  if (!res.ok) return;
-  admToast(isFr ? '🗑️ Classement REMO Odyssey réinitialisé.' : '🗑️ REMO Odyssey leaderboard cleared.');
+  if (!res.ok) {
+    admToast(isFr ? '🔒 Session Admin requise pour réinitialiser.' : '🔒 Admin session required to reset leaderboard.');
+    return;
+  }
   renderAdminOdysseyPanel();
+  const cloud = res.cloudPromise ? await res.cloudPromise : { ok: true };
+  if (!cloud || cloud.ok === false) {
+    admToast(isFr
+      ? '⚠️ Réinitialisé localement mais refusé par le Cloud — connectez-vous au compte Admin.'
+      : '⚠️ Reset locally but Cloud sync failed — sign in to your Admin account first.');
+    return;
+  }
+  admToast(isFr ? '🗑️ Classement mondial REMO Odyssey réinitialisé dans le Cloud !' : '🗑️ Global REMO Odyssey leaderboard permanently cleared in Cloud!');
 }
 
 window.renderAdminOdysseyPanel = renderAdminOdysseyPanel;

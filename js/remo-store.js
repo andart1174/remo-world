@@ -1323,6 +1323,8 @@ function getDefaultRemoOdyssey() {
     totalRuns: 0,
     leaderboard: [],
     cityKings: {},
+    deletedEntries: {},
+    resetAt: 0,
     updatedAt: 0
   };
 }
@@ -2363,6 +2365,8 @@ function upgradeEcosystemState(st) {
     st.remoOdyssey.totalRuns = Number(st.remoOdyssey.totalRuns || 0);
     if (!Array.isArray(st.remoOdyssey.leaderboard)) st.remoOdyssey.leaderboard = [];
     if (!st.remoOdyssey.cityKings || typeof st.remoOdyssey.cityKings !== 'object') st.remoOdyssey.cityKings = {};
+    if (!st.remoOdyssey.deletedEntries || typeof st.remoOdyssey.deletedEntries !== 'object') st.remoOdyssey.deletedEntries = {};
+    st.remoOdyssey.resetAt = Number(st.remoOdyssey.resetAt || 0);
     st.remoOdyssey.updatedAt = Number(st.remoOdyssey.updatedAt || 0);
   }
   if (st.gamesHub) {
@@ -2952,6 +2956,7 @@ const REMO_STORE = {
             );
           }
           this.state = diskState;
+          this._pruneOdysseyWithTombstones(this.ensureRemoOdyssey());
           if (!Array.isArray(this.state.vipShopItems) || this.state.vipShopItems.length === 0) {
             this.state.vipShopItems = getDefaultVipShopItems();
           }
@@ -3762,9 +3767,88 @@ const REMO_STORE = {
     if (!this.state.remoOdyssey.cityKings || typeof this.state.remoOdyssey.cityKings !== 'object') {
       this.state.remoOdyssey.cityKings = {};
     }
+    if (!this.state.remoOdyssey.deletedEntries || typeof this.state.remoOdyssey.deletedEntries !== 'object') {
+      this.state.remoOdyssey.deletedEntries = {};
+    }
     this.state.remoOdyssey.event2x = Boolean(this.state.remoOdyssey.event2x);
     this.state.remoOdyssey.totalRuns = Number(this.state.remoOdyssey.totalRuns || 0);
+    this.state.remoOdyssey.resetAt = Number(this.state.remoOdyssey.resetAt || 0);
+    this.state.remoOdyssey.updatedAt = Number(this.state.remoOdyssey.updatedAt || 0);
     return this.state.remoOdyssey;
+  },
+
+  _pruneOdysseyWithTombstones(od) {
+    if (!od || typeof od !== 'object') return od;
+    const resetAt = Number(od.resetAt || 0);
+    const delMap = (od.deletedEntries && typeof od.deletedEntries === 'object') ? od.deletedEntries : {};
+    const isAlive = (entry) => {
+      if (!entry || !entry.uid) return false;
+      const ts = Number(entry.ts || 0);
+      if (resetAt > 0 && ts <= resetAt) return false;
+      const delTs = Number(delMap[entry.uid] || 0);
+      if (delTs > 0 && ts <= delTs) return false;
+      return true;
+    };
+    od.leaderboard = (Array.isArray(od.leaderboard) ? od.leaderboard : [])
+      .filter(isAlive)
+      .sort((a, b) => Number(b.score || 0) - Number(a.score || 0))
+      .slice(0, 20);
+
+    const nextKings = {};
+    if (od.cityKings && typeof od.cityKings === 'object') {
+      Object.keys(od.cityKings).forEach((cid) => {
+        const k = od.cityKings[cid];
+        if (k && isAlive(k)) nextKings[cid] = k;
+      });
+    }
+    od.leaderboard.forEach((e) => {
+      if (!e || !e.cityId) return;
+      const cur = nextKings[e.cityId];
+      if (!cur || Number(e.score || 0) > Number(cur.score || 0)) {
+        nextKings[e.cityId] = {
+          uid: e.uid,
+          name: e.name || 'Citizen',
+          score: Number(e.score || 0),
+          avatarUrl: e.avatarUrl || '',
+          ts: Number(e.ts || Date.now())
+        };
+      }
+    });
+    od.cityKings = nextKings;
+    return od;
+  },
+
+  syncRemoOdysseyToCloudNow(reason = 'odyssey_sync') {
+    if (!this.fbDb) return Promise.resolve({ ok: true, localOnly: true });
+    try {
+      const od = this._pruneOdysseyWithTombstones(this.ensureRemoOdyssey());
+      const cleanOd = JSON.parse(JSON.stringify({
+        event2x: Boolean(od.event2x),
+        totalRuns: Number(od.totalRuns || 0),
+        leaderboard: Array.isArray(od.leaderboard) ? od.leaderboard.slice(0, 20) : [],
+        cityKings: od.cityKings || {},
+        deletedEntries: od.deletedEntries || {},
+        resetAt: Number(od.resetAt || 0),
+        updatedAt: Number(od.updatedAt || Date.now())
+      }));
+      const docRef = this.fbDb.collection('remo_ecosystem').doc('live_state');
+      // Atomic field replacement: replaces the entire remoOdyssey map in Firestore (never deep-merges stale keys!)
+      return docRef.update({
+        remoOdyssey: cleanOd,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      }).then(() => ({ ok: true, synced: true })).catch((err) => {
+        if (err && err.code === 'not-found') {
+          return docRef.set({
+            remoOdyssey: cleanOd,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+          }, { merge: true }).then(() => ({ ok: true, synced: true }));
+        }
+        console.warn('REMO Odyssey cloud sync warning (' + reason + '):', err && err.message ? err.message : err);
+        return { ok: false, error: (err && (err.code || err.message)) || 'cloud_error' };
+      });
+    } catch (e) {
+      return Promise.resolve({ ok: false, error: e.message || 'sync_exception' });
+    }
   },
 
   ensureGamesHub() {
@@ -3796,7 +3880,7 @@ const REMO_STORE = {
     const score = Math.floor(Number(summary.score || 0));
     if (!Number.isFinite(score) || score <= 0 || score > 50000000) return { ok: false };
     const u = this.getCurrentUser();
-    const od = this.ensureRemoOdyssey();
+    const od = this._pruneOdysseyWithTombstones(this.ensureRemoOdyssey());
     const is2x = Boolean(od.event2x || (this.state.settings && this.state.settings.happyHour2x));
     const startCityId = String(summary.startCityId || (u && u.homeCity) || 'montreal');
     const citiesCount = Math.max(1, Math.min(24, Math.floor(Number(summary.citiesCount || 1))));
@@ -3820,6 +3904,13 @@ const REMO_STORE = {
     const prevPersonal = existing ? Number(existing.score || 0) : 0;
     const safeAvatar = (u.avatarUrl && /^https?:\/\//i.test(String(u.avatarUrl)) && String(u.avatarUrl).length < 512) ? String(u.avatarUrl) : '';
 
+    // Clock-skew-proof timestamp: strictly after any prior resetAt / deletion tombstone for this UID.
+    // Keep od.deletedEntries[u.uid] intact so stale pre-deletion cached scores on other tabs stay blocked forever.
+    const minAllowedTs = Math.max(
+      Number(od.resetAt || 0),
+      Number((od.deletedEntries && od.deletedEntries[u.uid]) || 0)
+    );
+    const nowTs = Math.max(Date.now(), minAllowedTs + 1);
     if (score > prevPersonal) {
       if (existing) {
         existing.score = score;
@@ -3828,7 +3919,7 @@ const REMO_STORE = {
         existing.citiesCount = citiesCount;
         existing.kmFlown = kmFlown;
         if (safeAvatar) existing.avatarUrl = safeAvatar;
-        existing.ts = Date.now();
+        existing.ts = nowTs;
       } else {
         od.leaderboard.push({
           uid: u.uid,
@@ -3838,7 +3929,7 @@ const REMO_STORE = {
           citiesCount,
           kmFlown,
           avatarUrl: safeAvatar,
-          ts: Date.now()
+          ts: nowTs
         });
       }
       od.leaderboard.sort((a, b) => (b.score || 0) - (a.score || 0));
@@ -3856,7 +3947,7 @@ const REMO_STORE = {
         name: u.name,
         score,
         avatarUrl: safeAvatar,
-        ts: Date.now()
+        ts: nowTs
       };
     }
 
@@ -3904,8 +3995,9 @@ const REMO_STORE = {
     }
 
     od.totalRuns = Number(od.totalRuns || 0) + 1;
-    od.updatedAt = Date.now();
-    this.save(true, 'remo_odyssey_run');
+    od.updatedAt = nowTs;
+    this.save(true, 'cloud_sync');
+    this.syncRemoOdysseyToCloudNow('remo_odyssey_run');
 
     return {
       ok: true,
@@ -3928,21 +4020,53 @@ const REMO_STORE = {
       return { ok: false, error: 'admin_only' };
     }
     const od = this.ensureRemoOdyssey();
+    const now = Date.now();
     od.event2x = Boolean(enabled);
-    od.updatedAt = Date.now();
-    this.save(true, 'admin_odyssey_2x');
-    return { ok: true, event2x: od.event2x };
+    od.updatedAt = now;
+    this._flushLocalSave();
+    if (typeof REMO_LIVE_BUS !== 'undefined' && REMO_LIVE_BUS) {
+      REMO_LIVE_BUS.postMessage({ type: 'STATE_UPDATED', reason: 'admin_odyssey_2x', ts: now });
+    }
+    window.dispatchEvent(new CustomEvent('remo:stateupdate', { detail: { reason: 'admin_odyssey_2x' } }));
+    const cloudPromise = this.syncRemoOdysseyToCloudNow('admin_odyssey_2x');
+    return { ok: true, event2x: od.event2x, cloudPromise };
   },
 
   adminDeleteOdysseyEntry(uid) {
     if (!this.isAdminUnlocked() && !this.isCurrentUserAdmin()) {
       return { ok: false, error: 'admin_only' };
     }
+    const cleanUid = String(uid || '').trim();
+    if (!cleanUid) return { ok: false, error: 'invalid_uid' };
     const od = this.ensureRemoOdyssey();
-    od.leaderboard = (od.leaderboard || []).filter((e) => e && e.uid !== uid);
-    od.updatedAt = Date.now();
-    this.save(true, 'admin_odyssey_del_entry');
-    return { ok: true };
+    const existingEntry = (od.leaderboard || []).find((e) => e && e.uid === cleanUid);
+    const existingKingTs = Object.values(od.cityKings || {})
+      .filter((k) => k && k.uid === cleanUid)
+      .reduce((m, k) => Math.max(m, Number(k.ts || 0)), 0);
+    const now = Math.max(
+      Date.now(),
+      Number((existingEntry && existingEntry.ts) || 0) + 1,
+      existingKingTs + 1
+    );
+    od.deletedEntries = od.deletedEntries || {};
+    od.deletedEntries[cleanUid] = now;
+    od.leaderboard = (od.leaderboard || []).filter((e) => e && e.uid !== cleanUid);
+    if (od.cityKings && typeof od.cityKings === 'object') {
+      Object.keys(od.cityKings).forEach((cid) => {
+        if (od.cityKings[cid] && od.cityKings[cid].uid === cleanUid) {
+          delete od.cityKings[cid];
+        }
+      });
+    }
+    this._pruneOdysseyWithTombstones(od);
+    od.updatedAt = now;
+    this._flushLocalSave();
+    if (typeof REMO_LIVE_BUS !== 'undefined' && REMO_LIVE_BUS) {
+      REMO_LIVE_BUS.postMessage({ type: 'STATE_UPDATED', reason: 'admin_odyssey_del_entry', ts: now });
+    }
+    window.dispatchEvent(new CustomEvent('remo:stateupdate', { detail: { reason: 'admin_odyssey_del_entry' } }));
+    const cloudPromise = this.syncRemoOdysseyToCloudNow('admin_odyssey_del_entry');
+    return { ok: true, cloudPromise };
   },
 
   adminResetOdysseyLeaderboard() {
@@ -3950,10 +4074,27 @@ const REMO_STORE = {
       return { ok: false, error: 'admin_only' };
     }
     const od = this.ensureRemoOdyssey();
+    const maxEntryTs = (od.leaderboard || []).reduce((m, e) => Math.max(m, Number((e && e.ts) || 0)), 0);
+    const maxKingTs = Object.values(od.cityKings || {}).reduce((m, k) => Math.max(m, Number((k && k.ts) || 0)), 0);
+    const now = Math.max(
+      Date.now(),
+      maxEntryTs + 1,
+      maxKingTs + 1,
+      Number(od.resetAt || 0) + 1
+    );
     od.leaderboard = [];
-    od.updatedAt = Date.now();
-    this.save(true, 'admin_odyssey_reset');
-    return { ok: true };
+    od.cityKings = {};
+    od.deletedEntries = {};
+    od.totalRuns = 0;
+    od.resetAt = now;
+    od.updatedAt = now;
+    this._flushLocalSave();
+    if (typeof REMO_LIVE_BUS !== 'undefined' && REMO_LIVE_BUS) {
+      REMO_LIVE_BUS.postMessage({ type: 'STATE_UPDATED', reason: 'admin_odyssey_reset', ts: now });
+    }
+    window.dispatchEvent(new CustomEvent('remo:stateupdate', { detail: { reason: 'admin_odyssey_reset' } }));
+    const cloudPromise = this.syncRemoOdysseyToCloudNow('admin_odyssey_reset');
+    return { ok: true, cloudPromise };
   },
 
   /* ── 🌟 STAGE 4: WORLD SPOTLIGHT STAGE (1x/DAY, 100 COINS, 45s + HYPE) ── */
@@ -5965,20 +6106,76 @@ const REMO_STORE = {
           const cOd = data.remoOdyssey;
           const cloudUpdated = Number(cOd.updatedAt || 0);
           const localUpdated = Number(localOd.updatedAt || 0);
-          localOd.leaderboard = this._mergeLeaderboardEntries(localOd.leaderboard, cOd.leaderboard);
-          if (cOd.cityKings && typeof cOd.cityKings === 'object') {
-            Object.keys(cOd.cityKings).forEach((cid) => {
-              const ck = cOd.cityKings[cid];
-              const lk = localOd.cityKings[cid];
-              if (ck && (!lk || Number(ck.score || 0) > Number(lk.score || 0))) {
-                localOd.cityKings[cid] = ck;
+          const cloudResetAt = Number(cOd.resetAt || 0);
+          const localResetAt = Number(localOd.resetAt || 0);
+          const effResetAt = Math.max(cloudResetAt, localResetAt);
+
+          // Merge per-user deletion tombstones (keep highest deletion timestamp per UID)
+          const mergedDeleted = {};
+          [localOd.deletedEntries, cOd.deletedEntries].forEach((dm) => {
+            if (!dm || typeof dm !== 'object') return;
+            Object.keys(dm).forEach((k) => {
+              const ts = Number(dm[k] || 0);
+              if (ts > effResetAt && ts > Number(mergedDeleted[k] || 0)) {
+                mergedDeleted[k] = ts;
               }
             });
+          });
+
+          const filterAlive = (arr) => (Array.isArray(arr) ? arr : []).filter((e) => {
+            if (!e || !e.uid) return false;
+            const ts = Number(e.ts || 0);
+            if (effResetAt > 0 && ts <= effResetAt) return false;
+            const delTs = Number(mergedDeleted[e.uid] || 0);
+            if (delTs > 0 && ts <= delTs) return false;
+            return true;
+          });
+
+          localOd.resetAt = effResetAt;
+          localOd.deletedEntries = mergedDeleted;
+          localOd.leaderboard = this._mergeLeaderboardEntries(
+            filterAlive(localOd.leaderboard),
+            filterAlive(cOd.leaderboard)
+          );
+
+          const mergedKings = {};
+          const ingestKings = (kMap) => {
+            if (!kMap || typeof kMap !== 'object') return;
+            Object.keys(kMap).forEach((cid) => {
+              const k = kMap[cid];
+              if (!k || !k.uid) return;
+              const ts = Number(k.ts || 0);
+              if (effResetAt > 0 && ts <= effResetAt) return;
+              const delTs = Number(mergedDeleted[k.uid] || 0);
+              if (delTs > 0 && ts <= delTs) return;
+              if (!mergedKings[cid] || Number(k.score || 0) > Number(mergedKings[cid].score || 0)) {
+                mergedKings[cid] = k;
+              }
+            });
+          };
+          ingestKings(localOd.cityKings);
+          ingestKings(cOd.cityKings);
+          localOd.cityKings = mergedKings;
+          this._pruneOdysseyWithTombstones(localOd);
+
+          if (cloudResetAt > localResetAt) {
+            localOd.totalRuns = Number(cOd.totalRuns || 0);
+          } else if (localResetAt > cloudResetAt) {
+            localOd.totalRuns = Number(localOd.totalRuns || 0);
+          } else {
+            localOd.totalRuns = Math.max(Number(localOd.totalRuns || 0), Number(cOd.totalRuns || 0));
           }
-          localOd.totalRuns = Math.max(Number(localOd.totalRuns || 0), Number(cOd.totalRuns || 0));
+
           if (cloudUpdated >= localUpdated) {
             localOd.event2x = Boolean(cOd.event2x);
-            localOd.updatedAt = cloudUpdated;
+            localOd.updatedAt = Math.max(cloudUpdated, effResetAt);
+          }
+
+          this._flushLocalSave();
+          const cloudDelMap = (cOd.deletedEntries && typeof cOd.deletedEntries === 'object') ? cOd.deletedEntries : {};
+          const localHasNewerTombstone = Object.keys(mergedDeleted).some((k) => Number(mergedDeleted[k] || 0) > Number(cloudDelMap[k] || 0));
+          if (localResetAt > cloudResetAt || localHasNewerTombstone) {
+            this.syncRemoOdysseyToCloudNow('odyssey_reconcile_admin_delete');
           }
           if (typeof renderAdminOdysseyPanel === 'function') renderAdminOdysseyPanel();
           if (typeof syncRemoOdysseyBadges === 'function') syncRemoOdysseyBadges();
@@ -6033,7 +6230,7 @@ const REMO_STORE = {
             customCities: typeof getCustomRemoCitiesPatch === 'function' ? getCustomRemoCitiesPatch() : [],
             viralContests: this.state.viralContests || getDefaultViralContests(),
             worldSystems: this.state.worldSystems || getDefaultUniqueWorldSystems(),
-            remoOdyssey: this.ensureRemoOdyssey(),
+            remoOdyssey: this._pruneOdysseyWithTombstones(this.ensureRemoOdyssey()),
             worldSpotlight: this.ensureWorldSpotlight(),
             deletedPostIds: [...(this.deletedPostIds || [])].slice(-100),
             deletedUserIds: [...(this.deletedUserIds || [])].slice(-100),
@@ -8839,7 +9036,7 @@ const REMO_STORE = {
             .slice(0, 15),
           viralContests: this.state.viralContests || getDefaultViralContests(),
           worldSystems: this.state.worldSystems || getDefaultUniqueWorldSystems(),
-          remoOdyssey: this.ensureRemoOdyssey(),
+          remoOdyssey: this._pruneOdysseyWithTombstones(this.ensureRemoOdyssey()),
           worldSpotlight: this.ensureWorldSpotlight(),
           deletedPostIds: [...(this.deletedPostIds || [])].slice(-100),
           updatedAt: firebase.firestore.FieldValue.serverTimestamp()
