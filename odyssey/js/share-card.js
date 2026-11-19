@@ -324,6 +324,43 @@
     ctx.font = '700 14px system-ui, sans-serif';
     ctx.fillText(`@${summary.playerName || 'REMO_Explorer'} · ${summary.vipLabel || 'SOVEREIGN 4D'}`, W / 2, 134);
 
+    // Optional Citizen Real Profile Photo Medallion (Feature #7)
+    if (summary.showPhotoOnCard && summary.playerAvatarImg && summary.playerAvatarImg.complete && summary.playerAvatarImg.naturalWidth > 0) {
+      const ax = 68, ay = 104, ar = 28;
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(ax, ay, ar, 0, Math.PI * 2);
+      ctx.clip();
+      ctx.drawImage(summary.playerAvatarImg, ax - ar, ay - ar, ar * 2, ar * 2);
+      ctx.restore();
+      ctx.save();
+      ctx.strokeStyle = '#fbbf24';
+      ctx.shadowColor = '#fbbf24';
+      ctx.shadowBlur = 12;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(ax, ay, ar + 1, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // Live City King Stamp if crowned during run!
+    if (summary.stoleCityKing || summary.isCityKing) {
+      ctx.save();
+      ctx.fillStyle = 'rgba(251, 191, 36, 0.22)';
+      ctx.strokeStyle = '#fbbf24';
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.roundRect(W / 2 - 110, 148, 220, 26, 13);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = '#fde047';
+      ctx.font = '900 11px "Orbitron", system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(isFr ? `👑 ROI DE ${startCity.code}` : `👑 CITY KING OF ${startCity.code}`, W / 2, 165);
+      ctx.restore();
+    }
+
     // City Landmark Backdrop behind Hero
     REMO_DATA.drawCityLandmark(ctx, startCity.id, col, W / 2, 412, 142, 0.45);
 
@@ -341,6 +378,7 @@
       vipFrame: summary.vipFrame || 'gold_fire',
       auraStyle: summary.vipFrame || 'gold_fire',
       hoverSkin: summary.hoverSkin || 'gold',
+      hasCrown: Boolean(summary.stoleCityKing || summary.isCityKing),
       showPowers: true
     });
 

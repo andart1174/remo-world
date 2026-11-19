@@ -15089,7 +15089,7 @@ function _buildRemoOdysseyWeatherMap() {
 function buildRemoOdysseyHostContext() {
   const lang = typeof REMO_I18N !== 'undefined' ? REMO_I18N.getLang() : 'en';
   const u = typeof REMO_STORE !== 'undefined' && REMO_STORE.getCurrentUser ? REMO_STORE.getCurrentUser() : null;
-  const od = typeof REMO_STORE !== 'undefined' && REMO_STORE.ensureRemoOdyssey ? REMO_STORE.ensureRemoOdyssey() : { event2x: false };
+  const od = typeof REMO_STORE !== 'undefined' && REMO_STORE.ensureRemoOdyssey ? REMO_STORE.ensureRemoOdyssey() : { event2x: false, leaderboard: [], cityKings: {} };
   let ownedCardCities = [];
   if (u && typeof REMO_STORE.getUserCards === 'function') {
     const cards = REMO_STORE.getUserCards(u.uid) || [];
@@ -15102,14 +15102,61 @@ function buildRemoOdysseyHostContext() {
       torchCityId = ws.torchRelay.currentCityId;
     }
   } catch (e) {}
+
+  const resolveAv = (uid, fallback) => {
+    if (fallback) return String(fallback);
+    try {
+      if (uid && typeof REMO_STORE.getUserAvatar === 'function') return String(REMO_STORE.getUserAvatar(uid) || '');
+    } catch (e) {}
+    return '';
+  };
+
+  const playerAvatarUrl = u ? resolveAv(u.uid, u.avatarUrl || '') : '';
+  const globalLeaderboard = (Array.isArray(od.leaderboard) ? od.leaderboard : []).slice(0, 10).map((e) => ({
+    uid: e.uid || '',
+    name: e.name || 'Citizen',
+    cityId: e.cityId || 'montreal',
+    score: Number(e.score || 0),
+    citiesCount: Number(e.citiesCount || 1),
+    kmFlown: Number(e.kmFlown || 0),
+    avatarUrl: resolveAv(e.uid, e.avatarUrl || '')
+  }));
+
+  const cityKings = {};
+  if (od.cityKings && typeof od.cityKings === 'object') {
+    Object.keys(od.cityKings).forEach((cid) => {
+      const k = od.cityKings[cid];
+      if (k && Number(k.score || 0) > 0) {
+        cityKings[cid] = { name: k.name || 'Champion', score: Number(k.score || 0), avatarUrl: resolveAv(k.uid, k.avatarUrl || '') };
+      }
+    });
+  }
+  globalLeaderboard.forEach((e) => {
+    if (e.cityId && (!cityKings[e.cityId] || e.score > cityKings[e.cityId].score)) {
+      cityKings[e.cityId] = { name: e.name, score: e.score, avatarUrl: e.avatarUrl };
+    }
+  });
+
+  const cityScores = (REMO_STORE && REMO_STORE.state && REMO_STORE.state.cityScores) || {};
+  const allCities = typeof getRemoCities === 'function' ? getRemoCities() : (window.REMO_CITIES || []);
+  const cityRanking = allCities
+    .filter((c) => c && c.id)
+    .map((c) => ({ id: c.id, score: Math.floor(Number(cityScores[c.id] || 1000)) }))
+    .sort((a, b) => b.score - a.score)
+    .map((entry, idx) => ({ id: entry.id, score: entry.score, rank: idx + 1 }));
+
   return {
     lang,
     isGuest: !u,
     playerName: u && u.name ? String(u.name) : '',
+    playerAvatarUrl,
     homeCityId: u && u.homeCity ? String(u.homeCity) : '',
     ownedCardCities,
     torchCityId,
     weatherMap: _buildRemoOdysseyWeatherMap(),
+    globalLeaderboard,
+    cityKings,
+    cityRanking,
     odyssey2x: Boolean(od.event2x),
     happyHour2x: Boolean(REMO_STORE && REMO_STORE.state && REMO_STORE.state.settings && REMO_STORE.state.settings.happyHour2x)
   };
@@ -15133,7 +15180,7 @@ function openRemoOdysseyModal(opts = {}) {
   const qs = new URLSearchParams();
   qs.set('embed', '1');
   qs.set('lang', lang);
-  qs.set('v', '147');
+  qs.set('v', '148');
   if (opts && opts.seed) qs.set('seed', String(opts.seed));
   if (opts && opts.start) qs.set('start', String(opts.start));
   if (opts && Number(opts.target) > 0) qs.set('target', String(Math.floor(Number(opts.target))));
@@ -15313,6 +15360,7 @@ window.addEventListener('message', (ev) => {
     const res = REMO_STORE.submitRemoOdysseyRun(summary);
     if (res && res.ok) {
       syncHeaderAndSidebars();
+      sendRemoOdysseyHostContext();
       if (res.isNewRecord) {
         if (typeof RemoAudio !== 'undefined' && RemoAudio.play) RemoAudio.play('fanfare');
         spawnRemoCoinsFX(14);

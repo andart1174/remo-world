@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;700;800&family=Orbitron:wght@700;800;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/remo-odyssey.css?v=146">
+  <link rel="stylesheet" href="css/remo-odyssey.css?v=148">
   <script>
     window.REMO_CITY_IMG_BASE = '../img/cities/';
     (function () {
@@ -72,6 +72,7 @@
       <div class="hud-actions">
         <button type="button" class="icon-btn" id="btnCityFmToggle" title="Live City FM Radio">📻 FM</button>
         <button type="button" class="icon-btn" id="btnGhostToggle" title="Ghost Racer On/Off">👻 ON</button>
+        <button type="button" class="icon-btn" id="btnPhotoVisorToggle" style="display:none;" title="Show My REMO Photo">🪪 ON</button>
         <div class="lang-switch" role="group" aria-label="Language">
           <button type="button" class="lang-pill active" data-lang="en">EN</button>
           <button type="button" class="lang-pill" data-lang="fr">FR</button>
@@ -102,9 +103,22 @@
 
             <div class="local-board-box">
               <div class="local-board-hdr">
-                <span id="lblLeaderboardTitle">🏆 LOCAL HIGH SCORES</span>
+                <span id="lblLeaderboardTitle">🌍 GLOBAL TOP 5</span>
+                <div class="board-tabs">
+                  <button type="button" class="board-tab-btn active" id="btnBoardGlobal">🌍</button>
+                  <button type="button" class="board-tab-btn" id="btnBoardLocal">🏆</button>
+                </div>
               </div>
               <div id="localBestList"></div>
+            </div>
+
+            <div class="local-board-box missions-box" id="menuMissionsBox">
+              <div class="local-board-hdr">
+                <span id="lblMissionsTitle">🎯 DAILY MISSIONS</span>
+                <span class="streak-pill" id="menuStreakBadge">🔥 0/7</span>
+              </div>
+              <div id="menuMissionsList"></div>
+              <div class="streak-bar-row" id="menuStreakDots"></div>
             </div>
 
             <div class="local-board-box wallet-mini-box">
@@ -221,6 +235,8 @@
 
           <div class="route-chain" id="overRouteChain"></div>
           <div class="city-war-banner" id="overCityWarBanner" style="display:none;"></div>
+          <div class="city-rivalry-box" id="overCityRivalryBox" style="display:none;"></div>
+          <div class="over-missions-box" id="overMissionsBox" style="display:none;"></div>
           <div class="daily-wordle-box" id="dailyWordleBox" style="display:none;"></div>
 
           <div class="over-btn-row">
@@ -261,11 +277,11 @@
     </div>
   </div>
 
-  <script src="js/cities-data.js?v=146"></script>
-  <script src="js/audio-sfx.js?v=146"></script>
-  <script src="js/avatar-sprites.js?v=146"></script>
-  <script src="js/avatar-renderer.js?v=146"></script>
-  <script src="js/share-card.js?v=146"></script>
-  <script src="js/game-engine.js?v=147"></script>
+  <script src="js/cities-data.js?v=148"></script>
+  <script src="js/audio-sfx.js?v=148"></script>
+  <script src="js/avatar-sprites.js?v=148"></script>
+  <script src="js/avatar-renderer.js?v=148"></script>
+  <script src="js/share-card.js?v=148"></script>
+  <script src="js/game-engine.js?v=148"></script>
 </body>
 </html>

@@ -26,7 +26,8 @@
     gold:    { ringA: 'rgba(251,191,36,0.85)', ringB: 'rgba(56,189,248,0.80)' },
     cyber:   { ringA: 'rgba(16,185,129,0.90)', ringB: 'rgba(6,182,212,0.85)' },
     diamond: { ringA: 'rgba(224,242,254,0.92)', ringB: 'rgba(244,114,182,0.82)' },
-    galaxy:  { ringA: 'rgba(192,132,252,0.92)', ringB: 'rgba(251,191,36,0.85)' }
+    galaxy:  { ringA: 'rgba(192,132,252,0.92)', ringB: 'rgba(251,191,36,0.85)' },
+    mythic:  { ringA: 'rgba(255,251,235,0.98)', ringB: 'rgba(245,158,11,0.95)', solarWings: true }
   };
 
   function drawRemoCoinDisc(ctx, cx, cy, rx, ry, rotAngle, time, showLabel) {
@@ -223,6 +224,23 @@
     }
     ctx.globalAlpha = alpha;
 
+    if (skin.solarWings) {
+      const wingFlap = Math.sin(time * 9) * 8;
+      ctx.save();
+      ctx.strokeStyle = '#fde047';
+      ctx.shadowColor = '#f59e0b';
+      ctx.shadowBlur = 18;
+      ctx.lineWidth = 3.2;
+      [-1, 1].forEach((dir) => {
+        ctx.beginPath();
+        ctx.moveTo(dir * 16, -42 * s);
+        ctx.quadraticCurveTo(dir * 52, -74 * s + wingFlap, dir * 74, -46 * s - wingFlap * 0.6);
+        ctx.quadraticCurveTo(dir * 48, -38 * s, dir * 22, -26 * s);
+        ctx.stroke();
+      });
+      ctx.restore();
+    }
+
     const size = 114 * s;
     ctx.drawImage(sp.full4B, -size * 0.50, -size * 0.845, size, size);
     ctx.restore();
@@ -249,10 +267,44 @@
     ctx.restore();
   }
 
+  function drawHeroGoldCrown(ctx, yTop, time) {
+    const bob = Math.sin(time * 6.5) * 3.5;
+    ctx.save();
+    ctx.translate(0, yTop + bob);
+    ctx.shadowColor = '#fbbf24';
+    ctx.shadowBlur = 16;
+    const g = ctx.createLinearGradient(-16, -14, 16, 4);
+    g.addColorStop(0, '#fef08a');
+    g.addColorStop(0.5, '#fbbf24');
+    g.addColorStop(1, '#d97706');
+    ctx.fillStyle = g;
+    ctx.strokeStyle = '#ffffffcc';
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.moveTo(-16, 4);
+    ctx.lineTo(-19, -11);
+    ctx.lineTo(-8, -3);
+    ctx.lineTo(0, -15);
+    ctx.lineTo(8, -3);
+    ctx.lineTo(19, -11);
+    ctx.lineTo(16, 4);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    // Jewels
+    ctx.fillStyle = '#38bdf8';
+    ctx.beginPath(); ctx.arc(0, -3, 2.6, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#f43f5e';
+    ctx.beginPath(); ctx.arc(-9, 0, 2, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(9, 0, 2, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+
   function drawRemoHero(ctx, p) {
     const x = p.x;
     const y = p.y;
-    const s = p.scale || 1.44;
+    const baseS = p.scale || 1.44;
+    const s = p.titanActive ? baseS * 1.32 : baseS;
     const time = p.time || 0;
     const morph = Math.max(0, Math.min(1, p.morph !== undefined ? p.morph : (p.mode === 'fly' ? 1 : 0)));
     const invuln = Boolean(p.invuln);
@@ -266,6 +318,27 @@
     }
 
     ctx.translate(x, y);
+
+    // Golden Titan Invincible Dome (Supply Drop Mini-Mode!)
+    if (p.titanActive) {
+      const tR = 86 * (s / 1.9);
+      const tg = ctx.createRadialGradient(0, -72, tR * 0.2, 0, -72, tR);
+      tg.addColorStop(0, 'rgba(254, 240, 138, 0.42)');
+      tg.addColorStop(0.6, 'rgba(245, 158, 11, 0.24)');
+      tg.addColorStop(1, 'transparent');
+      ctx.fillStyle = tg;
+      ctx.beginPath();
+      ctx.arc(0, -72, tR, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#fde047';
+      ctx.shadowColor = '#fbbf24';
+      ctx.shadowBlur = 20;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(0, -72, tR * 0.84 + Math.sin(time * 12) * 3, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+    }
 
     // Sovereign Vault Aura glow behind Hero
     const aR = 62 * (s / 1.44);
@@ -335,6 +408,33 @@
       });
     }
 
+    // Real Citizen Photo Holographic Medallion Crest (Feature #7)
+    if (p.photoImg && _spriteReady(p.photoImg)) {
+      const mx = -44 * (s / 1.44);
+      const my = -104 * (s / 1.44) + Math.sin(time * 4.5) * 3;
+      const mr = 14;
+      ctx.save();
+      ctx.shadowColor = '#38bdf8';
+      ctx.shadowBlur = 10;
+      ctx.beginPath();
+      ctx.arc(mx, my, mr, 0, Math.PI * 2);
+      ctx.clip();
+      ctx.drawImage(p.photoImg, mx - mr, my - mr, mr * 2, mr * 2);
+      ctx.restore();
+      ctx.save();
+      ctx.strokeStyle = '#fbbf24';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(mx, my, mr + 0.5, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // Live City King Golden Crown hovering above Hero's head (Feature #1)
+    if (p.hasCrown) {
+      drawHeroGoldCrown(ctx, p.titanActive ? -175 : -142, time);
+    }
+
     ctx.restore();
 
     if (!rendered) {
@@ -342,26 +442,32 @@
     }
   }
 
-  function drawGhostHero(ctx, p, label) {
+  function drawGhostHero(ctx, p, label, isRival) {
     ctx.save();
-    ctx.globalAlpha = 0.36;
-    if ('filter' in ctx) ctx.filter = 'hue-rotate(155deg) saturate(1.8) brightness(1.2)';
+    ctx.globalAlpha = isRival ? 0.44 : 0.36;
+    if ('filter' in ctx) {
+      ctx.filter = isRival
+        ? 'hue-rotate(275deg) saturate(2.1) brightness(1.25)'
+        : 'hue-rotate(155deg) saturate(1.8) brightness(1.2)';
+    }
     drawRemoHero(ctx, p);
     if ('filter' in ctx) ctx.filter = 'none';
 
-    ctx.globalAlpha = 0.85;
-    ctx.fillStyle = 'rgba(5, 8, 22, 0.78)';
-    ctx.strokeStyle = '#38bdf8';
-    ctx.lineWidth = 1.2;
+    ctx.globalAlpha = 0.92;
+    const tagTxt = String(label || (isRival ? '⚔️ RIVAL' : '👻 BEST')).slice(0, 16);
+    const pillW = Math.max(88, tagTxt.length * 7.2 + 20);
+    ctx.fillStyle = isRival ? 'rgba(42, 8, 48, 0.86)' : 'rgba(5, 8, 22, 0.78)';
+    ctx.strokeStyle = isRival ? '#ec4899' : '#38bdf8';
+    ctx.lineWidth = 1.4;
     ctx.beginPath();
-    ctx.roundRect(p.x - 42, p.y - 165, 84, 20, 10);
+    ctx.roundRect(p.x - pillW / 2, p.y - 165, pillW, 20, 10);
     ctx.fill();
     ctx.stroke();
 
-    ctx.fillStyle = '#7dd3fc';
+    ctx.fillStyle = isRival ? '#fbcfe8' : '#7dd3fc';
     ctx.font = '800 10px "Orbitron", sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText(label || '👻 BEST', p.x, p.y - 151);
+    ctx.fillText(tagTxt, p.x, p.y - 151);
     ctx.restore();
   }
 

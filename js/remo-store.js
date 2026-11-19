@@ -1322,6 +1322,7 @@ function getDefaultRemoOdyssey() {
     event2x: false,
     totalRuns: 0,
     leaderboard: [],
+    cityKings: {},
     updatedAt: 0
   };
 }
@@ -2361,6 +2362,7 @@ function upgradeEcosystemState(st) {
     st.remoOdyssey.event2x = Boolean(st.remoOdyssey.event2x);
     st.remoOdyssey.totalRuns = Number(st.remoOdyssey.totalRuns || 0);
     if (!Array.isArray(st.remoOdyssey.leaderboard)) st.remoOdyssey.leaderboard = [];
+    if (!st.remoOdyssey.cityKings || typeof st.remoOdyssey.cityKings !== 'object') st.remoOdyssey.cityKings = {};
     st.remoOdyssey.updatedAt = Number(st.remoOdyssey.updatedAt || 0);
   }
   if (st.gamesHub) {
@@ -3757,6 +3759,9 @@ const REMO_STORE = {
     if (!Array.isArray(this.state.remoOdyssey.leaderboard)) {
       this.state.remoOdyssey.leaderboard = [];
     }
+    if (!this.state.remoOdyssey.cityKings || typeof this.state.remoOdyssey.cityKings !== 'object') {
+      this.state.remoOdyssey.cityKings = {};
+    }
     this.state.remoOdyssey.event2x = Boolean(this.state.remoOdyssey.event2x);
     this.state.remoOdyssey.totalRuns = Number(this.state.remoOdyssey.totalRuns || 0);
     return this.state.remoOdyssey;
@@ -3779,6 +3784,7 @@ const REMO_STORE = {
           score: Number(e.score || 0),
           citiesCount: Number(e.citiesCount || 1),
           kmFlown: Number(e.kmFlown || 0),
+          avatarUrl: (e.avatarUrl && String(e.avatarUrl).length < 512) ? String(e.avatarUrl) : '',
           ts: Number(e.ts || Date.now())
         });
       }
@@ -3812,6 +3818,7 @@ const REMO_STORE = {
     const prevTop = od.leaderboard.length > 0 ? Number(od.leaderboard[0].score || 0) : 0;
     const existing = od.leaderboard.find((e) => e && e.uid === u.uid);
     const prevPersonal = existing ? Number(existing.score || 0) : 0;
+    const safeAvatar = (u.avatarUrl && /^https?:\/\//i.test(String(u.avatarUrl)) && String(u.avatarUrl).length < 512) ? String(u.avatarUrl) : '';
 
     if (score > prevPersonal) {
       if (existing) {
@@ -3820,6 +3827,7 @@ const REMO_STORE = {
         existing.cityId = startCityId;
         existing.citiesCount = citiesCount;
         existing.kmFlown = kmFlown;
+        if (safeAvatar) existing.avatarUrl = safeAvatar;
         existing.ts = Date.now();
       } else {
         od.leaderboard.push({
@@ -3829,11 +3837,27 @@ const REMO_STORE = {
           score,
           citiesCount,
           kmFlown,
+          avatarUrl: safeAvatar,
           ts: Date.now()
         });
       }
       od.leaderboard.sort((a, b) => (b.score || 0) - (a.score || 0));
       if (od.leaderboard.length > 20) od.leaderboard = od.leaderboard.slice(0, 20);
+    }
+
+    // Update Live City King Crown record for the city defended!
+    const prevKing = od.cityKings[startCityId];
+    let stoleCityKing = false;
+    let prevKingName = prevKing && prevKing.name ? prevKing.name : '';
+    if (!prevKing || score > Number(prevKing.score || 0)) {
+      if (prevKing && prevKing.uid && prevKing.uid !== u.uid) stoleCityKing = true;
+      od.cityKings[startCityId] = {
+        uid: u.uid,
+        name: u.name,
+        score,
+        avatarUrl: safeAvatar,
+        ts: Date.now()
+      };
     }
 
     const isNewRecord = score > prevTop;
@@ -3888,6 +3912,8 @@ const REMO_STORE = {
       score,
       improved: score > prevPersonal,
       isNewRecord,
+      stoleCityKing,
+      prevKingName,
       coinsGranted: coinsToGrant,
       dailyFirstBonus,
       cityWarPoints: rawWarPts,
@@ -5940,6 +5966,15 @@ const REMO_STORE = {
           const cloudUpdated = Number(cOd.updatedAt || 0);
           const localUpdated = Number(localOd.updatedAt || 0);
           localOd.leaderboard = this._mergeLeaderboardEntries(localOd.leaderboard, cOd.leaderboard);
+          if (cOd.cityKings && typeof cOd.cityKings === 'object') {
+            Object.keys(cOd.cityKings).forEach((cid) => {
+              const ck = cOd.cityKings[cid];
+              const lk = localOd.cityKings[cid];
+              if (ck && (!lk || Number(ck.score || 0) > Number(lk.score || 0))) {
+                localOd.cityKings[cid] = ck;
+              }
+            });
+          }
           localOd.totalRuns = Math.max(Number(localOd.totalRuns || 0), Number(cOd.totalRuns || 0));
           if (cloudUpdated >= localUpdated) {
             localOd.event2x = Boolean(cOd.event2x);

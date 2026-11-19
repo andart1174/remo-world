@@ -54,6 +54,11 @@
       desc_en: 'Cosmic nebula warp jets', desc_fr: 'Jets Nébuleuse Cosmique'
     },
     {
+      id: 'coin_mythic', kind: 'skin', cat: 'hoverSkin', val: 'mythic', price: 0, streakExclusive: true,
+      icon: '🌟', name_en: 'Solar Phoenix Mythic', name_fr: 'Phénix Solaire Mythique',
+      desc_en: '7-Day Streak Exclusive — Solar Wings!', desc_fr: 'Exclusif Série 7 Jours — Ailes Solaires !'
+    },
+    {
       id: 'aura_gold_fire', kind: 'skin', cat: 'aura', val: 'gold_fire', price: 0,
       icon: '✨', name_en: 'Solar Crown Aura', name_fr: 'Aura Couronne Solaire',
       desc_en: 'Warm golden 4D battle glow', desc_fr: 'Halo doré de combat 4D'
@@ -187,7 +192,37 @@
       cityWarBanner: '⚔️ +{pts} CITY WAR POWER ADDED FOR {city}!',
       dropFeedBtn: '🌐 DROP CHALLENGE & CLAIM +150 🪙 ON REMO WORLD',
       dropFeedBtnLoggedIn: '📣 POST 1v1 CHALLENGE TO REMO FEED (+15 🪙)',
-      feedChallengeDropped: '🚀 Challenge sent to REMO World Feed!'
+      feedChallengeDropped: '🚀 Challenge sent to REMO World Feed!',
+      boardGlobalTitle: '🌍 GLOBAL TOP 5',
+      boardLocalTitle: '🏆 LOCAL RECORDS',
+      missionsTitle: '🎯 DAILY MISSIONS',
+      shopStreakLocked: '🔒 7-DAY STREAK',
+      photoOn: '🪪 ON',
+      photoOff: '🪪 OFF',
+      cityKingBanner: '👑 KING OF {code}: @{name} · {score} PTS',
+      cityKingStolenToast: '👑 NEW CITY KING OF {city}! CROWN STOLEN!',
+      supplyDropIncoming: '📦 4D SUPPLY DRONE! SHOOT (F) OR JUMP!',
+      supplyCoinRain: '🪙 COIN RAIN STORM! (8s)',
+      supplyGoldenTitan: '🛡️ GOLDEN TITAN! SMASH EVERYTHING (8s)!',
+      supplyHyperWarp: '🚀 HYPER WARP! PORTAL SUMMONED (+250)!',
+      nearMissPopup: '🔥 CLOSE CALL +{pts}!',
+      titanSmashPopup: '🛡️ SMASH +{pts}!',
+      rivalAhead: '⚡ +{diff} AHEAD OF @{vs}',
+      rivalBehind: '🔥 -{diff} BEHIND @{vs}',
+      rivalPassedToast: '👑 YOU JUST PASSED @{vs}!',
+      rivalryNeedPts: '{flag} {city} #{rank} — Only {gap} pts behind {rFlag} {rCity} #{rRank}!',
+      rivalryWorldOne: '👑 {flag} {city} IS #1 IN THE WORLD! (+{lead} pts lead!)',
+      missionDoneToast: '🎯 MISSION COMPLETE: {label} (+{reward} 🪙)!',
+      streakToast: '🔥 {days}-DAY ODYSSEY STREAK! +{bonus} 🪙!',
+      streakMythicToast: '🌟 7-DAY STREAK! MYTHIC SOLAR PHOENIX UNLOCKED!',
+      m_score_2500: 'Score 2,500+ pts in 1 run',
+      m_cities_3: 'Visit 3+ cities in 1 run',
+      m_boss_1: 'Shatter 1 Boss (FireBlast F)',
+      m_nearmiss_3: 'Pull off 3 Close Calls',
+      m_supply_1: 'Crack 1 4D Supply Crate',
+      m_compass_1: 'Land 1 Perfect Compass Lock',
+      m_coins_35: 'Collect 35+ Coins in 1 run',
+      m_combo_12: 'Hit a 12x Combo Streak'
     },
     fr: {
       brandSub: 'Jeu Officiel 4D REMO World · 4A↔4B',
@@ -300,7 +335,37 @@
       cityWarBanner: '⚔️ +{pts} PUISSANCE DE GUERRE POUR {city} !',
       dropFeedBtn: '🌐 PUBLIER LE DÉFI & RÉCLAMER +150 🪙 SUR REMO WORLD',
       dropFeedBtnLoggedIn: '📣 PUBLIER CE DÉFI DANS LE FIL REMO (+15 🪙)',
-      feedChallengeDropped: '🚀 Défi publié sur le Fil REMO World !'
+      feedChallengeDropped: '🚀 Défi publié sur le Fil REMO World !',
+      boardGlobalTitle: '🌍 TOP 5 MONDIAL',
+      boardLocalTitle: '🏆 RECORDS LOCAUX',
+      missionsTitle: '🎯 MISSIONS DU JOUR',
+      shopStreakLocked: '🔒 SÉRIE 7 JOURS',
+      photoOn: '🪪 ON',
+      photoOff: '🪪 OFF',
+      cityKingBanner: '👑 ROI DE {code} : @{name} · {score} PTS',
+      cityKingStolenToast: '👑 NOUVEAU ROI DE {city} ! COURONNE VOLÉE !',
+      supplyDropIncoming: '📦 DRONE 4D ! TIREZ (F) OU SAUTEZ !',
+      supplyCoinRain: '🪙 PLUIE DE PIÈCES 24K ! (8s)',
+      supplyGoldenTitan: '🛡️ TITAN D’OR ! DÉTRUISEZ TOUT (8s) !',
+      supplyHyperWarp: '🚀 HYPER WARP ! PORTAIL INVOQUÉ (+250) !',
+      nearMissPopup: '🔥 FRÔLEMENT +{pts} !',
+      titanSmashPopup: '🛡️ CHOC +{pts} !',
+      rivalAhead: '⚡ +{diff} DEVANT @{vs}',
+      rivalBehind: '🔥 -{diff} DERRIÈRE @{vs}',
+      rivalPassedToast: '👑 VOUS VENEZ DE DÉPASSER @{vs} !',
+      rivalryNeedPts: '{flag} {city} #{rank} — Plus que {gap} pts pour dépasser {rFlag} {rCity} #{rRank} !',
+      rivalryWorldOne: '👑 {flag} {city} EST #1 MONDIAL ! (+{lead} pts d’avance !)',
+      missionDoneToast: '🎯 MISSION RÉUSSIE : {label} (+{reward} 🪙) !',
+      streakToast: '🔥 SÉRIE DE {days} JOURS ! +{bonus} 🪙 !',
+      streakMythicToast: '🌟 SÉRIE 7 JOURS ! PHÉNIX SOLAIRE MYTHIQUE DÉBLOQUÉ !',
+      m_score_2500: 'Marquer 2 500+ pts en 1 manche',
+      m_cities_3: 'Traverser 3+ villes en 1 manche',
+      m_boss_1: 'Vaincre 1 Boss (Tir F)',
+      m_nearmiss_3: 'Réussir 3 Frôlements',
+      m_supply_1: 'Ouvrir 1 Caisse Drone 4D',
+      m_compass_1: 'Réussir 1 Verrou Boussole Parfait',
+      m_coins_35: 'Récolter 35+ Pièces en 1 manche',
+      m_combo_12: 'Atteindre un Combo x12'
     }
   };
 
@@ -379,6 +444,11 @@
     if (typeof s.totalCoins !== 'number') s.totalCoins = 0;
     if (typeof s.totalKm !== 'number') s.totalKm = 0;
     if (typeof s.bestScore !== 'number') s.bestScore = 0;
+    if (!s.dailyMissions || typeof s.dailyMissions !== 'object') s.dailyMissions = { dateKey: '', doneIds: [] };
+    if (!Array.isArray(s.dailyMissions.doneIds)) s.dailyMissions.doneIds = [];
+    if (!s.streak || typeof s.streak !== 'object') s.streak = { days: 0, lastDate: '', mythicUnlocked: false };
+    if (typeof s.photoVisorEnabled !== 'boolean') s.photoVisorEnabled = true;
+    if (!s.boardTab) s.boardTab = 'global';
     return s;
   }
 
@@ -504,6 +574,33 @@
     ghostSamplesRec: [],
     ghostNextSampleT: 0,
     activeGhostTrack: null,
+
+    // V7 Legendary Edition: Global Podium, City King Crown, Daily Missions, Streak, Supply Drops, Near-Miss, Rival & Photo
+    globalLeaderboard: [],
+    cityKings: {},
+    cityRanking: [],
+    boardTab: 'global',
+    playerAvatarUrl: '',
+    playerAvatarImg: null,
+    photoVisorEnabled: true,
+    cityKingTarget: null,
+    heroCrownActive: false,
+    stoleCityKingThisRun: false,
+    cityKingBannerTimer: 0,
+    supplyDrop: null,
+    supplySpawnTimer: 16,
+    coinRainTimer: 0,
+    coinRainSpawnTimer: 0,
+    titanTimer: 0,
+    hyperWarpTimer: 0,
+    slowMoTimer: 0,
+    rivalGhostPassed: false,
+    runBossesDefeated: 0,
+    runNearMisses: 0,
+    runSupplyCrates: 0,
+    runPerfectLocks: 0,
+    runCompletedMissions: [],
+    lastStreakEvent: null,
 
     hero: {
       x: 195,
@@ -720,6 +817,268 @@
     }
   }
 
+  /* ── V7 LEGENDARY SYSTEMS: Missions, 7-Day Streak, City King, Supply Drops, Near-Miss, Rival & Photo ── */
+  const DAILY_MISSION_POOL = [
+    { id: 'score_2500', key: 'm_score_2500', goal: 2500, reward: 30, cur: () => state.score },
+    { id: 'cities_3',   key: 'm_cities_3',   goal: 3,    reward: 40, cur: () => state.routeIds.length },
+    { id: 'boss_1',     key: 'm_boss_1',     goal: 1,    reward: 35, cur: () => state.runBossesDefeated },
+    { id: 'nearmiss_3', key: 'm_nearmiss_3', goal: 3,    reward: 30, cur: () => state.runNearMisses },
+    { id: 'supply_1',   key: 'm_supply_1',   goal: 1,    reward: 35, cur: () => state.runSupplyCrates },
+    { id: 'compass_1',  key: 'm_compass_1',  goal: 1,    reward: 30, cur: () => state.runPerfectLocks },
+    { id: 'coins_35',   key: 'm_coins_35',   goal: 35,   reward: 25, cur: () => state.coins },
+    { id: 'combo_12',   key: 'm_combo_12',   goal: 12,   reward: 35, cur: () => state.maxCombo }
+  ];
+
+  function getTodayUtcKey() {
+    const now = new Date();
+    return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}-${String(now.getUTCDate()).padStart(2, '0')}`;
+  }
+
+  function getPrevUtcKey(dateKey) {
+    const parts = String(dateKey || getTodayUtcKey()).split('-').map(Number);
+    const prev = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2]) - 86400000);
+    return `${prev.getUTCFullYear()}-${String(prev.getUTCMonth() + 1).padStart(2, '0')}-${String(prev.getUTCDate()).padStart(2, '0')}`;
+  }
+
+  function getDailyMissions() {
+    const dateKey = (state.dailyInfo && state.dailyInfo.dateKey) || getTodayUtcKey();
+    if (!state.save.dailyMissions || state.save.dailyMissions.dateKey !== dateKey) {
+      state.save.dailyMissions = { dateKey, doneIds: [] };
+      writeSave(state.save);
+    }
+    const rng = REMO_DATA.mulberry32('ODYSSEY_MISSIONS_' + dateKey);
+    const pool = DAILY_MISSION_POOL.slice();
+    for (let i = pool.length - 1; i > 0; i--) {
+      const j = Math.floor(rng() * (i + 1));
+      const tmp = pool[i]; pool[i] = pool[j]; pool[j] = tmp;
+    }
+    return pool.slice(0, 3);
+  }
+
+  function checkLiveMissions() {
+    if (state.phase !== 'run' && state.phase !== 'fly' && state.phase !== 'landing' && state.phase !== 'gameover') return;
+    const missions = getDailyMissions();
+    const doneIds = state.save.dailyMissions.doneIds || [];
+    let changed = false;
+    missions.forEach((m) => {
+      if (doneIds.includes(m.id)) return;
+      if (m.cur() >= m.goal) {
+        doneIds.push(m.id);
+        state.save.dailyMissions.doneIds = doneIds;
+        state.coins += m.reward;
+        state.runCompletedMissions.push(m);
+        changed = true;
+        REMO_SFX.chest();
+        showToast(tr('missionDoneToast', { label: tr(m.key), reward: m.reward }), '#34d399', 2.8);
+      }
+    });
+    if (changed) writeSave(state.save);
+  }
+
+  function updateDailyStreak() {
+    const today = getTodayUtcKey();
+    const st = state.save.streak || { days: 0, lastDate: '', mythicUnlocked: false };
+    if (st.lastDate === today) {
+      state.lastStreakEvent = null;
+      return;
+    }
+    const prev = getPrevUtcKey(today);
+    st.days = st.lastDate === prev ? (Number(st.days || 0) + 1) : 1;
+    st.lastDate = today;
+    const bonus = Math.min(100, st.days * 15);
+    state.save.totalCoins = (state.save.totalCoins || 0) + bonus;
+    let unlockedMythic = false;
+    if (st.days >= 7 && !st.mythicUnlocked) {
+      st.mythicUnlocked = true;
+      if (!state.save.unlockedItems.includes('coin_mythic')) {
+        state.save.unlockedItems.push('coin_mythic');
+      }
+      unlockedMythic = true;
+    }
+    state.save.streak = st;
+    state.lastStreakEvent = { days: st.days, bonus, unlockedMythic };
+    writeSave(state.save);
+  }
+
+  function loadPlayerAvatar(url) {
+    const cleanUrl = String(url || '').trim();
+    state.playerAvatarUrl = cleanUrl;
+    const btn = document.getElementById('btnPhotoVisorToggle');
+    if (btn) {
+      btn.style.display = cleanUrl ? 'inline-flex' : 'none';
+      btn.textContent = state.photoVisorEnabled ? tr('photoOn') : tr('photoOff');
+      btn.classList.toggle('fm-on', Boolean(cleanUrl && state.photoVisorEnabled));
+    }
+    if (!cleanUrl || typeof Image !== 'function') {
+      state.playerAvatarImg = null;
+      return;
+    }
+    try {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => { state.playerAvatarImg = img; };
+      img.onerror = () => {
+        // Retry without anonymous CORS so in-game canvas still displays avatar cleanly
+        const img2 = new Image();
+        img2.onload = () => { img2._tainted = true; state.playerAvatarImg = img2; };
+        img2.src = cleanUrl;
+      };
+      img.src = cleanUrl;
+    } catch (e) {
+      state.playerAvatarImg = null;
+    }
+  }
+
+  function getCityKingForCity(cityId) {
+    if (!cityId) return null;
+    const hostKing = state.cityKings && state.cityKings[cityId];
+    if (hostKing && Number(hostKing.score || 0) > 0) return hostKing;
+    const localBest = Number((state.save.cityBest && state.save.cityBest[cityId]) || 0);
+    if (localBest > 0) {
+      return { name: state.save.playerName || 'REMO', score: localBest, avatarUrl: state.playerAvatarUrl || '' };
+    }
+    return null;
+  }
+
+  function initCityKingTarget(city) {
+    if (!city) {
+      state.cityKingTarget = null;
+      return;
+    }
+    const k = getCityKingForCity(city.id);
+    if (k && Number(k.score || 0) > 0) {
+      state.cityKingTarget = {
+        cityId: city.id,
+        code: city.code,
+        name: k.name || 'Champion',
+        score: Number(k.score || 0),
+        stolen: state.score > Number(k.score || 0)
+      };
+      if (state.cityKingTarget.stolen) {
+        state.heroCrownActive = true;
+      } else {
+        state.cityKingBannerTimer = 3.6;
+      }
+    } else {
+      state.cityKingTarget = null;
+    }
+  }
+
+  function checkCityKingCrownSteal() {
+    const ck = state.cityKingTarget;
+    if (!ck || ck.stolen || state.score <= ck.score) return;
+    ck.stolen = true;
+    state.heroCrownActive = true;
+    state.stoleCityKingThisRun = true;
+    state.cityKingBannerTimer = 0;
+    state.flashAlpha = 0.72;
+    state.flashColor = '#fbbf24';
+    state.shakeTimer = 0.3;
+    state.shakeAmt = 8;
+    REMO_SFX.perfectLock();
+    REMO_SFX.chest();
+    emitParticles(state.hero.x, state.hero.y - 90, '#fbbf24', 34, 300);
+    emitParticles(state.hero.x, state.hero.y - 90, '#38bdf8', 24, 260);
+    const cityLabel = REMO_DATA.getCityLabel(state.currentCity, state.lang).toUpperCase();
+    addPopup(state.hero.x + 15, state.hero.y - 135, '👑 CITY KING!', '#fde047', 22);
+    showToast(tr('cityKingStolenToast', { city: cityLabel }), '#fde047', 3.2);
+  }
+
+  function spawnSupplyDrop() {
+    if (state.supplyDrop || (state.boss && state.boss.active) || state.portalSpawned) return;
+    state.supplyDrop = {
+      x: VW + 70,
+      y: 128 + state.rng() * 88,
+      baseY: 165,
+      bob: 0,
+      r: 28,
+      cracked: false
+    };
+    state.supplyDrop.baseY = state.supplyDrop.y;
+    showToast(tr('supplyDropIncoming'), '#fde047', 2.2);
+  }
+
+  function crackSupplyDrop(x, y) {
+    state.supplyDrop = null;
+    state.runSupplyCrates++;
+    REMO_SFX.chest();
+    emitParticles(x, y, '#fbbf24', 32, 300);
+    emitParticles(x, y, '#38bdf8', 22, 240);
+    const roll = state.rng();
+    if (roll < 0.38) {
+      // 1. COIN RAIN STORM (8s)
+      state.coinRainTimer = 8.0;
+      state.coinRainSpawnTimer = 0.05;
+      state.magnetTimer = Math.max(state.magnetTimer, 8.0);
+      showToast(tr('supplyCoinRain'), '#fde047', 2.8);
+      addPopup(x, y - 24, '🪙 COIN RAIN!', '#fde047', 20);
+    } else if (roll < 0.74) {
+      // 2. GOLDEN TITAN (8s)
+      state.titanTimer = 8.0;
+      state.flashAlpha = 0.55;
+      state.flashColor = '#fbbf24';
+      showToast(tr('supplyGoldenTitan'), '#fbbf24', 2.8);
+      addPopup(x, y - 24, '🛡️ GOLDEN TITAN!', '#fde047', 20);
+    } else {
+      // 3. HYPER WARP (3.5s) — Rockets straight to Portal!
+      state.hyperWarpTimer = 3.5;
+      state.hero.invulnTimer = Math.max(state.hero.invulnTimer, 3.8);
+      const pts = addScore(250);
+      state.sectorProgress = Math.max(state.sectorProgress, 0.93);
+      state.flashAlpha = 0.7;
+      state.flashColor = '#38bdf8';
+      REMO_SFX.portalWarp();
+      showToast(tr('supplyHyperWarp'), '#38bdf8', 2.8);
+      addPopup(x, y - 24, `🚀 WARP +${pts}!`, '#7dd3fc', 21);
+    }
+    checkLiveMissions();
+  }
+
+  function triggerNearMiss(x, y) {
+    state.runNearMisses++;
+    state.combo++;
+    state.maxCombo = Math.max(state.maxCombo, state.combo);
+    state.novaCharge = Math.min(100, state.novaCharge + 8);
+    state.slowMoTimer = 0.085; // 85ms Matrix slow-motion juice!
+    const pts = addScore(75);
+    REMO_SFX.dash();
+    emitParticles(x, y, '#38bdf8', 14, 210);
+    emitParticles(x, y, '#fde047', 10, 180);
+    addPopup(state.hero.x + 24, state.hero.y - 108, tr('nearMissPopup', { pts }), '#7dd3fc', 17);
+    checkLiveMissions();
+  }
+
+  function getRivalScoreAtTime(t) {
+    if (!state.duelChallenge || !state.duelChallenge.target) return 0;
+    const target = Number(state.duelChallenge.target || 0);
+    // Smooth escalating curve matching typical Odyssey acceleration (reaches target around 62s)
+    const p = Math.min(1.12, Math.pow(Math.max(0, t) / 62, 1.15));
+    return Math.round(target * p);
+  }
+
+  function sampleRivalGhost(t) {
+    if (!state.duelChallenge || !state.duelChallenge.target) return null;
+    const rivalScore = getRivalScoreAtTime(t);
+    const diff = state.score - rivalScore;
+    // Visually position Rival ahead (right) if winning, behind (left) if losing
+    const rx = Math.max(82, Math.min(430, state.hero.x - Math.max(-210, Math.min(115, diff * 0.14))));
+    const ry = state.phase === 'fly'
+      ? Math.max(95, Math.min(VH - 95, VH * 0.48 + Math.sin(t * 2.1) * 90))
+      : (GROUND_Y - Math.max(0, Math.sin(t * 3.8) * 65));
+    return {
+      x: rx,
+      y: ry,
+      mode: state.phase === 'fly' ? 'fly' : 'run',
+      morph: state.phase === 'fly' ? 1 : 0,
+      sliding: false,
+      runPhase: t * 11,
+      time: t,
+      scale: 1.40,
+      rivalScore,
+      diff
+    };
+  }
+
   function applyHostContext(ctxData) {
     if (!ctxData || typeof ctxData !== 'object') return;
     state.hostContext = ctxData;
@@ -729,8 +1088,20 @@
       const inp = document.getElementById('playerNickInput');
       if (inp) inp.value = state.save.playerName;
     }
+    if (typeof ctxData.playerAvatarUrl === 'string') {
+      loadPlayerAvatar(ctxData.playerAvatarUrl);
+    }
     if (Array.isArray(ctxData.ownedCardCities)) {
       state.ownedCardCities = ctxData.ownedCardCities.slice();
+    }
+    if (Array.isArray(ctxData.globalLeaderboard)) {
+      state.globalLeaderboard = ctxData.globalLeaderboard.slice(0, 10);
+    }
+    if (ctxData.cityKings && typeof ctxData.cityKings === 'object') {
+      state.cityKings = Object.assign({}, ctxData.cityKings);
+    }
+    if (Array.isArray(ctxData.cityRanking)) {
+      state.cityRanking = ctxData.cityRanking.slice();
     }
     if (ctxData.torchCityId) {
       state.torchCityId = ctxData.torchCityId;
@@ -747,6 +1118,10 @@
     }
     writeSave(state.save);
     renderCityPicker();
+    renderLocalProgressBoard();
+    if (state.phase === 'gameover' && state.lastSummary) {
+      renderGameOverCityRivalry(state.lastSummary);
+    }
   }
 
   function dropChallengeToRemoWorld() {
@@ -918,6 +1293,26 @@
     state.boss = null;
     state.compassLock = null;
     state.safeGraceTimer = 1.0;
+
+    // Reset V7 per-run states
+    state.heroCrownActive = false;
+    state.stoleCityKingThisRun = false;
+    state.cityKingBannerTimer = 0;
+    state.supplyDrop = null;
+    state.supplySpawnTimer = 14 + state.rng() * 7;
+    state.coinRainTimer = 0;
+    state.coinRainSpawnTimer = 0;
+    state.titanTimer = 0;
+    state.hyperWarpTimer = 0;
+    state.slowMoTimer = 0;
+    state.rivalGhostPassed = false;
+    state.runBossesDefeated = 0;
+    state.runNearMisses = 0;
+    state.runSupplyCrates = 0;
+    state.runPerfectLocks = 0;
+    state.runCompletedMissions = [];
+    state.lastStreakEvent = null;
+    initCityKingTarget(startCity);
 
     // Ghost Racer setup
     state.ghostSamplesRec = [];
@@ -1155,6 +1550,8 @@
     const cardBoost = state.cardChampionBuff ? 1.15 : 1;
     const pts = Math.round(basePts * state.multiplier * surgeBoost * prismBoost * feverBoost * chronoBoost * torchBoost * cardBoost);
     state.score += pts;
+    checkCityKingCrownSteal();
+    checkLiveMissions();
     if (typeof global.remoSubmitScore === 'function') {
       try { global.remoSubmitScore(state.score); } catch (e) {}
     }
@@ -1303,6 +1700,7 @@
     if (!state.boss || !state.boss.active) return;
     const bossName = state.boss.name || tr('bossName_void');
     state.boss.active = false;
+    state.runBossesDefeated++;
     const pts = addScore(400);
     state.coins += 12;
 
@@ -1492,11 +1890,13 @@
     state.coins += (perfectLock ? 18 : 10) * (state.chronoRiftTimer > 0 ? 3 : 1);
 
     if (perfectLock) {
+      state.runPerfectLocks++;
       REMO_SFX.perfectLock();
       state.hero.invulnTimer = 2.6;
       state.flashAlpha = 0.8;
       state.flashColor = '#fde047';
       showToast(tr('compassPerfect'), '#6ee7b7', 2.6);
+      checkLiveMissions();
     } else {
       REMO_SFX.landCity();
       showToast(tr('landedToast', { city: REMO_DATA.getCityLabel(arrived, state.lang), pts }), arrived.themeColor, 2.4);
@@ -1549,6 +1949,9 @@
     state.rings = [];
     state.safeGraceTimer = 1.25;
     state.spawnTimer = 0.85;
+    state.supplyDrop = null;
+    initCityKingTarget(arrived);
+    checkLiveMissions();
     state.hero.y = GROUND_Y;
     state.hero.vy = 0;
     state.hero.jumpsLeft = 2;
@@ -1563,7 +1966,7 @@
   }
 
   function takeDamage() {
-    if (state.hero.invulnTimer > 0 || state.blitzTimer > 0 || state.hero.blinkTimer > 0) return;
+    if (state.hero.invulnTimer > 0 || state.blitzTimer > 0 || state.titanTimer > 0 || state.hyperWarpTimer > 0 || state.hero.blinkTimer > 0) return;
 
     if (state.crystals > 0) {
       state.crystals--;
@@ -1614,6 +2017,8 @@
 
     if (!state.save.cityBest) state.save.cityBest = {};
     state.save.cityBest[state.startCityId] = Math.max(state.save.cityBest[state.startCityId] || 0, state.score);
+    checkLiveMissions();
+    updateDailyStreak();
     state.save.totalCoins = (state.save.totalCoins || 0) + state.coins;
     state.save.totalKm = (state.save.totalKm || 0) + state.kmFlown;
 
@@ -1627,6 +2032,12 @@
       startCityId: state.startCityId,
       cityWarPoints,
       blitzGatesWon: state.blitzGatesWon,
+      nearMisses: state.runNearMisses,
+      supplyCrates: state.runSupplyCrates,
+      stoleCityKing: state.stoleCityKingThisRun,
+      isCityKing: state.heroCrownActive,
+      completedMissions: state.runCompletedMissions.map((m) => m.id),
+      streakEvent: state.lastStreakEvent,
       maxCombo: state.maxCombo,
       maxMult: state.maxMult,
       crystalsLeft: state.crystals,
@@ -1689,12 +2100,18 @@
     }
   }
 
-  /* ── Update Physics (Normalized Delta-Time) ── */
-  function update(dt) {
+  /* ── Update Physics (Normalized Delta-Time + Matrix Near-Miss Slow-Mo) ── */
+  function update(rawDt) {
+    let dt = rawDt;
+    if (state.slowMoTimer > 0) {
+      state.slowMoTimer = Math.max(0, state.slowMoTimer - rawDt);
+      dt = rawDt * 0.28;
+    }
     state.time += dt;
-    if (state.toastTimer > 0) state.toastTimer = Math.max(0, state.toastTimer - dt);
-    if (state.flashAlpha > 0) state.flashAlpha = Math.max(0, state.flashAlpha - dt * 1.4);
-    if (state.shakeTimer > 0) state.shakeTimer = Math.max(0, state.shakeTimer - dt);
+    if (state.toastTimer > 0) state.toastTimer = Math.max(0, state.toastTimer - rawDt);
+    if (state.cityKingBannerTimer > 0) state.cityKingBannerTimer = Math.max(0, state.cityKingBannerTimer - rawDt);
+    if (state.flashAlpha > 0) state.flashAlpha = Math.max(0, state.flashAlpha - rawDt * 1.4);
+    if (state.shakeTimer > 0) state.shakeTimer = Math.max(0, state.shakeTimer - rawDt);
 
     for (let i = state.particles.length - 1; i >= 0; i--) {
       const pt = state.particles[i];
@@ -1736,6 +2153,53 @@
     if (state.prismTimer > 0) state.prismTimer = Math.max(0, state.prismTimer - dt);
     if (state.ascendedTimer > 0) state.ascendedTimer = Math.max(0, state.ascendedTimer - dt);
     if (state.chronoRiftTimer > 0) state.chronoRiftTimer = Math.max(0, state.chronoRiftTimer - dt);
+    if (state.coinRainTimer > 0) state.coinRainTimer = Math.max(0, state.coinRainTimer - dt);
+    if (state.titanTimer > 0) state.titanTimer = Math.max(0, state.titanTimer - dt);
+    if (state.hyperWarpTimer > 0) state.hyperWarpTimer = Math.max(0, state.hyperWarpTimer - dt);
+
+    // 🪙 COIN RAIN STORM (Supply Drop Mini-Mode!)
+    if (state.coinRainTimer > 0) {
+      state.coinRainSpawnTimer -= dt;
+      if (state.coinRainSpawnTimer <= 0) {
+        state.coinRainSpawnTimer = 0.14;
+        state.items.push({
+          kind: 'coin',
+          x: VW + 20,
+          y: 95 + Math.random() * (GROUND_Y - 125),
+          r: 13,
+          magnet: true
+        });
+      }
+    }
+
+    // 📦 4D SUPPLY DROP DRONE Spawner & Movement
+    if (!state.supplyDrop && state.safeGraceTimer <= 0 && !state.portalSpawned && !(state.boss && state.boss.active)) {
+      state.supplySpawnTimer -= dt;
+      if (state.supplySpawnTimer <= 0) {
+        state.supplySpawnTimer = 20 + state.rng() * 8;
+        spawnSupplyDrop();
+      }
+    }
+    if (state.supplyDrop) {
+      const sd = state.supplyDrop;
+      sd.bob += dt * 4.5;
+      sd.x -= (155 * state.speedMult) * dt;
+      sd.y = sd.baseY + Math.sin(sd.bob) * 20;
+      if (Math.hypot(h.x - sd.x, (h.y - 54) - (sd.y + 22)) < sd.r + 36) {
+        crackSupplyDrop(sd.x, sd.y + 20);
+      } else if (sd.x < -90) {
+        state.supplyDrop = null;
+      }
+    }
+
+    // ⚔️ Live 1v1 Rival Surpassed Celebration
+    if (state.duelChallenge && !state.rivalGhostPassed && state.score > state.duelChallenge.target) {
+      state.rivalGhostPassed = true;
+      REMO_SFX.perfectLock();
+      emitParticles(h.x, h.y - 60, '#ec4899', 24, 260);
+      emitParticles(h.x, h.y - 60, '#fde047', 24, 240);
+      showToast(tr('rivalPassedToast', { vs: state.duelChallenge.vs }), '#6ee7b7', 2.8);
+    }
 
     for (let i = state.autoZapBeams.length - 1; i >= 0; i--) {
       state.autoZapBeams[i].life -= dt;
@@ -1779,10 +2243,11 @@
       ]);
     }
 
-    const blitzFactor = state.blitzTimer > 0 ? 1.42 : 1.0;
+      const blitzFactor = state.blitzTimer > 0 ? 1.42 : 1.0;
+    const warpFactor = state.hyperWarpTimer > 0 ? 1.65 : 1.0;
     const blinkFactor = h.blinkTimer > 0 ? 1.28 : 1.0;
     const chronoSlow = state.chronoRiftTimer > 0 ? 0.85 : 1.0;
-    const worldSpeed = (state.phase === 'fly' ? 470 : 390) * state.speedMult * (h.dashTimer > 0 ? 1.30 : 1) * blitzFactor * blinkFactor * chronoSlow;
+    const worldSpeed = (state.phase === 'fly' ? 470 : 390) * state.speedMult * (h.dashTimer > 0 ? 1.30 : 1) * blitzFactor * warpFactor * blinkFactor * chronoSlow;
 
     state.stars.forEach((st) => {
       st.x -= (st.speed + worldSpeed * 0.06) * dt;
@@ -2008,6 +2473,15 @@
         }
       }
 
+      // Hit 4D Supply Drop Crate with FireBlast (F)!
+      if (!consumed && state.supplyDrop) {
+        const sd = state.supplyDrop;
+        if (Math.hypot(pr.x - sd.x, pr.y - (sd.y + 18)) < sd.r + 28) {
+          crackSupplyDrop(sd.x, sd.y + 18);
+          consumed = true;
+        }
+      }
+
       // Open GeoVault Chest from afar!
       if (!consumed) {
         for (let k = state.items.length - 1; k >= 0; k--) {
@@ -2092,12 +2566,31 @@
       }
 
       if (hit) {
+        if (state.titanTimer > 0) {
+          const pts = addScore(60);
+          REMO_SFX.crystal();
+          state.shakeTimer = 0.14;
+          state.shakeAmt = 6;
+          emitParticles(o.x + (o.w || 0) * 0.5, o.y - (o.h || 0) * 0.5, '#fbbf24', 24, 300);
+          addPopup(o.x, o.y - 82, tr('titanSmashPopup', { pts }), '#fde047', 19);
+          state.obstacles.splice(i, 1);
+          continue;
+        }
+        if (state.hyperWarpTimer > 0) {
+          emitParticles(o.x, o.y - 30, '#38bdf8', 16, 240);
+          state.obstacles.splice(i, 1);
+          continue;
+        }
         if (h.blinkTimer > 0) {
           if (!o._blinkScored) {
             o._blinkScored = true;
+            o._nearMissed = true;
+            state.runNearMisses++;
+            state.slowMoTimer = 0.065;
             const pts = addScore(80);
             emitParticles(h.x, h.y - 44, '#38bdf8', 14, 210);
             addPopup(h.x, h.y - 98, `🌀 +${pts}`, '#7dd3fc', 17);
+            checkLiveMissions();
           }
           continue;
         }
@@ -2113,6 +2606,15 @@
           takeDamage();
           if (state.phase === 'gameover') return;
           continue;
+        }
+      } else if (!o._nearMissed && state.hero.invulnTimer <= 0 && state.titanTimer <= 0 && state.hyperWarpTimer <= 0) {
+        // 🔥 NEAR-MISS Matrix Slow-Mo Check!
+        const oRight = o.x + (o.w || o.r || 20);
+        const oCenterY = o.h ? (o.y - o.h * 0.5) : o.y;
+        const heroCenterY = heroBox.y + heroBox.h * 0.5;
+        if (oRight < heroBox.x && oRight > heroBox.x - 42 && Math.abs(oCenterY - heroCenterY) < (heroBox.h * 0.5 + (o.h ? o.h * 0.5 : (o.r || 20)) + 52)) {
+          o._nearMissed = true;
+          triggerNearMiss(h.x - 16, heroCenterY);
         }
       }
 
@@ -2877,15 +3379,72 @@
       ctx.restore();
     }
 
-    // Ghost Racer Hologram (behind Player!)
-    if (state.ghostEnabled && (state.phase === 'run' || state.phase === 'fly')) {
-      const gp = sampleGhostAtTime(state.time);
-      if (gp && typeof REMO_AVATAR.drawGhostHero === 'function') {
-        REMO_AVATAR.drawGhostHero(ctx, gp, tr('ghostLbl'));
+    // 📦 4D Supply Drop Drone + Golden Parachute Crate!
+    if (state.supplyDrop) {
+      const sd = state.supplyDrop;
+      ctx.save();
+      ctx.translate(sd.x, sd.y);
+      // Hover Drone top hull
+      ctx.fillStyle = '#0f172a';
+      ctx.strokeStyle = '#38bdf8';
+      ctx.shadowColor = '#38bdf8';
+      ctx.shadowBlur = 14;
+      ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      ctx.roundRect(-26, -18, 52, 16, 8);
+      ctx.fill();
+      ctx.stroke();
+      // Spinning twin rotors
+      const rotW = 14 + Math.sin(state.time * 40) * 6;
+      ctx.strokeStyle = '#fde047';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.moveTo(-22 - rotW * 0.5, -23); ctx.lineTo(-22 + rotW * 0.5, -23);
+      ctx.moveTo(22 - rotW * 0.5, -23); ctx.lineTo(22 + rotW * 0.5, -23);
+      ctx.stroke();
+      // Energy cables
+      ctx.strokeStyle = 'rgba(251, 191, 36, 0.75)';
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.moveTo(-12, -2); ctx.lineTo(-14, 14);
+      ctx.moveTo(12, -2); ctx.lineTo(14, 14);
+      ctx.stroke();
+      // Golden 4D Supply Crate
+      ctx.shadowColor = '#fbbf24';
+      ctx.shadowBlur = 18;
+      const cg = ctx.createLinearGradient(-18, 12, 18, 44);
+      cg.addColorStop(0, '#fef08a');
+      cg.addColorStop(0.5, '#f59e0b');
+      cg.addColorStop(1, '#b45309');
+      ctx.fillStyle = cg;
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.roundRect(-18, 12, 36, 32, 7);
+      ctx.fill();
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = '#050816';
+      ctx.font = '900 13px "Orbitron", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('4D', 0, 33);
+      ctx.restore();
+    }
+
+    // Ghost Racer Hologram & Live 1v1 Rival Ghost (behind Player!)
+    if (state.phase === 'run' || state.phase === 'fly') {
+      if (state.duelChallenge && typeof REMO_AVATAR.drawGhostHero === 'function') {
+        const rg = sampleRivalGhost(state.time);
+        if (rg) REMO_AVATAR.drawGhostHero(ctx, rg, `⚔️ @${state.duelChallenge.vs}`, true);
+      } else if (state.ghostEnabled) {
+        const gp = sampleGhostAtTime(state.time);
+        if (gp && typeof REMO_AVATAR.drawGhostHero === 'function') {
+          REMO_AVATAR.drawGhostHero(ctx, gp, tr('ghostLbl'), false);
+        }
       }
     }
 
-    // PLAYER HERO (4A <-> 4B) + Equipped Vault Auras & Skins!
+    // PLAYER HERO (4A <-> 4B) + Equipped Vault Auras, Skins, Titan Dome, Crown & Photo Medallion!
     REMO_AVATAR.drawRemoHero(ctx, {
       x: state.hero.x,
       y: state.hero.y,
@@ -2899,6 +3458,9 @@
       dashing: state.hero.dashTimer > 0,
       blinkActive: state.hero.blinkTimer > 0,
       ascendedActive: state.ascendedTimer > 0,
+      titanActive: state.titanTimer > 0,
+      hasCrown: state.heroCrownActive,
+      photoImg: state.photoVisorEnabled ? state.playerAvatarImg : null,
       invuln: state.hero.invulnTimer > 0,
       magnetActive: state.magnetTimer > 0,
       blitzActive: state.blitzTimer > 0,
@@ -2973,9 +3535,68 @@
       ctx.globalAlpha = 1;
     }
 
+    // ⚡ Dynamic Cinematic Neon Speed Lines (10x+ Combo, Fever, Titan, Hyper Warp, High Speed!)
+    if ((state.phase === 'run' || state.phase === 'fly') && (state.combo >= 10 || state.feverActive || state.titanTimer > 0 || state.hyperWarpTimer > 0 || state.speedMult >= 1.28)) {
+      ctx.save();
+      const intense = state.hyperWarpTimer > 0 || state.titanTimer > 0 || state.feverActive;
+      const lineCount = intense ? 18 : 10;
+      ctx.strokeStyle = state.titanTimer > 0 ? 'rgba(251,191,36,0.42)' : (state.hyperWarpTimer > 0 ? 'rgba(56,189,248,0.52)' : 'rgba(168,85,247,0.34)');
+      ctx.lineWidth = intense ? 2.4 : 1.6;
+      for (let i = 0; i < lineCount; i++) {
+        const ly = i % 2 === 0 ? (12 + ((i * 29) % 105)) : (VH - 12 - ((i * 31) % 105));
+        const len = 55 + ((i * 37) % 110);
+        const lx = VW - (((state.time * (intense ? 1400 : 950) + i * 173) % (VW + 220)) - 60);
+        ctx.beginPath();
+        ctx.moveTo(lx, ly);
+        ctx.lineTo(lx + len, ly);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
     if (state.phase === 'run' || state.phase === 'fly') {
       drawInCanvasCompassBar(city, nextCity, elInfo);
       drawActivePowerBadges();
+
+      // 👑 Top-Sky City King Hologram Banner on City Entry!
+      if (state.cityKingBannerTimer > 0 && state.cityKingTarget && !state.cityKingTarget.stolen) {
+        const ck = state.cityKingTarget;
+        ctx.save();
+        ctx.globalAlpha = Math.min(1, state.cityKingBannerTimer * 1.5);
+        const kTxt = tr('cityKingBanner', { code: ck.code, name: ck.name, score: ck.score.toLocaleString() });
+        ctx.font = '800 11px "Orbitron", sans-serif';
+        const kw = Math.min(440, ctx.measureText(kTxt).width + 34);
+        ctx.fillStyle = 'rgba(28, 16, 6, 0.88)';
+        ctx.strokeStyle = '#fbbf24';
+        ctx.lineWidth = 1.6;
+        ctx.beginPath(); ctx.roundRect((VW - kw) / 2, 64, kw, 26, 13); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = '#fde047';
+        ctx.textAlign = 'center';
+        ctx.fillText(kTxt, VW / 2, 81);
+        ctx.restore();
+      }
+
+      // ⚔️ Live 1v1 Rival Score Gap Pill (Top-Right!)
+      if (state.duelChallenge) {
+        const rivalNow = getRivalScoreAtTime(state.time);
+        const diff = state.score - rivalNow;
+        const ahead = diff >= 0;
+        const rTxt = ahead
+          ? tr('rivalAhead', { diff: Math.abs(diff).toLocaleString(), vs: state.duelChallenge.vs })
+          : tr('rivalBehind', { diff: Math.abs(diff).toLocaleString(), vs: state.duelChallenge.vs });
+        ctx.save();
+        ctx.font = '800 10px "Orbitron", sans-serif';
+        const rw = Math.min(230, ctx.measureText(rTxt).width + 24);
+        const rx = VW - rw - 16;
+        ctx.fillStyle = ahead ? 'rgba(6, 46, 36, 0.88)' : 'rgba(56, 12, 32, 0.88)';
+        ctx.strokeStyle = ahead ? '#10b981' : '#ec4899';
+        ctx.lineWidth = 1.6;
+        ctx.beginPath(); ctx.roundRect(rx, 16, rw, 26, 13); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = ahead ? '#6ee7b7' : '#fbcfe8';
+        ctx.textAlign = 'center';
+        ctx.fillText(rTxt, rx + rw / 2, 33);
+        ctx.restore();
+      }
     }
 
     if (state.toastTimer > 0 && state.toastText) {
@@ -3052,6 +3673,9 @@
     if (hEl) badges.push({ lbl: `${hEl.icon} ${(state.lang === 'fr' ? hEl.name_fr : hEl.name_en).toUpperCase()}`, col: hEl.color });
     if (state.torchActive) badges.push({ lbl: `🔥 TORCH 3X`, col: '#fbbf24' });
     if (state.cardChampionBuff) badges.push({ lbl: `👑 +15%`, col: '#fde047' });
+    if (state.titanTimer > 0) badges.push({ lbl: `🛡️ TITAN ${state.titanTimer.toFixed(0)}s`, col: '#fbbf24' });
+    if (state.coinRainTimer > 0) badges.push({ lbl: `🪙 RAIN ${state.coinRainTimer.toFixed(0)}s`, col: '#fde047' });
+    if (state.hyperWarpTimer > 0) badges.push({ lbl: `🚀 WARP`, col: '#38bdf8' });
     if (state.ascendedTimer > 0) badges.push({ lbl: `🌟 4D ${state.ascendedTimer.toFixed(0)}s`, col: '#fde047' });
     if (state.chronoRiftTimer > 0) badges.push({ lbl: `⏳ 3X ${state.chronoRiftTimer.toFixed(0)}s`, col: '#e879f9' });
     if (state.magnetTimer > 0) badges.push({ lbl: `🧲 ${state.magnetTimer.toFixed(0)}s`, col: '#38bdf8' });
@@ -3165,7 +3789,8 @@
       s.upgrades[item.key] = lv + 1;
       REMO_SFX.shopBuy();
     } else {
-      const owned = (s.unlockedItems || []).includes(item.id) || item.price === 0;
+      const owned = (s.unlockedItems || []).includes(item.id) || (item.price === 0 && !item.streakExclusive);
+      if (item.streakExclusive && !owned) return;
       if (!owned) {
         if ((s.totalCoins || 0) < item.price) return;
         s.totalCoins -= item.price;
@@ -3212,13 +3837,16 @@
           </div>
         `;
       }
-      const owned = (state.save.unlockedItems || []).includes(item.id) || item.price === 0;
+      const owned = (state.save.unlockedItems || []).includes(item.id) || (item.price === 0 && !item.streakExclusive);
+      const lockedStreak = Boolean(item.streakExclusive && !owned);
       const equipped = item.cat === 'hoverSkin'
         ? (state.save.equippedHoverSkin || 'gold') === item.val
         : (state.save.equippedAura || state.save.vipFrame) === item.val;
-      const canBuy = owned || coins >= item.price;
+      const canBuy = !lockedStreak && (owned || coins >= item.price);
       const cls = equipped ? 'equipped' : (owned ? 'equip' : '');
-      const lbl = equipped ? tr('shopEquipped') : (owned ? tr('shopEquip') : `${tr('shopBuy')} · ${item.price} 🪙`);
+      const lbl = lockedStreak
+        ? tr('shopStreakLocked')
+        : (equipped ? tr('shopEquipped') : (owned ? tr('shopEquip') : `${tr('shopBuy')} · ${item.price} 🪙`));
       return `
         <div class="shop-card ${equipped ? 'equipped' : ''}">
           <div class="shop-card-top"><span>${item.icon} ${title}</span></div>
@@ -3274,8 +3902,15 @@
     set('lblPickCity', tr('pickCity'));
     set('lblVipAura', tr('vipStyle'));
     set('btnStartOdyssey', tr('startBtn'));
+    const phBtn = document.getElementById('btnPhotoVisorToggle');
+    if (phBtn) {
+      phBtn.textContent = state.photoVisorEnabled ? tr('photoOn') : tr('photoOff');
+      phBtn.classList.toggle('fm-on', Boolean(state.playerAvatarUrl && state.photoVisorEnabled));
+    }
+    set('lblMissionsTitle', tr('missionsTitle'));
     set('lblControlsHint', tr('controlsHint'));
-    set('lblLeaderboardTitle', tr('leaderboardTitle'));
+    const useGlobal = state.boardTab === 'global' && state.globalLeaderboard.length > 0;
+    set('lblLeaderboardTitle', useGlobal ? tr('boardGlobalTitle') : tr('boardLocalTitle'));
     set('lblStampsTitle', tr('stampsTitle'));
     set('lblRelicsTitle', tr('relicsTitle'));
     set('lblVaultBankTitle', tr('vaultBankTitle'));
@@ -3398,27 +4033,88 @@
     });
   }
 
+  function escapeMiniHtml(str) {
+    return String(str || '').replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+  }
+
   function renderLocalProgressBoard() {
+    const useGlobal = state.boardTab === 'global' && state.globalLeaderboard.length > 0;
+    document.getElementById('btnBoardGlobal')?.classList.toggle('active', state.boardTab === 'global');
+    document.getElementById('btnBoardLocal')?.classList.toggle('active', state.boardTab !== 'global');
+    const titleEl = document.getElementById('lblLeaderboardTitle');
+    if (titleEl) titleEl.textContent = useGlobal ? tr('boardGlobalTitle') : tr('boardLocalTitle');
+
     const lb = document.getElementById('localBestList');
     if (lb) {
-      const hist = state.save.history || [];
-      lb.innerHTML = hist.length
-        ? hist.slice(0, 5).map((h, i) => {
-            const c = REMO_DATA.getCityById(h.startId || 'chisinau');
-            const fUri = getFlagDataUri(c);
-            const cLbl = state.lang === 'fr' ? 'villes' : 'cities';
-            return `
-              <div class="lb-row">
-                <span style="display:flex;align-items:center;gap:5px;">
-                  ${['🥇', '🥈', '🥉', '4.', '5.'][i]}
-                  ${fUri ? `<img class="flag-img" src="${fUri}" alt="${c.countryIso}">` : ''}
-                  ${h.cities} ${cLbl} · ${h.km} km
-                </span>
-                <b>${Number(h.score).toLocaleString()}</b>
-              </div>
-            `;
-          }).join('')
-        : `<div class="lb-empty">${tr('noRunsYet')}</div>`;
+      if (useGlobal) {
+        lb.innerHTML = state.globalLeaderboard.slice(0, 5).map((g, i) => {
+          const c = REMO_DATA.getCityById(g.cityId || 'montreal');
+          const fUri = getFlagDataUri(c);
+          const avHtml = g.avatarUrl
+            ? `<img class="lb-avatar-img" src="${escapeMiniHtml(g.avatarUrl)}" alt="">`
+            : '';
+          return `
+            <div class="lb-row">
+              <span style="display:flex;align-items:center;gap:5px;min-width:0;overflow:hidden;">
+                <span>${['🥇', '🥈', '🥉', '4.', '5.'][i]}</span>
+                ${avHtml}
+                ${fUri ? `<img class="flag-img" src="${fUri}" alt="${c.countryIso}">` : ''}
+                <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">@${escapeMiniHtml(g.name || 'Citizen')}</span>
+              </span>
+              <b>${Number(g.score || 0).toLocaleString()}</b>
+            </div>
+          `;
+        }).join('');
+      } else {
+        const hist = state.save.history || [];
+        lb.innerHTML = hist.length
+          ? hist.slice(0, 5).map((h, i) => {
+              const c = REMO_DATA.getCityById(h.startId || 'chisinau');
+              const fUri = getFlagDataUri(c);
+              const cLbl = state.lang === 'fr' ? 'villes' : 'cities';
+              return `
+                <div class="lb-row">
+                  <span style="display:flex;align-items:center;gap:5px;">
+                    ${['🥇', '🥈', '🥉', '4.', '5.'][i]}
+                    ${fUri ? `<img class="flag-img" src="${fUri}" alt="${c.countryIso}">` : ''}
+                    ${h.cities} ${cLbl} · ${h.km} km
+                  </span>
+                  <b>${Number(h.score).toLocaleString()}</b>
+                </div>
+              `;
+            }).join('')
+          : `<div class="lb-empty">${tr('noRunsYet')}</div>`;
+      }
+    }
+
+    // 🎯 Daily Missions + 🔥 7-Day Streak Chest
+    const mList = document.getElementById('menuMissionsList');
+    const stBadge = document.getElementById('menuStreakBadge');
+    const stDots = document.getElementById('menuStreakDots');
+    const missions = getDailyMissions();
+    const doneIds = (state.save.dailyMissions && state.save.dailyMissions.doneIds) || [];
+    const streakDays = Number((state.save.streak && state.save.streak.days) || 0);
+
+    if (mList) {
+      mList.innerHTML = missions.map((m) => {
+        const isDone = doneIds.includes(m.id);
+        return `
+          <div class="mission-row ${isDone ? 'done' : ''}">
+            <span>${isDone ? '✅' : '▫️'} ${escapeMiniHtml(tr(m.key))}</span>
+            <b>${isDone ? 'OK' : `+${m.reward} 🪙`}</b>
+          </div>
+        `;
+      }).join('');
+    }
+    if (stBadge) {
+      stBadge.textContent = `🔥 ${Math.min(7, streakDays)}/7`;
+    }
+    if (stDots) {
+      stDots.innerHTML = [1, 2, 3, 4, 5, 6, 7].map((d) => {
+        const lit = streakDays >= d;
+        const mythic = d === 7;
+        return `<span class="streak-dot ${lit ? 'lit' : ''} ${mythic ? 'mythic' : ''}" title="Day ${d}">${mythic ? '🌟' : d}</span>`;
+      }).join('');
     }
 
     const stEl = document.getElementById('unlockedStampsCount');
@@ -3433,6 +4129,86 @@
     if (walEl) {
       walEl.textContent = `${Number(state.save.totalCoins || 0).toLocaleString()} 🪙`;
     }
+  }
+
+  function renderGameOverCityRivalry(summary) {
+    const box = document.getElementById('overCityRivalryBox');
+    if (!box) return;
+    const rankList = Array.isArray(state.cityRanking) ? state.cityRanking : [];
+    const idx = rankList.findIndex((x) => x && x.id === summary.startCityId);
+    if (idx < 0 || rankList.length < 2) {
+      box.style.display = 'none';
+      return;
+    }
+    const mine = rankList[idx];
+    const myCity = REMO_DATA.getCityById(mine.id);
+    const myName = REMO_DATA.getCityLabel(myCity, state.lang).toUpperCase();
+    const myFlag = getFlagDataUri(myCity);
+    const myFlagHtml = myFlag ? `<img class="flag-img" src="${myFlag}" alt="${myCity.countryIso}">` : '';
+
+    if (idx === 0) {
+      const runnerUp = rankList[1];
+      const lead = Math.max(1, mine.score - runnerUp.score);
+      box.style.display = 'flex';
+      box.innerHTML = `
+        <div style="display:flex;align-items:center;justify-content:center;gap:6px;flex-wrap:wrap;">
+          ${myFlagHtml}
+          <span>${escapeMiniHtml(tr('rivalryWorldOne', { flag: '', city: myName, lead: lead.toLocaleString() }).trim())}</span>
+        </div>
+        <div class="city-rivalry-track"><div class="city-rivalry-fill" style="width:100%;"></div></div>
+      `;
+    } else {
+      const rival = rankList[idx - 1];
+      const rCity = REMO_DATA.getCityById(rival.id);
+      const rName = REMO_DATA.getCityLabel(rCity, state.lang).toUpperCase();
+      const gap = Math.max(1, rival.score - mine.score + 1);
+      const pct = Math.max(12, Math.min(96, Math.round((mine.score / Math.max(1, rival.score)) * 100)));
+      box.style.display = 'flex';
+      box.innerHTML = `
+        <div style="display:flex;align-items:center;justify-content:center;gap:6px;flex-wrap:wrap;">
+          ${myFlagHtml}
+          <span>${escapeMiniHtml(tr('rivalryNeedPts', {
+            flag: '',
+            city: myName,
+            rank: mine.rank,
+            gap: gap.toLocaleString(),
+            rFlag: '',
+            rCity: rName,
+            rRank: rival.rank
+          }).trim())}</span>
+        </div>
+        <div class="city-rivalry-track"><div class="city-rivalry-fill" style="width:${pct}%;"></div></div>
+      `;
+    }
+  }
+
+  function renderGameOverMissions(summary) {
+    const box = document.getElementById('overMissionsBox');
+    if (!box) return;
+    const missions = getDailyMissions();
+    const doneIds = (state.save.dailyMissions && state.save.dailyMissions.doneIds) || [];
+    const streakEv = summary.streakEvent;
+    let streakHtml = '';
+    if (streakEv) {
+      streakHtml = `<div style="font-size:0.72rem;font-weight:900;color:#fde047;margin-bottom:4px;">${escapeMiniHtml(
+        streakEv.unlockedMythic
+          ? tr('streakMythicToast')
+          : tr('streakToast', { days: streakEv.days, bonus: streakEv.bonus })
+      )}</div>`;
+    }
+    box.style.display = 'flex';
+    box.innerHTML = `
+      ${streakHtml}
+      ${missions.map((m) => {
+        const done = doneIds.includes(m.id);
+        return `
+          <div class="mission-row ${done ? 'done' : ''}">
+            <span>${done ? '✅' : '🎯'} ${escapeMiniHtml(tr(m.key))}</span>
+            <b>${done ? `+${m.reward} 🪙` : `${Math.min(m.goal, m.cur())}/${m.goal}`}</b>
+          </div>
+        `;
+      }).join('')}
+    `;
   }
 
   function buildWordleDailyText(summary) {
@@ -3498,6 +4274,9 @@
     const isLoggedHost = Boolean(state.hostContext && state.hostContext.isGuest === false);
     set('btnDropFeedChallenge', tr(isLoggedHost ? 'dropFeedBtnLoggedIn' : 'dropFeedBtn'));
 
+    renderGameOverCityRivalry(summary);
+    renderGameOverMissions(summary);
+
     // Daily Wordle Box & Button
     const wBox = document.getElementById('dailyWordleBox');
     const wBtn = document.getElementById('btnCopyDailyWordle');
@@ -3524,8 +4303,21 @@
     const clBtn = document.getElementById('btnCloseShareModal');
     if (!modal || !preview) return;
 
-    const cardCv = REMO_SHARE.renderStoryCardCanvas(state.lastSummary, state.lang);
-    const dataUrl = cardCv.toDataURL('image/png');
+    const cardPayload = Object.assign({}, state.lastSummary, {
+      showPhotoOnCard: Boolean(state.photoVisorEnabled && state.playerAvatarImg && !state.playerAvatarImg._tainted),
+      playerAvatarImg: (state.playerAvatarImg && !state.playerAvatarImg._tainted) ? state.playerAvatarImg : null
+    });
+    let cardCv = REMO_SHARE.renderStoryCardCanvas(cardPayload, state.lang);
+    let dataUrl = '';
+    try {
+      dataUrl = cardCv.toDataURL('image/png');
+    } catch (eCors) {
+      // Safe fallback if third-party avatar image lacked CORS headers
+      cardPayload.showPhotoOnCard = false;
+      cardPayload.playerAvatarImg = null;
+      cardCv = REMO_SHARE.renderStoryCardCanvas(cardPayload, state.lang);
+      dataUrl = cardCv.toDataURL('image/png');
+    }
     preview.src = dataUrl;
     if (dlBtn) {
       dlBtn.textContent = tr('downloadBtn');
@@ -3711,6 +4503,8 @@
     state.torchCityId = getTorchCityId();
     state.ghostEnabled = state.save.ghostEnabled !== false;
     state.cityFmEnabled = Boolean(state.save.cityFmEnabled);
+    state.photoVisorEnabled = state.save.photoVisorEnabled !== false;
+    state.boardTab = state.save.boardTab || 'global';
     initBackdropEntities();
 
     const params = new URLSearchParams(global.location.search || '');
@@ -3753,6 +4547,28 @@
       writeSave(state.save);
       const b = document.getElementById('btnGhostToggle');
       if (b) b.textContent = state.ghostEnabled ? tr('ghostOn') : tr('ghostOff');
+    });
+    document.getElementById('btnPhotoVisorToggle')?.addEventListener('click', () => {
+      state.photoVisorEnabled = !state.photoVisorEnabled;
+      state.save.photoVisorEnabled = state.photoVisorEnabled;
+      writeSave(state.save);
+      const b = document.getElementById('btnPhotoVisorToggle');
+      if (b) {
+        b.textContent = state.photoVisorEnabled ? tr('photoOn') : tr('photoOff');
+        b.classList.toggle('fm-on', Boolean(state.playerAvatarUrl && state.photoVisorEnabled));
+      }
+    });
+    document.getElementById('btnBoardGlobal')?.addEventListener('click', () => {
+      state.boardTab = 'global';
+      state.save.boardTab = 'global';
+      writeSave(state.save);
+      renderLocalProgressBoard();
+    });
+    document.getElementById('btnBoardLocal')?.addEventListener('click', () => {
+      state.boardTab = 'local';
+      state.save.boardTab = 'local';
+      writeSave(state.save);
+      renderLocalProgressBoard();
     });
 
     document.getElementById('btnStartOdyssey')?.addEventListener('click', () => startRun());
@@ -3838,6 +4654,8 @@
   global.REMO_ODYSSEY = {
     state, startRun, actionJump, actionDashOrSlide, actionBlink, actionBlast, actionNova,
     setLanguage, setMenuTab, buyOrEquipShopItem, buildWordleDailyText,
-    toggleCityFm, spawnBlitzSkyGate, applyHostContext, getEffectiveWeather, dropChallengeToRemoWorld
+    toggleCityFm, spawnBlitzSkyGate, applyHostContext, getEffectiveWeather, dropChallengeToRemoWorld,
+    getDailyMissions, spawnSupplyDrop, crackSupplyDrop, triggerNearMiss, sampleRivalGhost,
+    updateDailyStreak, checkCityKingCrownSteal
   };
 })(window);
