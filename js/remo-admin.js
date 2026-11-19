@@ -2984,108 +2984,96 @@ window.adminReplySupportTicketFromOffice = adminReplySupportTicketFromOffice;
 window.adminDeleteSupportTicketFromOffice = adminDeleteSupportTicketFromOffice;
 window.adminReplyDmFromOffice = adminReplyDmFromOffice;
 
-/* ── 🕹️ ADMIN REMO GAMES HUB MANAGER ── */
-function renderAdminGamesHubPanel() {
-  const tbody = document.getElementById('admGamesHubTable');
-  if (!tbody || typeof REMO_STORE.ensureGamesHub !== 'function') return;
-  const lang = REMO_I18N.getLang();
-  const isFr = lang === 'fr';
-  const hub = REMO_STORE.ensureGamesHub();
-  const games = Array.isArray(hub.games) ? hub.games : [];
+/* ── 🧭 ADMIN REMO ODYSSEY OFFICIAL GAME MANAGER ── */
+function renderAdminOdysseyPanel() {
+  const tbody = document.getElementById('admOdysseyLeaderboardTable');
+  if (!tbody || typeof REMO_STORE.ensureRemoOdyssey !== 'function') return;
+  const isFr = REMO_I18N.getLang() === 'fr';
+  const od = REMO_STORE.ensureRemoOdyssey();
+  const lb = Array.isArray(od.leaderboard) ? od.leaderboard : [];
 
-  tbody.innerHTML = games.map((g) => {
-    const isFeat = hub.featuredGameId === g.id;
-    const isOn = g.enabled !== false;
-    const rec = Array.isArray(g.leaderboard) && g.leaderboard[0] ? g.leaderboard[0] : null;
-    const title = isFr ? (g.title_fr || g.title_en) : (g.title_en || g.title_fr);
+  const btn2x = document.getElementById('admOdyssey2xBtn');
+  if (btn2x) {
+    btn2x.textContent = od.event2x
+      ? (isFr ? '⚡ Événement 2X : ACTIF (Désactiver)' : '⚡ 2X Coins Event: ON (Disable)')
+      : (isFr ? '⚡ Activer Événement 2X Pièces' : '⚡ Enable 2X Coins Event');
+    btn2x.className = `adm-btn ${od.event2x ? 'emerald' : 'gold'}`;
+  }
+
+  const statsRow = document.getElementById('admOdysseyStatsRow');
+  if (statsRow) {
+    const topScore = lb[0] ? Number(lb[0].score || 0).toLocaleString() : '0';
+    statsRow.innerHTML = `
+      <span style="padding:6px 12px;border-radius:10px;background:rgba(56,189,248,0.12);border:1px solid rgba(56,189,248,0.3);">
+        🎮 ${isFr ? 'Parties Totales' : 'Total Runs'}: <b style="color:#7dd3fc;">${Number(od.totalRuns || 0).toLocaleString()}</b>
+      </span>
+      <span style="padding:6px 12px;border-radius:10px;background:rgba(251,191,36,0.12);border:1px solid rgba(251,191,36,0.3);">
+        👑 ${isFr ? 'Record Mondial' : 'Global Record'}: <b style="color:#fde047;">${topScore} PTS</b>
+      </span>
+      <span style="padding:6px 12px;border-radius:10px;background:${od.event2x ? 'rgba(16,185,129,0.18)' : 'rgba(255,255,255,0.05)'};border:1px solid ${od.event2x ? '#10b981' : 'rgba(255,255,255,0.14)'};">
+        ⚡ ${isFr ? 'Multiplicateur' : 'Coins Event'}: <b style="color:${od.event2x ? '#34d399' : '#94a3b8'};">${od.event2x ? '2X ACTIVE' : '1X Standard'}</b>
+      </span>
+    `;
+  }
+
+  if (!lb.length) {
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:#94a3b8;padding:16px;">${isFr ? 'Aucun score REMO Odyssey enregistré pour le moment.' : 'No REMO Odyssey scores recorded yet.'}</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = lb.map((e, i) => {
+    const c = typeof getCityById === 'function' ? getCityById(e.cityId || 'montreal') : null;
+    const med = ['🥇', '🥈', '🥉'][i] || `#${i + 1}`;
     return `
       <tr>
+        <td><b>${med}</b></td>
+        <td><b>@${escapeHtmlStr(e.name || 'Citizen')}</b></td>
+        <td>${c ? `${c.flag} ${escapeHtmlStr(isFr ? (c.name_fr || c.name_en) : c.name_en)}` : escapeHtmlStr(e.cityId || 'REMO')}</td>
+        <td><b style="color:#fde047;">${Number(e.score || 0).toLocaleString()} PTS</b> · <span style="color:#94a3b8;font-size:0.75rem;">${Number(e.citiesCount || 1)} ${isFr ? 'villes' : 'cities'} · ${Number(e.kmFlown || 0).toLocaleString()} km</span></td>
         <td>
-          <b>${escapeHtmlStr(g.icon || '🎮')} ${escapeHtmlStr(title || g.id)}</b>
-          ${isFeat ? ' <span style="background:rgba(251,191,36,0.2);color:#fde047;border:1px solid #fbbf24;border-radius:99px;padding:1px 7px;font-size:0.68rem;font-weight:900;">⚡ 2X TODAY</span>' : ''}
-        </td>
-        <td>
-          <span style="font-size:0.74rem;color:${g.isBuiltin ? '#7dd3fc' : '#c084fc'};font-weight:800;">${g.isBuiltin ? 'BUILTIN' : 'CUSTOM'}</span>
-          ·
-          <span style="font-size:0.74rem;color:${isOn ? '#34d399' : '#f87171'};font-weight:800;">${isOn ? 'ENABLED' : 'HIDDEN'}</span>
-        </td>
-        <td style="font-size:0.78rem;">
-          ${rec ? `<b>${Number(rec.score || 0).toLocaleString()}</b> · @${escapeHtmlStr(rec.name || 'Champion')}` : '—'}
-        </td>
-        <td style="display:flex;gap:6px;flex-wrap:wrap;">
-          <button type="button" class="adm-btn ${isOn ? 'rose' : 'emerald'}" style="padding:4px 9px;font-size:0.72rem;" onclick="adminToggleHubGameFromOffice('${escapeHtmlStr(g.id)}', ${isOn ? 'false' : 'true'})">
-            ${isOn ? '🙈 Hide' : '👁️ Enable'}
-          </button>
-          <button type="button" class="adm-btn gold" style="padding:4px 9px;font-size:0.72rem;" onclick="adminFeatureHubGameFromOffice('${escapeHtmlStr(g.id)}')">
-            ⚡ Set 2X
-          </button>
-          ${!g.isBuiltin ? `
-            <button type="button" class="adm-btn rose" style="padding:4px 9px;font-size:0.72rem;" onclick="adminDeleteHubGameFromOffice('${escapeHtmlStr(g.id)}')">
-              🗑️ Delete
-            </button>
-          ` : ''}
+          <button type="button" class="adm-btn rose" style="padding:4px 9px;font-size:0.72rem;" onclick="adminDeleteOdysseyEntryFromOffice('${escapeHtmlStr(e.uid || '')}')">🗑️ ${isFr ? 'Retirer' : 'Remove'}</button>
         </td>
       </tr>
     `;
   }).join('');
 }
 
-function adminAddCustomHubGameFromOffice() {
-  const lang = REMO_I18N.getLang();
-  const icon = document.getElementById('admHubGameIcon')?.value.trim() || '🕹️';
-  const title_en = document.getElementById('admHubGameTitleEn')?.value.trim() || '';
-  const title_fr = document.getElementById('admHubGameTitleFr')?.value.trim() || '';
-  const desc_en = document.getElementById('admHubGameDescEn')?.value.trim() || '';
-  const desc_fr = document.getElementById('admHubGameDescFr')?.value.trim() || '';
-  const customHtml = document.getElementById('admHubGameHtml')?.value.trim() || '';
-
-  if (!title_en || !customHtml) {
-    admToast(lang === 'fr' ? '⚠️ Ajoutez un titre EN et le code HTML5.' : '⚠️ Please provide an English title and HTML5 code.');
-    return;
-  }
-  const res = REMO_STORE.adminAddCustomHubGame({ icon, title_en, title_fr: title_fr || title_en, desc_en, desc_fr, customHtml });
-  if (!res.ok) {
-    admToast(res.error === 'invalid_html'
-      ? (lang === 'fr' ? '⚠️ HTML invalide ou trop lourd (> 36 KB).' : '⚠️ HTML invalid or exceeds 36 KB.')
-      : '⚠️ Admin access required.');
-    return;
-  }
-  ['admHubGameTitleEn', 'admHubGameTitleFr', 'admHubGameDescEn', 'admHubGameDescFr', 'admHubGameHtml'].forEach((id) => {
-    const el = document.getElementById(id);
-    if (el) el.value = '';
-  });
-  RemoAudio.play('fanfare');
-  admToast(lang === 'fr' ? '🕹️ Nouveau jeu publié dans REMO Games Hub !' : '🕹️ New game published to REMO Games Hub!');
-  renderAdminGamesHubPanel();
-}
-
-function adminToggleHubGameFromOffice(gameId, enabled) {
-  const res = REMO_STORE.adminToggleHubGame(gameId, enabled);
-  if (!res.ok) return;
-  admToast(enabled ? '👁️ Game enabled in REMO Games Hub.' : '🙈 Game hidden from REMO Games Hub.');
-  renderAdminGamesHubPanel();
-}
-
-function adminFeatureHubGameFromOffice(gameId) {
-  const res = REMO_STORE.adminSetFeatured2xHubGame(gameId);
+function adminToggleOdyssey2xFromOffice() {
+  const od = REMO_STORE.ensureRemoOdyssey();
+  const res = REMO_STORE.adminToggleOdyssey2x(!od.event2x);
   if (!res.ok) return;
   RemoAudio.play('fanfare');
-  admToast('⚡ Featured 2X Coins Game updated!');
-  renderAdminGamesHubPanel();
+  const isFr = REMO_I18N.getLang() === 'fr';
+  admToast(res.event2x
+    ? (isFr ? '⚡ Événement 2X Pièces REMO Odyssey ACTIVÉ !' : '⚡ REMO Odyssey 2X Coins Event ENABLED!')
+    : (isFr ? '⚡ Événement 2X REMO Odyssey désactivé.' : '⚡ REMO Odyssey 2X Event disabled.'));
+  renderAdminOdysseyPanel();
 }
 
-function adminDeleteHubGameFromOffice(gameId) {
-  const res = REMO_STORE.adminDeleteHubGame(gameId);
+function adminDeleteOdysseyEntryFromOffice(uid) {
+  if (!uid) return;
+  const res = REMO_STORE.adminDeleteOdysseyEntry(uid);
   if (!res.ok) return;
-  admToast('🗑️ Custom game deleted.');
-  renderAdminGamesHubPanel();
+  admToast(REMO_I18N.getLang() === 'fr' ? '🗑️ Score retiré du classement.' : '🗑️ Score removed from leaderboard.');
+  renderAdminOdysseyPanel();
 }
 
-window.renderAdminGamesHubPanel = renderAdminGamesHubPanel;
-window.adminAddCustomHubGameFromOffice = adminAddCustomHubGameFromOffice;
-window.adminToggleHubGameFromOffice = adminToggleHubGameFromOffice;
-window.adminFeatureHubGameFromOffice = adminFeatureHubGameFromOffice;
-window.adminDeleteHubGameFromOffice = adminDeleteHubGameFromOffice;
+function adminResetOdysseyLeaderboardFromOffice() {
+  const isFr = REMO_I18N.getLang() === 'fr';
+  if (typeof confirm === 'function' && !confirm(isFr ? 'Réinitialiser le classement mondial REMO Odyssey ?' : 'Reset the global REMO Odyssey leaderboard?')) {
+    return;
+  }
+  const res = REMO_STORE.adminResetOdysseyLeaderboard();
+  if (!res.ok) return;
+  admToast(isFr ? '🗑️ Classement REMO Odyssey réinitialisé.' : '🗑️ REMO Odyssey leaderboard cleared.');
+  renderAdminOdysseyPanel();
+}
+
+window.renderAdminOdysseyPanel = renderAdminOdysseyPanel;
+window.renderAdminGamesHubPanel = renderAdminOdysseyPanel;
+window.adminToggleOdyssey2xFromOffice = adminToggleOdyssey2xFromOffice;
+window.adminDeleteOdysseyEntryFromOffice = adminDeleteOdysseyEntryFromOffice;
+window.adminResetOdysseyLeaderboardFromOffice = adminResetOdysseyLeaderboardFromOffice;
 
 /* ── 🌟 ADMIN WORLD SPOTLIGHT STAGE MANAGER ── */
 function renderAdminSpotlightPanel() {

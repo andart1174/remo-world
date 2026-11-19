@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>🧭 REMO ODYSSEY — Official 4D World Game | REMO World</title>
+  <link rel="icon" type="image/png" sizes="32x32" href="../img/favicon-32x32.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;700;800&family=Orbitron:wght@700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/remo-odyssey.css?v=146">
+  <script>
+    window.REMO_CITY_IMG_BASE = '../img/cities/';
+    (function () {
+      try {
+        var qs = new URLSearchParams(window.location.search || '');
+        if (qs.get('embed') === '1' || window.self !== window.top) {
+          document.documentElement.classList.add('is-embedded');
+        }
+      } catch (e) {}
+    })();
+  </script>
+</head>
+<body>
+  <div class="odyssey-shell">
+
+    <!-- Top Live HUD -->
+    <header class="hud-bar">
+      <div class="hud-brand">
+        <div class="hud-logo-dot">🧭</div>
+        <div class="hud-brand-text">
+          <div class="hud-title">REMO ODYSSEY <span class="hud-2x-pill" id="hudEvent2xBadge" style="display:none;">⚡ 2X</span></div>
+          <div id="hudBrandSub" class="hud-brand-sub">REMO World Official 4D Game · 4A↔4B</div>
+        </div>
+      </div>
+
+      <div class="hud-kpis">
+        <div class="kpi-pill gold">
+          <small id="lblHudScore">SCORE</small>
+          <b id="hudScore">0</b>
+        </div>
+        <div class="kpi-pill">
+          <small id="lblHudCoins">COINS</small>
+          <b id="hudCoins">0 🪙</b>
+        </div>
+        <div class="kpi-pill cyan">
+          <small id="lblHudCities">CITIES</small>
+          <b id="hudCities">1</b>
+        </div>
+        <div class="kpi-pill kpi-hide-xs">
+          <small id="lblHudDistance">DISTANCE</small>
+          <b id="hudKm">0 km</b>
+        </div>
+        <div class="kpi-pill gold">
+          <small id="lblHudMult">MULT</small>
+          <b id="hudMult">x1</b>
+        </div>
+      </div>
+
+      <div class="hud-status">
+        <div class="crystals-row" title="4 Elemental Crystal Shields">
+          <span class="crystal-pip c0 active" id="hudCrystal_0"></span>
+          <span class="crystal-pip c1 active" id="hudCrystal_1"></span>
+          <span class="crystal-pip c2 active" id="hudCrystal_2"></span>
+          <span class="crystal-pip c3" id="hudCrystal_3"></span>
+        </div>
+        <div class="nova-meter" title="4D Compass Nova Charge (E)">
+          <div class="nova-fill" id="hudNovaFill"></div>
+        </div>
+      </div>
+
+      <div class="hud-actions">
+        <button type="button" class="icon-btn" id="btnCityFmToggle" title="Live City FM Radio">📻 FM</button>
+        <button type="button" class="icon-btn" id="btnGhostToggle" title="Ghost Racer On/Off">👻 ON</button>
+        <div class="lang-switch" role="group" aria-label="Language">
+          <button type="button" class="lang-pill active" data-lang="en">EN</button>
+          <button type="button" class="lang-pill" data-lang="fr">FR</button>
+        </div>
+        <button type="button" class="icon-btn" id="btnMuteHud" title="Audio On/Off">🔊</button>
+        <button type="button" class="icon-btn" id="btnPauseHud" title="Pause (P)">⏸️</button>
+      </div>
+    </header>
+
+    <!-- Main Interactive Game Stage -->
+    <main class="stage-wrap">
+      <canvas id="remoGameCanvas"></canvas>
+
+      <!-- START / PASSPORT / VAULT SHOP OVERLAY -->
+      <div class="stage-overlay open" id="menuOverlay">
+        <div class="menu-card">
+          <aside class="hero-showcase-col">
+            <div class="dual-art-pair">
+              <div class="art-card">
+                <img src="assets/avatar_4A_fullbody_coin_belt.jpg" alt="REMO Sovereign 4A">
+                <span class="art-tag" id="artTag4A">4A · CITY</span>
+              </div>
+              <div class="art-card">
+                <img src="assets/avatar_4B_hover_coin_surfer.jpg" alt="REMO Hover-Coin 4B">
+                <span class="art-tag" id="artTag4B">4B · FLIGHT</span>
+              </div>
+            </div>
+
+            <div class="local-board-box">
+              <div class="local-board-hdr">
+                <span id="lblLeaderboardTitle">🏆 LOCAL HIGH SCORES</span>
+              </div>
+              <div id="localBestList"></div>
+            </div>
+
+            <div class="local-board-box wallet-mini-box">
+              <div class="wallet-stat-row">
+                <span id="lblStampsTitle">🎫 PASSPORT</span>
+                <b id="unlockedStampsCount" style="color:var(--cyan);font-family:'Orbitron',sans-serif;">3 / 24</b>
+              </div>
+              <div class="wallet-stat-row">
+                <span id="lblRelicsTitle">👑 RELICS</span>
+                <b id="menuRelicsCount" style="color:#c084fc;font-family:'Orbitron',sans-serif;">0 / 24</b>
+              </div>
+              <div class="wallet-stat-row">
+                <span id="lblVaultBankTitle">🪙 VAULT COINS</span>
+                <b id="menuWalletCoins" style="color:var(--gold);font-family:'Orbitron',sans-serif;">0 🪙</b>
+              </div>
+            </div>
+          </aside>
+
+          <section class="menu-main-col">
+            <div class="menu-header-strip">
+              <div>
+                <span class="eyebrow">★ <span id="menuSubtitle">REMO WORLD · 4D COMPASS</span> ★</span>
+                <h1 id="menuTitle">REMO ODYSSEY</h1>
+              </div>
+              <div class="menu-tabs-row">
+                <button type="button" class="tab-pill active" id="tabBtnPlay">🌍 PLAY &amp; PASSPORT</button>
+                <button type="button" class="tab-pill" id="tabBtnShop">🪙 VAULT SHOP</button>
+              </div>
+            </div>
+
+            <p class="menu-desc" id="menuDesc"></p>
+
+            <!-- TAB 1: MODES & 4D WORLD PASSPORT -->
+            <div id="menuTabPlay" class="menu-tab-pane">
+              <div class="mode-switch-row">
+                <button type="button" class="mode-pill active" id="btnModeTour" data-mode="tour">🌍 WORLD TOUR</button>
+                <button type="button" class="mode-pill" id="btnModeDaily" data-mode="daily">📅 DAILY ODYSSEY #1</button>
+              </div>
+              <div id="dailyRoutePreview" class="daily-preview-box" style="display:none;"></div>
+              <div class="duel-banner" id="menuDuelBanner" style="display:none;"></div>
+
+              <div class="config-row">
+                <div class="field-box">
+                  <label for="playerNickInput">Citizen @Nick</label>
+                  <input type="text" id="playerNickInput" class="remo-input" maxlength="20" placeholder="REMO_Explorer">
+                </div>
+                <div class="field-box">
+                  <label for="vipFrameSelect" id="lblVipAura">VIP Avatar Aura</label>
+                  <select id="vipFrameSelect" class="remo-input">
+                    <option value="gold_fire">🔥 Solar Crown 4D</option>
+                    <option value="cyber_matrix">⚡ Cyber Matrix Neon</option>
+                    <option value="diamond_vip">💎 Royal Diamond Prism</option>
+                    <option value="tricolor_crest">👑 Imperial Crest</option>
+                    <option value="rainbow_4d">🌈 Rainbow 4D Halo</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="field-box" id="cityPickerWrap">
+                <div class="passport-hdr-row">
+                  <label id="lblPickCity" style="margin:0;">4D World Passport (24 Cities)</label>
+                  <div class="continent-pills" id="passportContinentBar"></div>
+                </div>
+                <div class="city-picker-grid" id="cityPickerGrid"></div>
+              </div>
+            </div>
+
+            <!-- TAB 2: 4D REMO VAULT SHOP -->
+            <div id="menuTabShop" class="menu-tab-pane" style="display:none;">
+              <div class="shop-top-banner">
+                <span id="lblShopHeadline">Upgrade abilities &amp; equip 4B Hover-Coin skins</span>
+                <b id="shopCoinBalance" style="color:var(--gold);font-family:'Orbitron',sans-serif;">0 🪙</b>
+              </div>
+              <div class="shop-items-grid" id="shopItemsGrid"></div>
+            </div>
+
+            <button type="button" class="btn-primary-4d" id="btnStartOdyssey">🚀 LAUNCH REMO ODYSSEY</button>
+            <div class="controls-hint" id="lblControlsHint"></div>
+          </section>
+        </div>
+      </div>
+
+      <!-- PAUSE OVERLAY -->
+      <div class="stage-overlay" id="pauseOverlay">
+        <div class="compact-modal-card">
+          <h2 id="pauseTitle">PAUSED</h2>
+          <p style="font-size:0.84rem;color:#cbd5e1;">REMO ODYSSEY · 4D Compass</p>
+          <button type="button" class="btn-primary-4d" id="btnResumeGame">▶ RESUME ODYSSEY</button>
+          <button type="button" class="btn-secondary-4d" id="btnQuitToMenu">🏠 MAIN MENU</button>
+        </div>
+      </div>
+
+      <!-- GAME OVER / VICTORY SUMMARY OVERLAY -->
+      <div class="stage-overlay" id="gameoverOverlay">
+        <div class="compact-modal-card">
+          <h2 id="overTitle">ODYSSEY COMPLETE!</h2>
+          <div class="over-badge" id="overBadgeRow"></div>
+          <div class="over-score-big" id="overScore">0</div>
+
+          <div class="over-kpis">
+            <div class="over-kpi">
+              <small id="overKpiCitiesLbl">CITIES</small>
+              <b id="overCities">1</b>
+            </div>
+            <div class="over-kpi">
+              <small id="overKpiDistLbl">DISTANCE</small>
+              <b id="overKm">0 km</b>
+            </div>
+            <div class="over-kpi">
+              <small id="overKpiCoinsLbl">REMO COINS</small>
+              <b id="overCoins">+0 🪙</b>
+            </div>
+          </div>
+
+          <div class="route-chain" id="overRouteChain"></div>
+          <div class="city-war-banner" id="overCityWarBanner" style="display:none;"></div>
+          <div class="daily-wordle-box" id="dailyWordleBox" style="display:none;"></div>
+
+          <div class="over-btn-row">
+            <button type="button" class="btn-secondary-4d" id="btnOpenShareCard">📲 9:16 STORY CARD</button>
+            <button type="button" class="btn-secondary-4d" id="btnCopyDuelLink">⚔️ 1v1 DUEL LINK</button>
+          </div>
+          <div class="over-btn-row">
+            <button type="button" class="btn-secondary-4d" id="btnDownloadClip">🎬 SAVE 10s CLIP</button>
+            <button type="button" class="btn-secondary-4d" id="btnCopyDailyWordle" style="display:none;">📋 COPY DAILY SCORE</button>
+          </div>
+          <button type="button" class="btn-remo-portal" id="btnDropFeedChallenge">🌐 DROP CHALLENGE IN REMO WORLD FEED</button>
+          <div class="duel-copied-toast" id="duelCopiedMsg"></div>
+
+          <div class="over-btn-row">
+            <button type="button" class="btn-primary-4d" id="btnPlayAgain" style="font-size:0.84rem;">🔄 PLAY AGAIN</button>
+            <button type="button" class="btn-secondary-4d" id="btnBackMenu">🌍 MAIN MENU</button>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Responsive Action Bar (Jump, Blink, Blast, Nova, Dash/Slide) -->
+    <div class="touch-controls-bar" id="mobileControlsBar">
+      <button type="button" class="touch-btn" id="btnJumpTouch">⬆️ JUMP</button>
+      <button type="button" class="touch-btn blink ready" id="btnBlinkTouch">🌀 BLINK</button>
+      <button type="button" class="touch-btn blast ready" id="btnBlastTouch">🔥 BLAST</button>
+      <button type="button" class="touch-btn nova" id="btnNovaTouch" disabled><span id="btnNovaTouchTxt">⚡ NOVA</span></button>
+      <button type="button" class="touch-btn" id="btnDashTouch">⬇️ DASH</button>
+    </div>
+
+  </div>
+
+  <!-- 9:16 Viral Story Card Preview Modal -->
+  <div class="share-modal-backdrop" id="shareCardModal" onclick="if(event.target===this)this.classList.remove('open')">
+    <div class="share-modal-box">
+      <img id="shareCardPreviewImg" alt="REMO Odyssey 9:16 Story Card">
+      <div style="display:flex;gap:8px;width:100%;">
+        <button type="button" class="btn-primary-4d" id="btnDownloadStoryPng" style="flex:1;padding:10px;font-size:0.78rem;">⬇️ PNG 9:16</button>
+        <button type="button" class="btn-secondary-4d" id="btnCloseShareModal">CLOSE</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/cities-data.js?v=146"></script>
+  <script src="js/audio-sfx.js?v=146"></script>
+  <script src="js/avatar-sprites.js?v=146"></script>
+  <script src="js/avatar-renderer.js?v=146"></script>
+  <script src="js/share-card.js?v=146"></script>
+  <script src="js/game-engine.js?v=146"></script>
+</body>
+</html>

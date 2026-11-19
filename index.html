@@ -63,6 +63,7 @@
           "4D Focus TV Ambient City Windows & Zen Desk Clock",
           "Synced Pomodoro Focus Together Study Rooms",
           "56 Ad-Free Live World City Radio Stations",
+          "REMO Odyssey Official 4D World Game & 1v1 Friend Duels",
           "Daily World Blitz 60s Geography Trivia & 1v1 Friend Duels",
           "Live Top 24 Cities Ranking & City Showdown Duels"
         ],
@@ -97,7 +98,7 @@
             "name": "What free browser games are inside REMO World?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "You can play Daily World Blitz 60-second city trivia with 1v1 friend challenge links, Guess My City photo trivia, live cross-city Clicker Wars, City Versus voting, and create 9:16 holographic 4D Boarding Passes."
+              "text": "You can play REMO Odyssey (our official 4D city runner & hover-coin game across 24 live cities), Daily World Blitz 60-second city trivia with 1v1 friend challenge links, Guess My City photo trivia, live cross-city Clicker Wars, City Versus voting, and create 9:16 holographic 4D Boarding Passes."
             }
           }
         ]
@@ -121,14 +122,14 @@
   <link rel="preconnect" href="https://firebasestorage.googleapis.com" crossorigin>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="preload" as="style" href="css/remo-core.css?v=145">
+  <link rel="preload" as="style" href="css/remo-core.css?v=146">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800;900&family=Orbitron:wght@700;900&display=swap" media="print" onload="this.media='all'">
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800;900&family=Orbitron:wght@700;900&display=swap"></noscript>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha384-sHL9NAb7lN7rfvG5lfHpm643Xkcjzp4jFvuavGOndn6pjVqS6ny56CAt3nsEVT4H" crossorigin="anonymous" media="print" onload="this.media='all'">
   <noscript><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha384-sHL9NAb7lN7rfvG5lfHpm643Xkcjzp4jFvuavGOndn6pjVqS6ny56CAt3nsEVT4H" crossorigin="anonymous"></noscript>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha384-cxOPjt7s7Iz04uaHJceBmS+qpjv2JkIHNVcuOrM+YHwZOmJGBXI00mdUXEq65HTH" crossorigin="anonymous" defer></script>
 
-  <link rel="stylesheet" href="css/remo-core.css?v=145">
+  <link rel="stylesheet" href="css/remo-core.css?v=146">
 </head>
 <body>
 
@@ -314,6 +315,7 @@
               <button class="fchip active" onclick="setFeedMode('all', this)" data-i18n="filter_all">🌍 For You</button>
               <button class="fchip" onclick="openStoriesHubModal()" style="border-color:rgba(236,72,153,0.65);color:#f472b6;font-weight:900;" data-i18n="hdr_story_btn">📸 Story</button>
               <button type="button" class="fchip blitz-feed-pill" id="feedWorldBlitzPill" onclick="openWorldBlitzModal()"><span data-i18n="feed_blitz_pill">🧠 Blitz</span><span class="blitz-pill-status" id="feedBlitzPillStatus">5/5</span></button>
+              <button type="button" class="fchip odyssey-feed-pill" id="feedRemoOdysseyPill" onclick="openRemoOdysseyModal()"><span data-i18n="feed_odyssey_pill">🧭 Odyssey</span><span class="odyssey-pill-tag" id="feedOdysseyPillBadge">4D</span></button>
               <button class="fchip" onclick="setFeedMode('duets', this)" data-i18n="filter_duets">⚔️ City Duels</button>
               <button class="fchip" id="feedChipAdminPromoBtn" onclick="openViralPromoStudioModal()" style="display:none;border-color:rgba(56,189,248,0.65);color:#7dd3fc;font-weight:900;">👑 <span data-i18n="promo_studio_chip">📣 Promo Studio</span></button>
               <button type="button" class="fchip" id="btnToggleMoreFilters" onclick="toggleMoreFeedFilters()" data-i18n="filter_more_btn">+ Filters ▾</button>
@@ -810,6 +812,7 @@
       <a href="focus-tv.html">4D Focus TV</a>
       <a href="study-room.html">Study Rooms</a>
       <a href="world-radio.html">56 Live Radios</a>
+      <a href="odyssey.html">REMO Odyssey</a>
       <a href="world-blitz.html">World Blitz 60s</a>
       <a href="cities/index.html">24 Cities</a>
       <a href="world-ranking.html">2026 Ranking</a>
@@ -2720,10 +2723,10 @@
 
       <div class="apps-sec-label" data-i18n="apps_sec_play">⚔️ Games, Arena &amp; Contests</div>
       <div class="apps-grid">
-        <button type="button" class="app-tile" id="appLauncherGamesHubTile" style="border-color:rgba(56,189,248,0.65);background:linear-gradient(135deg,rgba(14,165,233,0.18),rgba(139,92,246,0.16));" onclick="closeAppLauncherModal();openGamesHubModal()">
-          <span class="app-tile-badge" style="background:linear-gradient(135deg,#38bdf8,#a855f7);" data-i18n="games_hub_badge">NEW</span>
-          <span class="app-tile-ic">🕹️</span>
-          <span class="app-tile-lbl" data-i18n="nav_games_hub">REMO Games Hub</span>
+        <button type="button" class="app-tile" id="appLauncherOdysseyTile" style="border-color:rgba(251,191,36,0.72);background:linear-gradient(135deg,rgba(14,165,233,0.22),rgba(139,92,246,0.22),rgba(251,191,36,0.12));" onclick="closeAppLauncherModal();openRemoOdysseyModal()">
+          <span class="app-tile-badge" id="appLauncherOdysseyBadge" style="background:linear-gradient(135deg,#fbbf24,#38bdf8);color:#050816;" data-i18n="odyssey_badge_4d">4D GAME</span>
+          <span class="app-tile-ic">🧭</span>
+          <span class="app-tile-lbl" data-i18n="nav_remo_odyssey">REMO Odyssey</span>
         </button>
         <button type="button" class="app-tile emerald" id="appLauncherBlitzTile" onclick="closeAppLauncherModal();openWorldBlitzModal()">
           <span class="app-tile-badge" id="appLauncherBlitzBadge" data-i18n="blitz_badge_daily">DAILY</span>
@@ -2868,17 +2871,21 @@
     </div>
   </div>
 
-  <!-- MODAL: 🕹️ REMO GAMES HUB (Play Arcade Games + Post Beat-My-Score Feed Challenges) -->
-  <div class="remo-modal-backdrop" id="gamesHubModal" onclick="if(event.target===this) closeGamesHubModal()">
-    <div class="remo-modal games-hub-modal-box">
-      <div class="modal-hdr">
-        <div>
-          <b style="font-family:'Orbitron',sans-serif;font-size:1rem;color:#38bdf8;" data-i18n="games_hub_title">🕹️ REMO Games Hub — Play &amp; Challenge</b>
-          <div style="font-size:0.74rem;color:var(--muted);margin-top:2px;" data-i18n="games_hub_sub">Play exclusive REMO arcade mini-games, climb the City Leaderboard, or drop a "Beat My Score" challenge straight into the global Feed!</div>
+  <!-- MODAL: 🧭 REMO ODYSSEY (Official 4D Flagship Game — Desktop & Mobile Fullscreen) -->
+  <div class="remo-modal-backdrop remo-odyssey-modal-backdrop" id="remoOdysseyModal" onclick="if(event.target===this) closeRemoOdysseyModal()">
+    <div class="remo-modal remo-odyssey-modal-box">
+      <div class="remo-odyssey-modal-hdr">
+        <div class="remo-odyssey-hdr-left">
+          <b class="remo-odyssey-hdr-title" data-i18n="odyssey_modal_title">🧭 REMO ODYSSEY</b>
+          <span class="remo-odyssey-2x-chip" id="remoOdysseyModal2xChip" style="display:none;" data-i18n="odyssey_badge_2x">⚡ 2X COINS</span>
+          <span class="remo-odyssey-hdr-sub" data-i18n="odyssey_modal_sub">Official 4D World Game · 24 Live Cities, City Wars &amp; 1v1 Duels</span>
         </div>
-        <button type="button" class="modal-close" onclick="closeGamesHubModal()">✕</button>
+        <div class="remo-odyssey-hdr-right">
+          <a href="odyssey.html" id="remoOdysseyFullscreenLink" target="_blank" rel="noopener" class="remo-odyssey-full-btn" data-i18n="odyssey_fullscreen_btn">↗ Fullscreen</a>
+          <button type="button" class="modal-close" onclick="closeRemoOdysseyModal()" aria-label="Close">✕</button>
+        </div>
       </div>
-      <div id="gamesHubBody" style="overflow-y:auto;flex:1;padding-right:2px;"></div>
+      <div class="remo-odyssey-frame-wrap" id="remoOdysseyFrameWrap"></div>
     </div>
   </div>
 
@@ -2959,12 +2966,12 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js" integrity="sha384-oFrOL1TiREYNET0lsYF3LjQuyi2gL7vhjH1X8vFr+umcmzAdPELopeSgbcrv4uRm" crossorigin="anonymous"></script>
 
   <!-- REMO Modular Engines -->
-  <script src="js/remo-i18n.js?v=145"></script>
+  <script src="js/remo-i18n.js?v=146"></script>
   <script src="js/remo-cities-data.js?v=145"></script>
-  <script src="js/remo-store.js?v=145"></script>
+  <script src="js/remo-store.js?v=146"></script>
   <script src="js/remo-card-engine.js?v=145"></script>
   <script src="js/remo-radar-arena.js?v=145"></script>
-  <script src="js/remo-social-comms.js?v=145"></script>
+  <script src="js/remo-social-comms.js?v=146"></script>
   <script src="js/remo-radio-engine.js?v=145"></script>
   <script src="js/remo-focus-tv.js?v=145"></script>
   <script src="js/remo-world-blitz.js?v=145"></script>
@@ -2973,6 +2980,7 @@
     <nav aria-label="REMO World Static Directory" style="padding:20px;background:#050816;color:#f8fafc;">
       <h2>Explore REMO World Cities &amp; Free Online Tools</h2>
       <ul>
+        <li><a href="odyssey.html">REMO Odyssey — Official 4D World Game &amp; 1v1 Duels (EN)</a> | <a href="fr/odyssey.html">REMO Odyssey — Jeu Officiel 4D (FR)</a></li>
         <li><a href="focus-tv.html">4D Focus TV — Ambient City Windows &amp; Zen Clock (EN)</a> | <a href="fr/focus-tv.html">Focus TV 4D (FR)</a></li>
         <li><a href="study-room.html">Synced Pomodoro Study Rooms &amp; Lofi Coworking (EN)</a> | <a href="fr/study-room.html">Salles d'Étude Synchronisées (FR)</a></li>
         <li><a href="world-blitz.html">Daily World Blitz 60s Geography Game &amp; 1v1 Duels (EN)</a> | <a href="fr/world-blitz.html">Daily World Blitz 60s (FR)</a></li>

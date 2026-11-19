@@ -1883,6 +1883,41 @@ function _renderPostMediaStageInner(p, city, lang) {
     `;
   }
 
+  // 0. 🧭 REMO ODYSSEY 1v1 FEED CHALLENGE CARD
+  if (p.odysseyChallenge && typeof p.odysseyChallenge === 'object') {
+    const oc = p.odysseyChallenge;
+    const ocCity = getCityById(oc.startCityId || p.cityId || 'montreal');
+    const bgImg = `img/cities/${escapeHtmlStr(ocCity ? ocCity.id : 'montreal')}.jpg`;
+    const routeTxt = Array.isArray(oc.routeIds) && oc.routeIds.length
+      ? oc.routeIds.slice(0, 6).map((cid) => {
+          const rc = getCityById(cid);
+          return rc ? `${rc.flag} ${rc.code}` : cid.toUpperCase();
+        }).join(' ➔ ')
+      : `${ocCity ? ocCity.flag : '🌍'} ${ocCity ? ocCity.code : 'REMO'}`;
+    const targetScore = Number(oc.score || 0);
+    const seedArg = escapeJsSingleArg(String(oc.seed || 'REMO2026'));
+    const startArg = escapeJsSingleArg(String(oc.startCityId || p.cityId || 'montreal'));
+    const vsArg = escapeJsSingleArg(String(oc.playerName || p.authorName || 'Citizen'));
+    return `
+      <div class="odyssey-feed-challenge-card">
+        <img class="odyssey-feed-challenge-bg" src="${bgImg}" alt="REMO Odyssey Challenge" loading="lazy">
+        <div class="odyssey-feed-challenge-overlay">
+          <span class="odyssey-feed-challenge-pill">${escapeHtmlStr(t('odyssey_challenge_badge'))}</span>
+          <div class="odyssey-feed-challenge-score">${targetScore.toLocaleString()} PTS</div>
+          <div class="odyssey-feed-challenge-meta">${escapeHtmlStr(t('odyssey_challenge_target', {
+            score: targetScore.toLocaleString(),
+            cities: Number(oc.citiesCount || 1),
+            km: Number(oc.kmFlown || 0).toLocaleString()
+          }))}</div>
+          <div style="font-size:0.74rem;color:#7dd3fc;font-weight:800;">${escapeHtmlStr(routeTxt)}</div>
+          <button type="button" class="odyssey-feed-challenge-cta" onclick="event.stopPropagation();openRemoOdysseyModal({seed:'${seedArg}',start:'${startArg}',target:${targetScore},vs:'${vsArg}'})">
+            ${escapeHtmlStr(t('odyssey_challenge_play_btn'))}
+          </button>
+        </div>
+      </div>
+    `;
+  }
+
   // 1. LIVE INTERACTIVE HTML / 3D MINI-APP
   if (p.mediaType === 'html_app' && p.htmlCode) {
     const cleanCode = buildFittedHtmlSrcdoc(p.htmlCode, p.id);
@@ -2194,7 +2229,7 @@ function renderSinglePostCardHtml(p, lang, u, isAdm) {
       : String((lang === 'fr' ? (p.caption_fr || p.caption_en) : (p.caption_en || p.caption_fr)) || '').replace(/^(?:🇬🇧|🇫🇷)\s+/u, '');
     const formattedCap = escapeHtmlStr(rawCap || '').replace(/#([\w\u00C0-\u024F]+)/g, `<span class="hashtag" onclick="renderSocialFeed('#$1', true)">#$1</span>`);
     const liked = Boolean(u && (p.likes || []).includes(u.uid));
-    const interactiveNoTilt = hiddenByCapsule || mboxLocked || p.mediaType === 'html_app' || p.mediaType === 'before_after' || p.mediaType === 'video_link' || Boolean(p.externalUrl);
+    const interactiveNoTilt = hiddenByCapsule || mboxLocked || p.mediaType === 'html_app' || p.mediaType === 'before_after' || p.mediaType === 'video_link' || Boolean(p.externalUrl) || Boolean(p.odysseyChallenge);
     const voiceResolved = p.voiceUrl ? RemoMediaDB.resolveSyncOrPlaceholder(p.voiceUrl) : '';
     const voiceIdbAttr = p.voiceUrl && String(p.voiceUrl).startsWith('idb://') ? `data-idb-src="${p.voiceUrl}"` : '';
     const cityMayor = (REMO_STORE && REMO_STORE.getCityMayor) ? REMO_STORE.getCityMayor(p.cityId) : null;
@@ -12174,289 +12209,37 @@ function copilotAutoTranslateStudio() {
   remoToast(lang === 'fr' ? '🌐 Traduction bilingue EN ⇄ FR prête !' : '🌐 Instant EN ⇄ FR translation ready!');
 }
 
-let _cityArcadeCycleIdx = 0;
-
-function _buildArcadeHtmlByGenre(genre, col = '#38bdf8', flag = '🌍', cName = 'REMO') {
-  if (genre === 'gyro_coins') {
-    return `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>
-html,body{margin:0;height:100%;overflow:hidden;background:radial-gradient(circle at 50% 25%,#1e1b4b,#040714);font-family:system-ui,sans-serif;user-select:none;touch-action:none;color:#fff;}
-canvas{display:block;width:100%;height:100%;cursor:grab;}
-.hud{position:fixed;top:12px;left:10px;right:10px;display:flex;justify-content:space-between;pointer-events:none;font-weight:900;font-size:12px;}
-.pill{background:rgba(8,14,34,0.88);border:1px solid #fbbf24;padding:4px 10px;border-radius:99px;}
-</style></head><body>
-<div class="hud"><span class="pill">🪙 ${flag} ${cName} COIN CATCHER</span><span class="pill" id="sc">🪙 0 · ❤️ 3</span></div>
-<canvas id="c"></canvas><script>
-const cv=document.getElementById('c'),x=cv.getContext('2d');
-let w,h,px=160,sc=0,lives=3,items=[],tilt=0,over=false,fr=0;
-function rs(){w=cv.width=innerWidth;h=cv.height=innerHeight;px=w/2;}addEventListener('resize',rs);rs();
-addEventListener('message',e=>{if(e.data&&e.data.type==='REMO_GYRO_TILT')tilt=Number(e.data.gamma||0);});
-addEventListener('deviceorientation',e=>{if(typeof e.gamma==='number')tilt=Math.max(-35,Math.min(35,e.gamma));});
-cv.addEventListener('pointermove',e=>{if(e.buttons||e.pointerType!=='mouse')px=Math.max(26,Math.min(w-26,e.clientX));});
-cv.addEventListener('pointerdown',e=>{if(over){sc=0;lives=3;items=[];over=false;document.getElementById('sc').textContent='🪙 0 · ❤️ 3';return;}px=Math.max(26,Math.min(w-26,e.clientX));});
-function loop(){
-  x.fillStyle='rgba(4,7,20,0.4)';x.fillRect(0,0,w,h);fr++;
-  if(!over){
-    if(Math.abs(tilt)>1.5)px=Math.max(26,Math.min(w-26,px+tilt*0.24));
-    if(fr%26===0)items.push({x:20+Math.random()*(w-40),y:-18,vy:2.6+Math.random()*2.1+sc*0.008,bomb:Math.random()>0.78});
-    for(let i=items.length-1;i>=0;i--){
-      const o=items[i];o.y+=o.vy;
-      x.fillStyle=o.bomb?'#f43f5e':'#fbbf24';
-      x.beginPath();x.arc(o.x,o.y,o.bomb?12:11,0,6.28);x.fill();
-      if(o.bomb){x.fillStyle='#fff';x.font='900 11px sans-serif';x.textAlign='center';x.fillText('💣',o.x,o.y+4);}
-      if(Math.abs(o.x-px)<32&&o.y>h-68&&o.y<h-26){
-        if(o.bomb){lives=Math.max(0,lives-1);if(lives<=0)over=true;}
-        else{sc+=15;if(window.remoSubmitScore)window.remoSubmitScore(sc);}
-        document.getElementById('sc').textContent='🪙 '+sc+' · ❤️ '+lives;
-        items.splice(i,1);continue;
-      }
-      if(o.y>h+20)items.splice(i,1);
-    }
-  }
-  x.shadowColor='${col}';x.shadowBlur=14;x.fillStyle='${col}';
-  x.fillRect(px-30,h-48,60,14);x.shadowBlur=0;
-  if(over){x.fillStyle='#fde047';x.font='900 17px sans-serif';x.textAlign='center';x.fillText('🏆 SCORE: '+sc+' — TAP TO RETRY',w/2,h/2);}
-  requestAnimationFrame(loop);
-}loop();<\/script></body></html>`;
-  }
-  if (genre === 'defense') {
-    return `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>
-html,body{margin:0;height:100%;overflow:hidden;background:#040714;font-family:system-ui,sans-serif;user-select:none;touch-action:none;color:#fff;}
-canvas{display:block;width:100%;height:100%;cursor:crosshair;}
-.hud{position:fixed;top:40px;left:10px;right:10px;display:flex;justify-content:space-between;pointer-events:none;font-weight:900;font-size:12px;}
-.pill{background:rgba(8,14,34,0.88);border:1px solid ${col};padding:4px 10px;border-radius:99px;}
-</style></head><body>
-<div class="hud"><span class="pill">🏙️ ${flag} ${cName} LASER DEFENSE</span><span class="pill" id="st">🛡️ 100% · 🪙 0</span></div>
-<canvas id="c"></canvas><script>
-const cv=document.getElementById('c'),x=cv.getContext('2d');
-let w,h,sc=0,hp=100,meteors=[],lasers=[],sparks=[],ac=null;
-function rs(){w=cv.width=innerWidth;h=cv.height=innerHeight;}addEventListener('resize',rs);rs();
-function sfx(f1,f2,d){try{if(!ac)ac=new(window.AudioContext||window.webkitAudioContext)();if(ac.state==='suspended')ac.resume();const o=ac.createOscillator(),g=ac.createGain(),t=ac.currentTime;o.type='sawtooth';o.frequency.setValueAtTime(f1,t);o.frequency.exponentialRampToValueAtTime(f2,t+d);g.gain.setValueAtTime(0.12,t);g.gain.exponentialRampToValueAtTime(0.001,t+d);o.connect(g);g.connect(ac.destination);o.start(t);o.stop(t+d);}catch(e){}}
-setInterval(()=>{if(hp<=0)return;meteors.push({x:24+Math.random()*(w-48),y:-18,vx:(Math.random()-0.5)*1.2,vy:1.3+Math.random()*1.8+sc*0.004,r:13+Math.random()*9,boss:Math.random()>0.82});},680);
-cv.addEventListener('pointerdown',e=>{
-  if(hp<=0){hp=100;sc=0;meteors=[];return;}
-  lasers.push({tx:e.clientX,ty:e.clientY,life:1});sfx(880,180,0.14);
-  for(let i=meteors.length-1;i>=0;i--){
-    const m=meteors[i];
-    if(Math.hypot(e.clientX-m.x,e.clientY-m.y)<m.r+34){
-      sc+=m.boss?40:15;if(window.remoSubmitScore)window.remoSubmitScore(sc);sfx(260,55,0.22);
-      for(let k=0;k<18;k++){const a=Math.random()*6.28,s=1.5+Math.random()*4;sparks.push({x:m.x,y:m.y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:1,c:m.boss?'#fbbf24':'${col}'});}
-      meteors.splice(i,1);
-    }
-  }
-  document.getElementById('st').textContent='🛡️ '+hp+'% · 🪙 '+sc;
-});
-function draw(){
-  x.fillStyle='rgba(4,7,20,0.32)';x.fillRect(0,0,w,h);
-  for(let i=0;i<11;i++){
-    const bw=w/11,bh=38+((i*29)%58)+(i===5?28:0),bx=i*bw+2;
-    x.fillStyle=i===5?'${col}44':'#0d1633';x.strokeStyle=i===5?'#fbbf24':'${col}66';
-    x.fillRect(bx,h-bh,bw-4,bh);x.strokeRect(bx,h-bh,bw-4,bh);
-  }
-  lasers.forEach(l=>{x.strokeStyle='#fbbf24';x.lineWidth=3*l.life;x.beginPath();x.moveTo(w/2,h-66);x.lineTo(l.tx,l.ty);x.stroke();l.life-=0.14;});
-  lasers=lasers.filter(l=>l.life>0);
-  for(let i=meteors.length-1;i>=0;i--){
-    const m=meteors[i];m.x+=m.vx;m.y+=m.vy;
-    x.shadowColor=m.boss?'#fbbf24':'#f43f5e';x.shadowBlur=16;
-    x.fillStyle=m.boss?'#fbbf24':'#f43f5e';x.beginPath();x.arc(m.x,m.y,m.r,0,6.28);x.fill();x.shadowBlur=0;
-    if(m.y>h-46){hp=Math.max(0,hp-15);meteors.splice(i,1);document.getElementById('st').textContent='🛡️ '+hp+'% · 🪙 '+sc;}
-  }
-  sparks.forEach(p=>{p.x+=p.vx;p.y+=p.vy;p.life-=0.04;x.globalAlpha=Math.max(0,p.life);x.fillStyle=p.c;x.fillRect(p.x,p.y,4,4);});
-  x.globalAlpha=1;sparks=sparks.filter(p=>p.life>0);
-  if(hp<=0){x.fillStyle='#fbbf24';x.font='900 18px sans-serif';x.textAlign='center';x.fillText('💥 TAP TO REBUILD ${cName} (SCORE: '+sc+')',w/2,h/2);}
-  requestAnimationFrame(draw);
-}draw();<\/script></body></html>`;
-  }
-  if (genre === 'stacker') {
-    return `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>
-html,body{margin:0;height:100%;overflow:hidden;background:linear-gradient(#040716,#131b3a);font-family:system-ui,sans-serif;user-select:none;touch-action:none;color:#fff;}
-canvas{display:block;width:100%;height:100%;cursor:pointer;}
-.hud{position:fixed;top:40px;left:10px;right:10px;display:flex;justify-content:space-between;pointer-events:none;font-weight:900;font-size:12px;}
-.pill{background:rgba(8,14,34,0.88);border:1px solid #fbbf24;padding:4px 10px;border-radius:99px;}
-</style></head><body>
-<div class="hud"><span class="pill">🏗️ ${flag} ${cName} TOWER STACKER</span><span class="pill" id="fl">FLOOR: 1</span></div>
-<canvas id="c"></canvas><script>
-const cv=document.getElementById('c'),x=cv.getContext('2d');
-let w,h,stack=[],cur=null,camY=0,over=false,ac=null;
-function rs(){w=cv.width=innerWidth;h=cv.height=innerHeight;reset();}addEventListener('resize',rs);
-function reset(){stack=[{x:w/2-70,w:140,c:'${col}'}];spawn();camY=0;over=false;document.getElementById('fl').textContent='FLOOR: 1';}
-function spawn(){const top=stack[stack.length-1];cur={x:20,w:top.w,vx:3.2+stack.length*0.22,dir:1};}
-function note(n){try{if(!ac)ac=new(window.AudioContext||window.webkitAudioContext)();const o=ac.createOscillator(),g=ac.createGain(),t=ac.currentTime;o.frequency.value=260+n*28;g.gain.setValueAtTime(0.13,t);g.gain.exponentialRampToValueAtTime(0.001,t+0.25);o.connect(g);g.connect(ac.destination);o.start(t);o.stop(t+0.26);}catch(e){}}
-cv.addEventListener('pointerdown',()=>{
-  if(over){reset();return;}
-  const top=stack[stack.length-1];
-  const left=Math.max(top.x,cur.x),right=Math.min(top.x+top.w,cur.x+cur.w),nw=right-left;
-  if(nw<=8){over=true;return;}
-  stack.push({x:left,w:nw,c:stack.length%2?'#fbbf24':'${col}'});
-  note(stack.length);document.getElementById('fl').textContent='FLOOR: '+stack.length+' 🏙️';
-  if(window.remoSubmitScore)window.remoSubmitScore(stack.length*10);
-  spawn();
-});
-rs();
-function loop(){
-  x.clearRect(0,0,w,h);
-  const bh=24,targetCam=Math.max(0,(stack.length-6)*bh);camY+=(targetCam-camY)*0.12;
-  if(!over&&cur){cur.x+=cur.vx*cur.dir;if(cur.x+cur.w>w-14)cur.dir=-1;if(cur.x<14)cur.dir=1;}
-  stack.forEach((b,i)=>{
-    const by=h-56-i*bh+camY;
-    x.fillStyle=b.c;x.fillRect(b.x,by,b.w,bh-2);
-    x.fillStyle='rgba(255,255,255,0.55)';
-    for(let wx=b.x+8;wx<b.x+b.w-10;wx+=16)x.fillRect(wx,by+6,7,10);
-  });
-  if(!over&&cur){
-    const cy=h-56-stack.length*bh+camY;
-    x.strokeStyle='#94a3b8';x.beginPath();x.moveTo(cur.x+cur.w/2,0);x.lineTo(cur.x+cur.w/2,cy);x.stroke();
-    x.fillStyle='#ec4899';x.fillRect(cur.x,cy,cur.w,bh-2);
-  }
-  if(over){x.fillStyle='#fbbf24';x.font='900 17px sans-serif';x.textAlign='center';x.fillText('🏆 '+stack.length+' FLOORS IN ${cName}! TAP TO PLAY AGAIN',w/2,h/2);}
-  requestAnimationFrame(loop);
-}loop();<\/script></body></html>`;
-  }
-  if (genre === 'drone') {
-    return `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>
-html,body{margin:0;height:100%;overflow:hidden;background:#050816;font-family:system-ui,sans-serif;user-select:none;touch-action:none;color:#fff;}
-canvas{display:block;width:100%;height:100%;cursor:pointer;}
-.hud{position:fixed;top:40px;left:10px;right:10px;display:flex;justify-content:space-between;pointer-events:none;font-weight:900;font-size:12px;}
-.pill{background:rgba(8,14,34,0.88);border:1px solid ${col};padding:4px 10px;border-radius:99px;}
-</style></head><body>
-<div class="hud"><span class="pill">🛸 ${flag} ${cName} DRONE FLIER</span><span class="pill" id="sc">🪙 0</span></div>
-<canvas id="c"></canvas><script>
-const cv=document.getElementById('c'),x=cv.getContext('2d');
-let w,h,dy=180,vy=0,gates=[],sc=0,dead=false,frame=0;
-function rs(){w=cv.width=innerWidth;h=cv.height=innerHeight;dy=h*0.45;}addEventListener('resize',rs);rs();
-cv.addEventListener('pointerdown',()=>{if(dead){dead=false;gates=[];sc=0;dy=h*0.45;vy=-5.5;document.getElementById('sc').textContent='🪙 0';return;}vy=-6.2;});
-function loop(){
-  x.fillStyle='#050816';x.fillRect(0,0,w,h);frame++;
-  if(!dead){
-    vy+=0.32;dy+=vy;
-    if(frame%85===0)gates.push({x:w+20,gapY:90+Math.random()*(h-210),gapH:118,passed:false});
-    if(dy<12||dy>h-48)dead=true;
-  }
-  for(let i=gates.length-1;i>=0;i--){
-    const g=gates[i];if(!dead)g.x-=2.8;
-    x.fillStyle='${col}';x.fillRect(g.x,0,26,g.gapY);x.fillRect(g.x,g.gapY+g.gapH,26,h);
-    if(!g.passed&&g.x<76){g.passed=true;sc+=10;if(window.remoSubmitScore)window.remoSubmitScore(sc);document.getElementById('sc').textContent='🪙 '+sc;}
-    if(78>g.x&&58<g.x+26&&(dy-12<g.gapY||dy+12>g.gapY+g.gapH))dead=true;
-    if(g.x<-40)gates.splice(i,1);
-  }
-  x.shadowColor='#fbbf24';x.shadowBlur=16;x.fillStyle='#fbbf24';
-  x.beginPath();x.ellipse(68,dy,18,10,0,0,6.28);x.fill();x.shadowBlur=0;
-  if(dead){x.fillStyle='#fff';x.font='900 17px sans-serif';x.textAlign='center';x.fillText('⚡ SCORE '+sc+' — TAP TO FLY OVER ${cName}!',w/2,h/2);}
-  requestAnimationFrame(loop);
-}loop();<\/script></body></html>`;
-  }
-  if (genre === 'metro') {
-    return `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>
-html,body{margin:0;height:100%;overflow:hidden;background:#050714;font-family:system-ui,sans-serif;user-select:none;touch-action:none;color:#fff;}
-canvas{display:block;width:100%;height:100%;cursor:pointer;}
-.hud{position:fixed;top:40px;left:10px;right:10px;display:flex;justify-content:space-between;pointer-events:none;font-weight:900;font-size:12px;}
-.pill{background:rgba(8,14,34,0.88);border:1px solid #10b981;padding:4px 10px;border-radius:99px;}
-</style></head><body>
-<div class="hud"><span class="pill">🚇 ${flag} ${cName} 3-LANE DASH</span><span class="pill" id="sc">🪙 0</span></div>
-<canvas id="c"></canvas><script>
-const cv=document.getElementById('c'),x=cv.getContext('2d');
-let w,h,lane=1,sc=0,objs=[],t=0;
-function rs(){w=cv.width=innerWidth;h=cv.height=innerHeight;}addEventListener('resize',rs);rs();
-addEventListener('message',e=>{if(e.data&&e.data.type==='REMO_GYRO_TILT'){const g=Number(e.data.gamma||0);lane=g<-8?0:g>8?2:1;}});
-cv.addEventListener('pointerdown',e=>{lane=e.clientX<w*0.35?0:e.clientX>w*0.65?2:1;});
-setInterval(()=>{objs.push({l:Math.floor(Math.random()*3),z:0.05,coin:Math.random()>0.38});},480);
-function loop(){
-  x.fillStyle='#050714';x.fillRect(0,0,w,h);t=(t+0.04)%1;
-  const hy=h*0.32;
-  x.fillStyle='${col}44';for(let i=0;i<14;i++){const bh=22+((i*19)%45);x.fillRect(i*(w/14),hy-bh,(w/14)-3,bh);}
-  x.strokeStyle='${col}';x.lineWidth=2;
-  [-1.5,-0.5,0.5,1.5].forEach(k=>{x.beginPath();x.moveTo(w/2+k*24,hy);x.lineTo(w/2+k*(w*0.3),h);x.stroke();});
-  for(let i=objs.length-1;i>=0;i--){
-    const o=objs[i];o.z+=0.022;
-    const py=hy+(h-hy)*o.z,px=w/2+(o.l-1)*(24+(w*0.28)*o.z),sz=8+26*o.z;
-    x.fillStyle=o.coin?'#fbbf24':'#f43f5e';
-    if(o.coin){x.beginPath();x.arc(px,py,sz*0.6,0,6.28);x.fill();}
-    else x.fillRect(px-sz,py-sz*0.4,sz*2,sz*0.8);
-    if(o.z>0.82&&o.z<0.95&&o.l===lane){
-      sc=o.coin?sc+20:Math.max(0,sc-25);if(window.remoSubmitScore)window.remoSubmitScore(sc);document.getElementById('sc').textContent='🪙 '+sc;objs.splice(i,1);continue;
-    }
-    if(o.z>1.05)objs.splice(i,1);
-  }
-  const carX=w/2+(lane-1)*(w*0.26);
-  x.shadowColor='#38bdf8';x.shadowBlur=16;x.fillStyle='#38bdf8';
-  x.beginPath();x.moveTo(carX,h-64);x.lineTo(carX-22,h-26);x.lineTo(carX+22,h-26);x.closePath();x.fill();x.shadowBlur=0;
-  requestAnimationFrame(loop);
-}loop();<\/script></body></html>`;
-  }
-  return `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>
-html,body{margin:0;height:100%;overflow:hidden;background:#050816;font-family:system-ui,sans-serif;user-select:none;touch-action:none;color:#fff;}
-canvas{display:block;width:100%;height:100%;cursor:pointer;}
-.hud{position:fixed;top:40px;left:10px;right:10px;display:flex;justify-content:space-between;pointer-events:none;font-weight:900;font-size:12px;}
-.pill{background:rgba(8,14,34,0.88);border:1px solid #ec4899;padding:4px 10px;border-radius:99px;}
-</style></head><body>
-<div class="hud"><span class="pill">🎹 ${flag} ${cName} RHYTHM PIANO</span><span class="pill" id="sc">🎵 SCORE: 0</span></div>
-<canvas id="c"></canvas><script>
-const cv=document.getElementById('c'),x=cv.getContext('2d');
-let w,h,tiles=[],combo=0,sc=0,ac=null;
-const notes=[261.6,329.6,392.0,523.25],cols=['#38bdf8','#ec4899','#fbbf24','#10b981'];
-function rs(){w=cv.width=innerWidth;h=cv.height=innerHeight;}addEventListener('resize',rs);rs();
-setInterval(()=>{tiles.push({col:Math.floor(Math.random()*4),y:-70,hit:false});},460);
-function play(f){try{if(!ac)ac=new(window.AudioContext||window.webkitAudioContext)();if(ac.state==='suspended')ac.resume();const o=ac.createOscillator(),g=ac.createGain(),t=ac.currentTime;o.type='triangle';o.frequency.value=f;g.gain.setValueAtTime(0.18,t);g.gain.exponentialRampToValueAtTime(0.001,t+0.35);o.connect(g);g.connect(ac.destination);o.start(t);o.stop(t+0.36);}catch(e){}}
-cv.addEventListener('pointerdown',e=>{
-  const lane=Math.min(3,Math.floor(e.clientX/(w/4)));
-  for(let i=0;i<tiles.length;i++){
-    const tl=tiles[i];
-    if(!tl.hit&&tl.col===lane&&tl.y>h-190&&tl.y<h-20){
-      tl.hit=true;combo++;sc+=10*Math.min(5,combo);play(notes[lane]);
-      if(window.remoSubmitScore)window.remoSubmitScore(sc);
-      document.getElementById('sc').textContent='🎵 SCORE: '+sc+' ('+combo+'x)';break;
-    }
-  }
-});
-function loop(){
-  x.fillStyle='#050816';x.fillRect(0,0,w,h);
-  const lw=w/4;
-  for(let i=1;i<4;i++){x.strokeStyle='rgba(255,255,255,0.08)';x.beginPath();x.moveTo(i*lw,0);x.lineTo(i*lw,h);x.stroke();}
-  x.fillStyle='rgba(251,191,36,0.14)';x.fillRect(0,h-105,w,48);
-  for(let i=tiles.length-1;i>=0;i--){
-    const tl=tiles[i];tl.y+=3.4;
-    if(!tl.hit){
-      x.fillStyle=cols[tl.col];x.fillRect(tl.col*lw+6,tl.y,lw-12,64);
-    }
-    if(tl.y>h+20){if(!tl.hit)combo=0;tiles.splice(i,1);}
-  }
-  requestAnimationFrame(loop);
-}loop();<\/script></body></html>`;
-}
+let _cityHtmlTemplateCycleIdx = 0;
 
 function copilotGenerateCityHtmlGame(forcedGenre = '') {
   if (!REMO_STORE.isAdminUnlocked() && !REMO_STORE.isCurrentUserAdmin()) {
-    remoToast(REMO_I18N.getLang() === 'fr' ? 'La génération de jeux arcade est réservée aux administrateurs.' : 'Arcade game generation is admin only.');
+    remoToast(REMO_I18N.getLang() === 'fr' ? 'La génération d’animations HTML est réservée aux administrateurs.' : 'HTML interactive generation is admin only.');
     return;
   }
   const lang = REMO_I18N.getLang();
   const cityId = document.getElementById('createCitySelect')?.value || 'chisinau';
   const city = getCityById(cityId);
-  const col = city.themeColor || '#38bdf8';
-  const cName = city.name_en.toUpperCase();
   switchCreateStudioTab('html');
 
-  const metaByGenre = {
-    defense: ['Skyline Laser Defense', 'Défense Laser Skyline'],
-    stacker: ['4D Skyscraper Builder', 'Constructeur Gratte-Ciel 4D'],
-    drone: ['Cyber Drone City Flier', 'Vol de Drone Cyber'],
-    metro: ['3D Neon Street Dash', 'Course Néon 3 Voies'],
-    rhythm: ['City Rhythm Synth Piano', 'Piano Rythmique Néon'],
-    gyro_coins: ['Cyber Coin Catcher', 'Attrape-Pièces Cyber']
-  };
-  const genres = Object.keys(metaByGenre);
-  const genre = forcedGenre && metaByGenre[forcedGenre]
+  const tplKeys = ['fireworks', 'racer', 'globe', 'beatpad'];
+  const key = forcedGenre && REMO_HTML_TEMPLATES && REMO_HTML_TEMPLATES[forcedGenre]
     ? forcedGenre
-    : genres[(_cityArcadeCycleIdx++) % genres.length];
+    : tplKeys[(_cityHtmlTemplateCycleIdx++) % tplKeys.length];
+  const tpl = (typeof REMO_HTML_TEMPLATES !== 'undefined' && REMO_HTML_TEMPLATES[key])
+    ? REMO_HTML_TEMPLATES[key]
+    : null;
+  if (!tpl) return;
 
-  const [gameTitleEn, gameTitleFr] = metaByGenre[genre];
-  const code = _buildArcadeHtmlByGenre(genre, col, city.flag, cName);
+  const titleEn = tpl.title_en || 'REMO 4D Interactive Visual';
+  const titleFr = tpl.title_fr || titleEn;
+  const code = String(tpl.code || '');
 
   const area = document.getElementById('createHtmlCodeArea');
   if (area) area.value = code;
   refreshStudioHtmlPreview();
 
-  const enCap = `🎮 Play my ${city.flag} ${city.name_en} "${gameTitleEn}" Arcade Game directly inside this post! Can you beat my score? #${city.code} #LiveHTML`;
-  const frCap = `🎮 Jouez à mon jeu d’arcade ${city.flag} ${city.name_fr || city.name_en} « ${gameTitleFr} » directement dans ce post ! #${city.code} #LiveHTML`;
+  const enCap = `✨ Experience this ${city.flag} ${city.name_en} "${titleEn}" interactive 4D moment directly inside this post! #${city.code} #LiveHTML`;
+  const frCap = `✨ Découvrez cette création interactive 4D ${city.flag} ${city.name_fr || city.name_en} « ${titleFr} » directement dans ce post ! #${city.code} #LiveHTML`;
   const inp = document.getElementById('createCaptionInp');
   if (inp) inp.value = lang === 'fr' ? frCap : enCap;
   const drawer = document.getElementById('bilingualCaptionDrawer');
@@ -12466,7 +12249,7 @@ function copilotGenerateCityHtmlGame(forcedGenre = '') {
     document.getElementById('createCaptionFrBox').value = frCap;
   }
   RemoAudio.play('fanfare');
-  remoToast(lang === 'fr' ? `🎮 Jeu « ${gameTitleFr} » (${city.flag}) prêt !` : `🎮 "${gameTitleEn}" (${city.flag}) ready!`, 'fanfare');
+  remoToast(lang === 'fr' ? `✨ Création « ${titleFr} » (${city.flag}) prête !` : `✨ "${titleEn}" (${city.flag}) ready!`, 'fanfare');
 }
 
 /* ── 11. 🌍 USER-FOUNDED MISSING CITIES (+75 🪙 + MAYOR CROWN + CARD #0001) ── */
@@ -15178,19 +14961,6 @@ window.addEventListener('message', (ev) => {
   const score = Math.floor(Number(d.score || 0));
   if (!Number.isFinite(score) || score <= 0 || score > 10000000) return;
 
-  if (pid.startsWith('hub_')) {
-    const gid = pid.slice(4);
-    if (!_hubActiveGameId || _hubActiveGameId !== gid) return;
-    if (score <= _hubSessionBestScore) return;
-    _hubSessionBestScore = score;
-    const saveBtn = document.getElementById('gamesHubSaveScoreBtn');
-    if (saveBtn) {
-      saveBtn.style.display = 'inline-flex';
-      saveBtn.textContent = t('games_hub_save_btn', { score: score.toLocaleString() });
-    }
-    return;
-  }
-
   const prev = Number(_sessionGameScores[d.postId] || 0);
   if (score <= prev) return;
   _sessionGameScores[d.postId] = score;
@@ -15274,242 +15044,182 @@ function flushPendingGuestGameScore() {
 }
 window.flushPendingGuestGameScore = flushPendingGuestGameScore;
 
-/* ── 🕹️ REMO GAMES HUB CONTROLLER ── */
-let _hubActiveGameId = '';
-let _hubSessionBestScore = 0;
-let _hubGyroEnabled = false;
-let _hubGyroListener = null;
+/* ── 🧭 REMO ODYSSEY OFFICIAL 4D GAME CONTROLLER & LIVE HOST BRIDGE ── */
+let _odysseyModalOpen = false;
+let _odysseyOwnedRadio = false;
+let _pendingOdysseyChallenge = null;
 
-function _hubGenreFromGameId(id) {
-  const map = {
-    g_gyro_coins: 'gyro_coins',
-    g_laser_defense: 'defense',
-    g_tower_stacker: 'stacker',
-    g_cyber_drone: 'drone',
-    g_neon_dash: 'metro',
-    g_rhythm_piano: 'rhythm'
-  };
-  return map[id] || 'gyro_coins';
+function syncRemoOdysseyBadges() {
+  if (typeof REMO_STORE === 'undefined' || typeof REMO_STORE.ensureRemoOdyssey !== 'function') return;
+  const od = REMO_STORE.ensureRemoOdyssey();
+  const is2x = Boolean(od.event2x || (REMO_STORE.state && REMO_STORE.state.settings && REMO_STORE.state.settings.happyHour2x));
+
+  const pill = document.getElementById('feedRemoOdysseyPill');
+  const pillTag = document.getElementById('feedOdysseyPillBadge');
+  if (pill) pill.classList.toggle('event-2x', is2x);
+  if (pillTag) pillTag.textContent = is2x ? '⚡2X' : '4D';
+
+  const tileBadge = document.getElementById('appLauncherOdysseyBadge');
+  if (tileBadge) tileBadge.textContent = is2x ? t('odyssey_badge_2x') : t('odyssey_badge_4d');
+
+  const modal2x = document.getElementById('remoOdysseyModal2xChip');
+  if (modal2x) modal2x.style.display = is2x ? 'inline-flex' : 'none';
 }
+window.syncRemoOdysseyBadges = syncRemoOdysseyBadges;
 
-function _getHubGameHtml(game) {
-  if (!game) return '';
-  if (!game.isBuiltin && game.customHtml) return String(game.customHtml);
-  const u = REMO_STORE.getCurrentUser();
-  const city = getCityById((u && u.homeCity) || 'montreal');
-  const col = (city && city.themeColor) || '#38bdf8';
-  const flag = (city && city.flag) || '🌍';
-  const cName = (city && (city.name_en || city.name_fr)) || 'REMO';
-  return _buildArcadeHtmlByGenre(_hubGenreFromGameId(game.id), col, flag, cName);
-}
-
-function _stopHubGyro() {
-  _hubGyroEnabled = false;
-  if (_hubGyroListener && typeof window !== 'undefined') {
-    window.removeEventListener('deviceorientation', _hubGyroListener);
-  }
-  _hubGyroListener = null;
-}
-
-function openGamesHubModal() {
-  REMO_STORE.ensureGamesHub();
-  _hubActiveGameId = '';
-  _hubSessionBestScore = 0;
-  _stopHubGyro();
-  document.getElementById('gamesHubModal')?.classList.add('open');
-  renderGamesHubContent();
-  if (typeof RemoAudio !== 'undefined' && RemoAudio.play) RemoAudio.play('click');
-}
-window.openGamesHubModal = openGamesHubModal;
-
-function closeGamesHubModal() {
-  _stopHubGyro();
-  _hubActiveGameId = '';
-  _hubSessionBestScore = 0;
-  const body = document.getElementById('gamesHubBody');
-  if (body) body.innerHTML = '';
-  document.getElementById('gamesHubModal')?.classList.remove('open');
-}
-window.closeGamesHubModal = closeGamesHubModal;
-
-function playGamesHubItem(gameId) {
-  const hub = REMO_STORE.ensureGamesHub();
-  const game = (hub.games || []).find((g) => g && g.id === gameId && g.enabled !== false);
-  if (!game) return;
-  _stopHubGyro();
-  _hubActiveGameId = gameId;
-  _hubSessionBestScore = 0;
-  renderGamesHubContent();
-  if (typeof RemoAudio !== 'undefined' && RemoAudio.play) RemoAudio.play('click');
-}
-window.playGamesHubItem = playGamesHubItem;
-
-function backToGamesHubGrid() {
-  _stopHubGyro();
-  _hubActiveGameId = '';
-  _hubSessionBestScore = 0;
-  renderGamesHubContent();
-}
-window.backToGamesHubGrid = backToGamesHubGrid;
-
-async function toggleGamesHubGyro() {
-  if (_hubGyroEnabled) {
-    _stopHubGyro();
-  } else {
+function _buildRemoOdysseyWeatherMap() {
+  const map = {};
+  if (typeof REMO_WEATHER === 'undefined' || typeof REMO_WEATHER.getCityLiveStatus !== 'function') return map;
+  const cities = typeof getRemoCities === 'function' ? getRemoCities() : (window.REMO_CITIES || []);
+  cities.forEach((c) => {
+    if (!c || !c.id) return;
     try {
-      if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-        const perm = await DeviceOrientationEvent.requestPermission();
-        if (perm !== 'granted') return;
-      }
+      const st = REMO_WEATHER.getCityLiveStatus(c);
+      if (!st) return;
+      const ic = String(st.icon || '');
+      let kind = 'clear';
+      if (ic.includes('❄')) kind = 'snow';
+      else if (ic.includes('🌧') || ic.includes('⛈') || st.isSurge) kind = 'rain';
+      map[c.id] = { kind, tempC: Number.isFinite(Number(st.tempC)) ? Number(st.tempC) : null, live: true };
     } catch (e) {}
-    _hubGyroEnabled = true;
-    _hubGyroListener = (ev) => {
-      const fr = document.getElementById('gamesHubIframe');
-      if (!fr || !fr.contentWindow || typeof ev.gamma !== 'number') return;
-      const g = Math.max(-35, Math.min(35, ev.gamma));
-      fr.contentWindow.postMessage({ type: 'REMO_GYRO_TILT', gamma: g }, '*');
-    };
-    window.addEventListener('deviceorientation', _hubGyroListener);
-  }
-  const btn = document.getElementById('gamesHubGyroBtn');
-  if (btn) btn.textContent = _hubGyroEnabled ? t('games_hub_gyro_on') : t('games_hub_gyro_off');
+  });
+  return map;
 }
-window.toggleGamesHubGyro = toggleGamesHubGyro;
 
-function renderGamesHubContent() {
-  const modal = document.getElementById('gamesHubModal');
-  const body = document.getElementById('gamesHubBody');
-  if (!body) return;
-  if (modal && !modal.classList.contains('open')) return;
+function buildRemoOdysseyHostContext() {
+  const lang = typeof REMO_I18N !== 'undefined' ? REMO_I18N.getLang() : 'en';
+  const u = typeof REMO_STORE !== 'undefined' && REMO_STORE.getCurrentUser ? REMO_STORE.getCurrentUser() : null;
+  const od = typeof REMO_STORE !== 'undefined' && REMO_STORE.ensureRemoOdyssey ? REMO_STORE.ensureRemoOdyssey() : { event2x: false };
+  let ownedCardCities = [];
+  if (u && typeof REMO_STORE.getUserCards === 'function') {
+    const cards = REMO_STORE.getUserCards(u.uid) || [];
+    ownedCardCities = Array.from(new Set(cards.map((c) => c && c.cityId).filter(Boolean)));
+  }
+  let torchCityId = '';
+  try {
+    const ws = typeof REMO_STORE.ensureWorldSystems === 'function' ? REMO_STORE.ensureWorldSystems() : null;
+    if (ws && ws.torchRelay && ws.torchRelay.active && ws.torchRelay.currentCityId) {
+      torchCityId = ws.torchRelay.currentCityId;
+    }
+  } catch (e) {}
+  return {
+    lang,
+    isGuest: !u,
+    playerName: u && u.name ? String(u.name) : '',
+    homeCityId: u && u.homeCity ? String(u.homeCity) : '',
+    ownedCardCities,
+    torchCityId,
+    weatherMap: _buildRemoOdysseyWeatherMap(),
+    odyssey2x: Boolean(od.event2x),
+    happyHour2x: Boolean(REMO_STORE && REMO_STORE.state && REMO_STORE.state.settings && REMO_STORE.state.settings.happyHour2x)
+  };
+}
 
+function sendRemoOdysseyHostContext() {
+  const fr = document.getElementById('remoOdysseyIframe');
+  if (!fr || !fr.contentWindow) return;
+  try {
+    const origin = (window.location && window.location.origin && window.location.origin !== 'null') ? window.location.origin : '*';
+    fr.contentWindow.postMessage({ type: 'REMO_HOST_CONTEXT', context: buildRemoOdysseyHostContext() }, origin);
+  } catch (e) {}
+}
+
+function openRemoOdysseyModal(opts = {}) {
+  const modal = document.getElementById('remoOdysseyModal');
+  const wrap = document.getElementById('remoOdysseyFrameWrap');
+  if (!modal || !wrap) return;
+
+  const lang = typeof REMO_I18N !== 'undefined' ? REMO_I18N.getLang() : 'en';
+  const qs = new URLSearchParams();
+  qs.set('embed', '1');
+  qs.set('lang', lang);
+  if (opts && opts.seed) qs.set('seed', String(opts.seed));
+  if (opts && opts.start) qs.set('start', String(opts.start));
+  if (opts && Number(opts.target) > 0) qs.set('target', String(Math.floor(Number(opts.target))));
+  if (opts && opts.vs) qs.set('vs', String(opts.vs));
+  if (opts && opts.mode) qs.set('mode', String(opts.mode));
+
+  const fullLink = document.getElementById('remoOdysseyFullscreenLink');
+  if (fullLink) {
+    const pageQs = new URLSearchParams(qs);
+    pageQs.delete('embed');
+    pageQs.delete('lang');
+    const basePage = lang === 'fr' ? 'fr/odyssey.html' : 'odyssey.html';
+    const qStr = pageQs.toString();
+    fullLink.href = qStr ? `${basePage}?${qStr}` : basePage;
+  }
+
+  _odysseyModalOpen = true;
+  _odysseyOwnedRadio = false;
+  syncRemoOdysseyBadges();
+  modal.classList.add('open');
+  document.body.style.overflow = 'hidden';
+
+  wrap.innerHTML = '';
+  const iframe = document.createElement('iframe');
+  iframe.id = 'remoOdysseyIframe';
+  iframe.className = 'remo-odyssey-iframe';
+  iframe.title = 'REMO Odyssey — Official 4D World Game';
+  iframe.setAttribute('allow', 'autoplay; fullscreen');
+  iframe.src = `odyssey/index.html?${qs.toString()}`;
+  iframe.addEventListener('load', () => {
+    setTimeout(sendRemoOdysseyHostContext, 80);
+  });
+  wrap.appendChild(iframe);
+
+  if (typeof RemoAudio !== 'undefined' && RemoAudio.play) RemoAudio.play('click');
+}
+window.openRemoOdysseyModal = openRemoOdysseyModal;
+window.openGamesHubModal = openRemoOdysseyModal;
+
+function closeRemoOdysseyModal() {
+  const modal = document.getElementById('remoOdysseyModal');
+  const wrap = document.getElementById('remoOdysseyFrameWrap');
+  const fr = document.getElementById('remoOdysseyIframe');
+  if (fr && fr.contentWindow) {
+    try {
+      const origin = (window.location && window.location.origin && window.location.origin !== 'null') ? window.location.origin : '*';
+      fr.contentWindow.postMessage({ type: 'REMO_ODYSSEY_PAUSE' }, origin);
+    } catch (e) {}
+  }
+  if (_odysseyOwnedRadio && window.REMO_RADIO && typeof window.REMO_RADIO.pause === 'function') {
+    try { window.REMO_RADIO.pause(); } catch (e) {}
+  }
+  _odysseyOwnedRadio = false;
+  _odysseyModalOpen = false;
+  if (wrap) wrap.innerHTML = '';
+  if (modal) modal.classList.remove('open');
+  document.body.style.overflow = '';
+}
+window.closeRemoOdysseyModal = closeRemoOdysseyModal;
+window.closeGamesHubModal = closeRemoOdysseyModal;
+
+function publishRemoOdysseyFeedChallenge(summary) {
+  if (!summary || !Number(summary.score)) return;
   const lang = REMO_I18N.getLang();
   const isFr = lang === 'fr';
-  const hub = REMO_STORE.ensureGamesHub();
-  const enabledGames = (hub.games || []).filter((g) => g && g.enabled !== false);
-
-  if (_hubActiveGameId) {
-    const active = enabledGames.find((g) => g.id === _hubActiveGameId);
-    if (!active) {
-      _hubActiveGameId = '';
-    } else {
-      const title = isFr ? (active.title_fr || active.title_en) : (active.title_en || active.title_fr);
-      const isFeat = hub.featuredGameId === active.id;
-      const topLb = Array.isArray(active.leaderboard) ? active.leaderboard.slice(0, 3) : [];
-      const existingFrame = document.getElementById('gamesHubIframe');
-      if (existingFrame && existingFrame.getAttribute('data-post-id') === ('hub_' + active.id)) {
-        return;
-      }
-      body.innerHTML = `
-        <div class="game-hub-play-stage">
-          <div class="game-hub-toolbar">
-            <button type="button" class="btn-ghost" onclick="backToGamesHubGrid()">${escapeHtmlStr(t('games_hub_back'))}</button>
-            <strong style="font-size:0.9rem;color:#fff;">${escapeHtmlStr(active.icon || '🎮')} ${escapeHtmlStr(title)} ${isFeat ? `<span class="game-hub-2x-pill">${escapeHtmlStr(t('games_hub_featured_2x'))}</span>` : ''}</strong>
-            <div style="display:flex;gap:6px;flex-wrap:wrap;">
-              <button type="button" id="gamesHubGyroBtn" class="btn-ghost" style="font-size:0.75rem;" onclick="toggleGamesHubGyro()">${escapeHtmlStr(_hubGyroEnabled ? t('games_hub_gyro_on') : t('games_hub_gyro_off'))}</button>
-              <button type="button" id="gamesHubSaveScoreBtn" class="btn-cyber btn-gold" style="font-size:0.75rem;${_hubSessionBestScore > 0 ? '' : 'display:none;'}" onclick="submitCurrentHubScore()">${escapeHtmlStr(t('games_hub_save_btn', { score: _hubSessionBestScore.toLocaleString() }))}</button>
-              <button type="button" class="btn-cyber" style="font-size:0.75rem;background:linear-gradient(135deg,#0284c7,#7c3aed);" onclick="challengeFeedFromGamesHub()">${escapeHtmlStr(t('games_hub_challenge_btn'))}</button>
-            </div>
-          </div>
-          ${topLb.length ? `
-            <div style="display:flex;gap:10px;flex-wrap:wrap;font-size:0.74rem;padding:6px 10px;border-radius:10px;background:rgba(15,23,42,0.7);border:1px solid rgba(56,189,248,0.2);">
-              ${topLb.map((e, i) => {
-                const c = getCityById(e.cityId || 'montreal');
-                const med = ['🥇', '🥈', '🥉'][i] || '🎮';
-                return `<span>${med} ${c ? c.flag : '🌍'} @${escapeHtmlStr(e.name || 'Citizen')} · <b>${Number(e.score || 0).toLocaleString()}</b></span>`;
-              }).join('')}
-            </div>
-          ` : ''}
-          <div class="game-hub-iframe-wrap">
-            <iframe id="gamesHubIframe" class="game-hub-iframe" data-post-id="${escapeHtmlStr('hub_' + active.id)}" sandbox="allow-scripts"></iframe>
-          </div>
-        </div>
-      `;
-      const iframe = document.getElementById('gamesHubIframe');
-      if (iframe) {
-        iframe.srcdoc = buildFittedHtmlSrcdoc(_getHubGameHtml(active), 'hub_' + active.id);
-      }
-      return;
-    }
-  }
-
-  const ordered = enabledGames.slice().sort((a, b) => (b.id === hub.featuredGameId ? 1 : 0) - (a.id === hub.featuredGameId ? 1 : 0));
-  body.innerHTML = `
-    ${ordered.length === 0 ? `<div style="padding:24px;text-align:center;color:var(--muted);">${escapeHtmlStr(t('games_hub_empty'))}</div>` : `
-      <div class="games-hub-grid">
-        ${ordered.map((g) => {
-          const isFeat = hub.featuredGameId === g.id;
-          const title = isFr ? (g.title_fr || g.title_en) : (g.title_en || g.title_fr);
-          const desc = isFr ? (g.desc_fr || g.desc_en) : (g.desc_en || g.desc_fr);
-          const rec = Array.isArray(g.leaderboard) && g.leaderboard[0] ? g.leaderboard[0] : null;
-          return `
-            <button type="button" class="game-hub-card ${isFeat ? 'featured-2x' : ''}" onclick="playGamesHubItem('${escapeHtmlStr(g.id)}')" style="text-align:left;">
-              <div class="game-hub-card-top">
-                <span class="game-hub-icon">${escapeHtmlStr(g.icon || '🎮')}</span>
-                ${isFeat ? `<span class="game-hub-2x-pill">${escapeHtmlStr(t('games_hub_featured_2x'))}</span>` : ''}
-              </div>
-              <div class="game-hub-card-title">${escapeHtmlStr(title)}</div>
-              <div class="game-hub-card-desc">${escapeHtmlStr(desc)}</div>
-              <div class="game-hub-card-rec">
-                <span>${escapeHtmlStr(t('games_hub_record_lbl'))}</span>
-                <b>${rec ? `${Number(rec.score || 0).toLocaleString()} · @${escapeHtmlStr(rec.name || 'Champion')}` : escapeHtmlStr(t('games_hub_no_record'))}</b>
-              </div>
-            </button>
-          `;
-        }).join('')}
-      </div>
-    `}
-  `;
-}
-window.renderGamesHubContent = renderGamesHubContent;
-
-function submitCurrentHubScore() {
-  if (!_hubActiveGameId || _hubSessionBestScore <= 0) return;
   const u = REMO_STORE.getCurrentUser();
   if (!u) {
+    _pendingOdysseyChallenge = summary;
+    remoToast(
+      isFr
+        ? `🧭 Créez votre Passeport en 1 clic (+150 🪙) pour publier votre défi de ${Number(summary.score).toLocaleString()} pts !`
+        : `🧭 Claim your Passport in 1 click (+150 🪙) to post your ${Number(summary.score).toLocaleString()} pts challenge!`,
+      'fanfare'
+    );
+    closeRemoOdysseyModal();
     openAuthModal();
     return;
   }
-  const res = REMO_STORE.submitGamesHubScore(_hubActiveGameId, _hubSessionBestScore);
-  if (!res.ok) return;
-  if (res.dailyBonus) {
-    RemoAudio.play('fanfare');
-    spawnRemoCoinsFX(res.isFeatured2x ? 14 : 8);
-    remoToast(t(res.isFeatured2x ? 'games_hub_daily_2x_bonus' : 'games_hub_daily_bonus'), 'fanfare');
-  } else if (res.isNewRecord) {
-    RemoAudio.play('fanfare');
-    spawnRemoCoinsFX(12);
-    remoToast(t('game_new_record_toast', { score: _hubSessionBestScore.toLocaleString() }), 'fanfare');
-  } else {
-    RemoAudio.play('coin');
-    remoToast(t('game_score_saved_toast', { score: _hubSessionBestScore.toLocaleString() }), 'coin');
-  }
-  syncHeaderAndSidebars();
-}
-window.submitCurrentHubScore = submitCurrentHubScore;
 
-function challengeFeedFromGamesHub() {
-  if (!_hubActiveGameId) return;
-  if (_hubSessionBestScore <= 0) {
-    remoToast(t('games_hub_score_first'));
-    return;
-  }
-  const u = REMO_STORE.getCurrentUser();
-  if (!u) {
-    openAuthModal();
-    return;
-  }
-  const hub = REMO_STORE.ensureGamesHub();
-  const game = (hub.games || []).find((g) => g && g.id === _hubActiveGameId);
-  if (!game) return;
-
-  REMO_STORE.submitGamesHubScore(_hubActiveGameId, _hubSessionBestScore);
-  const myScore = _hubSessionBestScore;
-  const htmlCode = _getHubGameHtml(game);
-  const cityId = u.homeCity || 'montreal';
+  const cityId = summary.startCityId || u.homeCity || 'montreal';
   const city = getCityById(cityId);
-  const gEn = game.title_en || 'REMO Arcade';
-  const gFr = game.title_fr || gEn;
+  const scoreNum = Math.floor(Number(summary.score || 0));
+  const citiesCount = Math.max(1, Math.floor(Number(summary.citiesCount || 1)));
+  const kmFlown = Math.max(0, Math.floor(Number(summary.kmFlown || 0)));
+  const routeIds = Array.isArray(summary.routeIds) && summary.routeIds.length ? summary.routeIds.slice(0, 8) : [cityId];
   const cloudAuthorUid = (typeof REMO_STORE.getCloudAuthorUid === 'function') ? REMO_STORE.getCloudAuthorUid(u) : u.uid;
+
   const newPost = {
     id: 'post_' + Date.now(),
     uid: u.uid,
@@ -15520,23 +15230,21 @@ function challengeFeedFromGamesHub() {
     authorVerified: Boolean(REMO_STORE.fbAuth && REMO_STORE.fbAuth.currentUser),
     authorPassport: u.passportNum,
     cityId,
-    vibe: '🔥',
-    caption_en: `${game.icon || '🎮'} @${u.name} scored ${myScore.toLocaleString()} pts in "${gEn}" for ${city ? city.name_en : 'REMO'}! Beat my score in the Feed to steal the Crown 👑! #RemoGamesHub #BeatMyScore`,
-    caption_fr: `${game.icon || '🎮'} @${u.name} a marqué ${myScore.toLocaleString()} pts à « ${gFr} » pour ${city ? (city.name_fr || city.name_en) : 'REMO'} ! Battez ce score pour voler la Couronne 👑 ! #RemoGamesHub #DefiScore`,
-    mediaType: 'html_app',
-    mediaUrl: '',
+    vibe: '🧭',
+    caption_en: `🧭 @${u.name} scored ${scoreNum.toLocaleString()} PTS in REMO Odyssey (${citiesCount} cities · ${kmFlown.toLocaleString()} km) for ${city ? city.name_en : 'REMO'}! Tap Play & Beat Score to race my 1v1 challenge! #RemoOdyssey #BeatMyScore`,
+    caption_fr: `🧭 @${u.name} a marqué ${scoreNum.toLocaleString()} PTS dans REMO Odyssey (${citiesCount} villes · ${kmFlown.toLocaleString()} km) pour ${city ? (city.name_fr || city.name_en) : 'REMO'} ! Cliquez pour relever mon défi 1v1 ! #RemoOdyssey #Defi1v1`,
+    mediaType: 'photo',
+    mediaUrl: `img/cities/${cityId}.jpg`,
     mediaUrls: [],
-    htmlCode,
-    leaderboard: [{ uid: u.uid, name: u.name, cityId, score: myScore, ts: Date.now() }],
-    gameChallenge: {
-      gameId: game.id,
-      title_en: gEn,
-      title_fr: gFr,
-      holderUid: u.uid,
-      holderName: u.name,
-      holderCityId: cityId,
-      targetScore: myScore,
-      crownSteals: 0
+    odysseyChallenge: {
+      seed: String(summary.seed || 'REMO2026'),
+      startCityId: cityId,
+      score: scoreNum,
+      citiesCount,
+      kmFlown,
+      routeIds,
+      playerName: u.name,
+      cityWarPoints: Math.max(10, Math.floor(Number(summary.cityWarPoints || 20)))
     },
     externalUrl: '',
     photoFilter: 'flt-none',
@@ -15551,16 +15259,117 @@ function challengeFeedFromGamesHub() {
   REMO_STORE.state.posts.unshift(newPost);
   REMO_STORE.addCoins(u.uid, 15, 10);
   REMO_STORE.syncPostToCloud(newPost);
-  REMO_STORE.save(true, 'hub_feed_challenge');
-  closeGamesHubModal();
+  REMO_STORE.save(true, 'odyssey_feed_challenge');
+  closeRemoOdysseyModal();
   if (typeof switchRemoView === 'function') switchRemoView('feed');
   else renderSocialFeed('', true);
   syncHeaderAndSidebars();
   if (typeof RemoAudio !== 'undefined' && RemoAudio.play) RemoAudio.play('fanfare');
   spawnRemoCoinsFX(12);
-  remoToast(t('games_hub_challenge_posted'), 'fanfare');
+  remoToast(t('odyssey_challenge_posted'), 'fanfare');
 }
-window.challengeFeedFromGamesHub = challengeFeedFromGamesHub;
+window.publishRemoOdysseyFeedChallenge = publishRemoOdysseyFeedChallenge;
+
+window.addEventListener('message', (ev) => {
+  const d = ev && ev.data;
+  if (!d || typeof d !== 'object' || !d.type) return;
+  const fr = document.getElementById('remoOdysseyIframe');
+  if (!fr || !fr.contentWindow || ev.source !== fr.contentWindow) return;
+  if (window.location && window.location.origin && window.location.origin !== 'null' && ev.origin && ev.origin !== 'null' && ev.origin !== window.location.origin) {
+    return;
+  }
+
+  if (d.type === 'REMO_ODYSSEY_READY') {
+    sendRemoOdysseyHostContext();
+    return;
+  }
+
+  if (d.type === 'REMO_GAME_TUNE_CITY_RADIO') {
+    if (window.REMO_RADIO) {
+      try {
+        if (d.stationId && typeof window.REMO_RADIO.selectStation === 'function') {
+          window.REMO_RADIO.selectStation(d.stationId, true);
+          _odysseyOwnedRadio = true;
+        } else if (d.cityId && typeof window.REMO_RADIO.tuneToCity === 'function') {
+          window.REMO_RADIO.tuneToCity(d.cityId, true);
+          _odysseyOwnedRadio = true;
+        }
+      } catch (e) {}
+    }
+    return;
+  }
+
+  if (d.type === 'REMO_GAME_STOP_CITY_RADIO') {
+    if (_odysseyOwnedRadio && window.REMO_RADIO && typeof window.REMO_RADIO.pause === 'function') {
+      try { window.REMO_RADIO.pause(); } catch (e) {}
+    }
+    _odysseyOwnedRadio = false;
+    return;
+  }
+
+  if (d.type === 'REMO_ODYSSEY_RUN_COMPLETE') {
+    const summary = d.summary || d;
+    const res = REMO_STORE.submitRemoOdysseyRun(summary);
+    if (res && res.ok) {
+      syncHeaderAndSidebars();
+      if (res.isNewRecord) {
+        if (typeof RemoAudio !== 'undefined' && RemoAudio.play) RemoAudio.play('fanfare');
+        spawnRemoCoinsFX(14);
+        remoToast(t('odyssey_new_record_toast', { score: res.score.toLocaleString(), coins: res.coinsGranted }), 'fanfare');
+      } else if (res.coinsGranted > 0 || res.cityWarPoints > 0) {
+        if (typeof RemoAudio !== 'undefined' && RemoAudio.play) RemoAudio.play('coin');
+        if (res.coinsGranted > 0) spawnRemoCoinsFX(8);
+        remoToast(t('odyssey_run_saved_toast', {
+          score: res.score.toLocaleString(),
+          coins: res.coinsGranted,
+          war: res.cityWarPoints
+        }), 'coin');
+      }
+    } else if (res && res.needAuth && res.score >= 250) {
+      remoToast(t('odyssey_guest_toast', { score: res.score.toLocaleString() }), 'fanfare');
+    }
+    return;
+  }
+
+  if (d.type === 'REMO_ODYSSEY_DROP_FEED_CHALLENGE') {
+    publishRemoOdysseyFeedChallenge(d.summary || d);
+    return;
+  }
+
+  if (d.type === 'REMO_ODYSSEY_CLOSE') {
+    closeRemoOdysseyModal();
+  }
+});
+
+window.addEventListener('remo:langchange', () => {
+  syncRemoOdysseyBadges();
+  if (!_odysseyModalOpen) return;
+  const fr = document.getElementById('remoOdysseyIframe');
+  if (fr && fr.contentWindow) {
+    try {
+      const origin = (window.location && window.location.origin && window.location.origin !== 'null') ? window.location.origin : '*';
+      fr.contentWindow.postMessage({ type: 'REMO_SET_LANG', lang: REMO_I18N.getLang() }, origin);
+    } catch (e) {}
+  }
+});
+
+window.addEventListener('remo:stateupdate', (ev) => {
+  syncRemoOdysseyBadges();
+  if (_odysseyModalOpen) {
+    sendRemoOdysseyHostContext();
+  }
+  if (ev && ev.detail && ev.detail.reason === 'auth' && _pendingOdysseyChallenge && REMO_STORE.getCurrentUser()) {
+    const pending = _pendingOdysseyChallenge;
+    _pendingOdysseyChallenge = null;
+    publishRemoOdysseyFeedChallenge(pending);
+  }
+});
+
+document.addEventListener('keydown', (e) => {
+  if (_odysseyModalOpen && e.key === 'Escape') {
+    closeRemoOdysseyModal();
+  }
+});
 
 /* ── 🌟 STAGE 4: WORLD SPOTLIGHT STAGE CONTROLLER (#1 Pill + Ultra-Compact Live Strip) ── */
 let _wspotTickTimer = null;
@@ -21445,8 +21254,20 @@ window.copyViralPromoTemplateText = copyViralPromoTemplateText;
 if (typeof window !== 'undefined') {
   window.addEventListener('DOMContentLoaded', () => {
     try {
+      syncRemoOdysseyBadges();
       const params = new URLSearchParams(window.location.search);
-      if (params.get('contact') === '1') {
+      const openParam = params.get('open');
+      if (openParam === 'odyssey' || openParam === 'games') {
+        setTimeout(() => {
+          openRemoOdysseyModal({
+            seed: params.get('seed') || '',
+            start: params.get('start') || params.get('city') || '',
+            target: Number(params.get('target') || params.get('odyssey_score') || 0),
+            vs: params.get('vs') || '',
+            mode: params.get('mode') || ''
+          });
+        }, 380);
+      } else if (params.get('contact') === '1') {
         setTimeout(() => openContactSupportModal(), 350);
       } else if (params.get('promo_studio') === '1') {
         setTimeout(() => openViralPromoStudioModal(), 450);

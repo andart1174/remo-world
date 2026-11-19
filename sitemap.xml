@@ -20,6 +20,24 @@
     <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/"/>
   </url>
   <url>
+    <loc>https://remoworld.com/odyssey.html</loc>
+    <lastmod>2026-11-18</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.97</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/odyssey.html"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/odyssey.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/odyssey.html"/>
+  </url>
+  <url>
+    <loc>https://remoworld.com/fr/odyssey.html</loc>
+    <lastmod>2026-11-18</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.97</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/odyssey.html"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/odyssey.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/odyssey.html"/>
+  </url>
+  <url>
     <loc>https://remoworld.com/focus-tv.html</loc>
     <lastmod>2026-11-12</lastmod>
     <changefreq>daily</changefreq>

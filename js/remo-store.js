@@ -1299,7 +1299,7 @@ function createDefaultState() {
     cityPredictions: getDefaultCityPredictions(now),
     viralContests: getDefaultViralContests(),
     worldSystems: getDefaultUniqueWorldSystems(),
-    gamesHub: getDefaultGamesHub(),
+    remoOdyssey: getDefaultRemoOdyssey(),
     worldSpotlight: getDefaultWorldSpotlight(),
     supportTickets: [],
     notifications: []
@@ -1317,83 +1317,11 @@ function getDefaultWorldSpotlight() {
   };
 }
 
-function getDefaultGamesHub() {
+function getDefaultRemoOdyssey() {
   return {
-    featuredGameId: 'g_gyro_coins',
-    games: [
-      {
-        id: 'g_gyro_coins',
-        icon: '🪙',
-        title_en: 'Cyber Coin Catcher (Gyro + Touch)',
-        title_fr: 'Attrape-Pièces Cyber (Gyro + Tactile)',
-        desc_en: 'Tilt your phone or drag to catch gold coins & dodge cyber bombs!',
-        desc_fr: 'Inclinez le mobile ou glissez pour attraper l’or et éviter les bombes !',
-        enabled: true,
-        isBuiltin: true,
-        customHtml: '',
-        leaderboard: []
-      },
-      {
-        id: 'g_laser_defense',
-        icon: '🛡️',
-        title_en: 'Skyline Laser Defense',
-        title_fr: 'Défense Laser Skyline',
-        desc_en: 'Blast incoming meteors before they strike your city skyline!',
-        desc_fr: 'Détruisez les météores avant qu’ils ne frappent votre ville !',
-        enabled: true,
-        isBuiltin: true,
-        customHtml: '',
-        leaderboard: []
-      },
-      {
-        id: 'g_tower_stacker',
-        icon: '🏗️',
-        title_en: '4D Skyscraper Builder',
-        title_fr: 'Constructeur Gratte-Ciel 4D',
-        desc_en: 'Drop neon skyscraper floors with pinpoint timing!',
-        desc_fr: 'Empilez les étages néon avec une précision millimétrée !',
-        enabled: true,
-        isBuiltin: true,
-        customHtml: '',
-        leaderboard: []
-      },
-      {
-        id: 'g_cyber_drone',
-        icon: '🛸',
-        title_en: 'Cyber Drone City Flier',
-        title_fr: 'Vol de Drone Cyber',
-        desc_en: 'Fly through neon sky gates high above the city!',
-        desc_fr: 'Traversez les portails lumineux au-dessus des toits !',
-        enabled: true,
-        isBuiltin: true,
-        customHtml: '',
-        leaderboard: []
-      },
-      {
-        id: 'g_neon_dash',
-        icon: '🚇',
-        title_en: '3D Neon Street Dash',
-        title_fr: 'Course Néon 3 Voies',
-        desc_en: 'Switch 3 hyper-lanes to grab coins & avoid hazards!',
-        desc_fr: 'Changez de voie à grande vitesse et récoltez les pièces !',
-        enabled: true,
-        isBuiltin: true,
-        customHtml: '',
-        leaderboard: []
-      },
-      {
-        id: 'g_rhythm_piano',
-        icon: '🎹',
-        title_en: 'City Rhythm Synth Piano',
-        title_fr: 'Piano Rythmique Néon',
-        desc_en: 'Tap glowing synth tiles on the beat for massive combos!',
-        desc_fr: 'Tapez les touches lumineuses en rythme pour enchaîner les combos !',
-        enabled: true,
-        isBuiltin: true,
-        customHtml: '',
-        leaderboard: []
-      }
-    ],
+    event2x: false,
+    totalRuns: 0,
+    leaderboard: [],
     updatedAt: 0
   };
 }
@@ -2426,20 +2354,17 @@ function upgradeEcosystemState(st) {
     });
   }
 
-  const defHub = getDefaultGamesHub();
-  if (!st.gamesHub || typeof st.gamesHub !== 'object') {
-    st.gamesHub = defHub;
+  const defOdyssey = getDefaultRemoOdyssey();
+  if (!st.remoOdyssey || typeof st.remoOdyssey !== 'object') {
+    st.remoOdyssey = defOdyssey;
   } else {
-    if (!Array.isArray(st.gamesHub.games) || st.gamesHub.games.length === 0) {
-      st.gamesHub.games = defHub.games;
-    } else {
-      defHub.games.forEach((dg) => {
-        if (!st.gamesHub.games.some((g) => g && g.id === dg.id)) {
-          st.gamesHub.games.push(dg);
-        }
-      });
-    }
-    if (!st.gamesHub.featuredGameId) st.gamesHub.featuredGameId = defHub.featuredGameId;
+    st.remoOdyssey.event2x = Boolean(st.remoOdyssey.event2x);
+    st.remoOdyssey.totalRuns = Number(st.remoOdyssey.totalRuns || 0);
+    if (!Array.isArray(st.remoOdyssey.leaderboard)) st.remoOdyssey.leaderboard = [];
+    st.remoOdyssey.updatedAt = Number(st.remoOdyssey.updatedAt || 0);
+  }
+  if (st.gamesHub) {
+    delete st.gamesHub;
   }
 
   const defSpot = getDefaultWorldSpotlight();
@@ -3823,24 +3748,22 @@ const REMO_STORE = {
     return { ok: true, isNewRecord, stoleCrown, prevHolderName, score };
   },
 
+  /* ── 🧭 OFFICIAL FLAGSHIP GAME: REMO ODYSSEY ── */
+  ensureRemoOdyssey() {
+    const def = getDefaultRemoOdyssey();
+    if (!this.state.remoOdyssey || typeof this.state.remoOdyssey !== 'object') {
+      this.state.remoOdyssey = def;
+    }
+    if (!Array.isArray(this.state.remoOdyssey.leaderboard)) {
+      this.state.remoOdyssey.leaderboard = [];
+    }
+    this.state.remoOdyssey.event2x = Boolean(this.state.remoOdyssey.event2x);
+    this.state.remoOdyssey.totalRuns = Number(this.state.remoOdyssey.totalRuns || 0);
+    return this.state.remoOdyssey;
+  },
+
   ensureGamesHub() {
-    const defHub = getDefaultGamesHub();
-    if (!this.state.gamesHub || typeof this.state.gamesHub !== 'object') {
-      this.state.gamesHub = defHub;
-    }
-    if (!Array.isArray(this.state.gamesHub.games) || !this.state.gamesHub.games.length) {
-      this.state.gamesHub.games = defHub.games;
-    } else {
-      defHub.games.forEach((dg) => {
-        if (!this.state.gamesHub.games.some((g) => g && g.id === dg.id)) {
-          this.state.gamesHub.games.push(dg);
-        }
-      });
-    }
-    if (!this.state.gamesHub.featuredGameId) {
-      this.state.gamesHub.featuredGameId = defHub.featuredGameId;
-    }
-    return this.state.gamesHub;
+    return { games: [], featuredGameId: '', updatedAt: 0 };
   },
 
   _mergeLeaderboardEntries(localArr = [], cloudArr = []) {
@@ -3854,140 +3777,156 @@ const REMO_STORE = {
           name: e.name || 'Citizen',
           cityId: e.cityId || 'montreal',
           score: Number(e.score || 0),
+          citiesCount: Number(e.citiesCount || 1),
+          kmFlown: Number(e.kmFlown || 0),
           ts: Number(e.ts || Date.now())
         });
       }
     });
-    return Array.from(map.values()).sort((a, b) => (b.score || 0) - (a.score || 0)).slice(0, 10);
+    return Array.from(map.values()).sort((a, b) => (b.score || 0) - (a.score || 0)).slice(0, 20);
   },
 
-  submitGamesHubScore(gameId, rawScore) {
-    const score = Math.floor(Number(rawScore || 0));
-    if (!gameId || !Number.isFinite(score) || score <= 0) return { ok: false };
+  submitRemoOdysseyRun(summary = {}) {
+    const score = Math.floor(Number(summary.score || 0));
+    if (!Number.isFinite(score) || score <= 0 || score > 50000000) return { ok: false };
     const u = this.getCurrentUser();
-    if (!u) return { ok: false, needAuth: true, score };
-    const hub = this.ensureGamesHub();
-    const game = hub.games.find((g) => g && g.id === gameId);
-    if (!game) return { ok: false };
+    const od = this.ensureRemoOdyssey();
+    const is2x = Boolean(od.event2x || (this.state.settings && this.state.settings.happyHour2x));
+    const startCityId = String(summary.startCityId || (u && u.homeCity) || 'montreal');
+    const citiesCount = Math.max(1, Math.min(24, Math.floor(Number(summary.citiesCount || 1))));
+    const kmFlown = Math.max(0, Math.min(250000, Math.floor(Number(summary.kmFlown || 0))));
+    const rawCoins = Math.max(0, Math.min(120, Math.floor(Number(summary.coinsEarned || 0))));
+    const rawWarPts = Math.max(5, Math.min(150, Math.floor(Number(summary.cityWarPoints || Math.round(score / 100)))));
 
-    if (!Array.isArray(game.leaderboard)) game.leaderboard = [];
-    const prevTop = game.leaderboard.length > 0 ? Number(game.leaderboard[0].score || 0) : 0;
-    const existing = game.leaderboard.find((e) => e && e.uid === u.uid);
+    if (!u) {
+      return {
+        ok: false,
+        needAuth: true,
+        score,
+        suggestedCoins: Math.max(10, rawCoins * (is2x ? 2 : 1)),
+        cityWarPoints: rawWarPts,
+        startCityId
+      };
+    }
+
+    const prevTop = od.leaderboard.length > 0 ? Number(od.leaderboard[0].score || 0) : 0;
+    const existing = od.leaderboard.find((e) => e && e.uid === u.uid);
     const prevPersonal = existing ? Number(existing.score || 0) : 0;
 
     if (score > prevPersonal) {
       if (existing) {
         existing.score = score;
         existing.name = u.name;
-        existing.cityId = u.homeCity || 'montreal';
+        existing.cityId = startCityId;
+        existing.citiesCount = citiesCount;
+        existing.kmFlown = kmFlown;
         existing.ts = Date.now();
       } else {
-        game.leaderboard.push({
+        od.leaderboard.push({
           uid: u.uid,
           name: u.name,
-          cityId: u.homeCity || 'montreal',
+          cityId: startCityId,
           score,
+          citiesCount,
+          kmFlown,
           ts: Date.now()
         });
       }
-      game.leaderboard.sort((a, b) => (b.score || 0) - (a.score || 0));
-      if (game.leaderboard.length > 10) game.leaderboard = game.leaderboard.slice(0, 10);
+      od.leaderboard.sort((a, b) => (b.score || 0) - (a.score || 0));
+      if (od.leaderboard.length > 20) od.leaderboard = od.leaderboard.slice(0, 20);
     }
 
     const isNewRecord = score > prevTop;
-    if (isNewRecord) this.addCoins(u.uid, 15, 15);
-
-    let dailyBonus = 0;
     const todayStr = new Date().toISOString().slice(0, 10);
-    const dailyKey = `remo_hub_daily_${u.uid}`;
-    const isFeatured2x = hub.featuredGameId === gameId;
-    if (typeof localStorage !== 'undefined' && localStorage.getItem(dailyKey) !== todayStr) {
-      localStorage.setItem(dailyKey, todayStr);
-      dailyBonus = isFeatured2x ? 20 : 10;
-      this.addCoins(u.uid, dailyBonus, dailyBonus);
+    const dailyCapKey = `remo_odyssey_coins_${u.uid}_${todayStr}`;
+    const dailyBonusKey = `remo_odyssey_daily_${u.uid}`;
+    let earnedToday = 0;
+    try {
+      earnedToday = Number(localStorage.getItem(dailyCapKey) || 0);
+    } catch (e) {}
+
+    const maxDailyCoins = is2x ? 500 : 250;
+    let baseGrant = Math.max(score >= 250 ? 5 : 0, rawCoins);
+    if (isNewRecord) baseGrant += 20;
+
+    let dailyFirstBonus = 0;
+    try {
+      if (localStorage.getItem(dailyBonusKey) !== todayStr) {
+        localStorage.setItem(dailyBonusKey, todayStr);
+        dailyFirstBonus = is2x ? 40 : 20;
+        baseGrant += dailyFirstBonus;
+      }
+    } catch (e) {}
+
+    // Double for Odyssey 2X Event when global happyHour2x is not already doubling addCoins
+    const happyOn = Boolean(this.state.settings && this.state.settings.happyHour2x);
+    if (od.event2x && !happyOn) {
+      baseGrant *= 2;
     }
 
-    hub.updatedAt = Date.now();
-    this.save(true, 'games_hub_score');
+    const remainingDaily = Math.max(0, maxDailyCoins - earnedToday);
+    const coinsToGrant = Math.min(remainingDaily, baseGrant);
+
+    if (coinsToGrant > 0) {
+      this.addCoins(u.uid, coinsToGrant, 0);
+      try {
+        localStorage.setItem(dailyCapKey, String(earnedToday + coinsToGrant));
+      } catch (e) {}
+    }
+
+    // Award City War points to the city the player defended in Odyssey
+    if (rawWarPts > 0) {
+      this.addCityScore(startCityId, rawWarPts);
+    }
+
+    od.totalRuns = Number(od.totalRuns || 0) + 1;
+    od.updatedAt = Date.now();
+    this.save(true, 'remo_odyssey_run');
+
     return {
       ok: true,
+      score,
       improved: score > prevPersonal,
       isNewRecord,
-      dailyBonus,
-      isFeatured2x,
-      best: Math.max(score, prevPersonal),
-      score
+      coinsGranted: coinsToGrant,
+      dailyFirstBonus,
+      cityWarPoints: rawWarPts,
+      startCityId,
+      is2x,
+      best: Math.max(score, prevPersonal)
     };
   },
 
-  adminAddCustomHubGame(opts = {}) {
+  adminToggleOdyssey2x(enabled) {
     if (!this.isAdminUnlocked() && !this.isCurrentUserAdmin()) {
       return { ok: false, error: 'admin_only' };
     }
-    const html = String(opts.customHtml || '').trim();
-    if (!html || html.length > 36000) {
-      return { ok: false, error: 'invalid_html' };
-    }
-    const hub = this.ensureGamesHub();
-    const id = 'g_custom_' + Date.now();
-    const titleEn = String(opts.title_en || 'Custom Arcade Game').trim();
-    const titleFr = String(opts.title_fr || titleEn).trim();
-    const game = {
-      id,
-      icon: String(opts.icon || '🎮').trim() || '🎮',
-      title_en: titleEn,
-      title_fr: titleFr,
-      desc_en: String(opts.desc_en || 'Exclusive Admin Arcade Challenge!').trim(),
-      desc_fr: String(opts.desc_fr || 'Défi Arcade Exclusif Admin !').trim(),
-      enabled: true,
-      isBuiltin: false,
-      customHtml: html,
-      leaderboard: []
-    };
-    hub.games.unshift(game);
-    hub.updatedAt = Date.now();
-    this.save(true, 'admin_hub_add');
-    return { ok: true, game };
+    const od = this.ensureRemoOdyssey();
+    od.event2x = Boolean(enabled);
+    od.updatedAt = Date.now();
+    this.save(true, 'admin_odyssey_2x');
+    return { ok: true, event2x: od.event2x };
   },
 
-  adminToggleHubGame(gameId, enabled) {
+  adminDeleteOdysseyEntry(uid) {
     if (!this.isAdminUnlocked() && !this.isCurrentUserAdmin()) {
       return { ok: false, error: 'admin_only' };
     }
-    const hub = this.ensureGamesHub();
-    const g = hub.games.find((x) => x && x.id === gameId);
-    if (!g) return { ok: false };
-    g.enabled = Boolean(enabled);
-    hub.updatedAt = Date.now();
-    this.save(true, 'admin_hub_toggle');
+    const od = this.ensureRemoOdyssey();
+    od.leaderboard = (od.leaderboard || []).filter((e) => e && e.uid !== uid);
+    od.updatedAt = Date.now();
+    this.save(true, 'admin_odyssey_del_entry');
     return { ok: true };
   },
 
-  adminSetFeatured2xHubGame(gameId) {
+  adminResetOdysseyLeaderboard() {
     if (!this.isAdminUnlocked() && !this.isCurrentUserAdmin()) {
       return { ok: false, error: 'admin_only' };
     }
-    const hub = this.ensureGamesHub();
-    if (!hub.games.some((x) => x && x.id === gameId)) return { ok: false };
-    hub.featuredGameId = gameId;
-    hub.updatedAt = Date.now();
-    this.save(true, 'admin_hub_feature');
-    return { ok: true };
-  },
-
-  adminDeleteHubGame(gameId) {
-    if (!this.isAdminUnlocked() && !this.isCurrentUserAdmin()) {
-      return { ok: false, error: 'admin_only' };
-    }
-    const hub = this.ensureGamesHub();
-    const target = hub.games.find((x) => x && x.id === gameId);
-    if (!target || target.isBuiltin) return { ok: false, error: 'cannot_delete_builtin' };
-    hub.games = hub.games.filter((x) => x && x.id !== gameId);
-    if (hub.featuredGameId === gameId) {
-      hub.featuredGameId = hub.games[0]?.id || 'g_gyro_coins';
-    }
-    hub.updatedAt = Date.now();
-    this.save(true, 'admin_hub_delete');
+    const od = this.ensureRemoOdyssey();
+    od.leaderboard = [];
+    od.updatedAt = Date.now();
+    this.save(true, 'admin_odyssey_reset');
     return { ok: true };
   },
 
@@ -5995,34 +5934,19 @@ const REMO_STORE = {
           if (typeof renderViralContestsView === 'function') renderViralContestsView();
           if (typeof renderFeedActiveContestsBanner === 'function') renderFeedActiveContestsBanner();
         }
-        if (data.gamesHub && typeof data.gamesHub === 'object') {
-          const localHub = this.ensureGamesHub();
-          const cHub = data.gamesHub;
-          const cGames = Array.isArray(cHub.games) ? cHub.games : [];
-          const localMap = new Map(localHub.games.map((g) => [g.id, g]));
-          const cloudUpdated = Number(cHub.updatedAt || 0);
-          const localUpdated = Number(localHub.updatedAt || 0);
-          const mergedGames = [];
-          const seen = new Set();
-
-          const baseOrder = cloudUpdated >= localUpdated ? cGames : localHub.games;
-          const altOrder = cloudUpdated >= localUpdated ? localHub.games : cGames;
-          [...baseOrder, ...altOrder].forEach((g) => {
-            if (!g || !g.id || seen.has(g.id)) return;
-            seen.add(g.id);
-            const lg = localMap.get(g.id);
-            const cg = cGames.find((x) => x && x.id === g.id);
-            const base = (cloudUpdated >= localUpdated && cg) ? cg : (lg || cg);
-            mergedGames.push(Object.assign({}, base, {
-              leaderboard: this._mergeLeaderboardEntries(lg?.leaderboard, cg?.leaderboard)
-            }));
-          });
-          localHub.games = mergedGames;
-          if (cloudUpdated >= localUpdated && cHub.featuredGameId) {
-            localHub.featuredGameId = cHub.featuredGameId;
+        if (data.remoOdyssey && typeof data.remoOdyssey === 'object') {
+          const localOd = this.ensureRemoOdyssey();
+          const cOd = data.remoOdyssey;
+          const cloudUpdated = Number(cOd.updatedAt || 0);
+          const localUpdated = Number(localOd.updatedAt || 0);
+          localOd.leaderboard = this._mergeLeaderboardEntries(localOd.leaderboard, cOd.leaderboard);
+          localOd.totalRuns = Math.max(Number(localOd.totalRuns || 0), Number(cOd.totalRuns || 0));
+          if (cloudUpdated >= localUpdated) {
+            localOd.event2x = Boolean(cOd.event2x);
+            localOd.updatedAt = cloudUpdated;
           }
-          localHub.updatedAt = Math.max(cloudUpdated, localUpdated);
-          if (typeof renderGamesHubContent === 'function') renderGamesHubContent();
+          if (typeof renderAdminOdysseyPanel === 'function') renderAdminOdysseyPanel();
+          if (typeof syncRemoOdysseyBadges === 'function') syncRemoOdysseyBadges();
         }
         if (data.worldSpotlight && typeof data.worldSpotlight === 'object') {
           const localWs = this.ensureWorldSpotlight();
@@ -6074,7 +5998,7 @@ const REMO_STORE = {
             customCities: typeof getCustomRemoCitiesPatch === 'function' ? getCustomRemoCitiesPatch() : [],
             viralContests: this.state.viralContests || getDefaultViralContests(),
             worldSystems: this.state.worldSystems || getDefaultUniqueWorldSystems(),
-            gamesHub: this.ensureGamesHub(),
+            remoOdyssey: this.ensureRemoOdyssey(),
             worldSpotlight: this.ensureWorldSpotlight(),
             deletedPostIds: [...(this.deletedPostIds || [])].slice(-100),
             deletedUserIds: [...(this.deletedUserIds || [])].slice(-100),
@@ -8859,12 +8783,6 @@ const REMO_STORE = {
           .filter(Boolean)
           .slice(0, 25);
         const isAdm = this.isCurrentUserAdmin();
-        const safeGamesHub = JSON.parse(JSON.stringify(this.ensureGamesHub()));
-        if (!isAdm && safeGamesHub && Array.isArray(safeGamesHub.games)) {
-          safeGamesHub.games.forEach((g) => {
-            if (g && !g.isBuiltin && g.customHtml) delete g.customHtml;
-          });
-        }
         const payloadDoc = {
           cityScores: this.state.cityScores || {},
           cityMayors: this.state.cityMayors || {},
@@ -8886,7 +8804,7 @@ const REMO_STORE = {
             .slice(0, 15),
           viralContests: this.state.viralContests || getDefaultViralContests(),
           worldSystems: this.state.worldSystems || getDefaultUniqueWorldSystems(),
-          gamesHub: safeGamesHub,
+          remoOdyssey: this.ensureRemoOdyssey(),
           worldSpotlight: this.ensureWorldSpotlight(),
           deletedPostIds: [...(this.deletedPostIds || [])].slice(-100),
           updatedAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -8957,6 +8875,7 @@ let _remoIndexNowInFlight = false;
 
 function getRemoIndexNowUrls() {
   const coreSlugs = [
+    'odyssey.html',
     'focus-tv.html',
     'study-room.html',
     'world-blitz.html',
