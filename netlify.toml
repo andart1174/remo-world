@@ -17,3 +17,11 @@
 [[edge_functions]]
   path = "/fr/index.html"
   function = "og-post"
+
+[[edge_functions]]
+  path = "/odyssey.html"
+  function = "og-post"
+
+[[edge_functions]]
+  path = "/fr/odyssey.html"
+  function = "og-post"

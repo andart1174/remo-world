@@ -12,6 +12,7 @@ import {
   decodeBlitzVsToken,
   buildPostOgMeta,
   buildBlitzOgMeta,
+  buildOdysseyOgMeta,
   buildStudyRoomOgMeta,
   sanitizeRecipientName,
   escapeHtmlAttr
@@ -80,12 +81,18 @@ export default async (request, context) => {
   const roomId = (url.searchParams.get('room') || '').trim();
   const openTarget = (url.searchParams.get('open') || '').trim().toLowerCase();
   const vsToken = (url.searchParams.get('vs') || '').trim();
+  const targetScore = Number(url.searchParams.get('target') || 0);
+  const isOdysseyPath = url.pathname === '/odyssey.html' || url.pathname === '/fr/odyssey.html';
 
   const wantsPost = isValidPostId(postId);
   const wantsRoom = !wantsPost && isValidRoomId(roomId);
-  const wantsBlitz = !wantsPost && !wantsRoom && (openTarget === 'blitz' || openTarget === 'worldblitz' || Boolean(decodeBlitzVsToken(vsToken)));
+  const wantsOdyssey = !wantsPost && !wantsRoom && (
+    openTarget === 'odyssey' ||
+    (isOdysseyPath && Boolean(vsToken) && targetScore > 0)
+  );
+  const wantsBlitz = !wantsPost && !wantsRoom && !wantsOdyssey && (openTarget === 'blitz' || openTarget === 'worldblitz' || Boolean(decodeBlitzVsToken(vsToken)));
 
-  if (!wantsPost && !wantsRoom && !wantsBlitz) {
+  if (!wantsPost && !wantsRoom && !wantsOdyssey && !wantsBlitz) {
     return context.next();
   }
 
@@ -115,6 +122,14 @@ export default async (request, context) => {
       durMin: url.searchParams.get('rd'),
       fx: url.searchParams.get('fx') || '',
       roomDoc
+    }, lang);
+  } else if (wantsOdyssey) {
+    originRes = await context.next();
+    meta = buildOdysseyOgMeta({
+      vs: vsToken,
+      target: targetScore,
+      start: (url.searchParams.get('start') || url.searchParams.get('city') || '').trim().toLowerCase(),
+      seed: (url.searchParams.get('seed') || '').trim()
     }, lang);
   } else if (wantsBlitz) {
     originRes = await context.next();

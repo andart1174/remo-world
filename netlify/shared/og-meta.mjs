@@ -278,6 +278,52 @@ export function buildBlitzOgMeta(vsData, vsToken = '', lang = 'en') {
   };
 }
 
+export function buildOdysseyOgMeta(opts = {}, lang = 'en') {
+  const isFr = lang === 'fr';
+  const vs = sanitizeRecipientName(opts.vs || '').slice(0, 22);
+  const target = Math.floor(Number(opts.target || 0));
+  const startId = String(opts.start || '').trim().toLowerCase();
+  const city = startId && REMO_CITIES_META[startId] ? REMO_CITIES_META[startId] : null;
+  const cityName = city ? getCityDisplayName(city, isFr ? 'fr' : 'en') : '';
+  const hasDuel = Boolean(vs && target > 0);
+  const ogImage = `${REMO_ORIGIN}/img/remo_odyssey_og_cover.jpg`;
+  const basePath = isFr ? '/fr/odyssey.html' : '/odyssey.html';
+  const qs = new URLSearchParams();
+  if (opts.seed) qs.set('seed', String(opts.seed).slice(0, 40));
+  if (city) qs.set('start', city.id);
+  if (target > 0) qs.set('target', String(target));
+  if (vs) qs.set('vs', vs);
+  const canonicalUrl = qs.toString() ? `${REMO_ORIGIN}${basePath}?${qs.toString()}` : `${REMO_ORIGIN}${basePath}`;
+
+  let title = isFr
+    ? '🧭 REMO ODYSSEY — Jeu Officiel 4D & Duels 1v1 des 24 Villes | REMO World'
+    : '🧭 REMO ODYSSEY — Official 4D World Game & 1v1 City Duels | REMO World';
+  let description = isFr
+    ? 'Courez et surfez en Hover-Coin 4B à travers 24 vraies villes avec météo en direct, 56 radios FM, boss élémentaires et duels Fantôme 1v1. Gratuit PC & Mobile !'
+    : 'Sprint & Hover-Coin surf across 24 real world cities with live weather surges, 56 city FM radios, elemental bosses & 1v1 Ghost duels. Free on PC & Mobile!';
+
+  if (hasDuel) {
+    const scoreStr = target.toLocaleString(isFr ? 'fr-FR' : 'en-US');
+    const locSuffix = city ? ` (${city.flag} ${cityName})` : '';
+    title = isFr
+      ? `⚔️ Bats le score de ${scoreStr} PTS de @${vs} dans REMO ODYSSEY${locSuffix} !`
+      : `⚔️ Beat @${vs}'s ${scoreStr} PTS in REMO ODYSSEY${locSuffix}!`;
+    description = isFr
+      ? `@${vs} te défie en duel 1v1 sur le même tracé REMO ODYSSEY ! Affronte son Fantôme en direct, vole la Couronne de Ville et joue gratuitement sur PC & Mobile.`
+      : `@${vs} challenged you to a 1v1 REMO ODYSSEY Ghost Duel! Race their live Ghost on the exact same city seed, steal the City King Crown & play free now.`;
+  }
+
+  return {
+    canonicalUrl,
+    ogImage,
+    imageWidth: '1200',
+    imageHeight: '630',
+    title,
+    description,
+    imageAlt: title
+  };
+}
+
 export function buildStudyRoomOgMeta(opts = {}, lang = 'en') {
   const isFr = lang === 'fr';
   const cleanRoom = String(opts.roomId || '').trim().replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 48);
