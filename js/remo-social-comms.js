@@ -15133,6 +15133,7 @@ function openRemoOdysseyModal(opts = {}) {
   const qs = new URLSearchParams();
   qs.set('embed', '1');
   qs.set('lang', lang);
+  qs.set('v', '147');
   if (opts && opts.seed) qs.set('seed', String(opts.seed));
   if (opts && opts.start) qs.set('start', String(opts.start));
   if (opts && Number(opts.target) > 0) qs.set('target', String(Math.floor(Number(opts.target))));

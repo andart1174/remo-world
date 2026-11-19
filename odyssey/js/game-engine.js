@@ -4,7 +4,7 @@
    - Fire & Lightning Combat + Elemental Counters (2X CRIT) + 5 Boss Variants
    - 4D Ascended Crystal Orbit + 4D Phase Blink (Q) + Chrono-Rift 3X Gravity
    - Dual Portals, Ghost Racer, Daily Wordle Odyssey, Vault Shop & 4D Passport
-   - Skyline Neon Equalizer synced to Procedural Elemental Synthwave + WebM Clip
+   - Skyline Neon Equalizer synced to Procedural Elemental Synthwave & Live City FM
    ═══════════════════════════════════════════════════════════════════════════ */
 
 (function (global) {
@@ -149,8 +149,6 @@
       changeCityBtn: '🏠 MAIN MENU',
       shareCardBtn: '📲 9:16 STORY CARD',
       copyDuelBtn: '⚔️ 1v1 DUEL LINK',
-      saveClipBtn: '🎬 SAVE HIGHLIGHT CLIP',
-      clipUnavailable: '🎬 CLIP SAVING...',
       copyDailyBtn: '📋 COPY DAILY SCORE',
       duelCopied: '🔗 Copied to clipboard!',
       downloadBtn: '⬇️ DOWNLOAD 9:16 PNG',
@@ -264,8 +262,6 @@
       changeCityBtn: '🏠 MENU PRINCIPAL',
       shareCardBtn: '📲 CARTE STORY 9:16',
       copyDuelBtn: '⚔️ LIEN DUEL 1v1',
-      saveClipBtn: '🎬 CLIP VIDÉO 10s',
-      clipUnavailable: '🎬 ENREGISTREMENT...',
       copyDailyBtn: '📋 COPIER SCORE DU JOUR',
       duelCopied: '🔗 Copié dans le presse-papiers !',
       downloadBtn: '⬇️ TÉLÉCHARGER PNG 9:16',
@@ -509,11 +505,6 @@
     ghostNextSampleT: 0,
     activeGhostTrack: null,
 
-    // 10s Highlight Clip Recorder
-    mediaRecorder: null,
-    clipChunks: [],
-    lastClipBlob: null,
-
     hero: {
       x: 195,
       y: GROUND_Y,
@@ -556,42 +547,6 @@
   };
 
   let canvas, ctx, rafId = null, lastTs = 0;
-
-  /* ── Highlight Clip Recorder (Valid Playable WebM per Segment) ── */
-  function rotateHighlightRecorder() {
-    stopHighlightRecorder(true);
-    if (!canvas || typeof canvas.captureStream !== 'function' || typeof global.MediaRecorder !== 'function') return;
-    try {
-      const stream = canvas.captureStream(24);
-      const mime = MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
-        ? 'video/webm;codecs=vp9'
-        : 'video/webm';
-      const rec = new MediaRecorder(stream, { mimeType: mime });
-      state.clipChunks = [];
-      rec.ondataavailable = (ev) => {
-        if (ev.data && ev.data.size > 0) state.clipChunks.push(ev.data);
-      };
-      rec.onstop = () => {
-        if (state.clipChunks.length > 0) {
-          state.lastClipBlob = new Blob(state.clipChunks, { type: 'video/webm' });
-        }
-      };
-      rec.start(250);
-      state.mediaRecorder = rec;
-    } catch (e) {
-      state.mediaRecorder = null;
-    }
-  }
-
-  function stopHighlightRecorder(discardPrevious = false) {
-    if (discardPrevious) state.lastClipBlob = null;
-    if (state.mediaRecorder) {
-      try {
-        if (state.mediaRecorder.state !== 'inactive') state.mediaRecorder.stop();
-      } catch (e) {}
-      state.mediaRecorder = null;
-    }
-  }
 
   /* ── V6 REMO Ecosystem: Live Weather, Local Clock, City FM, Blitz Gate & Host Bridge ── */
   function getTorchCityId() {
@@ -1016,7 +971,6 @@
     } else {
       REMO_SFX.startPulse(getAudioContextState);
     }
-    rotateHighlightRecorder();
   }
 
   /* ── Player Controls & Active Combat ── */
@@ -1499,7 +1453,6 @@
     emitParticles(state.hero.x, state.hero.y - 35, '#38bdf8', 24, 240);
 
     showToast(tr('portalToast', { code: state.nextCity.code, km: state.legKm.toLocaleString() }), '#38bdf8', 2.6);
-    rotateHighlightRecorder();
   }
 
   function startCompassLockLanding() {
@@ -1639,7 +1592,6 @@
     }
     REMO_SFX.stopPulse();
     stopCityFm();
-    stopHighlightRecorder(false);
     state.phase = 'gameover';
 
     const isDaily = state.gameMode === 'daily';
@@ -3345,7 +3297,6 @@
     set('btnBackMenu', tr('changeCityBtn'));
     set('btnOpenShareCard', tr('shareCardBtn'));
     set('btnCopyDuelLink', tr('copyDuelBtn'));
-    set('btnDownloadClip', tr('saveClipBtn'));
     set('btnCopyDailyWordle', tr('copyDailyBtn'));
     const isLoggedHost = Boolean(state.hostContext && state.hostContext.isGuest === false);
     set('btnDropFeedChallenge', tr(isLoggedHost ? 'dropFeedBtnLoggedIn' : 'dropFeedBtn'));
@@ -3562,11 +3513,6 @@
       }
     }
 
-    const clipBtn = document.getElementById('btnDownloadClip');
-    if (clipBtn) {
-      clipBtn.disabled = !(canvas && typeof canvas.captureStream === 'function' && typeof global.MediaRecorder === 'function');
-    }
-
     renderLocalProgressBoard();
   }
 
@@ -3631,27 +3577,6 @@
   function copyDailyWordle() {
     if (!state.lastSummary) return;
     copyTextWithFallback(buildWordleDailyText(state.lastSummary));
-  }
-
-  function downloadHighlightClip() {
-    if (!state.lastClipBlob) {
-      setTimeout(() => {
-        if (state.lastClipBlob) triggerClipDownload(state.lastClipBlob);
-      }, 280);
-      return;
-    }
-    triggerClipDownload(state.lastClipBlob);
-  }
-
-  function triggerClipDownload(blob) {
-    try {
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `REMO-Odyssey-Highlight-${state.lastSummary ? state.lastSummary.score : 'clip'}.webm`;
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(url), 4000);
-    } catch (e) {}
   }
 
   function loop(ts) {
@@ -3760,7 +3685,6 @@
       } else if (e.data.type === 'REMO_ODYSSEY_PAUSE') {
         REMO_SFX.stopPulse();
         stopCityFm();
-        stopHighlightRecorder(true);
         if (state.phase === 'run' || state.phase === 'fly') {
           state.phaseBeforePause = state.phase;
           state.phase = 'paused';
@@ -3843,7 +3767,6 @@
     document.getElementById('btnQuitToMenu')?.addEventListener('click', () => {
       REMO_SFX.stopPulse();
       stopCityFm();
-      stopHighlightRecorder(true);
       state.phase = 'menu';
       syncOverlays();
       applyFullLanguageRefresh();
@@ -3852,7 +3775,6 @@
     document.getElementById('btnOpenShareCard')?.addEventListener('click', openShareCardModal);
     document.getElementById('btnCopyDuelLink')?.addEventListener('click', copyDuelLink);
     document.getElementById('btnCopyDailyWordle')?.addEventListener('click', copyDailyWordle);
-    document.getElementById('btnDownloadClip')?.addEventListener('click', downloadHighlightClip);
     document.getElementById('btnDropFeedChallenge')?.addEventListener('click', dropChallengeToRemoWorld);
     document.getElementById('btnCloseShareModal')?.addEventListener('click', () => {
       document.getElementById('shareCardModal')?.classList.remove('open');
