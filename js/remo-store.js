@@ -3200,19 +3200,26 @@ const REMO_STORE = {
   redeemReferralCode(claimerUid, rawCode) {
     if (!claimerUid || !rawCode) return { ok: false, reason: 'empty' };
     const clean = String(rawCode).trim().toUpperCase();
-    const claimer = (this.state.users || []).find((u) => u.uid === claimerUid);
+    const claimer = (this.state.users || []).find((u) => u && u.uid === claimerUid);
     if (!claimer) return { ok: false, reason: 'no_user' };
+    if (this.isFakeOrGuestUser(claimer)) {
+      try { localStorage.setItem('remo_pending_ref', clean); } catch (e) {}
+      return { ok: false, reason: 'pending_auth' };
+    }
     if (claimer.referredBy) return { ok: false, reason: 'already_claimed' };
 
     const inviter = (this.state.users || []).find((u) =>
-      (u.referralCode && u.referralCode.toUpperCase() === clean) ||
-      (`PASS${u.passportNum}` === clean) ||
-      (`REMO-${u.passportNum}` === clean)
+      u && !this.isFakeOrGuestUser(u) && (
+        (u.referralCode && u.referralCode.toUpperCase() === clean) ||
+        (`PASS${u.passportNum}` === clean) ||
+        (`REMO-${u.passportNum}` === clean)
+      )
     );
     if (!inviter) return { ok: false, reason: 'invalid' };
     if (inviter.uid === claimer.uid) return { ok: false, reason: 'self' };
 
     const bonus = (this.state.settings.rewards && this.state.settings.rewards.referralBonus) || 100;
+    const warBonusPts = 150;
     claimer.referredBy = inviter.referralCode || `REMO-${inviter.passportNum}`;
     claimer.coins = (claimer.coins || 0) + bonus;
     claimer.lifetimeCoins = (claimer.lifetimeCoins || 0) + bonus;
@@ -3220,19 +3227,30 @@ const REMO_STORE = {
     inviter.referralsCount = (inviter.referralsCount || 0) + 1;
     inviter.coins = (inviter.coins || 0) + bonus;
     inviter.lifetimeCoins = (inviter.lifetimeCoins || 0) + bonus;
+    if (inviter.homeCity) {
+      this.addCityScore(inviter.homeCity, warBonusPts);
+    }
 
     this.state.directMessages = this.state.directMessages || [];
-    this.state.directMessages.push({
+    const dmObj = {
       id: 'dm_ref_' + Date.now(),
       fromUid: inviter.uid,
       fromName: `🤝 @${inviter.name}`,
       toUid: claimer.uid,
-      text: `🎉 Referral Bonus Activated! Both @${inviter.name} and @${claimer.name} earned +${bonus} 🪙 REMO Coins!`,
+      text: `🎉 Referral Bonus Activated! Both @${inviter.name} and @${claimer.name} earned +${bonus} 🪙 REMO Coins & +${warBonusPts} City War PTS!`,
       ts: Date.now()
-    });
+    };
+    this.state.directMessages.push(dmObj);
+    if (typeof this.syncUserToCloud === 'function') {
+      this.syncUserToCloud(claimer);
+      this.syncUserToCloud(inviter);
+    }
+    if (typeof this.syncDmToCloud === 'function') {
+      this.syncDmToCloud(dmObj);
+    }
     RemoAudio.play('fanfare');
-    this.save(true, 'referral_claimed', { inviter: inviter.name, claimer: claimer.name, bonus });
-    return { ok: true, inviter, claimer, bonus };
+    this.save(true, 'referral_claimed', { inviter: inviter.name, claimer: claimer.name, bonus, warBonusPts });
+    return { ok: true, inviter, claimer, bonus, warBonusPts };
   },
 
   ensureGuestOrCitizen(name, email, homeCity = 'montreal', isAdmin = false, fbUid = '') {
@@ -3353,8 +3371,18 @@ const REMO_STORE = {
       if (!cleanEmail && !fbUid) {
         return null;
       }
-      const realUsersCount = (this.state.users || []).filter((x) => !this.isFakeOrGuestUser(x)).length;
-      const pNum = String(realUsersCount + 1).padStart(4, '0');
+      const usedPassports = new Set(
+        (this.state.users || []).map((x) => x && String(x.passportNum || '').trim()).filter(Boolean)
+      );
+      const usedRefs = new Set(
+        (this.state.users || []).map((x) => x && String(x.referralCode || '').trim().toUpperCase()).filter(Boolean)
+      );
+      let nextIdx = (this.state.users || []).filter((x) => !this.isFakeOrGuestUser(x)).length + 1;
+      let pNum = String(nextIdx).padStart(4, '0');
+      while (usedPassports.has(pNum) || usedRefs.has(`REMO-${pNum}`)) {
+        nextIdx += 1;
+        pNum = String(nextIdx).padStart(4, '0');
+      }
       const bonus = this.state.settings?.rewards?.signupBonus || 150;
       const finalEmail = cleanEmail || (fbUid ? `user_${fbUid.slice(0, 8)}@gmail.com` : '');
 

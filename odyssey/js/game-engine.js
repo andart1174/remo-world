@@ -190,6 +190,7 @@
       torchJackpotToast: '🔥 4D TORCH RELAY CITY! 3X JACKPOT!',
       cardChampToast: '👑 CARD CHAMPION BUFF (+15% SCORE)!',
       cityWarBanner: '⚔️ +{pts} CITY WAR POWER ADDED FOR {city}!',
+      saveGlobalGuestBtn: '🏆 SAVE {score} PTS TO WORLD TOP 20 (+150 🪙)',
       dropFeedBtn: '🌐 DROP CHALLENGE & CLAIM +150 🪙 ON REMO WORLD',
       dropFeedBtnLoggedIn: '📣 POST 1v1 CHALLENGE TO REMO FEED (+15 🪙)',
       feedChallengeDropped: '🚀 Challenge sent to REMO World Feed!',
@@ -333,6 +334,7 @@
       torchJackpotToast: '🔥 VILLE FLAMME 4D ! JACKPOT 3X !',
       cardChampToast: '👑 BONUS CHAMPION CARTE 4D (+15% SCORE) !',
       cityWarBanner: '⚔️ +{pts} PUISSANCE DE GUERRE POUR {city} !',
+      saveGlobalGuestBtn: '🏆 SAUVER {score} PTS AU TOP 20 MONDIAL (+150 🪙)',
       dropFeedBtn: '🌐 PUBLIER LE DÉFI & RÉCLAMER +150 🪙 SUR REMO WORLD',
       dropFeedBtnLoggedIn: '📣 PUBLIER CE DÉFI DANS LE FIL REMO (+15 🪙)',
       feedChallengeDropped: '🚀 Défi publié sur le Fil REMO World !',
@@ -1122,6 +1124,21 @@
     if (state.phase === 'gameover' && state.lastSummary) {
       renderGameOverCityRivalry(state.lastSummary);
     }
+  }
+
+  function claimGuestGlobalScore() {
+    if (!state.lastSummary || Number(state.lastSummary.score || 0) <= 0) return;
+    const posted = postToHost({
+      type: 'REMO_ODYSSEY_CLAIM_GUEST_SCORE',
+      summary: state.lastSummary
+    });
+    if (posted) return;
+    try {
+      localStorage.setItem('remo_pending_odyssey_claim_v1', JSON.stringify(state.lastSummary));
+    } catch (e) {}
+    const s = state.lastSummary;
+    const target = `https://remoworld.com/?claim_odyssey=1&lang=${encodeURIComponent(state.lang || 'en')}&seed=${encodeURIComponent(s.seed || 'REMO2026')}&start=${encodeURIComponent(s.startCityId || 'montreal')}&target=${encodeURIComponent(s.score)}&cities=${encodeURIComponent(s.citiesCount || 1)}&km=${encodeURIComponent(s.kmFlown || 0)}&coins=${encodeURIComponent(s.coinsEarned || 15)}&war=${encodeURIComponent(s.cityWarPoints || 20)}`;
+    if (typeof global.location !== 'undefined') global.location.href = target;
   }
 
   function dropChallengeToRemoWorld() {
@@ -3935,6 +3952,7 @@
     set('btnCopyDailyWordle', tr('copyDailyBtn'));
     const isLoggedHost = Boolean(state.hostContext && state.hostContext.isGuest === false);
     set('btnDropFeedChallenge', tr(isLoggedHost ? 'dropFeedBtnLoggedIn' : 'dropFeedBtn'));
+    syncOverGuestCta(state.lastSummary);
 
     const duelBox = document.getElementById('menuDuelBanner');
     if (duelBox) {
@@ -4224,6 +4242,18 @@
     return `${header}\n${line2}\n${blocks} (${codes})\nhttps://remoworld.com/odyssey.html`;
   }
 
+  function syncOverGuestCta(summary) {
+    const saveGuestBtn = document.getElementById('btnSaveGuestGlobal');
+    if (!saveGuestBtn) return;
+    const isLoggedHost = Boolean(state.hostContext && state.hostContext.isGuest === false);
+    if (!isLoggedHost && summary && Number(summary.score || 0) > 0) {
+      saveGuestBtn.style.display = 'block';
+      saveGuestBtn.textContent = tr('saveGlobalGuestBtn', { score: Number(summary.score || 0).toLocaleString() });
+    } else {
+      saveGuestBtn.style.display = 'none';
+    }
+  }
+
   function renderGameOverModal(summary) {
     const set = (id, txt) => {
       const el = document.getElementById(id);
@@ -4273,6 +4303,7 @@
     }
     const isLoggedHost = Boolean(state.hostContext && state.hostContext.isGuest === false);
     set('btnDropFeedChallenge', tr(isLoggedHost ? 'dropFeedBtnLoggedIn' : 'dropFeedBtn'));
+    syncOverGuestCta(state.lastSummary);
 
     renderGameOverCityRivalry(summary);
     renderGameOverMissions(summary);
@@ -4591,6 +4622,7 @@
     document.getElementById('btnOpenShareCard')?.addEventListener('click', openShareCardModal);
     document.getElementById('btnCopyDuelLink')?.addEventListener('click', copyDuelLink);
     document.getElementById('btnCopyDailyWordle')?.addEventListener('click', copyDailyWordle);
+    document.getElementById('btnSaveGuestGlobal')?.addEventListener('click', claimGuestGlobalScore);
     document.getElementById('btnDropFeedChallenge')?.addEventListener('click', dropChallengeToRemoWorld);
     document.getElementById('btnCloseShareModal')?.addEventListener('click', () => {
       document.getElementById('shareCardModal')?.classList.remove('open');

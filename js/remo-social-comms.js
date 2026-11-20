@@ -10768,17 +10768,20 @@ document.addEventListener('DOMContentLoaded', () => {
   if (params.get('ref')) {
     const refCode = params.get('ref').trim().toUpperCase();
     const curU = REMO_STORE.getCurrentUser();
-    if (curU && !curU.referredBy) {
+    if (curU && !REMO_STORE.isFakeOrGuestUser(curU) && !curU.referredBy) {
       const r = REMO_STORE.redeemReferralCode(curU.uid, refCode);
       if (r.ok) {
         spawnRemoCoinsFX(12);
         syncHeaderAndSidebars();
         remoToast(`🎉 +${r.bonus} 🪙 Referral Bonus claimed with @${r.inviter.name}!`, 'fanfare');
       }
-    } else if (!curU) {
+    } else if (!curU || REMO_STORE.isFakeOrGuestUser(curU)) {
       localStorage.setItem('remo_pending_ref', refCode);
-      remoToast(`🎁 Invite Code ${refCode} ready! Sign In to claim +100 🪙!`, 'fanfare');
-      openAuthModal();
+      const hasDirectActivity = Boolean(openTarget || tvCity || tvRoom || params.get('claim_odyssey') === '1');
+      if (!hasDirectActivity && localStorage.getItem('remo_vip_invite_claimed') === '1') {
+        remoToast(`🎁 Invite Code ${refCode} ready! Sign In to claim +100 🪙!`, 'fanfare');
+        openAuthModal();
+      }
     }
   }
 
@@ -10984,6 +10987,7 @@ window.addEventListener('remo:stateupdate', (ev) => {
   if (reason === 'auth') {
     if (typeof flushPendingGuestGameScore === 'function') flushPendingGuestGameScore();
     if (typeof flushPendingGuestV59Rewards === 'function') flushPendingGuestV59Rewards();
+    if (typeof flushPendingOdysseyScoreClaim === 'function') flushPendingOdysseyScoreClaim();
   }
   if (window._pendingProfileDeepLink && typeof openCitizenProfileModal === 'function') {
     const opened = openCitizenProfileModal(window._pendingProfileDeepLink, '', true);
@@ -15048,6 +15052,79 @@ window.flushPendingGuestGameScore = flushPendingGuestGameScore;
 let _odysseyModalOpen = false;
 let _odysseyOwnedRadio = false;
 let _pendingOdysseyChallenge = null;
+let _pendingOdysseyScoreClaim = null;
+const ODYSSEY_PENDING_CLAIM_KEY = 'remo_pending_odyssey_claim_v1';
+
+function stagePendingOdysseyClaim(summary) {
+  if (!summary || !Number(summary.score || 0)) return;
+  const payload = {
+    score: Math.floor(Number(summary.score || 0)),
+    startCityId: String(summary.startCityId || 'montreal'),
+    citiesCount: Math.max(1, Math.min(24, Math.floor(Number(summary.citiesCount || 1)))),
+    kmFlown: Math.max(0, Math.min(250000, Math.floor(Number(summary.kmFlown || 0)))),
+    coinsEarned: Math.max(0, Math.min(120, Math.floor(Number(summary.coinsEarned || 0)))),
+    cityWarPoints: Math.max(5, Math.min(150, Math.floor(Number(summary.cityWarPoints || 20)))),
+    seed: String(summary.seed || 'REMO2026'),
+    routeIds: Array.isArray(summary.routeIds) ? summary.routeIds.slice(0, 8) : [],
+    playerName: String(summary.playerName || 'Citizen'),
+    ts: Number(summary.ts || Date.now())
+  };
+  _pendingOdysseyScoreClaim = payload;
+  try {
+    localStorage.setItem(ODYSSEY_PENDING_CLAIM_KEY, JSON.stringify(payload));
+  } catch (e) {}
+}
+window.stagePendingOdysseyClaim = stagePendingOdysseyClaim;
+
+function readPendingOdysseyClaim() {
+  if (_pendingOdysseyScoreClaim && Number(_pendingOdysseyScoreClaim.score || 0) > 0) {
+    return _pendingOdysseyScoreClaim;
+  }
+  try {
+    const raw = localStorage.getItem(ODYSSEY_PENDING_CLAIM_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || !Number(parsed.score || 0) || parsed.score > 50000000) return null;
+    if (parsed.ts && Date.now() - Number(parsed.ts) > 7200000) {
+      localStorage.removeItem(ODYSSEY_PENDING_CLAIM_KEY);
+      return null;
+    }
+    return parsed;
+  } catch (e) {
+    return null;
+  }
+}
+
+function clearPendingOdysseyClaim() {
+  _pendingOdysseyScoreClaim = null;
+  try { localStorage.removeItem(ODYSSEY_PENDING_CLAIM_KEY); } catch (e) {}
+}
+
+function flushPendingOdysseyScoreClaim() {
+  const u = typeof REMO_STORE !== 'undefined' && REMO_STORE.getCurrentUser ? REMO_STORE.getCurrentUser() : null;
+  if (!u || (typeof REMO_STORE.isFakeOrGuestUser === 'function' && REMO_STORE.isFakeOrGuestUser(u))) return false;
+  const pending = readPendingOdysseyClaim();
+  if (!pending) return false;
+  clearPendingOdysseyClaim();
+  const res = REMO_STORE.submitRemoOdysseyRun(pending);
+  if (res && res.ok) {
+    syncHeaderAndSidebars();
+    sendRemoOdysseyHostContext();
+    if (typeof spawnRemoCoinsFX === 'function') spawnRemoCoinsFX(16);
+    if (typeof RemoAudio !== 'undefined' && RemoAudio.play) RemoAudio.play('fanfare');
+    remoToast(
+      t('odyssey_claim_saved_toast', {
+        score: Number(res.score || pending.score).toLocaleString(),
+        coins: Number(res.coinsGranted || 0),
+        war: Number(res.cityWarPoints || 0)
+      }),
+      'fanfare'
+    );
+    return true;
+  }
+  return false;
+}
+window.flushPendingOdysseyScoreClaim = flushPendingOdysseyScoreClaim;
 
 function syncRemoOdysseyBadges() {
   if (typeof REMO_STORE === 'undefined' || typeof REMO_STORE.ensureRemoOdyssey !== 'function') return;
@@ -15180,7 +15257,7 @@ function openRemoOdysseyModal(opts = {}) {
   const qs = new URLSearchParams();
   qs.set('embed', '1');
   qs.set('lang', lang);
-  qs.set('v', '148');
+  qs.set('v', '151');
   if (opts && opts.seed) qs.set('seed', String(opts.seed));
   if (opts && opts.start) qs.set('start', String(opts.start));
   if (opts && Number(opts.target) > 0) qs.set('target', String(Math.floor(Number(opts.target))));
@@ -15249,6 +15326,7 @@ function publishRemoOdysseyFeedChallenge(summary) {
   const u = REMO_STORE.getCurrentUser();
   if (!u) {
     _pendingOdysseyChallenge = summary;
+    stagePendingOdysseyClaim(summary);
     remoToast(
       isFr
         ? `🧭 Créez votre Passeport en 1 clic (+150 🪙) pour publier votre défi de ${Number(summary.score).toLocaleString()} pts !`
@@ -15374,9 +15452,29 @@ window.addEventListener('message', (ev) => {
           war: res.cityWarPoints
         }), 'coin');
       }
-    } else if (res && res.needAuth && res.score >= 250) {
-      remoToast(t('odyssey_guest_toast', { score: res.score.toLocaleString() }), 'fanfare');
+    } else if (res && res.needAuth && res.score > 0) {
+      stagePendingOdysseyClaim(summary);
+      if (res.score >= 250) {
+        remoToast(t('odyssey_guest_toast', { score: res.score.toLocaleString() }), 'fanfare');
+      }
     }
+    return;
+  }
+
+  if (d.type === 'REMO_ODYSSEY_CLAIM_GUEST_SCORE') {
+    const summary = d.summary || d;
+    stagePendingOdysseyClaim(summary);
+    const u = REMO_STORE.getCurrentUser();
+    if (u && !(typeof REMO_STORE.isFakeOrGuestUser === 'function' && REMO_STORE.isFakeOrGuestUser(u))) {
+      flushPendingOdysseyScoreClaim();
+      return;
+    }
+    closeRemoOdysseyModal();
+    remoToast(
+      t('odyssey_claim_prompt_toast', { score: Number((summary && summary.score) || 0).toLocaleString() }),
+      'fanfare'
+    );
+    openAuthModal();
     return;
   }
 
@@ -20392,11 +20490,14 @@ function claimVipInviteWelcomePack() {
   }
 
   const alreadyClaimed = localStorage.getItem('remo_vip_invite_claimed') === '1';
+  let referralResult = null;
   if (!alreadyClaimed) {
     localStorage.setItem('remo_vip_invite_claimed', '1');
     REMO_STORE.addCoins(u.uid, 150, 50);
     if (_detectedVipInviteCode && typeof REMO_STORE.redeemReferralCode === 'function') {
-      try { REMO_STORE.redeemReferralCode(_detectedVipInviteCode); } catch (e) {}
+      try {
+        referralResult = REMO_STORE.redeemReferralCode(u.uid, _detectedVipInviteCode);
+      } catch (e) {}
     }
   } else {
     REMO_STORE.addCoins(u.uid, 25, 15);
@@ -20412,12 +20513,21 @@ function claimVipInviteWelcomePack() {
 
   const cityObj = getCityById(chosenCityId);
   const cityName = getCityName(cityObj, lang);
-  remoToast(
-    isFr
-      ? `🎉 Pack VIP Réclamé ! +150 🪙 dans votre coffre & +50 PTS pour ${cityObj.flag} ${cityName} !`
-      : `🎉 VIP Pack Claimed! +150 🪙 added to your vault & +50 PTS for ${cityObj.flag} ${cityName}!`,
-    'fanfare'
-  );
+  if (referralResult && referralResult.ok) {
+    remoToast(
+      isFr
+        ? `🎉 Pack VIP (+150 🪙) + Bonus Parrainage @${referralResult.inviter.name} (+${referralResult.bonus} 🪙 & +${referralResult.warBonusPts || 150} PTS Ville) activés !`
+        : `🎉 VIP Pack (+150 🪙) + Referral Bonus with @${referralResult.inviter.name} (+${referralResult.bonus} 🪙 & +${referralResult.warBonusPts || 150} City PTS) activated!`,
+      'fanfare'
+    );
+  } else {
+    remoToast(
+      isFr
+        ? `🎉 Pack VIP Réclamé ! +150 🪙 dans votre coffre & +50 PTS pour ${cityObj.flag} ${cityName} !`
+        : `🎉 VIP Pack Claimed! +150 🪙 added to your vault & +50 PTS for ${cityObj.flag} ${cityName}!`,
+      'fanfare'
+    );
+  }
 }
 window.claimVipInviteWelcomePack = claimVipInviteWelcomePack;
 
@@ -21306,7 +21416,34 @@ if (typeof window !== 'undefined') {
       syncRemoOdysseyBadges();
       const params = new URLSearchParams(window.location.search);
       const openParam = params.get('open');
-      if (openParam === 'odyssey' || openParam === 'games') {
+      if (params.get('claim_odyssey') === '1') {
+        const scoreParam = Number(params.get('target') || 0);
+        if (scoreParam > 0 && !readPendingOdysseyClaim()) {
+          stagePendingOdysseyClaim({
+            score: scoreParam,
+            startCityId: params.get('start') || 'montreal',
+            citiesCount: Number(params.get('cities') || 1),
+            kmFlown: Number(params.get('km') || 0),
+            coinsEarned: Number(params.get('coins') || 15),
+            cityWarPoints: Number(params.get('war') || Math.round(scoreParam / 100)),
+            seed: params.get('seed') || 'REMO2026',
+            ts: Date.now()
+          });
+        }
+        setTimeout(() => {
+          const curU = REMO_STORE.getCurrentUser();
+          if (curU && !REMO_STORE.isFakeOrGuestUser(curU)) {
+            flushPendingOdysseyScoreClaim();
+          } else {
+            const pClaim = readPendingOdysseyClaim();
+            remoToast(
+              t('odyssey_claim_prompt_toast', { score: Number((pClaim && pClaim.score) || scoreParam || 0).toLocaleString() }),
+              'fanfare'
+            );
+            openAuthModal();
+          }
+        }, 420);
+      } else if (openParam === 'odyssey' || openParam === 'games') {
         setTimeout(() => {
           openRemoOdysseyModal({
             seed: params.get('seed') || '',

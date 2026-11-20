@@ -495,6 +495,58 @@ export function renderStudyRoomOgPngBuffer(opts = {}, lang = 'en') {
   return encodeRgbaToPng(buf, OG_W, OG_H);
 }
 
+export function renderOdysseyOgPngBuffer(opts = {}, lang = 'en') {
+  const atlas = getOgFontAtlas();
+  const buf = Buffer.allocUnsafe(OG_W * OG_H * 4);
+  const isFr = lang === 'fr';
+  const city = getCityMeta(opts.start || 'montreal');
+  const cityName = getCityDisplayName(city, isFr ? 'fr' : 'en').toUpperCase();
+  const target = Math.max(0, Math.floor(Number(opts.target || 0)));
+  const cleanVs = sanitizeTextForAtlas(
+    String(opts.vs || 'CITIZEN').replace(/^@+/, '').toUpperCase(),
+    atlas.md
+  ) || 'CITIZEN';
+  const cityRgb = hexToRgb(city.themeColor || '#38bdf8', [56, 189, 248]);
+
+  fillGradientRect(buf, OG_W, OG_H, 0, 0, OG_W, OG_H, '#050816', '#0f172a', '#1e1b4b');
+  blendRadialGlow(buf, OG_W, OG_H, 260, 170, 520, cityRgb, 0.30);
+  blendRadialGlow(buf, OG_W, OG_H, 940, 450, 460, [251, 191, 36], 0.24);
+
+  // Dynamic 4D cyber horizon grid & glass frame
+  drawRoundedBox(buf, OG_W, OG_H, 36, 30, OG_W - 72, OG_H - 60, 32, [255, 255, 255, 0.03], [251, 191, 36, 0.45], 2.5);
+  drawPill(buf, OG_W, OG_H, atlas.sm, 'REMO ODYSSEY 4D', 80, 84, [15, 23, 42, 0.72], [253, 224, 71]);
+  drawPill(buf, OG_W, OG_H, atlas.sm, isFr ? 'DUEL 1V1 FANTOME' : '1V1 GHOST DUEL', 0, 84, [139, 92, 246, 0.28], [196, 181, 253], OG_W - 80);
+
+  if (target > 0) {
+    const headline = isFr
+      ? `@${truncateClean(cleanVs, 18)} TE DEFIE !`
+      : `@${truncateClean(cleanVs, 18)} CHALLENGES YOU!`;
+    drawAtlasText(buf, OG_W, OG_H, headline, OG_W / 2, 148, atlas.md, [125, 211, 252], 'center', 0.45);
+
+    // Highlighted score medallion box
+    drawRoundedBox(buf, OG_W, OG_H, 220, 218, OG_W - 440, 142, 28, [15, 23, 42, 0.84], [251, 191, 36, 0.85], 3);
+    const scoreStr = target.toLocaleString('en-US') + ' PTS';
+    drawAtlasText(buf, OG_W, OG_H, scoreStr, OG_W / 2, 258, atlas.lg, [253, 224, 71], 'center', 0.55);
+
+    const routeTxt = isFr
+      ? `VILLE : ${truncateClean(cityName, 18)}  •  24 VILLES EN DIRECT`
+      : `CITY: ${truncateClean(cityName, 18)}  •  24 LIVE CITIES`;
+    drawAtlasText(buf, OG_W, OG_H, routeTxt, OG_W / 2, 392, atlas.sm, [226, 232, 240], 'center', 0.36);
+
+    const ctaTxt = isFr
+      ? 'BATS MON SCORE SUR LE MEME TRACE • JEU GRATUIT'
+      : 'BEAT THIS SCORE ON THE SAME SEED • FREE PLAY';
+    drawAtlasText(buf, OG_W, OG_H, ctaTxt, OG_W / 2, 448, atlas.sm, [110, 231, 183], 'center', 0.35);
+  } else {
+    drawAtlasText(buf, OG_W, OG_H, 'REMO ODYSSEY', OG_W / 2, 200, atlas.lg, [255, 255, 255], 'center', 0.55);
+    drawAtlasText(buf, OG_W, OG_H, isFr ? '24 VILLES • METEO LIVE • DUELS 1V1' : '24 CITIES • LIVE WEATHER • 1V1 DUELS', OG_W / 2, 308, atlas.md, [253, 224, 71], 'center', 0.42);
+  }
+
+  drawAtlasText(buf, OG_W, OG_H, isFr ? 'PC & MOBILE SANS TELECHARGEMENT' : 'PC & MOBILE • NO DOWNLOAD', 84, 528, atlas.sm, [203, 213, 225], 'left', 0.3);
+  drawAtlasText(buf, OG_W, OG_H, 'REMOWORLD.COM', OG_W - 84, 528, atlas.sm, [56, 189, 248], 'right', 0.3);
+  return encodeRgbaToPng(buf, OG_W, OG_H);
+}
+
 export function renderPostOgPngBuffer(post, lang = 'en', nowMs = Date.now(), recipientOverride = '') {
   const atlas = getOgFontAtlas();
   const buf = Buffer.allocUnsafe(OG_W * OG_H * 4);
@@ -668,6 +720,24 @@ export const handler = async (event, _context, deps = {}) => {
   if (mode === 'blitz') {
     const vsData = decodeBlitzVsToken(params.vs || '');
     const pngBuf = renderBlitzOgPngBuffer(vsData, lang);
+    return {
+      statusCode: 200,
+      headers: {
+        'Content-Type': 'image/png',
+        'Cache-Control': 'public, max-age=300, s-maxage=900',
+        'Access-Control-Allow-Origin': '*'
+      },
+      body: pngBuf.toString('base64'),
+      isBase64Encoded: true
+    };
+  }
+
+  if (mode === 'odyssey') {
+    const pngBuf = renderOdysseyOgPngBuffer({
+      vs: params.vs || '',
+      target: params.target || 0,
+      start: params.start || 'montreal'
+    }, lang);
     return {
       statusCode: 200,
       headers: {

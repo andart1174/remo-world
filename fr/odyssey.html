@@ -114,7 +114,7 @@
       var iframeQs = new URLSearchParams();
       iframeQs.set('embed', '1');
       iframeQs.set('lang', 'fr');
-      iframeQs.set('v', '148');
+      iframeQs.set('v', '151');
       ['seed', 'start', 'target', 'vs', 'mode'].forEach(function (k) {
         var v = params.get(k);
         if (v) iframeQs.set(k, v);
@@ -136,11 +136,34 @@
       window.addEventListener('message', function (ev) {
         var d = ev && ev.data;
         if (!d || typeof d !== 'object') return;
+        if (d.type === 'REMO_ODYSSEY_RUN_COMPLETE' && d.summary) {
+          try { localStorage.setItem('remo_pending_odyssey_claim_v1', JSON.stringify(d.summary)); } catch (e) {}
+          return;
+        }
+        if (d.type === 'REMO_ODYSSEY_CLAIM_GUEST_SCORE' && d.summary) {
+          var sc = d.summary;
+          try { localStorage.setItem('remo_pending_odyssey_claim_v1', JSON.stringify(sc)); } catch (e) {}
+          var claimQs = new URLSearchParams({
+            lang: 'fr',
+            claim_odyssey: '1',
+            seed: sc.seed || 'REMO2026',
+            start: sc.startCityId || 'montreal',
+            target: String(sc.score || 0),
+            cities: String(sc.citiesCount || 1),
+            km: String(sc.kmFlown || 0),
+            coins: String(sc.coinsEarned || 15),
+            war: String(sc.cityWarPoints || 20)
+          });
+          window.location.href = '../?' + claimQs.toString();
+          return;
+        }
         if (d.type === 'REMO_ODYSSEY_DROP_FEED_CHALLENGE' && d.summary) {
           var s = d.summary;
+          try { localStorage.setItem('remo_pending_odyssey_claim_v1', JSON.stringify(s)); } catch (e) {}
           var targetQs = new URLSearchParams({
             lang: 'fr',
             open: 'odyssey',
+            claim_odyssey: '1',
             seed: s.seed || 'REMO2026',
             start: s.startCityId || 'chisinau',
             target: String(s.score || 0),

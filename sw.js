@@ -3,7 +3,7 @@
    Offline Shell Caching + Native Push & Incoming Call Notifications
    ════════════════════════════════════════════════════════════════════ */
 
-const CACHE_NAME = 'remo-pwa-v150';
+const CACHE_NAME = 'remo-pwa-v151';
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -17,12 +17,12 @@ const CORE_ASSETS = [
   './img/favicon-64x64.png',
   './img/remo_coin_front.png',
   './img/remo_coin_back_base.png',
-  './js/remo-i18n.js?v=146',
+  './js/remo-i18n.js?v=151',
   './js/remo-cities-data.js?v=145',
-  './js/remo-store.js?v=150',
+  './js/remo-store.js?v=151',
   './js/remo-card-engine.js?v=145',
   './js/remo-radar-arena.js?v=145',
-  './js/remo-social-comms.js?v=148',
+  './js/remo-social-comms.js?v=151',
   './js/remo-radio-engine.js?v=145',
   './js/remo-focus-tv.js?v=145',
   './js/remo-world-blitz.js?v=145'

@@ -286,7 +286,9 @@ export function buildOdysseyOgMeta(opts = {}, lang = 'en') {
   const city = startId && REMO_CITIES_META[startId] ? REMO_CITIES_META[startId] : null;
   const cityName = city ? getCityDisplayName(city, isFr ? 'fr' : 'en') : '';
   const hasDuel = Boolean(vs && target > 0);
-  const ogImage = `${REMO_ORIGIN}/img/remo_odyssey_og_cover.jpg`;
+  const ogImage = hasDuel
+    ? `${REMO_ORIGIN}/.netlify/functions/og-image?mode=odyssey&vs=${encodeURIComponent(vs)}&target=${target}${city ? '&start=' + encodeURIComponent(city.id) : ''}${isFr ? '&lang=fr' : ''}`
+    : `${REMO_ORIGIN}/img/remo_odyssey_og_cover.jpg`;
   const basePath = isFr ? '/fr/odyssey.html' : '/odyssey.html';
   const qs = new URLSearchParams();
   if (opts.seed) qs.set('seed', String(opts.seed).slice(0, 40));
