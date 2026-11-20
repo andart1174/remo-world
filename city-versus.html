@@ -159,6 +159,10 @@
           <a class="btn-primary" href="index.html?lang=en&amp;from=city_versus">🗳️ Vote in Live City Duels (+10 🪙)</a>
           <a class="btn-sec" href="cities/index.html">🌍 Explore All 24 Cities</a>
         </div>
+        <div id="seoWeeklyCupStrip" style="margin-top:16px;padding:10px 14px;border-radius:12px;background:rgba(251,191,36,0.12);border:1px solid rgba(251,191,36,0.4);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;font-size:0.84rem;">
+          <span style="color:#fde047;font-weight:800;">⏳ Weekly City Cup Round ends Sunday 23:59 UTC · #1 City wins 👑 Crown Week + 500 🪙 pool</span>
+          <strong id="seoWeeklyCupClock" style="font-family:monospace;font-size:0.95rem;color:#fff;">--d --h --m --s</strong>
+        </div>
       </section>
 
       <!-- Interactive Live City vs City Comparator -->
@@ -312,6 +316,7 @@
         <a href="cities/index.html">24 World Cities</a>
         <a href="world-radio.html">56 Live Radios</a>
         <a href="world-ranking.html">World Ranking</a>
+        <a href="ambassadors.html">City Ambassadors</a>
         <a href="terms.html">Terms</a>
         <a href="privacy.html">Privacy &amp; GDPR</a>
         <a href="index.html?contact=1">Contact &amp; Support</a>
@@ -386,6 +391,16 @@
     }
 
     updateComparison();
+    (function tickCup(){
+      const el = document.getElementById('seoWeeklyCupClock');
+      if (!el) return;
+      const now = Date.now(), d = new Date(now);
+      let endMs = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + ((7 - d.getUTCDay()) % 7), 23, 59, 59, 999);
+      if (endMs <= now) endMs += 7 * 86400000;
+      const sec = Math.max(0, Math.floor((endMs - now) / 1000));
+      el.textContent = `⏱️ ${Math.floor(sec/86400)}d ${String(Math.floor((sec%86400)/3600)).padStart(2,'0')}h ${String(Math.floor((sec%3600)/60)).padStart(2,'0')}m ${String(sec%60).padStart(2,'0')}s`;
+      setTimeout(tickCup, 1000);
+    })();
   </script>
 </body>
 </html>

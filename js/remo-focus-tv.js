@@ -69,6 +69,7 @@
     _lastSelfMsgId: '',
     _joinedRoomTs: 0,
     zenMode: false,
+    obsMode: false,
     zenIntervalId: null,
     lightningAlpha: 0,
     lightningCooldown: 0,
@@ -339,6 +340,12 @@
             <button type="button" class="ftv-hud-btn ftv-zen-btn" id="ftvZenBtn" onclick="toggleFocusTvZenMode()" data-i18n="ftv_zen_btn">
               🕰️ Zen
             </button>
+            <button type="button" class="ftv-hud-btn ftv-obs-btn" id="ftvObsBtn" onclick="toggleFocusTvObsMode()" data-i18n="ftv_obs_btn" title="OBS Browser Source Mode">
+              🎥 OBS
+            </button>
+            <button type="button" class="ftv-hud-btn ftv-obs-copy-btn" id="ftvObsCopyBtn" onclick="copyFocusTvObsUrl()" data-i18n-title="ftv_obs_copy_btn" title="Copy OBS Browser Source URL">
+              🔗 OBS
+            </button>
             <button type="button" class="ftv-hud-btn ftv-share-btn" onclick="shareFocusTvVibe()" data-i18n="ftv_share_vibe">
               📲 Share Vibe
             </button>
@@ -363,6 +370,10 @@
         <button type="button" class="ftv-zen-exit-pill" id="ftvZenExitPill" onclick="toggleFocusTvZenMode(false)" data-i18n="ftv_zen_exit">
           ✨ Show Controls (Esc)
         </button>
+        <div class="ftv-obs-watermark" id="ftvObsWatermark" onclick="toggleFocusTvObsMode(false)" title="remoworld.com/study-room">
+          <span class="ftv-obs-live-dot"></span>
+          <span>REMO 4D · <span data-i18n="ftv_obs_wm">remoworld.com/study-room</span></span>
+        </div>
 
         <!-- BOTTOM CONTROL DECK -->
         <div class="ftv-bottom-dock">
@@ -1982,6 +1993,10 @@
         const rm = String(Math.floor(state.pomodoroRemainingSec / 60)).padStart(2, '0');
         const rs = String(state.pomodoroRemainingSec % 60).padStart(2, '0');
         extraRoom = `  ·  👥 #${state.room.id} · ⏱️ ${rm}:${rs}`;
+      } else if (state.pomodoroActive) {
+        const rm = String(Math.floor(state.pomodoroRemainingSec / 60)).padStart(2, '0');
+        const rs = String(state.pomodoroRemainingSec % 60).padStart(2, '0');
+        extraRoom = `  ·  ⏱️ ${rm}:${rs}`;
       }
       _setTextIfChanged(metaEl, `${wx.icon || '🌤️'} ${wx.tempC ?? 20}°C  ·  ${stName}${extraRoom}`);
     }
@@ -2036,6 +2051,13 @@
 
   window.toggleFocusTvZenMode = function (forceVal) {
     state.zenMode = typeof forceVal === 'boolean' ? forceVal : !state.zenMode;
+    if (state.zenMode && state.obsMode) {
+      state.obsMode = false;
+      const ovObs = document.getElementById('remoFocusTvOverlay');
+      const obsBtn = document.getElementById('ftvObsBtn');
+      if (ovObs) ovObs.classList.remove('ftv-obs-mode');
+      if (obsBtn) obsBtn.classList.remove('active');
+    }
     const overlay = document.getElementById('remoFocusTvOverlay');
     const zenBtn = document.getElementById('ftvZenBtn');
     if (overlay) overlay.classList.toggle('ftv-zen-mode', state.zenMode);
@@ -2043,7 +2065,7 @@
 
     clearInterval(state.zenIntervalId);
     state.zenIntervalId = null;
-    if (state.zenMode) {
+    if (state.zenMode || state.obsMode) {
       state.fxPopoverOpen = false;
       state.roomPopoverOpen = false;
       state.chatPopoverOpen = false;
@@ -2053,9 +2075,72 @@
       _syncChatPopoverUI();
       _updateZenClockDisplay();
       state.zenIntervalId = setInterval(() => {
-        if (state.isOpen && state.zenMode) _updateZenClockDisplay();
+        if (state.isOpen && (state.zenMode || state.obsMode)) _updateZenClockDisplay();
       }, 1000);
     }
+  };
+
+  window.toggleFocusTvObsMode = function (forceVal, silent) {
+    const nextObs = typeof forceVal === 'boolean' ? forceVal : !state.obsMode;
+    state.obsMode = nextObs;
+    if (state.obsMode && state.zenMode) {
+      state.zenMode = false;
+      const ovZen = document.getElementById('remoFocusTvOverlay');
+      const zenBtn = document.getElementById('ftvZenBtn');
+      if (ovZen) ovZen.classList.remove('ftv-zen-mode');
+      if (zenBtn) zenBtn.classList.remove('active');
+    }
+    const overlay = document.getElementById('remoFocusTvOverlay');
+    const obsBtn = document.getElementById('ftvObsBtn');
+    if (overlay) overlay.classList.toggle('ftv-obs-mode', state.obsMode);
+    if (obsBtn) obsBtn.classList.toggle('active', state.obsMode);
+
+    clearInterval(state.zenIntervalId);
+    state.zenIntervalId = null;
+    if (state.obsMode || state.zenMode) {
+      state.fxPopoverOpen = false;
+      state.roomPopoverOpen = false;
+      state.chatPopoverOpen = false;
+      _hideChatPeekToast();
+      _syncAmbientButtons();
+      _syncRoomPopoverUI();
+      _syncChatPopoverUI();
+      _updateZenClockDisplay();
+      state.zenIntervalId = setInterval(() => {
+        if (state.isOpen && (state.zenMode || state.obsMode)) _updateZenClockDisplay();
+      }, 1000);
+      if (state.obsMode && !silent && typeof window.remoToast === 'function') {
+        window.remoToast(_t('ftv_obs_on_toast'), 'info');
+      }
+    }
+  };
+
+  function _buildObsShareUrl() {
+    const base = _buildVibeShareUrl();
+    return base + (base.includes('?') ? '&' : '?') + 'obs=1';
+  }
+  window.getFocusTvObsShareUrl = _buildObsShareUrl;
+
+  window.copyFocusTvObsUrl = async function () {
+    const obsUrl = _buildObsShareUrl();
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(obsUrl);
+      } else {
+        const ta = document.createElement('textarea');
+        ta.value = obsUrl;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
+    } catch (e) {}
+    if (typeof window.remoToast === 'function') {
+      window.remoToast(_t('ftv_obs_copied_toast'), 'fanfare');
+    }
+    return obsUrl;
   };
 
   function syncFocusTvUI() {
@@ -2480,7 +2565,12 @@
     state._lastSeenChatMsgId = '';
     state._lastSelfMsgId = '';
     _hideChatPeekToast();
-    window.toggleFocusTvZenMode(Boolean(opts.zen));
+    if (opts.obs) {
+      window.toggleFocusTvObsMode(true, true);
+    } else {
+      window.toggleFocusTvObsMode(false, true);
+      window.toggleFocusTvZenMode(Boolean(opts.zen));
+    }
     _renderCitySelectors();
     if (opts.room) {
       _joinFocusRoom(opts.room, opts.roomStartSec, opts.roomDurMin);
@@ -2509,6 +2599,7 @@
     _hideChatPeekToast();
     _syncChatPopoverUI();
     window.toggleFocusTvZenMode(false);
+    window.toggleFocusTvObsMode(false, true);
     if (overlay) overlay.classList.remove('open');
     document.body.classList.remove('ftv-active');
 
@@ -2528,7 +2619,9 @@
 
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && state.isOpen) {
-      if (state.zenMode) {
+      if (state.obsMode) {
+        window.toggleFocusTvObsMode(false);
+      } else if (state.zenMode) {
         window.toggleFocusTvZenMode(false);
       } else if (state.chatPopoverOpen || state.roomPopoverOpen || state.fxPopoverOpen) {
         state.chatPopoverOpen = false;

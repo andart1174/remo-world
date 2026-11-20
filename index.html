@@ -122,14 +122,14 @@
   <link rel="preconnect" href="https://firebasestorage.googleapis.com" crossorigin>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="preload" as="style" href="css/remo-core.css?v=146">
+  <link rel="preload" as="style" href="css/remo-core.css?v=152">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800;900&family=Orbitron:wght@700;900&display=swap" media="print" onload="this.media='all'">
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800;900&family=Orbitron:wght@700;900&display=swap"></noscript>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha384-sHL9NAb7lN7rfvG5lfHpm643Xkcjzp4jFvuavGOndn6pjVqS6ny56CAt3nsEVT4H" crossorigin="anonymous" media="print" onload="this.media='all'">
   <noscript><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha384-sHL9NAb7lN7rfvG5lfHpm643Xkcjzp4jFvuavGOndn6pjVqS6ny56CAt3nsEVT4H" crossorigin="anonymous"></noscript>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha384-cxOPjt7s7Iz04uaHJceBmS+qpjv2JkIHNVcuOrM+YHwZOmJGBXI00mdUXEq65HTH" crossorigin="anonymous" defer></script>
 
-  <link rel="stylesheet" href="css/remo-core.css?v=146">
+  <link rel="stylesheet" href="css/remo-core.css?v=152">
 </head>
 <body>
 
@@ -218,6 +218,22 @@
       <b id="worldChestAlertTitle" style="color:#fde047;font-size:0.82rem;font-family:'Orbitron',sans-serif;">WORLD TREASURE DROP!</b>
       <div id="worldChestAlertText" style="color:#cbd5e1;font-size:0.75rem;">A secret chest landed! Tap to hunt on Radar ➔</div>
     </div>
+  </div>
+
+  <!-- 📱 PWA App Install Banner (Chromium native + iOS Safari guide) -->
+  <div id="remoPwaInstallBanner" class="remo-pwa-banner" style="display:none;">
+    <div class="remo-pwa-banner-info">
+      <span style="font-size:1.25rem;flex-shrink:0;">📱</span>
+      <div style="min-width:0;">
+        <div style="font-weight:900;font-size:0.84rem;color:#f8fafc;" data-i18n="pwa_install_title">Install REMO World App</div>
+        <div class="remo-pwa-banner-sub" style="font-size:0.74rem;color:#bae6fd;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" data-i18n="pwa_install_sub">1-tap Focus TV, 56 Radios, REMO Odyssey &amp; live City Alerts.</div>
+      </div>
+    </div>
+    <div class="remo-pwa-banner-actions">
+      <button type="button" class="btn-cyber" style="padding:6px 12px;font-size:0.76rem;white-space:nowrap;" onclick="triggerRemoPwaInstall()" data-i18n="pwa_install_btn">📱 Install App</button>
+      <button type="button" class="fomo-close-btn" onclick="dismissRemoPwaBanner(event)" title="Dismiss">✕</button>
+    </div>
+  </div>
   </div>
 
   <!-- 🖥️ Desktop 3-Column Cyber Dashboard / 📱 Mobile Full-Screen Stage -->
@@ -438,7 +454,8 @@
       <!-- 3. CITY WARS & 3D CARD PVP BATTLE ARENA -->
       <div class="remo-view" id="view-arena">
         <div class="glass-box" style="margin-bottom:16px;">
-          <h2 style="font-family:'Orbitron',sans-serif;font-size:1.18rem;margin-bottom:14px;" data-i18n="arena_title">⚔️ City Wars &amp; 3D Card PvP Battle Arena</h2>
+          <h2 style="font-family:'Orbitron',sans-serif;font-size:1.18rem;margin-bottom:10px;" data-i18n="arena_title">⚔️ City Wars &amp; 3D Card PvP Battle Arena</h2>
+          <div id="weeklyCupCountdownArena" class="weekly-cup-bar"></div>
           <div id="arenaWarsList"></div>
         </div>
 
@@ -767,7 +784,8 @@
         <!-- Tab 1: World City Cup & Live Wars -->
         <div class="right-tab-pane active" id="rightPaneCup">
           <div style="font-family:'Orbitron',sans-serif;font-weight:900;font-size:0.84rem;color:#fbbf24;margin-bottom:4px;" data-i18n="cup_title">🏆 World City Cup</div>
-          <div style="font-size:0.7rem;color:var(--muted);margin-bottom:8px;" data-i18n="cup_subtitle"></div>
+          <div style="font-size:0.7rem;color:var(--muted);margin-bottom:6px;" data-i18n="cup_subtitle"></div>
+          <div id="weeklyCupRightRailBadge" class="weekly-cup-pill-compact"></div>
           <div id="rightCityCupList"></div>
           <div style="margin-top:10px;padding-top:9px;border-top:1px solid rgba(255,255,255,0.08);">
             <div style="font-weight:900;font-size:0.8rem;color:#f43f5e;margin-bottom:6px;" data-i18n="arena_tab_wars">🏙️ Live City Wars</div>
@@ -818,6 +836,7 @@
       <a href="cities/index.html">24 Cities</a>
       <a href="world-ranking.html">2026 Ranking</a>
       <a href="city-versus.html">City Duels</a>
+      <a href="ambassadors.html" data-i18n="nav_ambassadors">🤝 Ambassadors</a>
       <a href="fr/" hreflang="fr">Version Française</a>
       <a href="privacy.html">Privacy</a>
       <a href="terms.html">Terms</a>
@@ -2841,6 +2860,14 @@
           <span class="app-tile-ic">🌍</span>
           <span class="app-tile-lbl" data-i18n="apps_add_city_short">+ Add City (+75 🪙)</span>
         </button>
+        <a class="app-tile cyan" href="ambassadors.html" onclick="closeAppLauncherModal()">
+          <span class="app-tile-ic">🤝</span>
+          <span class="app-tile-lbl" data-i18n="apps_ambassador_program">City Ambassadors</span>
+        </a>
+        <button type="button" class="app-tile emerald" id="appLauncherInstallTile" onclick="closeAppLauncherModal();triggerRemoPwaInstall()">
+          <span class="app-tile-ic">📱</span>
+          <span class="app-tile-lbl" data-i18n="apps_install_short">Install App (PWA)</span>
+        </button>
         <button type="button" class="app-tile" id="appLauncherAdminPromoTile" style="display:none;border-color:#38bdf8;" onclick="closeAppLauncherModal();openViralPromoStudioModal()">
           <span class="app-tile-ic">📣</span>
           <span class="app-tile-lbl" data-i18n="nav_promo_studio">Viral Promo Studio</span>
@@ -2967,14 +2994,14 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js" integrity="sha384-oFrOL1TiREYNET0lsYF3LjQuyi2gL7vhjH1X8vFr+umcmzAdPELopeSgbcrv4uRm" crossorigin="anonymous"></script>
 
   <!-- REMO Modular Engines -->
-  <script src="js/remo-i18n.js?v=151"></script>
+  <script src="js/remo-i18n.js?v=152"></script>
   <script src="js/remo-cities-data.js?v=145"></script>
   <script src="js/remo-store.js?v=151"></script>
   <script src="js/remo-card-engine.js?v=145"></script>
   <script src="js/remo-radar-arena.js?v=145"></script>
-  <script src="js/remo-social-comms.js?v=151"></script>
+  <script src="js/remo-social-comms.js?v=152"></script>
   <script src="js/remo-radio-engine.js?v=145"></script>
-  <script src="js/remo-focus-tv.js?v=145"></script>
+  <script src="js/remo-focus-tv.js?v=152"></script>
   <script src="js/remo-world-blitz.js?v=145"></script>
 
   <noscript>

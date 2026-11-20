@@ -119,6 +119,7 @@ footer{margin-top:34px;padding-top:20px;border-top:1px solid rgba(255,255,255,0.
         <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
           <a id="srLaunchBtn" class="btn-primary" href="../?tv=tokyo&fx=rain&room=focus-crew&lang=fr&from=seo">👥 Lancer la Salle Synchronisée</a>
           <button type="button" id="srCopyBtn" class="btn-sec" onclick="copyRoomLink()">📋 Copier le Lien d’Invitation</button>
+          <button type="button" id="srObsCopyBtn" class="btn-sec" style="border-color:rgba(248,113,113,0.5);color:#fecaca;" onclick="copyObsRoomLink()">🎥 Copier Lien Source OBS</button>
           <span id="srPreview" style="font-family:monospace;font-size:0.8rem;color:#a7f3d0;"></span>
         </div>
       </section>
@@ -224,6 +225,7 @@ footer{margin-top:34px;padding-top:20px;border-top:1px solid rgba(255,255,255,0.
       <a href="../fr/boarding-pass.html">Billet 4D</a>
       <a href="../fr/world-ranking.html">Classement 2026</a>
       <a href="../fr/city-versus.html">Duels Villes</a>
+      <a href="../fr/ambassadors.html">Ambassadeurs Villes</a>
       <a href="../llms.txt">AI / LLMs</a>
       <a href="../sitemap.xml">Sitemap</a>
     </div>
@@ -248,6 +250,12 @@ footer{margin-top:34px;padding-top:20px;border-top:1px solid rgba(255,255,255,0.
       var rel = getRoomRel().replace(/^\.\.\//, '').replace(/^\.\//, '');
       if(navigator.clipboard) navigator.clipboard.writeText('https://remoworld.com/' + rel);
       document.getElementById('srCopyBtn').textContent = '✓ ' + ("Invitation Copiée !");
+    };
+    window.copyObsRoomLink = function(){
+      var rel = getRoomRel().replace(/^\.\.\//, '').replace(/^\.\//, '') + '&obs=1';
+      if(navigator.clipboard) navigator.clipboard.writeText('https://remoworld.com/' + rel);
+      var btn = document.getElementById('srObsCopyBtn');
+      if(btn) btn.textContent = '✓ Lien OBS Copié ! (1920x1080)';
     };
     window.copyPresetRoom = function(query, btn){
       if(navigator.clipboard) navigator.clipboard.writeText('https://remoworld.com/' + query);

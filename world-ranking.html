@@ -196,6 +196,10 @@
         <a href="city-versus.html" class="btn-sec">⚔️ Compare 2 Cities Head-to-Head</a>
         <a href="index.html" class="btn-sec">🛂 Claim Free 4D Citizen Passport (+100 🪙)</a>
       </div>
+      <div id="seoWeeklyCupStrip" style="margin-top:16px;padding:10px 14px;border-radius:12px;background:rgba(251,191,36,0.12);border:1px solid rgba(251,191,36,0.4);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;font-size:0.84rem;">
+        <span style="color:#fde047;font-weight:800;">⏳ Weekly City Cup Round ends Sunday 23:59 UTC · #1 City wins 👑 Crown Week + 500 🪙 pool</span>
+        <strong id="seoWeeklyCupClock" style="font-family:monospace;font-size:0.95rem;color:#fff;">--d --h --m --s</strong>
+      </div>
     </section>
 
     <div id="voteSuccessBanner" class="toast-banner">
@@ -305,6 +309,7 @@
       <a href="world-blitz.html">Daily World Blitz</a>
         <a href="cities/index.html">24 Cities Directory</a>
         <a href="city-versus.html">City Duels</a>
+        <a href="ambassadors.html">City Ambassadors</a>
         <a href="world-radio.html">56 Live Radios</a>
         <a href="terms.html">Terms</a>
         <a href="privacy.html">Privacy &amp; GDPR</a>
@@ -514,6 +519,22 @@
       }
     }
 
+    function tickSeoWeeklyCup() {
+      const el = document.getElementById('seoWeeklyCupClock');
+      if (!el) return;
+      const now = Date.now();
+      const d = new Date(now);
+      const daysUntilSun = (7 - d.getUTCDay()) % 7;
+      let endMs = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + daysUntilSun, 23, 59, 59, 999);
+      if (endMs <= now) endMs += 7 * 86400000;
+      const sec = Math.max(0, Math.floor((endMs - now) / 1000));
+      const dd = Math.floor(sec / 86400);
+      const hh = String(Math.floor((sec % 86400) / 3600)).padStart(2, '0');
+      const mm = String(Math.floor((sec % 3600) / 60)).padStart(2, '0');
+      const ss = String(sec % 60).padStart(2, '0');
+      el.textContent = `⏱️ ${dd}d ${hh}h ${mm}m ${ss}s`;
+    }
+
     document.addEventListener('DOMContentLoaded', () => {
       const list = (typeof getRemoCities === 'function') ? getRemoCities() : REMO_DEFAULT_CITIES;
       const sel = document.getElementById('badgeCitySel');
@@ -522,6 +543,8 @@
       }
       renderRankingTable();
       updateEmbedBadgePreview();
+      tickSeoWeeklyCup();
+      setInterval(tickSeoWeeklyCup, 1000);
     });
   </script>
 </body>

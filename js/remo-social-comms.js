@@ -524,7 +524,213 @@ function renderRightSidebarWidgets() {
   if (typeof renderMobileCityWarStrip === 'function') {
     renderMobileCityWarStrip();
   }
+  if (typeof updateWeeklyCupCountdowns === 'function') {
+    updateWeeklyCupCountdowns();
+  }
 }
+
+/* ══════════════════════════════════════════════════════════════
+   ⏳ WEEKLY CITY CUP COUNTDOWN (Deterministic Sunday 23:59:59 UTC)
+   ══════════════════════════════════════════════════════════════ */
+function getWeeklyCityCupCountdown(nowMs) {
+  const now = typeof nowMs === 'number' && !Number.isNaN(nowMs) ? nowMs : Date.now();
+  const d = new Date(now);
+  const utcDay = d.getUTCDay(); // 0=Sun..6=Sat
+  const daysUntilSunday = (7 - utcDay) % 7;
+  let endUtcMs = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + daysUntilSunday, 23, 59, 59, 999);
+  if (endUtcMs <= now) {
+    endUtcMs += 7 * 86400000;
+  }
+  const diffSec = Math.max(0, Math.floor((endUtcMs - now) / 1000));
+  const days = Math.floor(diffSec / 86400);
+  const hours = Math.floor((diffSec % 86400) / 3600);
+  const mins = Math.floor((diffSec % 3600) / 60);
+  const secs = diffSec % 60;
+
+  // ISO week number (UTC)
+  const isoDate = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  const isoDayNum = isoDate.getUTCDay() || 7;
+  isoDate.setUTCDate(isoDate.getUTCDate() + 4 - isoDayNum);
+  const yearStart = new Date(Date.UTC(isoDate.getUTCFullYear(), 0, 1));
+  const weekNum = Math.ceil((((isoDate - yearStart) / 86400000) + 1) / 7);
+
+  let leadingCityId = 'montreal';
+  let leadingPts = 0;
+  if (typeof REMO_STORE !== 'undefined' && REMO_STORE.state && REMO_STORE.state.cityScores) {
+    const top = Object.entries(REMO_STORE.state.cityScores).sort((a, b) => Number(b[1] || 0) - Number(a[1] || 0))[0];
+    if (top) {
+      leadingCityId = top[0];
+      leadingPts = Number(top[1] || 0);
+    }
+  }
+  return { days, hours, mins, secs, weekNum, endUtcMs, diffSec, leadingCityId, leadingPts };
+}
+window.getWeeklyCityCupCountdown = getWeeklyCityCupCountdown;
+
+let _lastCupArenaHtml = '';
+let _lastCupRailHtml = '';
+function updateWeeklyCupCountdowns() {
+  const arenaEl = document.getElementById('weeklyCupCountdownArena');
+  const railEl = document.getElementById('weeklyCupRightRailBadge');
+  if (!arenaEl && !railEl) return;
+
+  const lang = typeof REMO_I18N !== 'undefined' ? REMO_I18N.getLang() : 'en';
+  const info = getWeeklyCityCupCountdown();
+  const dUnit = t('cup_days_short');
+  const hUnit = t('cup_hours_short');
+  const mUnit = t('cup_mins_short');
+  const sUnit = t('cup_secs_short');
+  const pad2 = (n) => String(n).padStart(2, '0');
+  const clockStr = `${info.days}${dUnit} ${pad2(info.hours)}${hUnit} ${pad2(info.mins)}${mUnit} ${pad2(info.secs)}${sUnit}`;
+  const leaderCity = typeof getCityById === 'function' ? getCityById(info.leadingCityId) : null;
+  const leaderName = leaderCity ? `${leaderCity.flag} ${getCityName(leaderCity, lang)}` : '⚜️ Montréal';
+
+  if (arenaEl) {
+    const html = `
+      <div style="display:flex;flex-direction:column;gap:2px;">
+        <div style="font-size:0.78rem;font-weight:900;color:#fde047;">${t('cup_weekly_lbl')} · W${info.weekNum}</div>
+        <div style="font-size:0.74rem;color:#cbd5e1;">${t('cup_leader_lbl')}: <strong style="color:#fff;">${leaderName}</strong> (${info.leadingPts.toLocaleString()} PTS) · <span style="color:#fca5a5;">${t('cup_prize_hint')}</span></div>
+      </div>
+      <div class="weekly-cup-timer" aria-live="off">⏱️ ${clockStr}</div>
+    `;
+    if (html !== _lastCupArenaHtml) {
+      _lastCupArenaHtml = html;
+      arenaEl.innerHTML = html;
+    }
+  }
+  if (railEl) {
+    const railHtml = `
+      <span>⏳ W${info.weekNum}</span>
+      <span class="weekly-cup-timer">${clockStr}</span>
+    `;
+    if (railHtml !== _lastCupRailHtml) {
+      _lastCupRailHtml = railHtml;
+      railEl.innerHTML = railHtml;
+    }
+  }
+}
+window.updateWeeklyCupCountdowns = updateWeeklyCupCountdowns;
+
+/* ══════════════════════════════════════════════════════════════
+   📱 PWA APP INSTALL BANNER (Chromium Native + iOS Safari Guide)
+   ══════════════════════════════════════════════════════════════ */
+window._deferredPwaPrompt = null;
+
+function isRemoPwaStandalone() {
+  try {
+    return Boolean(
+      (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
+      window.navigator.standalone === true
+    );
+  } catch (e) {
+    return false;
+  }
+}
+
+function isRemoIosBrowser() {
+  try {
+    const ua = window.navigator.userAgent || '';
+    return /(iphone|ipad|ipod)/i.test(ua) && !isRemoPwaStandalone();
+  } catch (e) {
+    return false;
+  }
+}
+
+function syncPwaInstallUI() {
+  const banner = document.getElementById('remoPwaInstallBanner');
+  if (!banner) return;
+  try {
+    if (window.location.search.indexOf('obs=1') >= 0 || isRemoPwaStandalone()) {
+      banner.style.display = 'none';
+      return;
+    }
+    const dismissedAt = Number(localStorage.getItem('remo_pwa_dismissed_at') || 0);
+    const weekCooldownMs = 7 * 86400000;
+    if (dismissedAt && (Date.now() - dismissedAt) < weekCooldownMs) {
+      banner.style.display = 'none';
+      return;
+    }
+    const canInstall = Boolean(window._deferredPwaPrompt) || isRemoIosBrowser();
+    banner.style.display = canInstall ? 'flex' : 'none';
+  } catch (e) {
+    banner.style.display = 'none';
+  }
+}
+window.syncPwaInstallUI = syncPwaInstallUI;
+
+window.dismissRemoPwaBanner = function (ev) {
+  if (ev && ev.stopPropagation) ev.stopPropagation();
+  try {
+    localStorage.setItem('remo_pwa_dismissed_at', String(Date.now()));
+  } catch (e) {}
+  const banner = document.getElementById('remoPwaInstallBanner');
+  if (banner) banner.style.display = 'none';
+};
+
+window.triggerRemoPwaInstall = async function () {
+  const lang = typeof REMO_I18N !== 'undefined' ? REMO_I18N.getLang() : 'en';
+  if (isRemoPwaStandalone()) {
+    remoToast(lang === 'fr' ? '📱 L’application REMO World est déjà installée !' : '📱 REMO World App is already installed!', 'info');
+    return;
+  }
+  if (window._deferredPwaPrompt) {
+    try {
+      const promptEv = window._deferredPwaPrompt;
+      promptEv.prompt();
+      const res = await promptEv.userChoice;
+      window._deferredPwaPrompt = null;
+      if (res && res.outcome === 'accepted') {
+        const banner = document.getElementById('remoPwaInstallBanner');
+        if (banner) banner.style.display = 'none';
+        remoToast(t('pwa_installed_toast'), 'fanfare');
+      } else {
+        syncPwaInstallUI();
+      }
+      return;
+    } catch (e) {}
+  }
+  if (isRemoIosBrowser()) {
+    remoToast(t('pwa_ios_hint'), 'info');
+    return;
+  }
+  remoToast(
+    lang === 'fr'
+      ? '📱 Ouvre le menu du navigateur (⋮) puis sélectionne « Installer REMO World ».'
+      : '📱 Open your browser menu (⋮) and tap "Install REMO World".',
+    'info'
+  );
+};
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  window._deferredPwaPrompt = e;
+  syncPwaInstallUI();
+});
+
+window.addEventListener('appinstalled', () => {
+  window._deferredPwaPrompt = null;
+  const banner = document.getElementById('remoPwaInstallBanner');
+  if (banner) banner.style.display = 'none';
+  if (typeof remoToast === 'function' && typeof t === 'function') {
+    remoToast(t('pwa_installed_toast'), 'fanfare');
+  }
+});
+
+window.addEventListener('remo:langchange', () => {
+  _lastCupArenaHtml = '';
+  _lastCupRailHtml = '';
+  if (typeof updateWeeklyCupCountdowns === 'function') updateWeeklyCupCountdowns();
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+  updateWeeklyCupCountdowns();
+  syncPwaInstallUI();
+  setInterval(() => {
+    try {
+      if (!document.hidden) updateWeeklyCupCountdowns();
+    } catch (e) {}
+  }, 1000);
+});
 
 
 /* ══════════════════════════════════════════════════════════════
@@ -10720,18 +10926,20 @@ document.addEventListener('DOMContentLoaded', () => {
   const tvFx = (params.get('fx') || '').trim().toLowerCase();
   const tvSt = (params.get('st') || params.get('station') || '').trim();
   const tvZen = params.get('zen') === '1';
+  const tvObs = params.get('obs') === '1';
   const tvRoom = (params.get('room') || '').trim();
   const tvRt = Number(params.get('rt') || 0);
   const tvRd = Number(params.get('rd') || 0);
   const focusFlag = params.get('focus') === '1';
   const openTarget = (params.get('open') || '').trim().toLowerCase();
-  if (tvCity || tvFx || tvSt || tvRoom || focusFlag || openTarget === 'focustv' || openTarget === 'tv') {
+  if (tvCity || tvFx || tvSt || tvRoom || tvObs || focusFlag || openTarget === 'focustv' || openTarget === 'tv') {
     setTimeout(() => {
       if (typeof window.openFocusTvModal === 'function') {
         window.openFocusTvModal(tvCity || null, true, {
           fx: tvFx,
           stationId: tvSt,
           zen: tvZen,
+          obs: tvObs,
           room: tvRoom,
           roomStartSec: tvRt,
           roomDurMin: tvRd
@@ -21452,6 +21660,10 @@ if (typeof window !== 'undefined') {
             vs: params.get('vs') || '',
             mode: params.get('mode') || ''
           });
+        }, 380);
+      } else if (openParam === 'ambassador' || openParam === 'diploma') {
+        setTimeout(() => {
+          if (typeof openCityAmbassadorModal === 'function') openCityAmbassadorModal();
         }, 380);
       } else if (params.get('contact') === '1') {
         setTimeout(() => openContactSupportModal(), 350);
