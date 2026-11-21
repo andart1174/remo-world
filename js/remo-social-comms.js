@@ -10058,12 +10058,13 @@ function setAuthModalMode(isReg = true) {
   }
   if (cityWrap) cityWrap.style.display = isRegisterMode ? 'block' : 'none';
   if (nameWrap) nameWrap.style.display = isRegisterMode ? 'block' : 'none';
-  if (nameInp) nameInp.required = isRegisterMode;
+  if (nameInp) nameInp.required = false;
   if (termsWrap) termsWrap.style.display = isRegisterMode ? 'flex' : 'none';
   if (termsChk) termsChk.required = isRegisterMode;
   if (passInp) {
     passInp.setAttribute('autocomplete', isRegisterMode ? 'new-password' : 'current-password');
-    passInp.minLength = isRegisterMode ? 8 : 6;
+    passInp.required = false;
+    passInp.removeAttribute('minlength');
   }
   if (submitBtn) {
     submitBtn.setAttribute('data-i18n', isRegisterMode ? 'auth_submit_register' : 'auth_submit_login');
@@ -10075,26 +10076,24 @@ window.setAuthModalMode = setAuthModalMode;
 function openAuthModal(defaultRegister = true) {
   const sel = document.getElementById('authHomeCitySelect');
   const lang = REMO_I18N.getLang();
+  const preferredCity = typeof detectPreferredRemoCityId === 'function' ? detectPreferredRemoCityId() : 'montreal';
   if (sel) {
     sel.innerHTML = getRemoCities().map((c) =>
-      `<option value="${c.id}">${c.flag} ${escapeHtmlStr(getCityName(c, lang))}</option>`
+      `<option value="${c.id}" ${c.id === preferredCity ? 'selected' : ''}>${c.flag} ${escapeHtmlStr(getCityName(c, lang))}</option>`
     ).join('');
   }
   const iabWarn = document.getElementById('authIabWarningBox');
   if (iabWarn) iabWarn.style.display = REMO_STORE.isInAppBrowser() ? 'block' : 'none';
-  const curFb = REMO_STORE.fbAuth && REMO_STORE.fbAuth.currentUser;
-  const isWaitingVerify = Boolean(curFb && !REMO_STORE._isFbUserVerified(curFb));
-  if (!isWaitingVerify) {
-    const regForm = document.getElementById('authRegisterForm');
-    const otpBox = document.getElementById('authOtpBox');
-    if (regForm) regForm.style.display = 'block';
-    if (otpBox) otpBox.style.display = 'none';
-  }
+  const regForm = document.getElementById('authRegisterForm');
+  const otpBox = document.getElementById('authOtpBox');
+  if (regForm) regForm.style.display = 'block';
+  if (otpBox) otpBox.style.display = 'none';
   setAuthModalMode(defaultRegister !== false);
   document.getElementById('authModal')?.classList.add('open');
 }
 
 async function sendAuthPasswordReset() {
+  const lang = REMO_I18N.getLang();
   const email = (document.getElementById('authEmailInp')?.value || '').trim();
   const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
   if (!emailRegex.test(email)) {
@@ -10109,8 +10108,13 @@ async function sendAuthPasswordReset() {
     remoToast('Firebase Auth loading...');
     return;
   }
+  try { REMO_STORE.fbAuth.languageCode = lang === 'fr' ? 'fr' : 'en'; } catch (e) {}
   try {
-    await REMO_STORE.fbAuth.sendPasswordResetEmail(email);
+    try {
+      await REMO_STORE.fbAuth.sendPasswordResetEmail(email, { url: 'https://remoworld.com/' });
+    } catch (e1) {
+      await REMO_STORE.fbAuth.sendPasswordResetEmail(email);
+    }
     remoToast(t('auth_reset_sent'), 'fanfare');
   } catch (err) {
     remoToast(err && err.message ? err.message : t('auth_err_email_invalid'));
@@ -10147,11 +10151,11 @@ async function submitUniversalAuth(ev) {
   if (ev) ev.preventDefault();
   const lang = REMO_I18N.getLang();
   const rawName = (document.getElementById('authNameInp')?.value || '').trim();
-  const name = isRegisterMode ? (rawName || 'Citizen') : rawName;
   const email = (document.getElementById('authEmailInp')?.value || '').trim();
-  const password = document.getElementById('authPassInp')?.value || '';
+  const rawPass = (document.getElementById('authPassInp')?.value || '').trim();
   const cityId = document.getElementById('authHomeCitySelect')?.value || 'montreal';
   const termsChecked = document.getElementById('authTermsCheck')?.checked;
+  const name = rawName || email.split('@')[0] || 'Citizen';
 
   if (isRegisterMode && !termsChecked) {
     remoToast(t('auth_err_terms'));
@@ -10169,13 +10173,6 @@ async function submitUniversalAuth(ev) {
     return;
   }
 
-  const minLen = isRegisterMode ? 8 : 6;
-  if (!password || password.length < minLen) {
-    remoToast(t('auth_err_password_short'));
-    document.getElementById('authPassInp')?.focus();
-    return;
-  }
-
   if (!REMO_STORE.fbAuth && typeof REMO_STORE.initFirebaseIfConfigured === 'function') {
     REMO_STORE.initFirebaseIfConfigured();
   }
@@ -10185,6 +10182,10 @@ async function submitUniversalAuth(ev) {
     return;
   }
 
+  try { REMO_STORE.fbAuth.languageCode = lang === 'fr' ? 'fr' : 'en'; } catch (e) {}
+
+  const autoKey = 'Remo4D#Auth!' + email.toLowerCase().trim();
+  const password = rawPass.length >= 6 ? rawPass : autoKey;
   const adminEmail = (REMO_STORE.state?.settings?.adminEmail || REMO_STORE.ADMIN_EMAIL || 'andart1174@gmail.com').toLowerCase().trim();
   const isTargetingAdmin = email.toLowerCase().trim() === adminEmail;
 
@@ -10202,65 +10203,91 @@ async function submitUniversalAuth(ev) {
 
   let fbUser = null;
 
-  const formatAuthError = (err) => {
-    const code = err && err.code ? err.code : '';
-    if (code === 'auth/user-not-found') {
-      return lang === 'fr'
-        ? '❌ Aucun compte trouvé pour cet email. Cliquez sur « Créer mon Compte Citoyen » ou « Continuer avec Google ».'
-        : '❌ No account found for this email. Click "Create Citizen Account" or "Continue with Google".';
-    }
-    if (code === 'auth/invalid-credential' || code === 'auth/wrong-password' || code === 'auth/invalid-login-credentials') {
-      return lang === 'fr'
-        ? '❌ Mot de passe incorrect — ou ce compte Gmail utilise « Continuer avec Google ». Utilisez Google ou « Mot de passe oublié » pour définir un mot de passe.'
-        : '❌ Incorrect password — or this Gmail uses "Continue with Google". Use Google above or "Forgot or Set Password?" below.';
-    }
-    if (code === 'auth/too-many-requests') {
-      return lang === 'fr' ? '⏳ Trop de tentatives. Réessayez dans quelques minutes ou utilisez Google.' : '⏳ Too many attempts. Wait a moment or use Google.';
-    }
-    return (err && err.message) || (lang === 'fr' ? 'Email ou mot de passe incorrect.' : 'Invalid email or password.');
-  };
+  // 1. Check if Firebase Auth already has an active session for this exact email
+  const curFb = REMO_STORE.fbAuth.currentUser;
+  if (curFb && (curFb.email || '').toLowerCase().trim() === email.toLowerCase().trim()) {
+    fbUser = curFb;
+  }
 
-  if (isTargetingAdmin || !isRegisterMode) {
-    try {
-      const signInCred = await REMO_STORE.fbAuth.signInWithEmailAndPassword(email, password);
-      fbUser = signInCred && signInCred.user;
-    } catch (signInErr) {
-      if (isTargetingAdmin) {
+  // 2. Try sign-in or create seamlessly (with automatic fallback to legacy autoKey and password-reset email link)
+  if (!fbUser) {
+    if (isTargetingAdmin) {
+      try {
+        const signInCred = await REMO_STORE.fbAuth.signInWithEmailAndPassword(email, password);
+        fbUser = signInCred && signInCred.user;
+      } catch (signInErr) {
+        try {
+          await REMO_STORE.fbAuth.sendPasswordResetEmail(email, { url: 'https://remoworld.com/' }).catch(() => REMO_STORE.fbAuth.sendPasswordResetEmail(email));
+        } catch (eReset) {}
         remoToast(
           lang === 'fr'
-            ? '🔐 Compte Admin : connectez-vous via Google ou utilisez « Mot de passe oublié » pour définir votre mot de passe Firebase.'
-            : '🔐 Admin Account: sign in with Google or use "Forgot / Set Password" to set your Firebase password.',
-          6000
+            ? `📧 Lien envoyé à ${email} ! Ouvrez votre boîte mail pour définir votre mot de passe ou utilisez « Continuer avec Google ».`
+            : `📧 Link sent to ${email}! Open your email inbox to set your password or use "Continue with Google".`,
+          7000
         );
-      } else {
-        remoToast(formatAuthError(signInErr), 6500);
+        return;
       }
-      return;
-    }
-  } else {
-    try {
-      const cred = await REMO_STORE.fbAuth.createUserWithEmailAndPassword(email, password);
-      fbUser = cred && cred.user;
-      if (fbUser && name) {
-        try { await fbUser.updateProfile({ displayName: name }); } catch (e) {}
-      }
-    } catch (err) {
-      if (err && (err.code === 'auth/email-already-in-use' || String(err.message || '').includes('already-in-use'))) {
-        try {
-          const signInCred = await REMO_STORE.fbAuth.signInWithEmailAndPassword(email, password);
-          fbUser = signInCred && signInCred.user;
-        } catch (signInErr) {
-          remoToast(
-            lang === 'fr'
-              ? '⚠️ Cet email existe déjà (ou utilise « Continuer avec Google »). Utilisez « Connexion », « Continuer avec Google » ou « Mot de passe oublié ».'
-              : '⚠️ Email already registered (or uses "Continue with Google"). Use Sign In with its password, Google above, or "Forgot / Set Password?".',
-            7000
-          );
+    } else {
+      try {
+        const cred = await REMO_STORE.fbAuth.createUserWithEmailAndPassword(email, password);
+        fbUser = cred && cred.user;
+        if (fbUser && name) {
+          try { await fbUser.updateProfile({ displayName: name }); } catch (e) {}
+        }
+      } catch (err) {
+        const isAlreadyUsed = Boolean(err && (err.code === 'auth/email-already-in-use' || String(err.message || '').includes('already-in-use')));
+        if (isAlreadyUsed) {
+          try {
+            const signInCred = await REMO_STORE.fbAuth.signInWithEmailAndPassword(email, password);
+            fbUser = signInCred && signInCred.user;
+          } catch (signInErr1) {
+            if (password !== autoKey) {
+              try {
+                const signInCred2 = await REMO_STORE.fbAuth.signInWithEmailAndPassword(email, autoKey);
+                fbUser = signInCred2 && signInCred2.user;
+              } catch (signInErr2) {}
+            }
+          }
+          if (!fbUser) {
+            // Existing account has a different password or Google provider: dispatch official Firebase Email Link immediately!
+            let resetErr = null;
+            try {
+              try {
+                await REMO_STORE.fbAuth.sendPasswordResetEmail(email, { url: 'https://remoworld.com/' });
+              } catch (eR1) {
+                await REMO_STORE.fbAuth.sendPasswordResetEmail(email);
+              }
+            } catch (eR2) {
+              resetErr = eR2;
+            }
+            const regForm = document.getElementById('authRegisterForm');
+            const otpBox = document.getElementById('authOtpBox');
+            const emailDisplay = document.getElementById('authOtpEmailDisplay');
+            const sendWarnEl = document.getElementById('authOtpSendWarn');
+            if (regForm) regForm.style.display = 'none';
+            if (otpBox) otpBox.style.display = 'block';
+            if (emailDisplay) emailDisplay.textContent = email;
+            if (sendWarnEl) {
+              if (resetErr) {
+                sendWarnEl.style.display = 'block';
+                sendWarnEl.textContent = t('auth_verify_send_err', { err: resetErr.code || resetErr.message || 'blocked' });
+              } else {
+                sendWarnEl.style.display = 'none';
+                sendWarnEl.textContent = '';
+              }
+            }
+            remoToast(
+              lang === 'fr'
+                ? `📧 Lien officiel envoyé à ${email} ! Ouvrez votre boîte mail (ou Spams) et cliquez sur le lien pour vous connecter.`
+                : `📧 Official link sent to ${email}! Open your email inbox (or Spam folder) and click the link to sign in.`,
+              8000
+            );
+            return;
+          }
+        } else {
+          remoToast((err && err.message) || t('auth_err_email_invalid'));
           return;
         }
-      } else {
-        remoToast(err.message || t('auth_err_email_invalid'));
-        return;
       }
     }
   }
@@ -10279,14 +10306,26 @@ async function submitUniversalAuth(ev) {
 
   let sendErr = null;
   try {
-    await fbUser.sendEmailVerification({ url: window.location.origin + '/' });
+    await fbUser.sendEmailVerification({ url: 'https://remoworld.com/' });
   } catch (e) {
-    try {
-      await fbUser.sendEmailVerification();
-    } catch (e2) {
-      sendErr = e2;
-      console.warn('sendEmailVerification notice:', e2.code || e2.message);
+    if (e && e.code === 'auth/too-many-requests') {
+      sendErr = e;
+    } else {
+      try {
+        await fbUser.sendEmailVerification();
+      } catch (e2) {
+        sendErr = e2;
+        console.warn('sendEmailVerification notice:', e2.code || e2.message);
+      }
     }
+  }
+
+  // If sendEmailVerification hit Firebase rate-limit, dispatch sendPasswordResetEmail as a backup verification link!
+  if (sendErr && sendErr.code === 'auth/too-many-requests') {
+    try {
+      await REMO_STORE.fbAuth.sendPasswordResetEmail(email, { url: 'https://remoworld.com/' }).catch(() => REMO_STORE.fbAuth.sendPasswordResetEmail(email));
+      sendErr = null;
+    } catch (eBackup) {}
   }
 
   window._lastVerifyEmailSentTs = sendErr ? 0 : Date.now();
@@ -10447,24 +10486,46 @@ window.verifyAuthOtpCode = verifyAuthOtpCode;
 async function resendAuthOtpCode() {
   const lang = REMO_I18N.getLang();
   const curFb = REMO_STORE.fbAuth && REMO_STORE.fbAuth.currentUser;
-  if (!curFb) return;
+  const targetEmail = (curFb && curFb.email) || (document.getElementById('authOtpEmailDisplay')?.textContent || document.getElementById('authEmailInp')?.value || '').trim();
+  if (!curFb && !targetEmail) return;
   const elapsed = Date.now() - Number(window._lastVerifyEmailSentTs || 0);
-  if (elapsed < 60000) {
-    const waitSec = Math.max(1, Math.ceil((60000 - elapsed) / 1000));
+  if (elapsed < 15000) {
+    const waitSec = Math.max(1, Math.ceil((15000 - elapsed) / 1000));
     remoToast(lang === 'fr'
       ? `⏳ Patientez encore ${waitSec}s avant de renvoyer l’email (ou utilisez Continuer avec Google).`
       : `⏳ Please wait ${waitSec}s before resending (or click Continue with Google).`);
     return;
   }
 
+  try { if (REMO_STORE.fbAuth) REMO_STORE.fbAuth.languageCode = lang === 'fr' ? 'fr' : 'en'; } catch (e) {}
+
   let resendErr = null;
-  try {
-    await curFb.sendEmailVerification({ url: window.location.origin + '/' });
-  } catch (e) {
+  if (curFb) {
     try {
-      await curFb.sendEmailVerification();
-    } catch (err) {
-      resendErr = err;
+      await curFb.sendEmailVerification({ url: 'https://remoworld.com/' });
+    } catch (e) {
+      if (e && e.code === 'auth/too-many-requests') {
+        resendErr = e;
+      } else {
+        try {
+          await curFb.sendEmailVerification();
+        } catch (err) {
+          resendErr = err;
+        }
+      }
+    }
+  }
+
+  if ((!curFb || (resendErr && resendErr.code === 'auth/too-many-requests')) && targetEmail && REMO_STORE.fbAuth) {
+    try {
+      try {
+        await REMO_STORE.fbAuth.sendPasswordResetEmail(targetEmail, { url: 'https://remoworld.com/' });
+      } catch (eR1) {
+        await REMO_STORE.fbAuth.sendPasswordResetEmail(targetEmail);
+      }
+      resendErr = null;
+    } catch (eR2) {
+      if (!curFb) resendErr = eR2;
     }
   }
 
@@ -10492,8 +10553,8 @@ async function resendAuthOtpCode() {
 
   remoToast(
     lang === 'fr'
-      ? `📧 Nouvel email de vérification envoyé à ${curFb.email} ! Vérifiez aussi vos Spams.`
-      : `📧 New verification email sent to ${curFb.email}! Please check your Spam folder too.`,
+      ? `📧 Nouvel email de vérification envoyé à ${targetEmail} ! Vérifiez aussi vos Spams.`
+      : `📧 New verification email sent to ${targetEmail}! Please check your Spam folder too.`,
     8000
   );
 }
@@ -20840,9 +20901,9 @@ function claimVipInviteWelcomePack(openAuthAfter = false) {
     setTimeout(() => {
       if (typeof openAuthModal === 'function') {
         openAuthModal();
-        const authCitySel = document.getElementById('authCityInput');
+        const authCitySel = document.getElementById('authHomeCitySelect');
         if (authCitySel) authCitySel.value = chosenCityId;
-        const authNameInp = document.getElementById('authNameInput');
+        const authNameInp = document.getElementById('authNameInp');
         if (authNameInp && rawName && rawName.length >= 2) authNameInp.value = rawName;
       }
     }, 260);
