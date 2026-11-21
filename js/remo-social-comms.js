@@ -10249,37 +10249,19 @@ async function submitUniversalAuth(ev) {
             }
           }
           if (!fbUser) {
-            // Existing account has a different password or Google provider: dispatch official Firebase Email Link immediately!
-            let resetErr = null;
+            // Existing account has a different password or Google provider: dispatch reset link & prompt password/Google
             try {
               try {
                 await REMO_STORE.fbAuth.sendPasswordResetEmail(email, { url: 'https://remoworld.com/' });
               } catch (eR1) {
                 await REMO_STORE.fbAuth.sendPasswordResetEmail(email);
               }
-            } catch (eR2) {
-              resetErr = eR2;
-            }
-            const regForm = document.getElementById('authRegisterForm');
-            const otpBox = document.getElementById('authOtpBox');
-            const emailDisplay = document.getElementById('authOtpEmailDisplay');
-            const sendWarnEl = document.getElementById('authOtpSendWarn');
-            if (regForm) regForm.style.display = 'none';
-            if (otpBox) otpBox.style.display = 'block';
-            if (emailDisplay) emailDisplay.textContent = email;
-            if (sendWarnEl) {
-              if (resetErr) {
-                sendWarnEl.style.display = 'block';
-                sendWarnEl.textContent = t('auth_verify_send_err', { err: resetErr.code || resetErr.message || 'blocked' });
-              } else {
-                sendWarnEl.style.display = 'none';
-                sendWarnEl.textContent = '';
-              }
-            }
+            } catch (eR2) {}
+            document.getElementById('authPassInp')?.focus();
             remoToast(
               lang === 'fr'
-                ? `📧 Lien officiel envoyé à ${email} ! Ouvrez votre boîte mail (ou Spams) et cliquez sur le lien pour vous connecter.`
-                : `📧 Official link sent to ${email}! Open your email inbox (or Spam folder) and click the link to sign in.`,
+                ? `🔑 Cet email existe déjà avec un mot de passe différent (ou via Google). Entrez votre mot de passe, cliquez sur « Continuer avec Google », ou utilisez le lien de réinitialisation envoyé à ${email} !`
+                : `🔑 This email already exists with a different password (or via Google). Enter your password, click "Continue with Google", or use the reset link sent to ${email}!`,
               8000
             );
             return;
@@ -10299,7 +10281,12 @@ async function submitUniversalAuth(ev) {
     fbUser = REMO_STORE.fbAuth.currentUser || fbUser;
   } catch (e) {}
 
-  if (fbUser.emailVerified) {
+  if (!isTargetingAdmin || fbUser.emailVerified) {
+    if (!fbUser.emailVerified) {
+      try {
+        fbUser.sendEmailVerification({ url: 'https://remoworld.com/' }).catch(() => fbUser.sendEmailVerification().catch(() => {}));
+      } catch (eBg) {}
+    }
     completeVerifiedEmailLogin(fbUser, pendingData);
     return;
   }
@@ -10474,7 +10461,7 @@ async function verifyAuthOtpCode() {
   } catch (e) {}
 
   const refreshed = REMO_STORE.fbAuth.currentUser || curFb;
-  if (!refreshed.emailVerified) {
+  if (!REMO_STORE._isFbUserVerified(refreshed)) {
     remoToast(t('auth_err_otp_invalid'));
     return;
   }

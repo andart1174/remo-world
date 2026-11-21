@@ -2751,12 +2751,12 @@ const REMO_STORE = {
   },
 
   _isFbUserVerified(fbU) {
-    if (!fbU) return false;
-    if (fbU.emailVerified === true) return true;
-    if (Array.isArray(fbU.providerData)) {
-      return fbU.providerData.some((p) => p && (p.providerId === 'google.com' || p.providerId === 'apple.com'));
+    if (!fbU || !fbU.uid) return false;
+    const fbEmail = this._getFbEmail(fbU);
+    if (this.isAdminEmail(fbEmail)) {
+      return fbU.emailVerified === true;
     }
-    return false;
+    return true;
   },
 
   isAdminEmail(email) {
