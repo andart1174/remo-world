@@ -10058,13 +10058,13 @@ function setAuthModalMode(isReg = true) {
   }
   if (cityWrap) cityWrap.style.display = isRegisterMode ? 'block' : 'none';
   if (nameWrap) nameWrap.style.display = isRegisterMode ? 'block' : 'none';
-  if (nameInp) nameInp.required = false;
+  if (nameInp) nameInp.required = isRegisterMode;
   if (termsWrap) termsWrap.style.display = isRegisterMode ? 'flex' : 'none';
   if (termsChk) termsChk.required = isRegisterMode;
   if (passInp) {
     passInp.setAttribute('autocomplete', isRegisterMode ? 'new-password' : 'current-password');
-    passInp.required = false;
-    passInp.removeAttribute('minlength');
+    passInp.required = true;
+    passInp.minLength = 6;
   }
   if (submitBtn) {
     submitBtn.setAttribute('data-i18n', isRegisterMode ? 'auth_submit_register' : 'auth_submit_login');
@@ -10152,10 +10152,10 @@ async function submitUniversalAuth(ev) {
   const lang = REMO_I18N.getLang();
   const rawName = (document.getElementById('authNameInp')?.value || '').trim();
   const email = (document.getElementById('authEmailInp')?.value || '').trim();
-  const rawPass = (document.getElementById('authPassInp')?.value || '').trim();
+  const password = (document.getElementById('authPassInp')?.value || '');
   const cityId = document.getElementById('authHomeCitySelect')?.value || 'montreal';
   const termsChecked = document.getElementById('authTermsCheck')?.checked;
-  const name = rawName || email.split('@')[0] || 'Citizen';
+  const name = isRegisterMode ? (rawName || email.split('@')[0] || 'Citizen') : rawName;
 
   if (isRegisterMode && !termsChecked) {
     remoToast(t('auth_err_terms'));
@@ -10173,6 +10173,12 @@ async function submitUniversalAuth(ev) {
     return;
   }
 
+  if (!password || password.length < 6) {
+    remoToast(t('auth_err_password_short'));
+    document.getElementById('authPassInp')?.focus();
+    return;
+  }
+
   if (!REMO_STORE.fbAuth && typeof REMO_STORE.initFirebaseIfConfigured === 'function') {
     REMO_STORE.initFirebaseIfConfigured();
   }
@@ -10184,8 +10190,6 @@ async function submitUniversalAuth(ev) {
 
   try { REMO_STORE.fbAuth.languageCode = lang === 'fr' ? 'fr' : 'en'; } catch (e) {}
 
-  const autoKey = 'Remo4D#Auth!' + email.toLowerCase().trim();
-  const password = rawPass.length >= 6 ? rawPass : autoKey;
   const adminEmail = (REMO_STORE.state?.settings?.adminEmail || REMO_STORE.ADMIN_EMAIL || 'andart1174@gmail.com').toLowerCase().trim();
   const isTargetingAdmin = email.toLowerCase().trim() === adminEmail;
 
@@ -10201,75 +10205,73 @@ async function submitUniversalAuth(ev) {
     localStorage.setItem('remo_pending_signup', JSON.stringify(pendingData));
   } catch (e) {}
 
-  let fbUser = null;
-
-  // 1. Check if Firebase Auth already has an active session for this exact email
-  const curFb = REMO_STORE.fbAuth.currentUser;
-  if (curFb && (curFb.email || '').toLowerCase().trim() === email.toLowerCase().trim()) {
-    fbUser = curFb;
+  // Clear any stale unverified Firebase session belonging to a DIFFERENT email before attempting auth
+  const prevFb = REMO_STORE.fbAuth.currentUser;
+  if (prevFb && !prevFb.emailVerified && (prevFb.email || '').toLowerCase().trim() !== email.toLowerCase().trim()) {
+    try { await REMO_STORE.fbAuth.signOut(); } catch (eSo) {}
   }
 
-  // 2. Try sign-in or create seamlessly (with automatic fallback to legacy autoKey and password-reset email link)
-  if (!fbUser) {
-    if (isTargetingAdmin) {
-      try {
-        const signInCred = await REMO_STORE.fbAuth.signInWithEmailAndPassword(email, password);
-        fbUser = signInCred && signInCred.user;
-      } catch (signInErr) {
-        try {
-          await REMO_STORE.fbAuth.sendPasswordResetEmail(email, { url: 'https://remoworld.com/' }).catch(() => REMO_STORE.fbAuth.sendPasswordResetEmail(email));
-        } catch (eReset) {}
+  let fbUser = null;
+  const formatAuthError = (err) => {
+    const code = err && err.code ? err.code : '';
+    if (code === 'auth/user-not-found') {
+      return lang === 'fr'
+        ? '❌ Aucun compte trouvé pour cet email. Cliquez sur « Créer mon Compte Citoyen » ou « Continuer avec Google ».'
+        : '❌ No account found for this email. Click "Create Citizen Account" or "Continue with Google".';
+    }
+    if (code === 'auth/invalid-credential' || code === 'auth/wrong-password' || code === 'auth/invalid-login-credentials') {
+      return lang === 'fr'
+        ? '❌ Mot de passe incorrect — ou ce compte Gmail utilise « Continuer avec Google ». Cliquez sur Google ci-dessus ou sur « Mot de passe oublié ».'
+        : '❌ Incorrect password — or this Gmail uses "Continue with Google". Click Google above or "Forgot or Set Password?" below.';
+    }
+    if (code === 'auth/too-many-requests') {
+      return lang === 'fr' ? '⏳ Trop de tentatives. Réessayez dans quelques minutes ou utilisez Google.' : '⏳ Too many attempts. Wait a moment or use Google.';
+    }
+    return (err && err.message) || (lang === 'fr' ? 'Email ou mot de passe incorrect.' : 'Invalid email or password.');
+  };
+
+  if (isTargetingAdmin || !isRegisterMode) {
+    try {
+      const signInCred = await REMO_STORE.fbAuth.signInWithEmailAndPassword(email, password);
+      fbUser = signInCred && signInCred.user;
+    } catch (signInErr) {
+      if (isTargetingAdmin) {
         remoToast(
           lang === 'fr'
-            ? `📧 Lien envoyé à ${email} ! Ouvrez votre boîte mail pour définir votre mot de passe ou utilisez « Continuer avec Google ».`
-            : `📧 Link sent to ${email}! Open your email inbox to set your password or use "Continue with Google".`,
-          7000
+            ? '🔐 Compte Admin : connectez-vous via « Continuer avec Google » ou utilisez « Mot de passe oublié » pour définir votre mot de passe Firebase.'
+            : '🔐 Admin Account: sign in via "Continue with Google" or use "Forgot / Set Password" to set your Firebase password.',
+          6500
         );
-        return;
+      } else {
+        remoToast(formatAuthError(signInErr), 6500);
       }
-    } else {
-      try {
-        const cred = await REMO_STORE.fbAuth.createUserWithEmailAndPassword(email, password);
-        fbUser = cred && cred.user;
-        if (fbUser && name) {
-          try { await fbUser.updateProfile({ displayName: name }); } catch (e) {}
-        }
-      } catch (err) {
-        const isAlreadyUsed = Boolean(err && (err.code === 'auth/email-already-in-use' || String(err.message || '').includes('already-in-use')));
-        if (isAlreadyUsed) {
-          try {
-            const signInCred = await REMO_STORE.fbAuth.signInWithEmailAndPassword(email, password);
-            fbUser = signInCred && signInCred.user;
-          } catch (signInErr1) {
-            if (password !== autoKey) {
-              try {
-                const signInCred2 = await REMO_STORE.fbAuth.signInWithEmailAndPassword(email, autoKey);
-                fbUser = signInCred2 && signInCred2.user;
-              } catch (signInErr2) {}
-            }
-          }
-          if (!fbUser) {
-            // Existing account has a different password or Google provider: dispatch reset link & prompt password/Google
-            try {
-              try {
-                await REMO_STORE.fbAuth.sendPasswordResetEmail(email, { url: 'https://remoworld.com/' });
-              } catch (eR1) {
-                await REMO_STORE.fbAuth.sendPasswordResetEmail(email);
-              }
-            } catch (eR2) {}
-            document.getElementById('authPassInp')?.focus();
-            remoToast(
-              lang === 'fr'
-                ? `🔑 Cet email existe déjà avec un mot de passe différent (ou via Google). Entrez votre mot de passe, cliquez sur « Continuer avec Google », ou utilisez le lien de réinitialisation envoyé à ${email} !`
-                : `🔑 This email already exists with a different password (or via Google). Enter your password, click "Continue with Google", or use the reset link sent to ${email}!`,
-              8000
-            );
-            return;
-          }
-        } else {
-          remoToast((err && err.message) || t('auth_err_email_invalid'));
+      return;
+    }
+  } else {
+    try {
+      const cred = await REMO_STORE.fbAuth.createUserWithEmailAndPassword(email, password);
+      fbUser = cred && cred.user;
+      if (fbUser && name) {
+        try { await fbUser.updateProfile({ displayName: name }); } catch (e) {}
+      }
+    } catch (err) {
+      const isAlreadyUsed = Boolean(err && (err.code === 'auth/email-already-in-use' || String(err.message || '').includes('already-in-use')));
+      if (isAlreadyUsed) {
+        try {
+          const signInCred = await REMO_STORE.fbAuth.signInWithEmailAndPassword(email, password);
+          fbUser = signInCred && signInCred.user;
+        } catch (signInErr) {
+          remoToast(
+            lang === 'fr'
+              ? '⚠️ Cet email existe déjà (ou utilise « Continuer avec Google »). Utilisez « Se Connecter », « 🌐 Continuer avec Google » ou « Mot de passe oublié ».'
+              : '⚠️ This email is already registered (or uses "Continue with Google"). Use Sign In, "🌐 Continue with Google", or "Forgot / Set Password?".',
+            7500
+          );
           return;
         }
+      } else {
+        remoToast((err && err.message) || t('auth_err_email_invalid'));
+        return;
       }
     }
   }
@@ -10281,12 +10283,9 @@ async function submitUniversalAuth(ev) {
     fbUser = REMO_STORE.fbAuth.currentUser || fbUser;
   } catch (e) {}
 
-  if (!isTargetingAdmin || fbUser.emailVerified) {
-    if (!fbUser.emailVerified) {
-      try {
-        fbUser.sendEmailVerification({ url: 'https://remoworld.com/' }).catch(() => fbUser.sendEmailVerification().catch(() => {}));
-      } catch (eBg) {}
-    }
+  // STRICT VERIFICATION: Only verified emails (emailVerified === true) can enter & create a citizen profile!
+  if (fbUser.emailVerified) {
+    try { await fbUser.getIdToken(true); } catch (eTok) {}
     completeVerifiedEmailLogin(fbUser, pendingData);
     return;
   }
@@ -10307,14 +10306,6 @@ async function submitUniversalAuth(ev) {
     }
   }
 
-  // If sendEmailVerification hit Firebase rate-limit, dispatch sendPasswordResetEmail as a backup verification link!
-  if (sendErr && sendErr.code === 'auth/too-many-requests') {
-    try {
-      await REMO_STORE.fbAuth.sendPasswordResetEmail(email, { url: 'https://remoworld.com/' }).catch(() => REMO_STORE.fbAuth.sendPasswordResetEmail(email));
-      sendErr = null;
-    } catch (eBackup) {}
-  }
-
   window._lastVerifyEmailSentTs = sendErr ? 0 : Date.now();
   const regForm = document.getElementById('authRegisterForm');
   const otpBox = document.getElementById('authOtpBox');
@@ -10331,6 +10322,7 @@ async function submitUniversalAuth(ev) {
       sendWarnEl.textContent = t('auth_verify_send_err', { err: errLabel });
     }
     remoToast(t('auth_verify_send_err', { err: errLabel }), 8000);
+    startEmailVerificationWatcher();
     return;
   }
   if (sendWarnEl) {
@@ -10340,8 +10332,8 @@ async function submitUniversalAuth(ev) {
 
   remoToast(
     lang === 'fr'
-      ? `📧 Email officiel de confirmation envoyé à ${email} ! Ouvrez votre boîte mail (ou vos Spams) et cliquez sur le lien.`
-      : `📧 Official verification email sent to ${email}! Open your inbox (or Spam folder) and click the link.`,
+      ? `📧 Email officiel de confirmation envoyé à ${email} ! Ouvrez votre boîte mail (ou vos Spams) et cliquez sur le lien pour activer votre compte.`
+      : `📧 Official verification email sent to ${email}! Open your inbox (or Spam folder) and click the link to activate your account.`,
     8000
   );
 
@@ -10461,11 +10453,12 @@ async function verifyAuthOtpCode() {
   } catch (e) {}
 
   const refreshed = REMO_STORE.fbAuth.currentUser || curFb;
-  if (!REMO_STORE._isFbUserVerified(refreshed)) {
+  if (!refreshed.emailVerified) {
     remoToast(t('auth_err_otp_invalid'));
     return;
   }
 
+  try { await refreshed.getIdToken(true); } catch (eTok) {}
   completeVerifiedEmailLogin(refreshed, pending);
 }
 window.verifyAuthOtpCode = verifyAuthOtpCode;
@@ -10473,11 +10466,10 @@ window.verifyAuthOtpCode = verifyAuthOtpCode;
 async function resendAuthOtpCode() {
   const lang = REMO_I18N.getLang();
   const curFb = REMO_STORE.fbAuth && REMO_STORE.fbAuth.currentUser;
-  const targetEmail = (curFb && curFb.email) || (document.getElementById('authOtpEmailDisplay')?.textContent || document.getElementById('authEmailInp')?.value || '').trim();
-  if (!curFb && !targetEmail) return;
+  if (!curFb) return;
   const elapsed = Date.now() - Number(window._lastVerifyEmailSentTs || 0);
-  if (elapsed < 15000) {
-    const waitSec = Math.max(1, Math.ceil((15000 - elapsed) / 1000));
+  if (elapsed < 30000) {
+    const waitSec = Math.max(1, Math.ceil((30000 - elapsed) / 1000));
     remoToast(lang === 'fr'
       ? `⏳ Patientez encore ${waitSec}s avant de renvoyer l’email (ou utilisez Continuer avec Google).`
       : `⏳ Please wait ${waitSec}s before resending (or click Continue with Google).`);
@@ -10487,32 +10479,17 @@ async function resendAuthOtpCode() {
   try { if (REMO_STORE.fbAuth) REMO_STORE.fbAuth.languageCode = lang === 'fr' ? 'fr' : 'en'; } catch (e) {}
 
   let resendErr = null;
-  if (curFb) {
-    try {
-      await curFb.sendEmailVerification({ url: 'https://remoworld.com/' });
-    } catch (e) {
-      if (e && e.code === 'auth/too-many-requests') {
-        resendErr = e;
-      } else {
-        try {
-          await curFb.sendEmailVerification();
-        } catch (err) {
-          resendErr = err;
-        }
-      }
-    }
-  }
-
-  if ((!curFb || (resendErr && resendErr.code === 'auth/too-many-requests')) && targetEmail && REMO_STORE.fbAuth) {
-    try {
+  try {
+    await curFb.sendEmailVerification({ url: 'https://remoworld.com/' });
+  } catch (e) {
+    if (e && e.code === 'auth/too-many-requests') {
+      resendErr = e;
+    } else {
       try {
-        await REMO_STORE.fbAuth.sendPasswordResetEmail(targetEmail, { url: 'https://remoworld.com/' });
-      } catch (eR1) {
-        await REMO_STORE.fbAuth.sendPasswordResetEmail(targetEmail);
+        await curFb.sendEmailVerification();
+      } catch (err) {
+        resendErr = err;
       }
-      resendErr = null;
-    } catch (eR2) {
-      if (!curFb) resendErr = eR2;
     }
   }
 
@@ -10540,8 +10517,8 @@ async function resendAuthOtpCode() {
 
   remoToast(
     lang === 'fr'
-      ? `📧 Nouvel email de vérification envoyé à ${targetEmail} ! Vérifiez aussi vos Spams.`
-      : `📧 New verification email sent to ${targetEmail}! Please check your Spam folder too.`,
+      ? `📧 Nouvel email de vérification envoyé à ${curFb.email} ! Vérifiez aussi vos Spams.`
+      : `📧 New verification email sent to ${curFb.email}! Please check your Spam folder too.`,
     8000
   );
 }
@@ -10642,8 +10619,9 @@ function quickGoogleSignInSim() {
       if (u) {
         u.emailVerified = true;
         u.fbUid = fbU.uid;
-        if (fbEmail && !u.email) u.email = fbEmail;
+        if (fbEmail) u.email = fbEmail;
         REMO_STORE.save(true, 'auth_google');
+        REMO_STORE.syncUserToCloud(u);
       }
       if (typeof REMO_STORE.refreshPrivateCloudListeners === 'function') {
         REMO_STORE.refreshPrivateCloudListeners();

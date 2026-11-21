@@ -122,14 +122,14 @@
   <link rel="preconnect" href="https://firebasestorage.googleapis.com" crossorigin>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="preload" as="style" href="css/remo-core.css?v=157">
+  <link rel="preload" as="style" href="css/remo-core.css?v=158">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800;900&family=Orbitron:wght@700;900&display=swap" media="print" onload="this.media='all'">
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800;900&family=Orbitron:wght@700;900&display=swap"></noscript>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha384-sHL9NAb7lN7rfvG5lfHpm643Xkcjzp4jFvuavGOndn6pjVqS6ny56CAt3nsEVT4H" crossorigin="anonymous" media="print" onload="this.media='all'">
   <noscript><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha384-sHL9NAb7lN7rfvG5lfHpm643Xkcjzp4jFvuavGOndn6pjVqS6ny56CAt3nsEVT4H" crossorigin="anonymous"></noscript>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha384-cxOPjt7s7Iz04uaHJceBmS+qpjv2JkIHNVcuOrM+YHwZOmJGBXI00mdUXEq65HTH" crossorigin="anonymous" defer></script>
 
-  <link rel="stylesheet" href="css/remo-core.css?v=157">
+  <link rel="stylesheet" href="css/remo-core.css?v=158">
 </head>
 <body>
 
@@ -2024,13 +2024,13 @@
           <select id="authHomeCitySelect" class="remo-input"></select>
         </div>
         <div class="form-field" id="authNameFieldWrap">
-          <input type="text" id="authNameInp" class="remo-input" data-i18n-placeholder="auth_name_ph" placeholder="Your Creator Name">
+          <input type="text" id="authNameInp" class="remo-input" data-i18n-placeholder="auth_name_ph" placeholder="Your Creator Name" required>
         </div>
         <div class="form-field">
           <input type="email" id="authEmailInp" class="remo-input" data-i18n-placeholder="auth_email_ph" placeholder="Email address" autocomplete="email" required>
         </div>
         <div class="form-field">
-          <input type="password" id="authPassInp" class="remo-input" data-i18n-placeholder="auth_pass_ph" placeholder="Password (optional — or receive email link)" autocomplete="current-password">
+          <input type="password" id="authPassInp" class="remo-input" data-i18n-placeholder="auth_pass_ph" placeholder="Password (6+ chars)" minlength="6" autocomplete="current-password" required>
         </div>
 
         <!-- 📜 Terms & Privacy Consent Checkbox (Strict 13+ Eligibility) -->
@@ -3002,15 +3002,15 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js" integrity="sha384-oFrOL1TiREYNET0lsYF3LjQuyi2gL7vhjH1X8vFr+umcmzAdPELopeSgbcrv4uRm" crossorigin="anonymous"></script>
 
   <!-- REMO Modular Engines -->
-  <script src="js/remo-i18n.js?v=157"></script>
-  <script src="js/remo-cities-data.js?v=157"></script>
-  <script src="js/remo-store.js?v=157"></script>
-  <script src="js/remo-card-engine.js?v=157"></script>
-  <script src="js/remo-radar-arena.js?v=157"></script>
-  <script src="js/remo-social-comms.js?v=157"></script>
-  <script src="js/remo-radio-engine.js?v=157"></script>
-  <script src="js/remo-focus-tv.js?v=157"></script>
-  <script src="js/remo-world-blitz.js?v=157"></script>
+  <script src="js/remo-i18n.js?v=158"></script>
+  <script src="js/remo-cities-data.js?v=158"></script>
+  <script src="js/remo-store.js?v=158"></script>
+  <script src="js/remo-card-engine.js?v=158"></script>
+  <script src="js/remo-radar-arena.js?v=158"></script>
+  <script src="js/remo-social-comms.js?v=158"></script>
+  <script src="js/remo-radio-engine.js?v=158"></script>
+  <script src="js/remo-focus-tv.js?v=158"></script>
+  <script src="js/remo-world-blitz.js?v=158"></script>
 
   <noscript>
     <nav aria-label="REMO World Static Directory" style="padding:20px;background:#050816;color:#f8fafc;">

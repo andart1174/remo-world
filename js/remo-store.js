@@ -2752,11 +2752,11 @@ const REMO_STORE = {
 
   _isFbUserVerified(fbU) {
     if (!fbU || !fbU.uid) return false;
-    const fbEmail = this._getFbEmail(fbU);
-    if (this.isAdminEmail(fbEmail)) {
-      return fbU.emailVerified === true;
+    if (fbU.emailVerified === true) return true;
+    if (Array.isArray(fbU.providerData)) {
+      return fbU.providerData.some((p) => p && (p.providerId === 'google.com' || p.providerId === 'apple.com'));
     }
-    return true;
+    return false;
   },
 
   isAdminEmail(email) {
@@ -4490,9 +4490,11 @@ const REMO_STORE = {
     } catch (e) {}
     this.state.users = (this.state.users || []).filter((u) => u.uid !== uid);
     this.save(true, 'user_deleted');
+    if (this._adminPrivateEmailsMap) this._adminPrivateEmailsMap.delete(uid);
     if (this.fbDb) {
       try {
         await this.fbDb.collection('remo_users').doc(uid).delete();
+        this.fbDb.collection('remo_users_private').doc(uid).delete().catch(() => {});
         this.fbDb.collection('remo_presence').doc(uid).delete().catch(() => {});
         return { ok: true };
       } catch (e) {
@@ -5430,6 +5432,15 @@ const REMO_STORE = {
             list.forEach((fn) => { try { fn(); } catch (e) {} });
           }
           if (fbU) {
+            if (!this._isFbUserVerified(fbU) && typeof fbU.reload === 'function') {
+              try {
+                await fbU.reload();
+                fbU = (this.fbAuth && this.fbAuth.currentUser) || fbU;
+                if (fbU && fbU.emailVerified && typeof fbU.getIdToken === 'function') {
+                  await fbU.getIdToken(true);
+                }
+              } catch (eReload) {}
+            }
             const isVerified = this._isFbUserVerified(fbU);
             if (!isVerified) {
               this.setAdminUnlocked(false);
@@ -5692,7 +5703,11 @@ const REMO_STORE = {
     this._privAuthKey = nextKey;
 
     if (!isVerified || !curFb) {
+      if (this._adminPrivateEmailsMap) this._adminPrivateEmailsMap.clear();
       return;
+    }
+    if (!isAdm && this._adminPrivateEmailsMap) {
+      this._adminPrivateEmailsMap.clear();
     }
 
     const dmState = { isInitial: true };
@@ -5711,13 +5726,45 @@ const REMO_STORE = {
     };
 
     if (isAdm) {
+      this._adminPrivateEmailsMap = this._adminPrivateEmailsMap || new Map();
       this._privUnsubs.push(
         this.fbDb.collection('remo_direct_messages').orderBy('ts', 'desc').limit(150)
           .onSnapshot((s) => this._mergeDmSnapshot(s, dmState), (err) => console.warn('DM admin watch notice:', err.message)),
         this.fbDb.collection('remo_notifications').orderBy('ts', 'desc').limit(80)
           .onSnapshot((s) => this._mergeNotifSnapshot(s, notifState), (err) => console.warn('Notif admin watch notice:', err.message)),
         this.fbDb.collection('remo_support_tickets').orderBy('ts', 'desc').limit(60)
-          .onSnapshot(ticketCb, (err) => console.warn('Support ticket watch notice:', err.message))
+          .onSnapshot(ticketCb, (err) => console.warn('Support ticket watch notice:', err.message)),
+        this.fbDb.collection('remo_users_private').limit(250)
+          .onSnapshot((snap) => {
+            if (!snap || !this.isCurrentUserAdmin()) return;
+            this._adminPrivateEmailsMap = this._adminPrivateEmailsMap || new Map();
+            const fbMap = new Map();
+            snap.forEach((doc) => {
+              const pd = doc.data();
+              if (!pd || !pd.email) return;
+              const em = String(pd.email).trim();
+              if (!em) return;
+              this._adminPrivateEmailsMap.set(doc.id, em);
+              if (pd.uid) this._adminPrivateEmailsMap.set(pd.uid, em);
+              if (pd.fbUid) {
+                fbMap.set(pd.fbUid, em);
+                this._adminPrivateEmailsMap.set('u_fb_' + pd.fbUid, em);
+              }
+            });
+            let updated = false;
+            (this.state.users || []).forEach((u) => {
+              if (!u || !u.uid) return;
+              const em = this._adminPrivateEmailsMap.get(u.uid) || (u.fbUid ? fbMap.get(u.fbUid) : '') || '';
+              if (em && u.email !== em) {
+                u.email = em;
+                updated = true;
+              }
+            });
+            if (updated || snap.size > 0) {
+              if (typeof refreshAllAdminPanels === 'function') refreshAllAdminPanels();
+              if (typeof renderAdminModerationPanel === 'function') renderAdminModerationPanel();
+            }
+          }, (err) => console.warn('Private email admin watch notice:', err.message))
       );
     } else if (myUid) {
       this._privUnsubs.push(
@@ -5830,6 +5877,10 @@ const REMO_STORE = {
             }
           }
           // Preserve owner's private email & auth identity fields across public profile sync
+          if (isAdm0 && !uData.email && this._adminPrivateEmailsMap) {
+            const mappedEmail = this._adminPrivateEmailsMap.get(uData.uid) || (uData.fbUid ? this._adminPrivateEmailsMap.get('u_fb_' + uData.fbUid) : '') || '';
+            if (mappedEmail) uData.email = mappedEmail;
+          }
           if (existingLocal) {
             if (existingLocal.email && !uData.email && (uData.uid === myUid0 || isAdm0)) {
               uData.email = existingLocal.email;
