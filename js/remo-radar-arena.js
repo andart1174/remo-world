@@ -2080,6 +2080,11 @@ function openEditProfileModal() {
   if (cityLbl) cityLbl.textContent = isFr ? 'Ville de Résidence (Home City) :' : 'Home City of Residence:';
   if (cancelBtn) cancelBtn.textContent = isFr ? 'Annuler' : 'Cancel';
   if (saveBtn) saveBtn.textContent = isFr ? '✓ Enregistrer' : '✓ Save Changes';
+  const delAccBtn = document.getElementById('editProfDeleteAccountBtn');
+  if (delAccBtn) {
+    delAccBtn.textContent = isFr ? '🗑️ Supprimer Mon Compte' : '🗑️ Delete My Account';
+    delAccBtn.style.display = (u.role === 'admin' || u.uid === 'u_admin_founder' || REMO_STORE.isCurrentUserAdmin()) ? 'none' : 'inline-flex';
+  }
 
   if (nameInp) {
     nameInp.value = u.name || '';
@@ -2124,6 +2129,26 @@ function openEditProfileModal() {
 
   modal.classList.add('open');
 }
+
+async function promptDeleteMyCitizenAccount() {
+  const isFr = REMO_I18N.getLang() === 'fr';
+  const msg = isFr
+    ? '⚠️ Voulez-vous vraiment supprimer définitivement votre compte citoyen REMO et vos données associées (RGPD) ? Cette action est irréversible.'
+    : '⚠️ Are you sure you want to permanently delete your REMO Citizen account and associated data (GDPR)? This action cannot be undone.';
+  if (typeof confirm === 'function' && !confirm(msg)) return;
+  const res = await REMO_STORE.deleteMyOwnAccount();
+  closeEditProfileModal();
+  if (res && res.ok) {
+    if (typeof remoToast === 'function') {
+      remoToast(isFr ? '🗑️ Votre compte a été supprimé définitivement.' : '🗑️ Your account has been permanently deleted.');
+    }
+    if (typeof syncHeaderAndSidebars === 'function') syncHeaderAndSidebars();
+    if (typeof renderPassportView === 'function') renderPassportView();
+  } else if (typeof remoToast === 'function') {
+    remoToast(isFr ? '⚠️ Impossible de supprimer ce compte.' : '⚠️ Unable to delete this account.', 'error');
+  }
+}
+window.promptDeleteMyCitizenAccount = promptDeleteMyCitizenAccount;
 
 async function handleProfileAvatarSelect(event) {
   const file = event && event.target && event.target.files && event.target.files[0];

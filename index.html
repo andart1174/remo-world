@@ -122,14 +122,14 @@
   <link rel="preconnect" href="https://firebasestorage.googleapis.com" crossorigin>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="preload" as="style" href="css/remo-core.css?v=152">
+  <link rel="preload" as="style" href="css/remo-core.css?v=153">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800;900&family=Orbitron:wght@700;900&display=swap" media="print" onload="this.media='all'">
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800;900&family=Orbitron:wght@700;900&display=swap"></noscript>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha384-sHL9NAb7lN7rfvG5lfHpm643Xkcjzp4jFvuavGOndn6pjVqS6ny56CAt3nsEVT4H" crossorigin="anonymous" media="print" onload="this.media='all'">
   <noscript><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha384-sHL9NAb7lN7rfvG5lfHpm643Xkcjzp4jFvuavGOndn6pjVqS6ny56CAt3nsEVT4H" crossorigin="anonymous"></noscript>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha384-cxOPjt7s7Iz04uaHJceBmS+qpjv2JkIHNVcuOrM+YHwZOmJGBXI00mdUXEq65HTH" crossorigin="anonymous" defer></script>
 
-  <link rel="stylesheet" href="css/remo-core.css?v=152">
+  <link rel="stylesheet" href="css/remo-core.css?v=153">
 </head>
 <body>
 
@@ -202,12 +202,12 @@
     <div class="genesis-fomo-inner" onclick="switchRemoView('passport')" title="Genesis Passport Allocation" style="display:flex;align-items:center;gap:8px;flex:1;cursor:pointer;">
       <span class="genesis-fomo-fire">🔥</span>
       <span class="genesis-fomo-txt">
-        <b data-i18n="genesis_fomo_badge">ALLOCATION PASSEPORTS GENESIS (#0001–#0500) :</b>
-        <span data-i18n="genesis_fomo_alert">Il ne reste que</span> <b id="genesisSlotsLeft" style="color:#fde047;">79</b> <span data-i18n="genesis_fomo_rem">Passeports Pionniers Or disponibles !</span>
+        <b data-i18n="genesis_fomo_badge">GENESIS PASSPORT ALLOCATION (#0001–#0500):</b>
+        <span data-i18n="genesis_fomo_alert">Only</span> <b id="genesisSlotsLeft" style="color:#fde047;">79</b> <span data-i18n="genesis_fomo_rem">Gold Pioneer Passports remaining!</span>
       </span>
-      <span class="genesis-fomo-pill" data-i18n="genesis_claim_btn">⚡ Réclamer +150 🪙</span>
+      <span class="genesis-fomo-pill" data-i18n="genesis_claim_btn">⚡ Claim +150 🪙</span>
     </div>
-    <button type="button" class="fomo-close-btn" onclick="dismissGenesisFomoBar(event)" title="Fermer / Dismiss">✕</button>
+    <button type="button" class="fomo-close-btn" onclick="dismissGenesisFomoBar(event)" title="Dismiss">✕</button>
     
   </div>
 
@@ -268,7 +268,7 @@
           </button>
           <div id="sidebarUnreadSenderPills" class="sidebar-sender-pills" style="display:none;"></div>
           <button class="nav-btn" data-nav-view="passport" onclick="switchRemoView('passport')">
-            <span class="nav-ic">👤</span> <span data-i18n="nav_passport">Profil Citoyen &amp; ID</span>
+            <span class="nav-ic">👤</span> <span data-i18n="nav_passport">Citizen Profile &amp; ID</span>
           </button>
 
           <!-- Modern App Launcher Grid Trigger -->
@@ -969,7 +969,7 @@
   <div class="remo-modal-backdrop" id="editProfileModal" onclick="if(event.target===this)closeEditProfileModal()">
     <div class="remo-modal" style="max-width:440px;">
       <div class="modal-hdr">
-        <b style="font-family:'Orbitron',sans-serif;color:#fbbf24;" id="editProfTitleHdr">✏️ Modifier Mon Profil Citoyen</b>
+        <b style="font-family:'Orbitron',sans-serif;color:#fbbf24;" id="editProfTitleHdr">✏️ Edit Citizen Profile</b>
         <button class="modal-close" onclick="closeEditProfileModal()">✕</button>
       </div>
       <form onsubmit="saveUserProfile(event)">
@@ -992,20 +992,23 @@
         </div>
 
         <div class="form-field">
-          <label id="editProfNameLbl">Nom d’affichage (Pseudo) :</label>
-          <input type="text" id="editProfNameInp" class="remo-input" maxlength="24" required placeholder="Votre pseudo REMO">
+          <label id="editProfNameLbl">Display Name (Nickname):</label>
+          <input type="text" id="editProfNameInp" class="remo-input" maxlength="24" required placeholder="Your REMO username">
         </div>
         <div class="form-field">
-          <label id="editProfBioLbl">Bio / Statut Citoyen (max 80 car.) :</label>
-          <input type="text" id="editProfBioInp" class="remo-input" maxlength="80" placeholder="Ex: Explorateur nocturne • Passionné d'art 🌃">
+          <label id="editProfBioLbl">Bio / Citizen Status (max 80 chars):</label>
+          <input type="text" id="editProfBioInp" class="remo-input" maxlength="80" placeholder="Ex: Night explorer • Art lover 🌃">
         </div>
         <div class="form-field">
-          <label id="editProfCityLbl">Ville de Résidence (Home City) :</label>
+          <label id="editProfCityLbl">Home City of Residence:</label>
           <select id="editProfCitySel" class="remo-input"></select>
         </div>
-        <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">
-          <button type="button" class="btn-ghost" onclick="closeEditProfileModal()" id="editProfCancelBtn">Annuler</button>
-          <button type="submit" class="btn-cyber btn-gold" id="editProfSaveBtn">✓ Enregistrer</button>
+        <div style="display:flex;gap:10px;justify-content:space-between;align-items:center;margin-top:16px;flex-wrap:wrap;">
+          <button type="button" class="btn-ghost" id="editProfDeleteAccountBtn" style="color:#fda4af;border-color:rgba(244,63,94,0.35);font-size:0.75rem;padding:6px 10px;" onclick="promptDeleteMyCitizenAccount()">🗑️ Delete My Account</button>
+          <div style="display:flex;gap:10px;margin-left:auto;">
+            <button type="button" class="btn-ghost" onclick="closeEditProfileModal()" id="editProfCancelBtn">Cancel</button>
+            <button type="submit" class="btn-cyber btn-gold" id="editProfSaveBtn">✓ Save Changes</button>
+          </div>
         </div>
       </form>
     </div>
@@ -2994,15 +2997,15 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js" integrity="sha384-oFrOL1TiREYNET0lsYF3LjQuyi2gL7vhjH1X8vFr+umcmzAdPELopeSgbcrv4uRm" crossorigin="anonymous"></script>
 
   <!-- REMO Modular Engines -->
-  <script src="js/remo-i18n.js?v=152"></script>
-  <script src="js/remo-cities-data.js?v=145"></script>
-  <script src="js/remo-store.js?v=151"></script>
-  <script src="js/remo-card-engine.js?v=145"></script>
-  <script src="js/remo-radar-arena.js?v=145"></script>
-  <script src="js/remo-social-comms.js?v=152"></script>
-  <script src="js/remo-radio-engine.js?v=145"></script>
-  <script src="js/remo-focus-tv.js?v=152"></script>
-  <script src="js/remo-world-blitz.js?v=145"></script>
+  <script src="js/remo-i18n.js?v=153"></script>
+  <script src="js/remo-cities-data.js?v=153"></script>
+  <script src="js/remo-store.js?v=153"></script>
+  <script src="js/remo-card-engine.js?v=153"></script>
+  <script src="js/remo-radar-arena.js?v=153"></script>
+  <script src="js/remo-social-comms.js?v=153"></script>
+  <script src="js/remo-radio-engine.js?v=153"></script>
+  <script src="js/remo-focus-tv.js?v=153"></script>
+  <script src="js/remo-world-blitz.js?v=153"></script>
 
   <noscript>
     <nav aria-label="REMO World Static Directory" style="padding:20px;background:#050816;color:#f8fafc;">

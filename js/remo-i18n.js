@@ -507,7 +507,9 @@ const REMO_DICT = {
     adm_back_network: '🌐 Open REMO Social Network',
     adm_lock_btn: '🔒 Lock Office',
     adm_unlock_title: '🛡️ Admin Executive Access',
-    adm_unlock_sub: 'Sign in with your verified Founder & Admin Firebase account (andart1174@gmail.com) to unlock REMO Admin Control Center.',
+    adm_unlock_sub: 'Sign in with your verified Founder & Admin Firebase account to unlock REMO Admin Control Center.',
+    adm_or_credentials: 'OR SIGN IN WITH ADMIN CREDENTIALS',
+    adm_email_ph: 'Verified Admin Email',
     adm_pin_ph: 'Admin Password',
     adm_unlock_btn: '🔐 Sign In with Email & Password',
     adm_google_btn: '🌐 Continue with Admin Google Account',
@@ -1786,7 +1788,9 @@ const REMO_DICT = {
     adm_back_network: '🌐 Ouvrir le Réseau Social REMO',
     adm_lock_btn: '🔒 Verrouiller Bureau',
     adm_unlock_title: '🛡️ Accès Exécutif Administrateur',
-    adm_unlock_sub: 'Connectez-vous avec le compte Fondateur vérifié Firebase (andart1174@gmail.com) pour déverrouiller le Bureau Admin REMO.',
+    adm_unlock_sub: 'Connectez-vous avec le compte Fondateur vérifié Firebase pour déverrouiller le Bureau Admin REMO.',
+    adm_or_credentials: 'OU CONNEXION AVEC IDENTIFIANTS ADMIN',
+    adm_email_ph: 'Email Admin Vérifié',
     adm_pin_ph: 'Mot de passe Admin',
     adm_unlock_btn: '🔐 Connexion Email & Mot de passe',
     adm_google_btn: '🌐 Continuer avec Google Admin',
@@ -2563,6 +2567,15 @@ const REMO_DICT = {
 
 const REMO_I18N = {
   current: (function () {
+    try {
+      if (typeof window !== 'undefined' && window.location && window.location.search) {
+        const qLang = new URLSearchParams(window.location.search).get('lang');
+        if (qLang === 'en' || qLang === 'fr') {
+          localStorage.setItem('remo_lang', qLang);
+          return qLang;
+        }
+      }
+    } catch (e) {}
     const saved = localStorage.getItem('remo_lang');
     if (saved === 'en' || saved === 'fr') return saved;
     const nav = (navigator.language || 'en').toLowerCase();
@@ -2617,6 +2630,17 @@ const REMO_I18N = {
       const btnLang = btn.getAttribute('data-lang');
       btn.classList.toggle('active', btnLang === this.current);
     });
+    if (typeof document !== 'undefined' && document.title) {
+      if (document.getElementById('admLockScreen')) {
+        document.title = this.current === 'fr'
+          ? 'REMO 🛡️ Bureau Exécutif Admin & Usine de Cartes Villes 4D'
+          : 'REMO 🛡️ Admin Executive Office & World City Card Factory';
+      } else if (document.getElementById('remoPostsGrid')) {
+        document.title = this.current === 'fr'
+          ? 'REMO World 🌐 24 Villes du Monde en 4D, 56 Radios Live, Focus TV & Quiz'
+          : 'REMO World 🌐 4D World Cities, 56 Live Radios, Focus TV & Trivia';
+      }
+    }
   }
 };
 

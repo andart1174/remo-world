@@ -12,8 +12,8 @@ service cloud.firestore {
         request.auth.uid == userId ||
         userId == 'u_fb_' + request.auth.uid ||
         (resource != null && resource.data != null && (
-          (('fbUid' in resource.data) && resource.data.fbUid == request.auth.uid) ||
-          (('email' in resource.data) && request.auth.token.email == resource.data.email)
+          (('fbUid' in resource.data) && resource.data.fbUid != '' && resource.data.fbUid == request.auth.uid) ||
+          (('email' in resource.data) && request.auth.token.email_verified == true && request.auth.token.email == resource.data.email)
         ))
       );
     }
@@ -118,13 +118,14 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
-    // 2. Citizen Profiles & Passports (Role, Ban, Verified, UID & Coin Delta Protected)
+    // 2. Citizen Profiles & Passports (Role, Ban, Verified, Private Email Exclusion, UID & Coin Delta Protected)
     match /remo_users/{userId} {
       allow read: if true;
       allow create: if isAdmin() || (
         isNotBanned() &&
         isSafeId(userId) &&
         isUidMatch(userId) &&
+        !('email' in request.resource.data) &&
         (!('role' in request.resource.data) || request.resource.data.role == 'citizen') &&
         (!('banned' in request.resource.data) || request.resource.data.banned == false) &&
         (!('verified' in request.resource.data) || request.resource.data.verified == false) &&
@@ -133,12 +134,13 @@ service cloud.firestore {
       allow update: if isAdmin() || (
         isOwner(userId) &&
         isNotBanned() &&
+        !('email' in request.resource.data) &&
         (!('uid' in resource.data) || request.resource.data.uid == resource.data.uid) &&
         (!('fbUid' in resource.data) || resource.data.fbUid == '' || request.resource.data.fbUid == resource.data.fbUid) &&
         (!('role' in request.resource.data) || (('role' in resource.data) && request.resource.data.role == resource.data.role) || (!('role' in resource.data) && request.resource.data.role == 'citizen')) &&
         (!('banned' in request.resource.data) || (('banned' in resource.data) && request.resource.data.banned == resource.data.banned) || (!('banned' in resource.data) && request.resource.data.banned == false)) &&
         (!('verified' in request.resource.data) || (('verified' in resource.data) && request.resource.data.verified == resource.data.verified) || (!('verified' in resource.data) && request.resource.data.verified == false)) &&
-        (!('coins' in request.resource.data) || (request.resource.data.coins >= 0 && (!('coins' in resource.data) || (request.resource.data.coins - resource.data.coins) <= 1500)))
+        (!('coins' in request.resource.data) || (request.resource.data.coins >= 0 && (!('coins' in resource.data) || (request.resource.data.coins - resource.data.coins) <= 600)))
       ) || (
         isNotBanned() &&
         !isOwner(userId) &&
@@ -148,10 +150,10 @@ service cloud.firestore {
         (request.resource.data.coins is int || request.resource.data.coins is float) &&
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['coins', 'lifetimeCoins', 'updatedAt']) &&
         (request.resource.data.coins - resource.data.coins) > 0 &&
-        (request.resource.data.coins - resource.data.coins) <= 5000 &&
+        (request.resource.data.coins - resource.data.coins) <= 1000 &&
         (!('lifetimeCoins' in resource.data) || !('lifetimeCoins' in request.resource.data) || request.resource.data.lifetimeCoins >= resource.data.lifetimeCoins)
       );
-      allow delete: if isAdmin();
+      allow delete: if isAdmin() || isOwner(userId);
     }
 
     // 2B. Private User Contact Vault (Email stored privately for Owner & Admin only)
@@ -162,18 +164,19 @@ service cloud.firestore {
     // 3. Ecosystem Live State & Admin-Protected Public Config
     match /remo_ecosystem/{docId} {
       allow read: if true;
-      allow create: if isAdmin() || (
-        isNotBanned() &&
-        !request.resource.data.keys().hasAny([
-          'settings', 'supportTickets', 'adminPinHash', 'adminEmail',
-          'deletedUserIds', 'deletedDuelIds', 'deletedAuctionIds', 'deletedStoryIds'
-        ])
-      );
+      allow create: if isAdmin();
       allow update: if isAdmin() || (
         isNotBanned() &&
+        docId == 'live_state' &&
         !request.resource.data.diff(resource.data).affectedKeys().hasAny([
-          'settings', 'supportTickets', 'adminPinHash', 'adminEmail',
-          'deletedUserIds', 'deletedDuelIds', 'deletedAuctionIds', 'deletedStoryIds'
+          'settings', 'supportTickets', 'adminPin', 'adminPinHash', 'adminEmail',
+          'deletedUserIds', 'deletedDuelIds', 'deletedAuctionIds', 'deletedStoryIds',
+          'deletedPostIds', 'customCities', 'cityMayors', 'posts', 'gamesHub'
+        ]) &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'cityScores', 'duels', 'bottles', 'jukeboxTracks', 'auctions',
+          'geoVaults', 'stories', 'viralContests', 'worldSystems',
+          'remoOdyssey', 'worldSpotlight', 'updatedAt'
         ])
       );
       allow delete: if isAdmin();
@@ -187,7 +190,13 @@ service cloud.firestore {
     // 4. 3D Digital City Cards Pool & Auctions
     match /remo_cards/{cardId} {
       allow read: if true;
-      allow create: if isAdmin() || (isNotBanned() && isSafeId(cardId) && isUidMatch(request.resource.data.ownerUid));
+      allow create: if isAdmin() || (
+        isNotBanned() &&
+        isSafeId(cardId) &&
+        isUidMatch(request.resource.data.ownerUid) &&
+        (!('rarity' in request.resource.data) || request.resource.data.rarity != 'Founder 1-of-1') &&
+        (!('coinValue' in request.resource.data) || (request.resource.data.coinValue >= 0 && request.resource.data.coinValue <= 25000))
+      );
       allow update: if isAdmin() || (isNotBanned() && (!('ownerUid' in resource.data) || isUidMatch(resource.data.ownerUid)));
       allow delete: if isAdmin();
     }

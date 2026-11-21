@@ -56,7 +56,7 @@ function runAppLauncherAudit() {
   const idx = read('index.html');
   const comms = read('js/remo-social-comms.js');
   const start = idx.indexOf('id="appLauncherModal"');
-  const end = idx.indexOf('id="gamesHubModal"');
+  const end = idx.indexOf('id="remoOdysseyModal"') > 0 ? idx.indexOf('id="remoOdysseyModal"') : idx.indexOf('id="gamesHubModal"');
   assert.ok(start > 0 && end > start, 'Missing appLauncherModal block in index.html');
   const block = idx.slice(start, end);
   const onclicks = [...block.matchAll(/onclick="([^"]+)"/g)].map((m) => m[1]);
@@ -278,9 +278,19 @@ async function runStoreSimulations() {
   assert.strictEqual(savedAfterPrune.length, 80);
   assert.ok(savedAfterPrune.some((p) => p.id === 'post_unsynced_tail'), '_prunePostsForLocalSave must preserve unsynced posts');
 
-  assert.ok(!comms.includes('id="gamesHubIframe" class="game-hub-iframe" data-post-id="${escapeHtmlStr(\'hub_\' + active.id)}" sandbox="allow-scripts allow-same-origin"'), 'gamesHubIframe must NOT use allow-same-origin!');
-  assert.ok(comms.includes('id="gamesHubIframe" class="game-hub-iframe" data-post-id="${escapeHtmlStr(\'hub_\' + active.id)}" sandbox="allow-scripts"'), 'gamesHubIframe must isolate games with sandbox="allow-scripts"');
+  assert.ok(!comms.includes('sandbox="allow-scripts allow-same-origin"'), 'HTML mini-app iframes must NOT use allow-same-origin!');
+  assert.ok(comms.includes('sandbox="allow-scripts"'), 'HTML mini-app iframes must isolate games with sandbox="allow-scripts"');
   assert.ok(comms.includes("await uploadMediaToCloudOrDataUrl(leftImg, 'posts'"), 'city_versus must upload left/right photos through Cloud Storage');
+
+  // 6B. Verify Admin & User Data Security Hardening
+  const admHtml = read('admin.html');
+  const admJs = read('js/remo-admin.js');
+  const redirects = read('_redirects');
+  assert.ok(!admHtml.includes('value="andart1174@gmail.com"'), 'admin.html must NOT pre-fill Founder Gmail address publicly');
+  assert.ok(admJs.includes('function isAdminSessionUnlocked()') && admJs.includes('if (!isAdminSessionUnlocked())'), 'js/remo-admin.js must gate DOM rendering and actions behind isAdminSessionUnlocked()');
+  assert.ok(rules.includes("!('email' in request.resource.data)"), 'firestore.rules must block writing plaintext email to public remo_users');
+  assert.ok(rules.includes("'customCities', 'cityMayors', 'posts'"), 'firestore.rules must block non-admin writes to customCities, cityMayors, and posts in remo_ecosystem');
+  assert.ok(redirects.includes('/firestore.rules') && redirects.includes('404!'), '_redirects must block public download of /firestore.rules');
 
   const stRules = read('storage.rules');
   assert.ok(stRules.includes('allow create:') && stRules.includes('allow update, delete: if isStorageAdmin();'), 'storage.rules must prevent non-admin overwrite');

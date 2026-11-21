@@ -12345,7 +12345,8 @@ function copilotGenerateViralIdea() {
   const city = getCityById(cityId);
   const enCity = city.name_en;
   const frCity = city.name_fr || city.name_en;
-  const tag = `#${enCity.replace(/[^A-Za-z]/g, '')} #RemoWorld #4DCity`;
+  const cleanHashtagCity = String(enCity || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Za-z0-9]/g, '');
+  const tag = `#${cleanHashtagCity} #RemoWorld #4DCity`;
 
   const ideas = [
     {

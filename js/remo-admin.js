@@ -22,22 +22,46 @@ function admToast(msg) {
 }
 
 /* ── 1. ADMIN FIREBASE AUTH LOCK / UNLOCK (Synced with Verified Founder Account) ── */
+function isAdminSessionUnlocked() {
+  return Boolean(typeof REMO_STORE !== 'undefined' && REMO_STORE.isAdminUnlocked() && REMO_STORE.isCurrentUserAdmin());
+}
+
 function getAdminRealUsers() {
+  if (!isAdminSessionUnlocked()) return [];
   return (REMO_STORE.state.users || []).filter((u) =>
     u && u.uid && !(typeof REMO_STORE.isFakeOrGuestUser === 'function' && REMO_STORE.isFakeOrGuestUser(u))
   );
 }
 
+function _clearLockedAdminDom() {
+  ['admUsersTable', 'admDirectMsgsTable', 'admSupportOverviewTable', 'admSupportModTable', 'admPostsTable', 'admCitiesTableBody', 'admEuroEntriesTable', 'admPgpEntriesTable', 'admMintedCoinsTableBody'].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = '';
+  });
+  ['kpiUsers', 'kpiPosts', 'kpiCards', 'kpiCoins'].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = '0';
+  });
+}
+
 function checkAdminSession() {
-  const unlocked = REMO_STORE.isAdminUnlocked() && REMO_STORE.isCurrentUserAdmin();
+  const unlocked = isAdminSessionUnlocked();
   const lockEl = document.getElementById('admLockScreen');
   if (lockEl) lockEl.style.display = unlocked ? 'none' : 'flex';
+  const topbarEl = document.getElementById('admTopbarEl') || document.querySelector('.adm-topbar');
+  const layoutEl = document.getElementById('admLayoutEl') || document.querySelector('.adm-layout');
+  if (topbarEl) topbarEl.style.display = unlocked ? '' : 'none';
+  if (layoutEl) layoutEl.style.display = unlocked ? '' : 'none';
   if (unlocked) {
+    renderAdminCardStudioSelectors();
+    onStudioCityChange(true);
     refreshAllAdminPanels();
     if (!window._remoAutoPurgeDone && typeof REMO_STORE.purgeFakeUsersFromCloud === 'function') {
       window._remoAutoPurgeDone = true;
       REMO_STORE.purgeFakeUsersFromCloud().catch(() => {});
     }
+  } else {
+    _clearLockedAdminDom();
   }
 }
 
@@ -58,7 +82,7 @@ async function adminGoogleSignIn() {
     const adminEmail = (REMO_STORE.state?.settings?.adminEmail || 'andart1174@gmail.com').toLowerCase().trim();
     if (!fbU || (fbU.email || '').toLowerCase().trim() !== adminEmail || fbU.emailVerified !== true) {
       await REMO_STORE.fbAuth.signOut();
-      alert(lang === 'fr' ? '❌ Accès refusé : connectez-vous avec le compte Fondateur vérifié (' + adminEmail + ').' : '❌ Access denied: please sign in with the verified Founder account (' + adminEmail + ').');
+      alert(lang === 'fr' ? '❌ Accès refusé : compte Fondateur vérifié requis.' : '❌ Access denied: verified Founder account required.');
       return;
     }
     REMO_STORE.ensureGuestOrCitizen(fbU.displayName || 'REMO Founder', fbU.email, 'montreal', true, fbU.uid);
@@ -114,6 +138,7 @@ function lockAdminOffice() {
 }
 
 function adminToggleHappyHour2x() {
+  if (!isAdminSessionUnlocked()) return;
   REMO_STORE.state.settings.happyHour2x = !REMO_STORE.state.settings.happyHour2x;
   REMO_STORE.save(true, 'happy_hour');
   refreshAllAdminPanels();
@@ -121,6 +146,7 @@ function adminToggleHappyHour2x() {
 }
 
 function switchAdminTab(tabId) {
+  if (!isAdminSessionUnlocked()) return;
   adminCurrentTab = tabId;
   document.querySelectorAll('.adm-panel').forEach((p) => p.classList.remove('active'));
   document.getElementById('adm-panel-' + tabId)?.classList.add('active');
@@ -137,6 +163,10 @@ function switchAdminTab(tabId) {
 
 /* ── 2. OVERVIEW KPIs & MEGAPHONE ── */
 function refreshAllAdminPanels() {
+  if (!isAdminSessionUnlocked()) {
+    _clearLockedAdminDom();
+    return;
+  }
   const st = REMO_STORE.state;
   const lang = REMO_I18N.getLang();
 
@@ -181,6 +211,7 @@ function refreshAllAdminPanels() {
 }
 
 function saveAdminMegaphone() {
+  if (!isAdminSessionUnlocked()) return;
   const lang = REMO_I18N.getLang();
   REMO_STORE.state.settings.announcement_en = document.getElementById('admMegaEn')?.value || '';
   REMO_STORE.state.settings.announcement_fr = document.getElementById('admMegaFr')?.value || '';
@@ -190,6 +221,7 @@ function saveAdminMegaphone() {
 }
 
 function triggerGlobalCoinRainAdmin() {
+  if (!isAdminSessionUnlocked()) return;
   const lang = REMO_I18N.getLang();
   const amt = Number(prompt(lang === 'fr' ? 'Combien de Pièces REMO envoyer à TOUS les citoyens ?' : 'How many REMO Coins to gift to ALL citizens?', '100'));
   if (!amt || amt <= 0) return;
@@ -204,6 +236,7 @@ function triggerGlobalCoinRainAdmin() {
 
 /* ── 3. MASTER CITY CARD STUDIO & MINTING FACTORY ── */
 function renderAdminCardStudioSelectors() {
+  if (!isAdminSessionUnlocked()) return;
   const citySel = document.getElementById('stCitySelect');
   const themeSel = document.getElementById('stThemeSelect');
   const recipientSel = document.getElementById('stRecipientUser');
@@ -212,18 +245,18 @@ function renderAdminCardStudioSelectors() {
 
   const prevVal = citySel.value || 'chisinau';
   citySel.innerHTML = getRemoCities().map((c) =>
-    `<option value="${c.id}" ${c.id === prevVal ? 'selected' : ''}>${c.flag} ${getCityName(c, lang)} (${c.code})</option>`
+    `<option value="${escapeHtmlStr(c.id)}" ${c.id === prevVal ? 'selected' : ''}>${escapeHtmlStr(c.flag)} ${escapeHtmlStr(getCityName(c, lang))} (${escapeHtmlStr(c.code)})</option>`
   ).join('');
 
   if (themeSel && !themeSel.options.length) {
     themeSel.innerHTML = REMO_CARD_THEMES.map((th) =>
-      `<option value="${th.id}">${lang === 'fr' ? th.name_fr : th.name_en}</option>`
+      `<option value="${escapeHtmlStr(th.id)}">${escapeHtmlStr(lang === 'fr' ? th.name_fr : th.name_en)}</option>`
     ).join('');
   }
 
   if (recipientSel) {
     recipientSel.innerHTML = `<option value="">🌐 REMO Public Drop Pool</option>` +
-      getAdminRealUsers().map((u) => `<option value="${u.uid}">👤 ${escapeHtmlStr(u.name)} (#${escapeHtmlStr(u.passportNum)})</option>`).join('');
+      getAdminRealUsers().map((u) => `<option value="${escapeHtmlStr(u.uid)}">👤 ${escapeHtmlStr(u.name)} (#${escapeHtmlStr(u.passportNum)})</option>`).join('');
   }
 }
 
@@ -556,14 +589,14 @@ function renderAdminCitiesPanel() {
 
   if (fdSel) {
     fdSel.innerHTML = cities.map((c) =>
-      `<option value="${c.id}">${c.flag} ${getCityName(c, lang)} (${c.code})</option>`
+      `<option value="${escapeHtmlStr(c.id)}">${escapeHtmlStr(c.flag)} ${escapeHtmlStr(getCityName(c, lang))} (${escapeHtmlStr(c.code)})</option>`
     ).join('');
   }
 
   const vSel = document.getElementById('admVaultCitySelect');
   if (vSel) {
     vSel.innerHTML = cities.map((c) =>
-      `<option value="${c.id}">${c.flag} ${getCityName(c, lang)} (${c.code})</option>`
+      `<option value="${escapeHtmlStr(c.id)}">${escapeHtmlStr(c.flag)} ${escapeHtmlStr(getCityName(c, lang))} (${escapeHtmlStr(c.code)})</option>`
     ).join('');
   }
 
@@ -575,12 +608,12 @@ function renderAdminCitiesPanel() {
       const photoUrl = typeof resolveCityRealPhotoUrl === 'function' ? resolveCityRealPhotoUrl(c) : '';
       const hasCustomRadio = Boolean(c.radioStreamUrl && /^https:\/\//i.test(c.radioStreamUrl));
       const thumbHtml = photoUrl
-        ? `<img src="${photoUrl.replace(/"/g, '&quot;')}" alt="${c.id}" style="width:30px;height:21px;object-fit:cover;border-radius:4px;border:1px solid rgba(255,255,255,0.22);vertical-align:middle;margin-right:6px;">`
+        ? `<img src="${escapeHtmlStr(photoUrl)}" alt="${escapeHtmlStr(c.id)}" style="width:30px;height:21px;object-fit:cover;border-radius:4px;border:1px solid rgba(255,255,255,0.22);vertical-align:middle;margin-right:6px;">`
         : '';
       return `
         <tr>
           <td>
-            ${thumbHtml}<b>${c.flag} ${escapeHtmlStr(getCityName(c, lang))}</b> <span style="color:var(--muted);">(${escapeHtmlStr(c.code)})</span>
+            ${thumbHtml}<b>${escapeHtmlStr(c.flag)} ${escapeHtmlStr(getCityName(c, lang))}</b> <span style="color:var(--muted);">(${escapeHtmlStr(c.code)})</span>
             ${wx ? `<span style="color:#7dd3fc;font-size:0.74rem;font-weight:800;"> · 🕒 ${escapeHtmlStr(wx.timeStr)} ${wx.icon} ${wx.tempC}°C</span>` : ''}
             ${wx && wx.isSurge ? `<span style="background:rgba(245,158,11,0.25);color:#fde047;padding:2px 6px;border-radius:99px;font-size:0.68rem;font-weight:900;">⚡ 2X SURGE</span>` : ''}
             ${c.foundedBy ? `<span style="background:rgba(16,185,129,0.2);color:#34d399;padding:2px 6px;border-radius:99px;font-size:0.68rem;font-weight:900;">🌱 @${escapeHtmlStr(c.foundedBy)}</span>` : ''}
@@ -1109,14 +1142,14 @@ function renderAdminEconomyPanel() {
     const prev = uSel.value;
     uSel.innerHTML = getAdminRealUsers().map((u) => {
       const c = getCityById(u.homeCity);
-      return `<option value="${u.uid}" ${u.uid === prev ? 'selected' : ''}>${c.flag} @${escapeHtmlStr(u.name)} (#${escapeHtmlStr(u.passportNum)}) — 🪙 ${u.coins.toLocaleString()}</option>`;
+      return `<option value="${escapeHtmlStr(u.uid)}" ${u.uid === prev ? 'selected' : ''}>${escapeHtmlStr(c.flag)} @${escapeHtmlStr(u.name)} (#${escapeHtmlStr(u.passportNum)}) — 🪙 ${Number(u.coins || 0).toLocaleString()}</option>`;
     }).join('');
   }
 
   const promoCitySel = document.getElementById('admPromoCardCitySel');
   if (promoCitySel) {
     promoCitySel.innerHTML = `<option value="">— No Card —</option>` +
-      getRemoCities().map((c) => `<option value="${c.id}">🎴 +${c.flag} ${getCityName(c, lang)}</option>`).join('');
+      getRemoCities().map((c) => `<option value="${escapeHtmlStr(c.id)}">🎴 +${escapeHtmlStr(c.flag)} ${escapeHtmlStr(getCityName(c, lang))}</option>`).join('');
   }
 
   // 👑 Royal Sovereign Coin Serialization Bureau
@@ -1125,7 +1158,7 @@ function renderAdminEconomyPanel() {
     mintUserSel.innerHTML = `<option value="vault">🏛️ Keep in Founder Treasury Vault</option>` +
       getAdminRealUsers().map((u) => {
         const c = getCityById(u.homeCity);
-        return `<option value="${u.uid}">${c ? c.flag : '👤'} @${escapeHtmlStr(u.name)} (#${escapeHtmlStr(u.passportNum)})</option>`;
+        return `<option value="${escapeHtmlStr(u.uid)}">${c ? escapeHtmlStr(c.flag) : '👤'} @${escapeHtmlStr(u.name)} (#${escapeHtmlStr(u.passportNum)})</option>`;
       }).join('');
   }
 
@@ -1153,15 +1186,15 @@ function renderAdminEconomyPanel() {
       const cfg = REMO_STORE.getAlloyConfig(sc.alloy || 'genesis');
       return `
         <tr>
-          <td><b style="color:#fbbf24;font-family:'Orbitron',monospace;letter-spacing:1px;">#${sc.serial}</b></td>
+          <td><b style="color:#fbbf24;font-family:'Orbitron',monospace;letter-spacing:1px;">#${escapeHtmlStr(sc.serial)}</b></td>
           <td>
             <span style="background:${cfg.badgeBg};color:${cfg.badgeColor};border:1px solid ${cfg.rimBorder};padding:2px 8px;border-radius:99px;font-size:0.7rem;font-weight:900;display:inline-flex;align-items:center;gap:4px;">
-              ${cfg.icon} ${cfg.name.split(' (')[0]}
+              ${cfg.icon} ${escapeHtmlStr(cfg.name.split(' (')[0])}
             </span>
           </td>
-          <td><b style="color:#fde047;">+${sc.coinsValue} 🪙</b></td>
-          <td><span style="color:#38bdf8;font-weight:700;">${sc.ownerName || 'Founder Vault'}</span></td>
-          <td><span style="background:${sc.status === 'assigned' ? 'rgba(16,185,129,0.2)' : 'rgba(56,189,248,0.2)'};color:${sc.status === 'assigned' ? '#34d399' : '#7dd3fc'};padding:2px 8px;border-radius:99px;font-size:0.7rem;font-weight:900;">${sc.status ? sc.status.toUpperCase() : 'VAULT'}</span></td>
+          <td><b style="color:#fde047;">+${Number(sc.coinsValue || 0)} 🪙</b></td>
+          <td><span style="color:#38bdf8;font-weight:700;">${escapeHtmlStr(sc.ownerName || 'Founder Vault')}</span></td>
+          <td><span style="background:${sc.status === 'assigned' ? 'rgba(16,185,129,0.2)' : 'rgba(56,189,248,0.2)'};color:${sc.status === 'assigned' ? '#34d399' : '#7dd3fc'};padding:2px 8px;border-radius:99px;font-size:0.7rem;font-weight:900;">${escapeHtmlStr(sc.status ? sc.status.toUpperCase() : 'VAULT')}</span></td>
           <td>
             <button class="adm-btn outline" style="padding:3px 8px;font-size:0.7rem;border-color:#fbbf24;color:#fbbf24;" onclick="adminExportDuplexPrintCoin('${escapeJsSingleArg(sc.serial)}')">🖨️ Print</button>
           </td>
@@ -1897,13 +1930,12 @@ function adminImportBackupJSON(ev) {
 
 document.addEventListener('DOMContentLoaded', () => {
   REMO_I18N.applyDOM();
-  renderAdminCardStudioSelectors();
-  onStudioCityChange();
   checkAdminSession();
-  if (typeof updateIndexNowStatusUI === 'function') updateIndexNowStatusUI();
+  if (isAdminSessionUnlocked() && typeof updateIndexNowStatusUI === 'function') updateIndexNowStatusUI();
 });
 
 window.addEventListener('remo:langchange', () => {
+  if (!isAdminSessionUnlocked()) return;
   refreshAllAdminPanels();
   renderAdminCardStudio();
   if (typeof updateIndexNowStatusUI === 'function') updateIndexNowStatusUI();
@@ -1913,7 +1945,7 @@ window.addEventListener('remo:stateupdate', (ev) => {
   const reason = ev && ev.detail && ev.detail.reason;
   if (reason === 'admin_mode' || reason === 'auth') {
     checkAdminSession();
-  } else if (adminCurrentTab !== 'cards') {
+  } else if (isAdminSessionUnlocked() && adminCurrentTab !== 'cards') {
     refreshAllAdminPanels();
   }
 });
@@ -2055,8 +2087,8 @@ function _admSyncWorldCupCityCheckboxes(cities, wc) {
     const checked = _admWcSelectedCities.includes(c.id);
     return `
       <label class="check-pill" style="padding:4px 8px;font-size:0.72rem;${checked ? 'border-color:#10b981;background:rgba(16,185,129,0.18);' : ''}">
-        <input type="checkbox" value="${c.id}" ${checked ? 'checked' : ''} onchange="adminToggleWorldCupCity('${c.id}', this.checked)">
-        ${c.flag} ${getCityName(c, lang)}
+        <input type="checkbox" value="${escapeHtmlStr(c.id)}" ${checked ? 'checked' : ''} onchange="adminToggleWorldCupCity('${escapeJsSingleArg(c.id)}', this.checked)">
+        ${escapeHtmlStr(c.flag)} ${escapeHtmlStr(getCityName(c, lang))}
       </label>
     `;
   }).join('');
@@ -2064,6 +2096,7 @@ function _admSyncWorldCupCityCheckboxes(cities, wc) {
 }
 
 function adminToggleWorldCupCity(cityId, checked) {
+  if (!isAdminSessionUnlocked()) return;
   if (checked) {
     if (!_admWcSelectedCities.includes(cityId)) {
       if (_admWcSelectedCities.length >= 8) {
@@ -2080,6 +2113,7 @@ function adminToggleWorldCupCity(cityId, checked) {
 }
 
 function adminSelectWorldCupPreset(mode = 'top') {
+  if (!isAdminSessionUnlocked()) return;
   const cities = getRemoCities().slice();
   if (mode === 'random') {
     for (let i = cities.length - 1; i > 0; i--) {
@@ -2096,7 +2130,7 @@ function adminSelectWorldCupPreset(mode = 'top') {
 }
 
 function renderAdminContestsPanel() {
-  if (!REMO_STORE || !REMO_STORE.state) return;
+  if (!isAdminSessionUnlocked() || !REMO_STORE || !REMO_STORE.state) return;
   const lang = REMO_I18N.getLang();
   const vc = REMO_STORE.ensureViralContests();
   const cities = getRemoCities();
@@ -2106,7 +2140,7 @@ function renderAdminContestsPanel() {
     if (!sel) return;
     const cur = sel.value || defVal || 'montreal';
     sel.innerHTML = cities.map((c) =>
-      `<option value="${c.id}" ${c.id === cur ? 'selected' : ''}>${c.flag} ${getCityName(c, lang)} (${c.code})</option>`
+      `<option value="${escapeHtmlStr(c.id)}" ${c.id === cur ? 'selected' : ''}>${escapeHtmlStr(c.flag)} ${escapeHtmlStr(getCityName(c, lang))} (${escapeHtmlStr(c.code)})</option>`
     ).join('');
   };
 
@@ -2129,11 +2163,11 @@ function renderAdminContestsPanel() {
           const c = getCityById(e.cityId);
           return `
             <tr>
-              <td><b>#${i + 1}</b> ${c.flag} ${getCityName(c, lang)}</td>
-              <td><b>${e.songTitle}</b> · <span style="color:#7dd3fc;">@${e.artistName}</span></td>
+              <td><b>#${i + 1}</b> ${escapeHtmlStr(c.flag)} ${escapeHtmlStr(getCityName(c, lang))}</td>
+              <td><b>${escapeHtmlStr(e.songTitle)}</b> · <span style="color:#7dd3fc;">@${escapeHtmlStr(e.artistName)}</span></td>
               <td style="color:#fbbf24;font-weight:900;">${Number(e.points || 0)} PTS (${Number(e.votesCount || 0)} votes)</td>
               <td>
-                <button class="adm-btn rose" style="padding:4px 9px;font-size:0.75rem;" onclick="REMO_STORE.adminDeleteEurovisionEntry('${e.id}')">✕ Delete</button>
+                <button class="adm-btn rose" style="padding:4px 9px;font-size:0.75rem;" onclick="REMO_STORE.adminDeleteEurovisionEntry('${escapeJsSingleArg(e.id)}')">✕ Delete</button>
               </td>
             </tr>
           `;
@@ -2152,16 +2186,17 @@ function renderAdminContestsPanel() {
       ? `<tr><td colspan="4" style="color:var(--muted);text-align:center;">No Grand Prix entries yet.</td></tr>`
       : entries.map((e, i) => {
           const c = getCityById(e.cityId);
-          const thumb = e.mediaUrl
-            ? (e.mediaType === 'video' ? `<a href="${e.mediaUrl}" target="_blank" rel="noopener noreferrer" style="color:#38bdf8;font-size:0.74rem;">🎬 Video</a>` : `<img src="${e.mediaUrl}" alt="" style="width:42px;height:28px;object-fit:cover;border-radius:6px;vertical-align:middle;margin-right:6px;">`)
+          const safeMediaUrl = (e.mediaUrl && /^(https?:\/\/|data:image\/)/i.test(String(e.mediaUrl))) ? escapeHtmlStr(e.mediaUrl) : '';
+          const thumb = safeMediaUrl
+            ? (e.mediaType === 'video' ? `<a href="${safeMediaUrl}" target="_blank" rel="noopener noreferrer" style="color:#38bdf8;font-size:0.74rem;">🎬 Video</a>` : `<img src="${safeMediaUrl}" alt="" style="width:42px;height:28px;object-fit:cover;border-radius:6px;vertical-align:middle;margin-right:6px;">`)
             : '';
           return `
             <tr>
-              <td><b>#${i + 1}</b> ${c.flag} ${getCityName(c, lang)}</td>
-              <td>${thumb}<b>${e.title}</b> · <span style="color:#7dd3fc;">@${e.authorName}</span></td>
+              <td><b>#${i + 1}</b> ${escapeHtmlStr(c.flag)} ${escapeHtmlStr(getCityName(c, lang))}</td>
+              <td>${thumb}<b>${escapeHtmlStr(e.title)}</b> · <span style="color:#7dd3fc;">@${escapeHtmlStr(e.authorName)}</span></td>
               <td style="color:#fbbf24;font-weight:900;">🔥 ${Number(e.votes || 0)} votes</td>
               <td>
-                <button class="adm-btn rose" style="padding:4px 9px;font-size:0.75rem;" onclick="REMO_STORE.adminDeletePhotoGrandPrixEntry('${e.id}')">✕ Delete</button>
+                <button class="adm-btn rose" style="padding:4px 9px;font-size:0.75rem;" onclick="REMO_STORE.adminDeletePhotoGrandPrixEntry('${escapeJsSingleArg(e.id)}')">✕ Delete</button>
               </td>
             </tr>
           `;
@@ -2187,9 +2222,9 @@ function renderAdminContestsPanel() {
           const isTie = vA === vB && m.round === wc.round && !m.winner;
           return `
             <tr>
-              <td><b>${String(m.round || '').toUpperCase()}</b></td>
-              <td>${cA.flag} ${getCityName(cA, lang)} (<b>${vA}</b>) <span style="color:#94a3b8;">VS</span> ${cB.flag} ${getCityName(cB, lang)} (<b>${vB}</b>)</td>
-              <td>${m.winner ? `<span style="color:#34d399;font-weight:800;">🏆 ${getCityName(getCityById(m.winner), lang)}</span>` : (isTie ? `<span style="color:#fbbf24;font-weight:800;">⚖️ TIE (A seeded)</span>` : '<span style="color:#7dd3fc;">LIVE VOTING</span>')}</td>
+              <td><b>${escapeHtmlStr(String(m.round || '').toUpperCase())}</b></td>
+              <td>${escapeHtmlStr(cA.flag)} ${escapeHtmlStr(getCityName(cA, lang))} (<b>${vA}</b>) <span style="color:#94a3b8;">VS</span> ${escapeHtmlStr(cB.flag)} ${escapeHtmlStr(getCityName(cB, lang))} (<b>${vB}</b>)</td>
+              <td>${m.winner ? `<span style="color:#34d399;font-weight:800;">🏆 ${escapeHtmlStr(getCityName(getCityById(m.winner), lang))}</span>` : (isTie ? `<span style="color:#fbbf24;font-weight:800;">⚖️ TIE (A seeded)</span>` : '<span style="color:#7dd3fc;">LIVE VOTING</span>')}</td>
             </tr>
           `;
         }).join('');
@@ -2210,8 +2245,8 @@ function renderAdminContestsPanel() {
           ? `<tr><td colspan="3" style="color:var(--muted);text-align:center;">${totalAttempts} detective attempt(s) so far · 0 winners yet.</td></tr>`
           : wins.map((w, idx) => `
               <tr>
-                <td><b>#${idx + 1}</b> @${w.name}</td>
-                <td>${getCityById(w.cityId || 'montreal').flag} ${w.cityId || ''}</td>
+                <td><b>#${idx + 1}</b> @${escapeHtmlStr(w.name)}</td>
+                <td>${escapeHtmlStr(getCityById(w.cityId || 'montreal').flag)} ${escapeHtmlStr(w.cityId || '')}</td>
                 <td style="color:#fbbf24;font-weight:800;">+${Number(w.reward || md.rewardCoins || 500)} 🪙</td>
               </tr>
             `).join(''));
@@ -2232,9 +2267,9 @@ function renderAdminContestsPanel() {
           ? `<tr><td colspan="3" style="color:var(--muted);text-align:center;">No tickets claimed yet.</td></tr>`
           : tks.slice(0, 25).map((tk) => `
               <tr>
-                <td><b style="color:#fbbf24;">${tk.code}</b> ${winCodes.has(tk.code) ? '👑 WINNER!' : ''}</td>
-                <td>@${tk.name}</td>
-                <td>${getCityById(tk.cityId || 'montreal').flag} ${getCityName(getCityById(tk.cityId || 'montreal'), lang)}</td>
+                <td><b style="color:#fbbf24;">${escapeHtmlStr(tk.code)}</b> ${winCodes.has(tk.code) ? '👑 WINNER!' : ''}</td>
+                <td>@${escapeHtmlStr(tk.name)}</td>
+                <td>${escapeHtmlStr(getCityById(tk.cityId || 'montreal').flag)} ${escapeHtmlStr(getCityName(getCityById(tk.cityId || 'montreal'), lang))}</td>
               </tr>
             `).join(''));
   }
@@ -2253,8 +2288,8 @@ function renderAdminContestsPanel() {
           ? `<tr><td colspan="3" style="color:var(--muted);text-align:center;">${Object.keys(fh.attempts || {}).length} hunter(s) tried · 0 chest claims yet.</td></tr>`
           : cls.map((cl, idx) => `
               <tr>
-                <td><b>#${idx + 1}</b> @${cl.name}</td>
-                <td>${getCityById(cl.cityId || 'montreal').flag}</td>
+                <td><b>#${idx + 1}</b> @${escapeHtmlStr(cl.name)}</td>
+                <td>${escapeHtmlStr(getCityById(cl.cityId || 'montreal').flag)}</td>
                 <td style="color:#fbbf24;font-weight:800;">+${Number(cl.reward || fh.rewardCoins || 300)} 🪙</td>
               </tr>
             `).join(''));
@@ -2273,7 +2308,7 @@ function renderAdminContestsPanel() {
   const trInfo = document.getElementById('admWsTorchInfo');
   if (trInfo) {
     trInfo.innerHTML = tr.active
-      ? `🔥 Current City: <b>${getCityName(getCityById(tr.currentCityId), lang)}</b> (Holder: <b>@${tr.currentHolderName}</b>) · Route: ${(tr.visitedCities || []).map((id) => getCityById(id).flag).join(' ➔ ')}`
+      ? `🔥 Current City: <b>${escapeHtmlStr(getCityName(getCityById(tr.currentCityId), lang))}</b> (Holder: <b>@${escapeHtmlStr(tr.currentHolderName)}</b>) · Route: ${(tr.visitedCities || []).map((id) => escapeHtmlStr(getCityById(id).flag)).join(' ➔ ')}`
       : '';
   }
 
@@ -2285,7 +2320,7 @@ function renderAdminContestsPanel() {
   if (gsInfo) {
     const ms = Array.isArray(gs.moments) ? gs.moments : [];
     gsInfo.innerHTML = gs.active
-      ? `⚡ Synced Cities (${ms.length}): ${ms.slice(0, 8).map((m) => `${getCityById(m.cityId).flag} @${m.authorName}${m.mediaUrl ? ' 📸' : ''}`).join(' · ')}`
+      ? `⚡ Synced Cities (${ms.length}): ${ms.slice(0, 8).map((m) => `${escapeHtmlStr(getCityById(m.cityId).flag)} @${escapeHtmlStr(m.authorName)}${m.mediaUrl ? ' 📸' : ''}`).join(' · ')}`
       : '';
   }
 
@@ -2298,14 +2333,15 @@ function renderAdminContestsPanel() {
       ? `<tr><td colspan="4" style="color:var(--muted);text-align:center;">No city mayor decrees submitted yet.</td></tr>`
       : decEntries.map(([cid, dec]) => {
           const c = getCityById(cid);
+          const safeCid = escapeJsSingleArg(cid);
           return `
             <tr>
-              <td>${c.flag} <b>${getCityName(c, lang)}</b><br><span style="font-size:0.72rem;color:#94a3b8;">@${dec.authorName || 'Mayor'}</span></td>
-              <td style="font-size:0.76rem;">"${(dec.text_en || dec.text_fr || '').slice(0, 100)}"</td>
+              <td>${escapeHtmlStr(c.flag)} <b>${escapeHtmlStr(getCityName(c, lang))}</b><br><span style="font-size:0.72rem;color:#94a3b8;">@${escapeHtmlStr(dec.authorName || 'Mayor')}</span></td>
+              <td style="font-size:0.76rem;">"${escapeHtmlStr((dec.text_en || dec.text_fr || '').slice(0, 100))}"</td>
               <td>${dec.approved ? '<span style="color:#34d399;font-weight:800;">✅ Approved</span>' : '<span style="color:#fbbf24;font-weight:800;">⏳ Pending</span>'}</td>
               <td style="white-space:nowrap;">
-                ${!dec.approved ? `<button class="adm-btn emerald" style="padding:3px 8px;font-size:0.72rem;margin-right:4px;" onclick="REMO_STORE.adminApproveMayorDecree('${cid}', true);admToast('✅ Decree approved!');">✅ Approve</button>` : ''}
-                <button class="adm-btn rose" style="padding:3px 8px;font-size:0.72rem;" onclick="REMO_STORE.adminApproveMayorDecree('${cid}', false);admToast('🗑️ Decree removed.');">✕ Reject</button>
+                ${!dec.approved ? `<button class="adm-btn emerald" style="padding:3px 8px;font-size:0.72rem;margin-right:4px;" onclick="REMO_STORE.adminApproveMayorDecree('${safeCid}', true);admToast('✅ Decree approved!');">✅ Approve</button>` : ''}
+                <button class="adm-btn rose" style="padding:3px 8px;font-size:0.72rem;" onclick="REMO_STORE.adminApproveMayorDecree('${safeCid}', false);admToast('🗑️ Decree removed.');">✕ Reject</button>
               </td>
             </tr>
           `;
@@ -2325,10 +2361,10 @@ function renderAdminContestsPanel() {
           const rem = _admFormatContestTimer(trItem.endsAt, 'open');
           return `
             <tr>
-              <td>${cA.flag} <b>${getCityName(cA, lang)}</b> × ${cB.flag} <b>${getCityName(cB, lang)}</b></td>
-              <td style="color:#34d399;font-weight:800;">👋 ${Number(trItem.wavesCount || 0)} waves · ${rem || 'Active'}</td>
+              <td>${escapeHtmlStr(cA.flag)} <b>${escapeHtmlStr(getCityName(cA, lang))}</b> × ${escapeHtmlStr(cB.flag)} <b>${escapeHtmlStr(getCityName(cB, lang))}</b></td>
+              <td style="color:#34d399;font-weight:800;">👋 ${Number(trItem.wavesCount || 0)} waves · ${escapeHtmlStr(rem || 'Active')}</td>
               <td>
-                <button class="adm-btn rose" style="padding:3px 8px;font-size:0.72rem;" onclick="REMO_STORE.adminRemoveSisterAlliance('${trItem.id}');admToast('🗑️ Treaty ended.');">✕ End</button>
+                <button class="adm-btn rose" style="padding:3px 8px;font-size:0.72rem;" onclick="REMO_STORE.adminRemoveSisterAlliance('${escapeJsSingleArg(trItem.id)}');admToast('🗑️ Treaty ended.');">✕ End</button>
               </td>
             </tr>
           `;
@@ -2351,10 +2387,10 @@ function renderAdminContestsPanel() {
       const holders = Object.keys(st.shareholders || {}).length;
       return `
         <tr>
-          <td><b>@${st.creatorName}</b> (${c.flag} ${getCityName(c, lang)})</td>
+          <td><b>@${escapeHtmlStr(st.creatorName)}</b> (${escapeHtmlStr(c.flag)} ${escapeHtmlStr(getCityName(c, lang))})</td>
           <td style="color:#fbbf24;font-weight:900;">${Number(st.sharePrice || 50)} 🪙/share · ${holders} fan holder(s)</td>
           <td>
-            <button class="adm-btn emerald" style="padding:4px 10px;font-size:0.74rem;" onclick="adminPayDividendToCreatorFromOffice('${st.creatorUid}')">💎 Pay Fan Dividend Now</button>
+            <button class="adm-btn emerald" style="padding:4px 10px;font-size:0.74rem;" onclick="adminPayDividendToCreatorFromOffice('${escapeJsSingleArg(st.creatorUid)}')">💎 Pay Fan Dividend Now</button>
           </td>
         </tr>
       `;
@@ -2880,6 +2916,7 @@ window.adminPayDividendToCreatorFromOffice = adminPayDividendToCreatorFromOffice
 
 /* ── 📩 OFFICIAL SUPPORT & CONTACT INBOX IN ADMIN OFFICE ── */
 function renderAdminSupportTicketsTables() {
+  if (!isAdminSessionUnlocked()) return;
   const tickets = (REMO_STORE.state.supportTickets || []).slice().sort((a, b) => Number(b.ts || 0) - Number(a.ts || 0));
   const openCount = tickets.filter((t) => t && t.status !== 'replied').length;
 

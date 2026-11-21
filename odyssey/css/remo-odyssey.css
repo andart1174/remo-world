@@ -583,11 +583,24 @@ html, body {
 
 .city-picker-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(126px, 1fr));
   gap: 6px;
-  max-height: 138px;
+  max-height: 118px;
   overflow-y: auto;
   padding-right: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(56, 189, 248, 0.45) rgba(15, 23, 42, 0.4);
+}
+.city-picker-grid::-webkit-scrollbar {
+  width: 6px;
+}
+.city-picker-grid::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.4);
+  border-radius: 99px;
+}
+.city-picker-grid::-webkit-scrollbar-thumb {
+  background: rgba(56, 189, 248, 0.45);
+  border-radius: 99px;
 }
 
 .city-chip {
@@ -1237,8 +1250,8 @@ html.is-embedded body {
 html.is-embedded .odyssey-shell {
   height: 100dvh;
   max-width: none;
-  padding: 8px 10px max(8px, env(safe-area-inset-bottom));
-  gap: 8px;
+  padding: 6px 8px max(6px, env(safe-area-inset-bottom));
+  gap: 6px;
 }
 html.is-embedded .stage-wrap {
   flex: 1 1 auto;
@@ -1246,9 +1259,33 @@ html.is-embedded .stage-wrap {
   height: auto;
   aspect-ratio: auto;
 }
+html.is-embedded .stage-overlay {
+  padding: 10px 12px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(56, 189, 248, 0.45) rgba(15, 23, 42, 0.4);
+}
+html.is-embedded .menu-card {
+  padding: 12px 15px;
+  gap: 14px;
+}
+html.is-embedded .menu-main-col {
+  gap: 7px;
+}
+html.is-embedded .menu-desc {
+  font-size: 0.78rem;
+  line-height: 1.32;
+}
+html.is-embedded .city-picker-grid {
+  max-height: 104px;
+}
 html.is-embedded .hud-bar,
 html.is-embedded .touch-controls-bar {
   flex-shrink: 0;
+}
+@media (hover: hover) and (pointer: fine) {
+  html.is-embedded .odyssey-shell:has(#menuOverlay.open) .touch-controls-bar {
+    display: none;
+  }
 }
 
 /* Compact Mobile Landscape (Phones Rotated Horizontally) */

@@ -1949,6 +1949,9 @@ function getDefaultVipShopItems() {
 /* ── Instant Bilingual EN ⇄ FR Auto-Translator & Viral Co-Pilot Engine ── */
 const REMO_TRANSLATOR = {
   phrasesEnToFr: [
+    ['guess my city', 'devine ma ville'],
+    ['guess the city', 'devine la ville'],
+    ['my city', 'ma ville'],
     ['what is happening in', 'que se passe-t-il à'],
     ['right now', 'en ce moment'],
     ['tonight in', 'ce soir à'],
@@ -1974,7 +1977,7 @@ const REMO_TRANSLATOR = {
     ['who is awake in', 'qui est réveillé à']
   ],
   wordsEnToFr: {
-    amazing: 'incroyable', awesome: 'génial', beautiful: 'magnifique', night: 'nuit',
+    guess: 'devine', amazing: 'incroyable', awesome: 'génial', beautiful: 'magnifique', night: 'nuit',
     city: 'ville', world: 'monde', sky: 'ciel', sunset: 'coucher de soleil',
     sunrise: 'lever du soleil', street: 'rue', lights: 'lumières', music: 'musique',
     game: 'jeu', code: 'code', video: 'vidéo', photo: 'photo', love: 'adore',
@@ -1989,16 +1992,18 @@ const REMO_TRANSLATOR = {
 
   detectLang(text = '') {
     const s = String(text).toLowerCase();
-    const frSignals = /[éèêëàâîïôûùçœ]|(\b(le|la|les|des|dans|avec|pour|une|cette|monde|ville|soir|magnifique|incroyable|bienvenue|bonjour|voici|depuis)\b)/i;
+    const frSignals = /[éèêëàâîïôûùçœ]|(\b(le|la|les|des|dans|avec|pour|une|cette|monde|ville|devine|soir|magnifique|incroyable|bienvenue|bonjour|voici|depuis)\b)/i;
     return frSignals.test(s) ? 'fr' : 'en';
   },
 
   translateSync(text = '', targetLang = 'fr') {
     if (!text || !text.trim()) return '';
-    const srcLang = this.detectLang(text);
-    if (srcLang === targetLang) return text.trim();
+    let out = String(text).trim()
+      .replace(/\bguess\s+mon\s+ville\b/gi, targetLang === 'fr' ? 'Devine ma ville' : 'Guess my city')
+      .replace(/#Montral\b/g, '#Montréal');
+    const srcLang = this.detectLang(out);
+    if (srcLang === targetLang) return out;
 
-    let out = text.trim();
     if (targetLang === 'fr') {
       this.phrasesEnToFr.forEach(([enP, frP]) => {
         const rx = new RegExp(enP, 'gi');
@@ -2010,7 +2015,7 @@ const REMO_TRANSLATOR = {
         const tr = this.wordsEnToFr[low];
         return m[0] === m[0].toUpperCase() ? tr.charAt(0).toUpperCase() + tr.slice(1) : tr;
       });
-      return out;
+      return out.replace(/\bmon\s+ville\b/gi, 'ma ville');
     } else {
       // FR -> EN reverse phrase & word pass
       this.phrasesEnToFr.forEach(([enP, frP]) => {
@@ -2020,6 +2025,7 @@ const REMO_TRANSLATOR = {
       const revWords = {};
       Object.entries(this.wordsEnToFr).forEach(([enW, frW]) => { revWords[frW.toLowerCase()] = enW; });
       revWords['à'] = 'in'; revWords['et'] = 'and'; revWords['la'] = 'the'; revWords['les'] = 'the';
+      revWords['ma'] = 'my'; revWords['devine'] = 'guess'; revWords['devinez'] = 'guess';
       revWords['magnifique'] = 'stunning'; revWords['incroyable'] = 'incredible'; revWords['découvrez'] = 'check out';
       revWords['bonjour'] = 'hello'; revWords['soirée'] = 'nightlife'; revWords['ville'] = 'city';
       out = out.replace(/([A-Za-zÀ-ÿ’']+)/g, (m) => {
@@ -3506,6 +3512,10 @@ const REMO_STORE = {
       } else if (!user.banned) {
         cleanUser.banned = false;
       }
+      // Remove legacy plaintext email from public remo_users document (email lives strictly in remo_users_private)
+      if (typeof firebase !== 'undefined' && firebase && firebase.firestore && firebase.firestore.FieldValue && typeof firebase.firestore.FieldValue.delete === 'function') {
+        cleanUser.email = firebase.firestore.FieldValue.delete();
+      }
       this.fbDb.collection('remo_users').doc(cleanUser.uid).set(cleanUser, { merge: true })
         .catch((err) => {
           console.warn('Firestore sync user notice:', err.message);
@@ -4521,15 +4531,38 @@ const REMO_STORE = {
       try {
         const snap = await this.fbDb.collection('remo_users').get();
         const refsToDelete = [];
+        const emailMigrateOps = [];
         snap.forEach((doc) => {
           const d = doc.data() || {};
           const candidate = Object.assign({ uid: doc.id }, d);
           if (this.isFakeOrGuestUser(candidate) || fakeUids.has(doc.id) || this.deletedUserIds.has(doc.id)) {
             refsToDelete.push(doc.ref);
             this.deletedUserIds.add(doc.id);
+          } else if (d.email && typeof firebase !== 'undefined' && firebase?.firestore?.FieldValue?.delete) {
+            emailMigrateOps.push(
+              this.fbDb.collection('remo_users_private').doc(doc.id).set({
+                uid: doc.id,
+                fbUid: d.fbUid || '',
+                email: d.email,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+              }, { merge: true }).then(() =>
+                doc.ref.update({ email: firebase.firestore.FieldValue.delete() })
+              ).catch(() => {})
+            );
           }
         });
         cloudDeleted = await this._deleteDocRefsInBatches(refsToDelete, 400);
+        if (emailMigrateOps.length > 0) {
+          await Promise.allSettled(emailMigrateOps);
+        }
+        if (typeof firebase !== 'undefined' && firebase?.firestore?.FieldValue?.delete) {
+          await this.fbDb.collection('remo_ecosystem').doc('live_state').update({
+            posts: firebase.firestore.FieldValue.delete(),
+            supportTickets: firebase.firestore.FieldValue.delete(),
+            settings: firebase.firestore.FieldValue.delete(),
+            gamesHub: firebase.firestore.FieldValue.delete()
+          }).catch(() => {});
+        }
 
         // Also sweep any orphaned guest/fake presence markers cleanly
         try {
@@ -4758,6 +4791,7 @@ const REMO_STORE = {
     this.state.directMessages = [];
     this.state.notifications = [];
     this.state.supportTickets = [];
+    this._flushLocalSave();
     let p = Promise.resolve();
     if (this.fbAuth) {
       try {
@@ -4769,6 +4803,33 @@ const REMO_STORE = {
     }
     window.dispatchEvent(new CustomEvent('remo:stateupdate', { detail: { reason: 'auth' } }));
     return p;
+  },
+
+  async deleteMyOwnAccount() {
+    const u = this.getCurrentUser();
+    if (!u || !u.uid) return { ok: false, error: 'not_signed_in' };
+    if (u.role === 'admin' || u.uid === 'u_admin_founder' || this.isCurrentUserAdmin()) {
+      return { ok: false, error: 'founder_protected' };
+    }
+    const targetUid = u.uid;
+    try {
+      if (this.fbDb) {
+        await Promise.allSettled([
+          this.fbDb.collection('remo_users').doc(targetUid).delete(),
+          this.fbDb.collection('remo_users_private').doc(targetUid).delete(),
+          this.fbDb.collection('remo_presence').doc(targetUid).delete()
+        ]);
+      }
+      this.state.users = (this.state.users || []).filter((x) => x && x.uid !== targetUid);
+      try {
+        localStorage.removeItem('remo_avatar_' + targetUid);
+        localStorage.removeItem('remo_bio_' + targetUid);
+      } catch (e) {}
+      await this.signOut();
+      return { ok: true, uid: targetUid };
+    } catch (err) {
+      return { ok: false, error: (err && err.message) || 'delete_failed' };
+    }
   },
 
   addCoins(uid, delta, addCityPoints = 0) {
@@ -5713,6 +5774,26 @@ const REMO_STORE = {
             });
             uData.cards = Array.from(cardMap.values()).slice(0, 60);
           }
+          // Auto-migrate & scrub any legacy public email field in remo_users to remo_users_private
+          if (uData.email && !/^citizen\d+@remo\.world$/i.test(uData.email)) {
+            if (isAdm0 || uData.uid === myUid0) {
+              if (typeof firebase !== 'undefined' && firebase?.firestore?.FieldValue?.delete) {
+                this.fbDb.collection('remo_users_private').doc(uData.uid).set({
+                  uid: uData.uid,
+                  fbUid: uData.fbUid || '',
+                  email: uData.email,
+                  updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                }, { merge: true }).then(() => {
+                  this.fbDb.collection('remo_users').doc(uData.uid).update({
+                    email: firebase.firestore.FieldValue.delete()
+                  }).catch(() => {});
+                }).catch(() => {});
+              }
+            } else {
+              // Never store other citizens' emails in a non-admin visitor's memory or localStorage
+              delete uData.email;
+            }
+          }
           // Preserve owner's private email & auth identity fields across public profile sync
           if (existingLocal) {
             if (existingLocal.email && !uData.email && (uData.uid === myUid0 || isAdm0)) {
@@ -5816,7 +5897,7 @@ const REMO_STORE = {
         this.state.users = activeUsers;
         this.save(false, 'cloud_users_sync');
         window.dispatchEvent(new CustomEvent('remo:stateupdate', { detail: { reason: 'cloud_users' } }));
-        if (typeof refreshAllAdminPanels === 'function') refreshAllAdminPanels();
+        if (this.isAdminUnlocked() && this.isCurrentUserAdmin() && typeof refreshAllAdminPanels === 'function') refreshAllAdminPanels();
         if (typeof syncHeaderAndSidebars === 'function') syncHeaderAndSidebars();
         if (typeof renderPassportView === 'function') renderPassportView();
         if (visualChanged && typeof renderSocialFeed === 'function') renderSocialFeed();
@@ -6269,6 +6350,21 @@ const REMO_STORE = {
         } else {
           const data = snap.data();
           if (data) {
+            // If legacy bloated/private keys exist on public live_state, purge them when Admin is online and never ingest them on clients
+            if (data.posts !== undefined || data.supportTickets !== undefined || data.settings !== undefined || data.gamesHub !== undefined) {
+              delete data.posts;
+              delete data.supportTickets;
+              delete data.settings;
+              delete data.gamesHub;
+              if (this.isCurrentUserAdmin() && typeof firebase !== 'undefined' && firebase?.firestore?.FieldValue?.delete) {
+                docRef.update({
+                  posts: firebase.firestore.FieldValue.delete(),
+                  supportTickets: firebase.firestore.FieldValue.delete(),
+                  settings: firebase.firestore.FieldValue.delete(),
+                  gamesHub: firebase.firestore.FieldValue.delete()
+                }).catch(() => {});
+              }
+            }
             mergeCloudScoresAndDuels(data);
             if (data.bottles) this.state.bottles = data.bottles;
             if (Array.isArray(data.jukeboxTracks) && data.jukeboxTracks.length > 0) {
@@ -6326,6 +6422,10 @@ const REMO_STORE = {
         if (!snap || !snap.exists || snap.metadata?.hasPendingWrites) return;
         const data = snap.data();
         if (data) {
+          delete data.posts;
+          delete data.supportTickets;
+          delete data.settings;
+          delete data.gamesHub;
           mergeCloudScoresAndDuels(data);
           if (data.bottles) this.state.bottles = data.bottles;
           if (Array.isArray(data.jukeboxTracks) && data.jukeboxTracks.length > 0) {
@@ -6406,6 +6506,17 @@ const REMO_STORE = {
     if (cp.uid) cp.uid = this._sanitizeSafeId(cp.uid);
     if (cp.authorUid) cp.authorUid = this._sanitizeSafeId(cp.authorUid);
     if (cp.cityId) cp.cityId = this._sanitizeSafeId(cp.cityId, 'montreal');
+    if (typeof cp.caption_en === 'string') {
+      cp.caption_en = cp.caption_en
+        .replace(/\bguess\s+mon\s+ville\b/gi, 'Guess my city')
+        .replace(/#Montral\b/g, '#Montréal');
+    }
+    if (typeof cp.caption_fr === 'string') {
+      cp.caption_fr = cp.caption_fr
+        .replace(/\bguess\s+mon\s+ville\b/gi, 'Devine ma ville')
+        .replace(/\bmon\s+ville\b/gi, 'ma ville')
+        .replace(/#Montral\b/g, '#Montréal');
+    }
     if (Array.isArray(cp.comments)) {
       cp.comments = cp.comments.map((c) => {
         if (!c || typeof c !== 'object') return c;
@@ -9045,13 +9156,11 @@ const REMO_STORE = {
         const isAdm = this.isCurrentUserAdmin();
         const payloadDoc = {
           cityScores: this.state.cityScores || {},
-          cityMayors: this.state.cityMayors || {},
           duels: (this.state.duels || []).slice(0, 15),
           bottles: (this.state.bottles || []).slice(0, 30),
           jukeboxTracks: (this.state.jukeboxTracks || []).slice(0, 30),
           auctions: cleanAuctions,
           geoVaults: (this.state.geoVaults || []).slice(0, 35),
-          customCities: typeof getCustomRemoCitiesPatch === 'function' ? getCustomRemoCitiesPatch() : [],
           stories: (this.state.stories || [])
             .filter((s) => s && s.id && (!this.deletedStoryIds || !this.deletedStoryIds.has(s.id)))
             .map((s) => ({
@@ -9066,14 +9175,22 @@ const REMO_STORE = {
           worldSystems: this.state.worldSystems || getDefaultUniqueWorldSystems(),
           remoOdyssey: this._pruneOdysseyWithTombstones(this.ensureRemoOdyssey()),
           worldSpotlight: this.ensureWorldSpotlight(),
-          deletedPostIds: [...(this.deletedPostIds || [])].slice(-100),
           updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         };
         if (isAdm) {
+          payloadDoc.cityMayors = this.state.cityMayors || {};
+          payloadDoc.customCities = typeof getCustomRemoCitiesPatch === 'function' ? getCustomRemoCitiesPatch() : [];
+          payloadDoc.deletedPostIds = [...(this.deletedPostIds || [])].slice(-100);
           payloadDoc.deletedUserIds = [...(this.deletedUserIds || [])].slice(-100);
           payloadDoc.deletedDuelIds = [...(this.deletedDuelIds || [])].slice(-100);
           payloadDoc.deletedAuctionIds = [...(this.deletedAuctionIds || [])].slice(-100);
           payloadDoc.deletedStoryIds = [...(this.deletedStoryIds || [])].slice(-100);
+          if (typeof firebase !== 'undefined' && firebase?.firestore?.FieldValue?.delete) {
+            payloadDoc.posts = firebase.firestore.FieldValue.delete();
+            payloadDoc.supportTickets = firebase.firestore.FieldValue.delete();
+            payloadDoc.settings = firebase.firestore.FieldValue.delete();
+            payloadDoc.gamesHub = firebase.firestore.FieldValue.delete();
+          }
         }
         // Protect Firestore 1MB hard limit on live_state by pruning heavy inline dataUrls if payload nears cap
         try {
@@ -9238,8 +9355,8 @@ async function pingIndexNowAllPages() {
     } catch (e) {}
     if (!idToken) {
       const needAuthMsg = isFr
-        ? '🔒 Connectez-vous avec votre compte Google Admin (andart1174@gmail.com) pour lancer IndexNow.'
-        : '🔒 Sign in with your verified Admin account (andart1174@gmail.com) to trigger IndexNow.';
+        ? '🔒 Connectez-vous avec votre compte Google Admin vérifié pour lancer IndexNow.'
+        : '🔒 Sign in with your verified Admin account to trigger IndexNow.';
       updateIndexNowStatusUI(`🔒 ${needAuthMsg}`);
       if (typeof admToast === 'function') admToast(needAuthMsg, 'error');
       else if (typeof remoToast === 'function') remoToast(needAuthMsg, 'error');

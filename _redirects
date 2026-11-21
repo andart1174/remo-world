@@ -1,3 +1,14 @@
+# REMO World — Block Public Access to Internal Config, Rules & Build Scripts
+/firestore.rules          /404.html                  404!
+/firestore.indexes.json   /404.html                  404!
+/storage.rules            /404.html                  404!
+/firebase.json            /404.html                  404!
+/.firebaserc              /404.html                  404!
+/netlify.toml             /404.html                  404!
+/netlify/*                /404.html                  404!
+/scripts/*                /404.html                  404!
+/scratch/*                /404.html                  404!
+
 # REMO World — Clean 301 Redirects for Legacy & Convenience Routes (Netlify)
 /beat-maker.html        /world-radio.html          301
 /beat-maker             /world-radio.html          301

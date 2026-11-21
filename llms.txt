@@ -4,10 +4,8 @@
 
 ## Key Free Features (Zero Sign-Up Required to Explore)
 - [REMO World Live Social App](https://remoworld.com/): Real-time cross-city social feed, live City Wars, Citizen Passports, and collectible 4D City Cards.
-- [REMO ODYSSEY — Official 4D World Browser Game](https://remoworld.com/odyssey.html) ([FR](https://remoworld.com/fr/odyssey.html)): Free PC & mobile Dual-Mode 4A City Runner & 4B Hover-Coin Flight game across 24 real city skylines with live weather 2X surges, 56 live city FM radios, Daily Missions, 7-day Streak Mythic skin, City King crowns, 4D Supply Drops, and shareable 1v1 Ghost duel links & 9:16 QR Story Cards.
 - [4D Focus TV — Ambient City Windows & Zen Clock](https://remoworld.com/focus-tv.html): Fullscreen 4D Focus TV window with rain/snow/neon/fireplace FX, Fly Random teleportation, Live Rain/Night city filters, Custom Vibe Links (`?tv=city&fx=rain`), and Minimal Zen Desk Clock mode.
-- [Synced Study Together Rooms](https://remoworld.com/study-room.html): Shareable Focus Together Room URLs (`?tv=tokyo&fx=rain&room=study42`) with synchronized Pomodoro sessions, clean OBS / Streamer Broadcast Mode (`?obs=1`), and ad-free Lofi radio.
-- [REMO City Ambassadors Program](https://remoworld.com/ambassadors.html) ([FR](https://remoworld.com/fr/ambassadors.html)): Founding Ambassadors (#001–#050) across 24 cities earning +100 Gold Coins & +150 City War PTS per referral, printable 9:16 Diplomas, and OBS creator kits.
+- [Synced Study Together Rooms](https://remoworld.com/study-room.html): Shareable Focus Together Room URLs (`?tv=tokyo&fx=rain&room=study42`) with synchronized Pomodoro sessions and ad-free Lofi radio.
 - [Daily World Blitz 60s & 1v1 Duels](https://remoworld.com/world-blitz.html): 5 daily world cities solved in 60 seconds with shareable Wordle-style result cards and URL-encoded 1v1 challenge links (`?open=blitz&vs=...`).
 - [Free Live World Cities Radio (56 Stations)](https://remoworld.com/world-radio.html): Stream live radio from Paris, Montréal, Chișinău (8 live stations), Bucharest, New York, London, Tokyo, Seoul, Berlin, Dubai, Lisbon, Amsterdam, Sydney, Rio, Singapore & Cairo + Lofi, Jazz & Synthwave.
 - [Guess The City Photo Game](https://remoworld.com/guess-the-city.html): Free browser geography & skyline photo guessing game created by real citizens worldwide.

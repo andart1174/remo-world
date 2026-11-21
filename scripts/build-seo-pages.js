@@ -151,6 +151,13 @@ details.faq p{margin-top:8px;color:#cbd5e1;font-size:0.9rem}
 .city-link:hover{border-color:var(--gold);background:rgba(251,191,36,0.08);text-decoration:none;transform:translateY(-1px)}
 .embed-code{width:100%;background:#020617;color:#7dd3fc;border:1px solid rgba(56,189,248,0.35);border-radius:10px;padding:9px;font-family:monospace;font-size:0.76rem;resize:none;margin:8px 0}
 footer{margin-top:34px;padding-top:20px;border-top:1px solid rgba(255,255,255,0.1);display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;font-size:0.82rem;color:var(--muted)}
+@media(max-width:680px){
+  .topbar{padding:10px 12px;gap:8px;margin-bottom:14px}
+  .top-links{flex-wrap:nowrap;overflow-x:auto;width:100%;padding-bottom:2px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+  .top-links::-webkit-scrollbar{display:none}
+  .pill{flex-shrink:0;padding:7px 12px;font-size:0.78rem}
+  .hero{padding:20px 16px}
+}
 `;
 
 const INLINE_RADIO_PLAYER_JS = `
@@ -1783,15 +1790,12 @@ ${urlNodes.join('\n')}
 function buildRobotsTxt() {
   return `User-agent: *
 Allow: /
-Disallow: /admin.html
 
 User-agent: Googlebot
 Allow: /
-Disallow: /admin.html
 
 User-agent: Bingbot
 Allow: /
-Disallow: /admin.html
 
 User-agent: GPTBot
 Allow: /

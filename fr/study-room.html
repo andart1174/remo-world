@@ -67,6 +67,13 @@ details.faq p{margin-top:8px;color:#cbd5e1;font-size:0.9rem}
 .city-link:hover{border-color:var(--gold);background:rgba(251,191,36,0.08);text-decoration:none;transform:translateY(-1px)}
 .embed-code{width:100%;background:#020617;color:#7dd3fc;border:1px solid rgba(56,189,248,0.35);border-radius:10px;padding:9px;font-family:monospace;font-size:0.76rem;resize:none;margin:8px 0}
 footer{margin-top:34px;padding-top:20px;border-top:1px solid rgba(255,255,255,0.1);display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;font-size:0.82rem;color:var(--muted)}
+@media(max-width:680px){
+  .topbar{padding:10px 12px;gap:8px;margin-bottom:14px}
+  .top-links{flex-wrap:nowrap;overflow-x:auto;width:100%;padding-bottom:2px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+  .top-links::-webkit-scrollbar{display:none}
+  .pill{flex-shrink:0;padding:7px 12px;font-size:0.78rem}
+  .hero{padding:20px 16px}
+}
 </style>
 </head>
 <body>
@@ -82,7 +89,6 @@ footer{margin-top:34px;padding-top:20px;border-top:1px solid rgba(255,255,255,0.
       <a class="pill" href="../fr/focus-tv.html">📺 Focus TV</a>
       <a class="pill" href="../fr/study-room.html">👥 Study Room</a>
       <a class="pill" href="../fr/world-radio.html">📻 Radio Monde</a>
-      <a class="pill" href="../fr/odyssey.html">🧭 REMO Odyssey</a>
       <a class="pill" href="../fr/world-blitz.html">⚡ World Blitz</a>
       <a class="pill" href="../study-room.html" hreflang="en">🇬🇧 EN</a>
       <a class="pill gold" href="../?lang=fr&from=seo">🚀 Ouvrir l’App</a>
@@ -119,65 +125,7 @@ footer{margin-top:34px;padding-top:20px;border-top:1px solid rgba(255,255,255,0.
         <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
           <a id="srLaunchBtn" class="btn-primary" href="../?tv=tokyo&fx=rain&room=focus-crew&lang=fr&from=seo">👥 Lancer la Salle Synchronisée</a>
           <button type="button" id="srCopyBtn" class="btn-sec" onclick="copyRoomLink()">📋 Copier le Lien d’Invitation</button>
-          <button type="button" id="srObsCopyBtn" class="btn-sec" style="border-color:rgba(248,113,113,0.5);color:#fecaca;" onclick="copyObsRoomLink()">🎥 Copier Lien Source OBS</button>
           <span id="srPreview" style="font-family:monospace;font-size:0.8rem;color:#a7f3d0;"></span>
-        </div>
-      </section>
-
-      <section class="card" style="margin-bottom:22px;border-color:rgba(139,92,246,0.45);">
-        <h2>🌍 Salles d’Étude Publiques Ouvertes (1 Clic · Gratuit)</h2>
-        <p style="font-size:0.86rem;color:var(--muted);margin-bottom:12px;">Rejoignez directement une salle mondiale ouverte avec Pomodoro synchronisé et radio live — zéro inscription requise :</p>
-        <div class="grid-3">
-          <div class="radio-item" style="flex-direction:column;align-items:stretch;">
-            <div>
-              <strong style="color:#fff;">🌧️ Tokyo Pluie Nocturne</strong>
-              <div style="font-size:0.78rem;color:#94a3b8;margin:3px 0 8px;">Pomodoro 25 min · Tokyo Lofi &amp; Pluie 4D</div>
-            </div>
-            <div style="display:flex;gap:6px;flex-wrap:wrap;">
-              <a class="radio-btn" style="text-decoration:none;" href="../?tv=tokyo&fx=rain&room=tokyo-rain&rd=25&lang=fr&from=seo">▶ Rejoindre</a>
-              <button type="button" class="pill" style="cursor:pointer;" onclick="copyPresetRoom('?tv=tokyo&fx=rain&room=tokyo-rain&rd=25&lang=fr', this)">📋 Partager</button>
-            </div>
-          </div>
-          <div class="radio-item" style="flex-direction:column;align-items:stretch;">
-            <div>
-              <strong style="color:#fff;">☕ Café Paris Minuit</strong>
-              <div style="font-size:0.78rem;color:#94a3b8;margin:3px 0 8px;">Deep Work 50 min · FIP Paris &amp; Ambiance</div>
-            </div>
-            <div style="display:flex;gap:6px;flex-wrap:wrap;">
-              <a class="radio-btn" style="text-decoration:none;" href="../?tv=paris&fx=neon&room=paris-cafe&rd=50&lang=fr&from=seo">▶ Rejoindre</a>
-              <button type="button" class="pill" style="cursor:pointer;" onclick="copyPresetRoom('?tv=paris&fx=neon&room=paris-cafe&rd=50&lang=fr', this)">📋 Partager</button>
-            </div>
-          </div>
-          <div class="radio-item" style="flex-direction:column;align-items:stretch;">
-            <div>
-              <strong style="color:#fff;">❄️ Montréal Bureau Neige</strong>
-              <div style="font-size:0.78rem;color:#94a3b8;margin:3px 0 8px;">Pomodoro 25 min · Révisions UdeM / McGill</div>
-            </div>
-            <div style="display:flex;gap:6px;flex-wrap:wrap;">
-              <a class="radio-btn" style="text-decoration:none;" href="../?tv=montreal&fx=snow&room=montreal-study&rd=25&lang=fr&from=seo">▶ Rejoindre</a>
-              <button type="button" class="pill" style="cursor:pointer;" onclick="copyPresetRoom('?tv=montreal&fx=snow&room=montreal-study&rd=25&lang=fr', this)">📋 Partager</button>
-            </div>
-          </div>
-          <div class="radio-item" style="flex-direction:column;align-items:stretch;">
-            <div>
-              <strong style="color:#fff;">🇲🇩 Chișinău Salle Calme</strong>
-              <div style="font-size:0.78rem;color:#94a3b8;margin:3px 0 8px;">Deep Work 50 min · Lecture &amp; Focus</div>
-            </div>
-            <div style="display:flex;gap:6px;flex-wrap:wrap;">
-              <a class="radio-btn" style="text-decoration:none;" href="../?tv=chisinau&fx=rain&room=chisinau-study&rd=50&lang=fr&from=seo">▶ Rejoindre</a>
-              <button type="button" class="pill" style="cursor:pointer;" onclick="copyPresetRoom('?tv=chisinau&fx=rain&room=chisinau-study&rd=50&lang=fr', this)">📋 Partager</button>
-            </div>
-          </div>
-          <div class="radio-item" style="flex-direction:column;align-items:stretch;">
-            <div>
-              <strong style="color:#fff;">🗽 NYC Cyber Sprint</strong>
-              <div style="font-size:0.78rem;color:#94a3b8;margin:3px 0 8px;">Sprint 25 min · Manhattan Code &amp; Synth</div>
-            </div>
-            <div style="display:flex;gap:6px;flex-wrap:wrap;">
-              <a class="radio-btn" style="text-decoration:none;" href="../?tv=newyork&fx=neon&room=nyc-hustle&rd=25&lang=fr&from=seo">▶ Rejoindre</a>
-              <button type="button" class="pill" style="cursor:pointer;" onclick="copyPresetRoom('?tv=newyork&fx=neon&room=nyc-hustle&rd=25&lang=fr', this)">📋 Partager</button>
-            </div>
-          </div>
         </div>
       </section>
 
@@ -198,17 +146,6 @@ footer{margin-top:34px;padding-top:20px;border-top:1px solid rgba(255,255,255,0.
           </div>
         </div>
       </section>
-    
-      <section class="card" style="margin-top:22px;margin-bottom:22px;border-color:rgba(251,191,36,0.48);background:linear-gradient(135deg,rgba(15,23,42,0.94),rgba(49,16,66,0.72));">
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;">
-          <div style="flex:1;min-width:240px;">
-            <div style="font-size:0.74rem;font-weight:900;color:#fde047;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;">🧭 JEU OFFICIEL 4D REMO WORLD</div>
-            <h2 style="margin-bottom:6px;">🧭 REMO ODYSSEY — Traversez 24 Villes en Direct</h2>
-            <p style="font-size:0.86rem;color:#cbd5e1;">Jouez gratuitement sur PC &amp; téléphone sans téléchargement ! Courez en Mode 4A, planez en Hover-Coin 4B, profitez de la météo réelle (Surge 2X), des 56 radios FM locales et défiez vos amis en Duel Fantôme 1v1.</p>
-          </div>
-          <a class="btn-primary" href="../fr/odyssey.html">🧭 Jouer à REMO Odyssey (Gratuit)</a>
-        </div>
-      </section>
     </main>
     
   <footer>
@@ -217,7 +154,6 @@ footer{margin-top:34px;padding-top:20px;border-top:1px solid rgba(255,255,255,0.
       <a href="../fr/">Accueil REMO</a>
       <a href="../fr/focus-tv.html">Focus TV 4D</a>
       <a href="../fr/study-room.html">Salles d’Étude</a>
-      <a href="../fr/odyssey.html">REMO Odyssey 4D</a>
       <a href="../fr/world-blitz.html">World Blitz 60s</a>
       <a href="../fr/cities/index.html">Annuaire des Villes</a>
       <a href="../fr/world-radio.html">56 Radios en Direct</a>
@@ -225,7 +161,6 @@ footer{margin-top:34px;padding-top:20px;border-top:1px solid rgba(255,255,255,0.
       <a href="../fr/boarding-pass.html">Billet 4D</a>
       <a href="../fr/world-ranking.html">Classement 2026</a>
       <a href="../fr/city-versus.html">Duels Villes</a>
-      <a href="../fr/ambassadors.html">Ambassadeurs Villes</a>
       <a href="../llms.txt">AI / LLMs</a>
       <a href="../sitemap.xml">Sitemap</a>
     </div>
@@ -250,16 +185,6 @@ footer{margin-top:34px;padding-top:20px;border-top:1px solid rgba(255,255,255,0.
       var rel = getRoomRel().replace(/^\.\.\//, '').replace(/^\.\//, '');
       if(navigator.clipboard) navigator.clipboard.writeText('https://remoworld.com/' + rel);
       document.getElementById('srCopyBtn').textContent = '✓ ' + ("Invitation Copiée !");
-    };
-    window.copyObsRoomLink = function(){
-      var rel = getRoomRel().replace(/^\.\.\//, '').replace(/^\.\//, '') + '&obs=1';
-      if(navigator.clipboard) navigator.clipboard.writeText('https://remoworld.com/' + rel);
-      var btn = document.getElementById('srObsCopyBtn');
-      if(btn) btn.textContent = '✓ Lien OBS Copié ! (1920x1080)';
-    };
-    window.copyPresetRoom = function(query, btn){
-      if(navigator.clipboard) navigator.clipboard.writeText('https://remoworld.com/' + query);
-      if(btn){ var orig = btn.textContent; btn.textContent = '✓ Copié !'; setTimeout(function(){ btn.textContent = orig; }, 1800); }
     };
     updateRoomLink();
   })();

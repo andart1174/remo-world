@@ -276,7 +276,7 @@
       </div>
       <div class="faq-item">
         <div class="faq-q">2. Which world cities rank highest for Gastronomy, Nightlife, and Tech in 2026?</div>
-        <div class="faq-a">Paris (99/100), Tokyo (98/100), Rome (98/100), Chișinău (96/100), and Montréal (94/100) lead the Gastronomy index. New York, Rio de Janeiro, Miami, Bucharest, and Barcelona top the Nightlife &amp; Energy rankings, while Tokyo, Seoul, Montréal, New York, and London lead in Tech &amp; AI innovation.</div>
+        <div class="faq-a">Paris (99/100), Rome (99/100), Tokyo (98/100), Monaco (97/100), Chișinău (96/100), and Montréal (94/100) lead the Gastronomy index. New York, Rio de Janeiro, Miami, Bucharest, and Barcelona top the Nightlife &amp; Energy rankings, while Tokyo, Seoul, Montréal, New York, and London lead in Tech &amp; AI innovation.</div>
       </div>
       <div class="faq-item">
         <div class="faq-q">3. How can I vote for my city in the 2026 World City Ranking?</div>
@@ -318,9 +318,23 @@
     </footer>
   </div>
 
-  <script src="js/remo-cities-data.js?v=127"></script>
+  <script src="js/remo-cities-data.js?v=153"></script>
   <script>
     let currentSortKey = 'overall';
+    let _cloudLiveCityScores = null;
+
+    function escHtml(str) {
+      return String(str == null ? '' : str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function getOfficial24Cities() {
+      return Array.isArray(REMO_DEFAULT_CITIES) ? REMO_DEFAULT_CITIES.slice() : [];
+    }
 
     function getLiveCityScoresMap() {
       const map = {};
@@ -332,12 +346,18 @@
           if (parsed && parsed.cityScores) storedScores = parsed.cityScores;
         }
       } catch (e) {}
+      if (_cloudLiveCityScores && typeof _cloudLiveCityScores === 'object') {
+        Object.keys(_cloudLiveCityScores).forEach((k) => {
+          const cv = Number(_cloudLiveCityScores[k] || 0);
+          if (cv > Number(storedScores[k] || 0)) storedScores[k] = cv;
+        });
+      }
       let extraVotes = {};
       try {
         extraVotes = JSON.parse(localStorage.getItem('remo_ranking_page_votes') || '{}');
       } catch (e) {}
 
-      const list = (typeof getRemoCities === 'function') ? getRemoCities() : REMO_DEFAULT_CITIES;
+      const list = getOfficial24Cities();
       list.forEach((c) => {
         const base = Number(storedScores[c.id] || (c.baseValue * 3) || 25000);
         const bonus = Number(extraVotes[c.id] || 0);
@@ -347,7 +367,7 @@
     }
 
     function getSortedCities() {
-      const list = ((typeof getRemoCities === 'function') ? getRemoCities() : REMO_DEFAULT_CITIES).slice();
+      const list = getOfficial24Cities();
       const scoreMap = getLiveCityScoresMap();
       return list.sort((a, b) => {
         if (currentSortKey === 'overall') {
@@ -380,10 +400,10 @@
         podiumEl.innerHTML = sorted.slice(0, 3).map((c, idx) => `
           <div class="podium-card rank-${idx + 1}">
             <div class="podium-medal">${medals[idx]}</div>
-            <div class="podium-city">${c.flag} <a href="cities/${c.id}.html" style="color:#fff;">${c.name_en}</a></div>
-            <div style="font-size:0.78rem;color:#94a3b8;margin-bottom:6px;">${c.country_en} • ${c.tagline_en}</div>
+            <div class="podium-city">${escHtml(c.flag)} <a href="cities/${escHtml(c.id)}.html" style="color:#fff;">${escHtml(c.name_en)}</a></div>
+            <div style="font-size:0.78rem;color:#94a3b8;margin-bottom:6px;">${escHtml(c.country_en)} • ${escHtml(c.tagline_en)}</div>
             <div class="podium-pts">🏆 ${(scoreMap[c.id] || 0).toLocaleString()} PTS</div>
-            <button type="button" class="vote-btn" onclick="voteForCityInRanking('${c.id}')">⚡ Vote ${c.name_en} +100 PTS (+20 🪙)</button>
+            <button type="button" class="vote-btn" onclick="voteForCityInRanking('${escHtml(c.id)}')">⚡ Vote ${escHtml(c.name_en)} +100 PTS (+20 🪙)</button>
           </div>
         `).join('');
       }
@@ -405,26 +425,26 @@
             <td><span class="rk-badge ${rkClass}">#${globalRank}</span></td>
             <td>
               <div style="font-weight:900;font-size:0.98rem;">
-                <a href="cities/${c.id}.html" style="color:#fff;">${c.flag} ${c.name_en}</a>
+                <a href="cities/${escHtml(c.id)}.html" style="color:#fff;">${escHtml(c.flag)} ${escHtml(c.name_en)}</a>
               </div>
-              <div style="font-size:0.76rem;color:#94a3b8;">${c.country_en} · ${c.tagline_en}</div>
+              <div style="font-size:0.76rem;color:#94a3b8;">${escHtml(c.country_en)} · ${escHtml(c.tagline_en)}</div>
             </td>
             <td>
               <div class="mini-bars">
-                <div class="m-stat" title="Culture & Heritage">🎭 Cul<b>${st.culture}</b></div>
-                <div class="m-stat" title="Nightlife & Vibes">🌙 Night<b>${st.nightlife}</b></div>
-                <div class="m-stat" title="Gastronomy & Food">🍽️ Food<b>${st.gastronomy}</b></div>
-                <div class="m-stat" title="Tech & AI">🚀 Tech<b>${st.tech}</b></div>
+                <div class="m-stat" title="Culture & Heritage">🎭 Cul<b>${Number(st.culture || 90)}</b></div>
+                <div class="m-stat" title="Nightlife & Vibes">🌙 Night<b>${Number(st.nightlife || 90)}</b></div>
+                <div class="m-stat" title="Gastronomy & Food">🍽️ Food<b>${Number(st.gastronomy || 90)}</b></div>
+                <div class="m-stat" title="Tech & AI">🚀 Tech<b>${Number(st.tech || 90)}</b></div>
               </div>
             </td>
             <td>
               <b style="color:#fbbf24;font-size:0.98rem;">🏆 ${pts} PTS</b>
-              <div style="font-size:0.7rem;color:#7dd3fc;">${c.rarity || 'Mythic 4D'}</div>
+              <div style="font-size:0.7rem;color:#7dd3fc;">${escHtml(c.rarity || 'Mythic 4D')}</div>
             </td>
             <td>
               <div style="display:flex;gap:6px;align-items:center;">
-                <button type="button" class="vote-btn" onclick="voteForCityInRanking('${c.id}')">⚡ Vote +100 PTS</button>
-                <button type="button" class="share-btn" onclick="shareCityRankDirect('${c.id}', ${globalRank})" title="Share rank">📲 Share</button>
+                <button type="button" class="vote-btn" onclick="voteForCityInRanking('${escHtml(c.id)}')">⚡ Vote +100 PTS</button>
+                <button type="button" class="share-btn" onclick="shareCityRankDirect('${escHtml(c.id)}', ${globalRank})" title="Share rank">📲 Share</button>
               </div>
             </td>
           </tr>
@@ -433,7 +453,7 @@
     }
 
     function voteForCityInRanking(cityId) {
-      const list = (typeof getRemoCities === 'function') ? getRemoCities() : REMO_DEFAULT_CITIES;
+      const list = getOfficial24Cities();
       const city = list.find((c) => c.id === cityId) || list[0];
       const todayKey = 'remo_rank_voted_' + cityId + '_' + new Date().toISOString().slice(0, 10);
       if (localStorage.getItem(todayKey)) {
@@ -536,15 +556,31 @@
     }
 
     document.addEventListener('DOMContentLoaded', () => {
-      const list = (typeof getRemoCities === 'function') ? getRemoCities() : REMO_DEFAULT_CITIES;
+      const list = getOfficial24Cities();
       const sel = document.getElementById('badgeCitySel');
       if (sel) {
-        sel.innerHTML = list.map((c) => `<option value="${c.id}">${c.flag} ${c.name_en} (${c.country_en})</option>`).join('');
+        sel.innerHTML = list.map((c) => `<option value="${escHtml(c.id)}">${escHtml(c.flag)} ${escHtml(c.name_en)} (${escHtml(c.country_en)})</option>`).join('');
       }
       renderRankingTable();
       updateEmbedBadgePreview();
       tickSeoWeeklyCup();
       setInterval(tickSeoWeeklyCup, 1000);
+      fetch('https://firestore.googleapis.com/v1/projects/remo-world/databases/(default)/documents/remo_ecosystem/live_state?mask.fieldPaths=cityScores')
+        .then((r) => r.ok ? r.json() : null)
+        .then((doc) => {
+          const f = doc && doc.fields && doc.fields.cityScores && doc.fields.cityScores.mapValue && doc.fields.cityScores.mapValue.fields;
+          if (!f) return;
+          const out = {};
+          Object.keys(f).forEach((k) => {
+            const v = f[k] && (f[k].integerValue || f[k].doubleValue);
+            if (v !== undefined) out[k] = Number(v);
+          });
+          if (Object.keys(out).length > 0) {
+            _cloudLiveCityScores = out;
+            renderRankingTable();
+            updateEmbedBadgePreview();
+          }
+        }).catch(() => {});
     });
   </script>
 </body>

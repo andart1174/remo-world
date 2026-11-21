@@ -1077,6 +1077,10 @@ function healBrokenCityPhotos(onUpdated) {
   return _healBrokenCitiesInFlight;
 }
 
+function _sanitizeCityStr(val, maxLen = 80) {
+  return String(val || '').replace(/[<>]/g, '').trim().slice(0, maxLen);
+}
+
 function mergeCustomRemoCitiesFromCloud(cloudCities) {
   if (!Array.isArray(cloudCities) || !cloudCities.length) return false;
   const current = getRemoCities();
@@ -1087,9 +1091,23 @@ function mergeCustomRemoCitiesFromCloud(cloudCities) {
 
   cloudCities.forEach((cc) => {
     if (!cc || !cc.id || !cc.name_en) return;
-    const existing = byId.get(cc.id);
+    const cleanId = String(cc.id).replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 48);
+    if (!cleanId) return;
+    const existing = byId.get(cleanId);
     if (!existing) {
-      const cloned = Object.assign({}, cc);
+      const cloned = Object.assign({}, cc, {
+        id: cleanId,
+        code: _sanitizeCityStr(cc.code || 'CTY', 6),
+        flag: _sanitizeCityStr(cc.flag || '🏙️', 16),
+        name_en: _sanitizeCityStr(cc.name_en, 60),
+        name_fr: _sanitizeCityStr(cc.name_fr || cc.name_en, 60),
+        country_en: _sanitizeCityStr(cc.country_en || 'World', 60),
+        country_fr: _sanitizeCityStr(cc.country_fr || cc.country_en || 'World', 60),
+        tagline_en: _sanitizeCityStr(cc.tagline_en, 120),
+        tagline_fr: _sanitizeCityStr(cc.tagline_fr || cc.tagline_en, 120),
+        desc_en: _sanitizeCityStr(cc.desc_en, 240),
+        desc_fr: _sanitizeCityStr(cc.desc_fr || cc.desc_en, 240)
+      });
       if (isBadCityStockImageUrl(cloned.imageUrl)) delete cloned.imageUrl;
       if (isBadCityStockImageUrl(cloned.cardImageUrl)) delete cloned.cardImageUrl;
       current.push(cloned);

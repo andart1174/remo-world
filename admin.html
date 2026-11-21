@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Outfit:wght@600;700;800;900&family=Orbitron:wght@700;900&display=swap" media="print" onload="this.media='all'">
-  <link rel="stylesheet" href="css/remo-admin.css?v=127">
+  <link rel="stylesheet" href="css/remo-admin.css?v=153">
   <link rel="icon" type="image/png" sizes="32x32" href="img/favicon-32x32.png">
   <link rel="icon" type="image/png" sizes="64x64" href="img/favicon-64x64.png">
   <link rel="apple-touch-icon" sizes="180x180" href="img/apple-touch-icon.png">
@@ -25,9 +25,9 @@
       <button type="button" onclick="adminGoogleSignIn()" class="adm-btn gold" style="width:100%;justify-content:center;padding:12px;font-size:0.92rem;margin-bottom:14px;" data-i18n="adm_google_btn">
         🌐 Continue with Admin Google Account
       </button>
-      <div style="font-size:0.72rem;color:var(--muted);margin-bottom:10px;">OR SIGN IN WITH ADMIN CREDENTIALS</div>
+      <div style="font-size:0.72rem;color:var(--muted);margin-bottom:10px;" data-i18n="adm_or_credentials">OR SIGN IN WITH ADMIN CREDENTIALS</div>
       <form onsubmit="unlockAdminOffice(event)" style="display:flex;flex-direction:column;gap:10px;">
-        <input type="email" id="admEmailInput" class="adm-inp" placeholder="andart1174@gmail.com" value="andart1174@gmail.com" required>
+        <input type="email" id="admEmailInput" class="adm-inp" data-i18n-placeholder="adm_email_ph" placeholder="Admin Email" value="" autocomplete="username" required>
         <input type="password" id="admPinInput" class="adm-inp" data-i18n-placeholder="adm_pin_ph" placeholder="Admin Password" value="" autocomplete="current-password" required>
         <button type="submit" class="adm-btn outline" style="padding:11px;font-size:0.88rem;justify-content:center;" data-i18n="adm_unlock_btn">🔐 Sign In with Email &amp; Password</button>
       </form>
@@ -38,7 +38,7 @@
   </div>
 
   <!-- 🏛️ TOP EXECUTIVE COMMAND BAR -->
-  <header class="adm-topbar">
+  <header class="adm-topbar" id="admTopbarEl" style="display:none;">
     <div class="adm-brand">
       <div class="adm-seal"><img src="img/remo_brand_coin.png" style="width:34px;height:34px;border-radius:50%;display:block;box-shadow:0 0 10px rgba(251,191,36,0.5);" alt="REMO"></div>
       <div>
@@ -62,7 +62,7 @@
   </header>
 
   <!-- 🧭 EXECUTIVE LAYOUT -->
-  <div class="adm-layout">
+  <div class="adm-layout" id="admLayoutEl" style="display:none;">
 
     <!-- Left Command Sidebar (Horizontal Scroll on Mobile) -->
     <aside class="adm-sidebar">
@@ -1146,10 +1146,10 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js" integrity="sha384-oFrOL1TiREYNET0lsYF3LjQuyi2gL7vhjH1X8vFr+umcmzAdPELopeSgbcrv4uRm" crossorigin="anonymous"></script>
 
   <!-- Shared REMO Core + Admin Controller -->
-  <script src="js/remo-i18n.js?v=152"></script>
-  <script src="js/remo-cities-data.js?v=145"></script>
-  <script src="js/remo-store.js?v=151"></script>
-  <script src="js/remo-card-engine.js?v=145"></script>
-  <script src="js/remo-admin.js?v=150"></script>
+  <script src="js/remo-i18n.js?v=153"></script>
+  <script src="js/remo-cities-data.js?v=153"></script>
+  <script src="js/remo-store.js?v=153"></script>
+  <script src="js/remo-card-engine.js?v=153"></script>
+  <script src="js/remo-admin.js?v=153"></script>
 </body>
 </html>
