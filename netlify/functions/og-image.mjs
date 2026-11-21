@@ -547,6 +547,49 @@ export function renderOdysseyOgPngBuffer(opts = {}, lang = 'en') {
   return encodeRgbaToPng(buf, OG_W, OG_H);
 }
 
+export function renderInviteOgPngBuffer(opts = {}, lang = 'en') {
+  const atlas = getOgFontAtlas();
+  const buf = Buffer.allocUnsafe(OG_W * OG_H * 4);
+  const isFr = lang === 'fr';
+  const city = getCityMeta(opts.cityId || 'montreal');
+  const cityName = getCityDisplayName(city, isFr ? 'fr' : 'en').toUpperCase();
+  const cleanRef = sanitizeTextForAtlas(
+    String(opts.ref || 'REMO2026').replace(/[^a-zA-Z0-9_-]/g, '').toUpperCase().slice(0, 18),
+    atlas.sm
+  ) || 'REMO2026';
+  const cityRgb = hexToRgb(city.themeColor || '#38bdf8', [56, 189, 248]);
+
+  fillGradientRect(buf, OG_W, OG_H, 0, 0, OG_W, OG_H, '#050816', '#0f172a', '#1e1b4b');
+  blendRadialGlow(buf, OG_W, OG_H, 280, 170, 540, cityRgb, 0.32);
+  blendRadialGlow(buf, OG_W, OG_H, 940, 450, 480, [251, 191, 36], 0.28);
+
+  drawRoundedBox(buf, OG_W, OG_H, 36, 30, OG_W - 72, OG_H - 60, 32, [255, 255, 255, 0.03], [251, 191, 36, 0.55], 2.5);
+  drawPill(buf, OG_W, OG_H, atlas.sm, isFr ? 'COFFRE VIP OFFICIEL' : 'OFFICIAL VIP WELCOME CHEST', 80, 84, [15, 23, 42, 0.78], [253, 224, 71]);
+  drawPill(buf, OG_W, OG_H, atlas.sm, `CODE: ${cleanRef}`, 0, 84, [56, 189, 248, 0.22], [125, 211, 252], OG_W - 80);
+
+  const kicker = isFr
+    ? 'COUPE MONDIALE DES VILLES 2026 EN DIRECT'
+    : '2026 LIVE WORLD CITIES RANKING & CUP';
+  drawAtlasText(buf, OG_W, OG_H, kicker, OG_W / 2, 148, atlas.sm, [125, 211, 252], 'center', 0.38);
+
+  drawRoundedBox(buf, OG_W, OG_H, 160, 206, OG_W - 320, 148, 28, [15, 23, 42, 0.86], [251, 191, 36, 0.88], 3);
+  drawAtlasText(buf, OG_W, OG_H, truncateClean(cityName, 18), OG_W / 2, 246, atlas.lg, [255, 255, 255], 'center', 0.55);
+
+  const giftTxt = isFr
+    ? '+150 PIECES D\'OR + 1 CARTE 4D GRATUITE'
+    : '+150 GOLD COINS + 1 FREE 4D CITY CARD';
+  drawAtlasText(buf, OG_W, OG_H, giftTxt, OG_W / 2, 392, atlas.md, [253, 224, 71], 'center', 0.44);
+
+  const ctaTxt = isFr
+    ? `VOTEZ POUR ${truncateClean(cityName, 16)} (+50 PTS VILLE)`
+    : `VOTE FOR ${truncateClean(cityName, 16)} (+50 CITY PTS)`;
+  drawAtlasText(buf, OG_W, OG_H, ctaTxt, OG_W / 2, 452, atlas.sm, [110, 231, 183], 'center', 0.36);
+
+  drawAtlasText(buf, OG_W, OG_H, isFr ? '24 VILLES • 56 RADIOS LIVE • CARTES 4D' : '24 CITIES • 56 LIVE RADIOS • 4D CARDS', 84, 528, atlas.sm, [203, 213, 225], 'left', 0.3);
+  drawAtlasText(buf, OG_W, OG_H, 'REMOWORLD.COM', OG_W - 84, 528, atlas.sm, [56, 189, 248], 'right', 0.3);
+  return encodeRgbaToPng(buf, OG_W, OG_H);
+}
+
 export function renderPostOgPngBuffer(post, lang = 'en', nowMs = Date.now(), recipientOverride = '') {
   const atlas = getOgFontAtlas();
   const buf = Buffer.allocUnsafe(OG_W * OG_H * 4);
@@ -763,6 +806,23 @@ export const handler = async (event, _context, deps = {}) => {
       headers: {
         'Content-Type': 'image/png',
         'Cache-Control': 'public, max-age=120, s-maxage=300',
+        'Access-Control-Allow-Origin': '*'
+      },
+      body: pngBuf.toString('base64'),
+      isBase64Encoded: true
+    };
+  }
+
+  if (mode === 'invite') {
+    const pngBuf = renderInviteOgPngBuffer({
+      cityId: params.city || 'montreal',
+      ref: params.ref || 'REMO2026'
+    }, lang);
+    return {
+      statusCode: 200,
+      headers: {
+        'Content-Type': 'image/png',
+        'Cache-Control': 'public, max-age=300, s-maxage=900',
         'Access-Control-Allow-Origin': '*'
       },
       body: pngBuf.toString('base64'),

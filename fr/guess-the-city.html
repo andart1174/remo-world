@@ -108,6 +108,17 @@ footer{margin-top:34px;padding-top:20px;border-top:1px solid rgba(255,255,255,0.
       <section class="card" style="margin-bottom:22px;border-color:rgba(56,189,248,0.45);">
         <h2>🎯 Mini-Défi Instantané : Pouvez-vous trouver ces 3 villes ?</h2>
         <div id="quizBox" style="margin-top:12px;"></div>
+        <div id="quizVictoryBanner" style="display:none;margin-top:14px;padding:18px;border-radius:16px;background:linear-gradient(135deg,rgba(16,185,129,0.22),rgba(251,191,36,0.18));border:2px solid #fbbf24;text-align:center;">
+          <div style="font-size:1.08rem;font-weight:900;color:#fde047;margin-bottom:6px;">
+            🏆 Bravo ! Vous avez débloqué votre Coffre VIP (+150 🪙 Pièces d’Or + 1 Carte de Ville 4D Gratuite) !
+          </div>
+          <p style="font-size:0.86rem;color:#e2e8f0;margin-bottom:12px;">
+            Entrez maintenant dans REMO World pour encaisser vos +150 🪙, choisir votre ville et jouer aux défis photos en direct !
+          </p>
+          <a class="btn-primary" href="../index.html?open=guess&promo=vip150&lang=fr">
+            🎁 Réclamer mes +150 🪙 & ma Carte 4D sur REMO World →
+          </a>
+        </div>
       </section>
 
       <section class="card">
@@ -142,6 +153,31 @@ footer{margin-top:34px;padding-top:20px;border-top:1px solid rgba(255,255,255,0.
       <a href="../sitemap.xml">Sitemap</a>
     </div>
   </footer>
+  <script>
+  (function(){
+    try {
+      var p = new URLSearchParams(window.location.search);
+      var ref = (p.get('ref') || p.get('invite') || '').trim();
+      var city = (p.get('city') || '').trim().toLowerCase();
+      var promo = (p.get('promo') || '').trim();
+      if (ref) localStorage.setItem('remo_pending_ref', ref.toUpperCase().slice(0, 24));
+      if (city && /^[a-z0-9_-]{2,24}$/.test(city)) localStorage.setItem('remo_user_picked_city', city);
+      if (ref || city || promo) {
+        document.querySelectorAll('a[href]').forEach(function(a){
+          var h = a.getAttribute('href') || '';
+          if (h.indexOf('index.html') !== -1 || h.indexOf('?from=seo') !== -1 || h.indexOf('?tv=') !== -1 || h.indexOf('?city=') !== -1 || h.indexOf('?open=') !== -1) {
+            var sep = h.indexOf('?') === -1 ? '?' : '&';
+            var tail = [];
+            if (ref && h.indexOf('ref=') === -1) tail.push('ref=' + encodeURIComponent(ref));
+            if (city && h.indexOf('city=') === -1) tail.push('city=' + encodeURIComponent(city));
+            if (promo && h.indexOf('promo=') === -1) tail.push('promo=' + encodeURIComponent(promo));
+            if (tail.length) a.setAttribute('href', h + sep + tail.join('&'));
+          }
+        });
+      }
+    } catch(e){}
+  })();
+  </script>
   </div>
   <script>
   (function(){
@@ -173,11 +209,19 @@ footer{margin-top:34px;padding-top:20px;border-top:1px solid rgba(255,255,255,0.
         }).join('') +
         '</div></div>';
     }).join('');
+    var solved = {};
     window.ansQuiz = function(ri, oi, ans, btn){
       var ok = oi === ans;
       btn.style.background = ok ? '#10b981' : '#ef4444';
       btn.style.color = '#fff';
-      btn.textContent += ok ? (isFr ? ' ✓ Bravo !' : ' ✓ Correct!') : ' ✕';
+      if (btn.textContent.indexOf('✓') === -1 && btn.textContent.indexOf('✕') === -1) {
+        btn.textContent += ok ? (isFr ? ' ✓ Bravo !' : ' ✓ Correct!') : ' ✕';
+      }
+      if (ok) {
+        solved[ri] = true;
+        var vb = document.getElementById('quizVictoryBanner');
+        if (vb) vb.style.display = 'block';
+      }
     };
   })();
   </script>

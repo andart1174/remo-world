@@ -977,6 +977,9 @@ const REMO_DICT = {
     vip_invite_city_lbl: '🌍 Choose Your Home City (+50 PTS Boost):',
     vip_invite_name_lbl: '🪪 Your Citizen Name or @Handle (Optional):',
     vip_invite_claim_btn: '⚡ Claim My +150 🪙 & Free City Card Now!',
+    vip_invite_google_save_btn: '🔐 Claim & Save with Google / Account (+100 🪙 Bonus)',
+    feed_scratch_pill: '🎟️ 24K Scratch',
+    feed_diploma_pill: '🏅 9:16 Diploma',
 
     // 📺 4D Focus TV & Clean App Launcher UI
     hdr_focus_tv_btn: '📺 Focus TV',
@@ -2256,6 +2259,9 @@ const REMO_DICT = {
     vip_invite_city_lbl: '🌍 Choisissez Votre Ville (+50 PTS Bonus) :',
     vip_invite_name_lbl: '🪪 Votre Nom Citoyen ou @Pseudo (Optionnel) :',
     vip_invite_claim_btn: '⚡ Réclamer Mes +150 🪙 & Ma Carte de Ville !',
+    vip_invite_google_save_btn: '🔐 Réclamer & Sauvegarder avec Google / Compte (+100 🪙 Bonus)',
+    feed_scratch_pill: '🎟️ Ticket 24K',
+    feed_diploma_pill: '🏅 Diplôme 9:16',
 
     // 📺 Focus TV 4D & Lanceur d'Apps Épuré
     hdr_focus_tv_btn: '📺 Focus TV',

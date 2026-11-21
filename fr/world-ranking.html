@@ -555,6 +555,25 @@
     }
 
     document.addEventListener('DOMContentLoaded', () => {
+      try {
+        const p = new URLSearchParams(window.location.search);
+        const ref = (p.get('ref') || p.get('invite') || '').trim();
+        const city = (p.get('city') || '').trim().toLowerCase();
+        const promo = (p.get('promo') || '').trim();
+        if (ref) localStorage.setItem('remo_pending_ref', ref.toUpperCase().slice(0, 24));
+        if (city && /^[a-z0-9_-]{2,24}$/.test(city)) localStorage.setItem('remo_user_picked_city', city);
+        if (ref || city || promo) {
+          document.querySelectorAll('a[href*="index.html"]').forEach((a) => {
+            const h = a.getAttribute('href') || '';
+            const sep = h.indexOf('?') === -1 ? '?' : '&';
+            const tail = [];
+            if (ref && h.indexOf('ref=') === -1) tail.push('ref=' + encodeURIComponent(ref));
+            if (city && h.indexOf('city=') === -1) tail.push('city=' + encodeURIComponent(city));
+            if (promo && h.indexOf('promo=') === -1) tail.push('promo=' + encodeURIComponent(promo));
+            if (tail.length) a.setAttribute('href', h + sep + tail.join('&'));
+          });
+        }
+      } catch (e) {}
       const list = getOfficial24Cities();
       const sel = document.getElementById('badgeCitySel');
       if (sel) {

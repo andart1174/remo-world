@@ -165,6 +165,31 @@ footer{margin-top:34px;padding-top:20px;border-top:1px solid rgba(255,255,255,0.
       <a href="../sitemap.xml">Sitemap</a>
     </div>
   </footer>
+  <script>
+  (function(){
+    try {
+      var p = new URLSearchParams(window.location.search);
+      var ref = (p.get('ref') || p.get('invite') || '').trim();
+      var city = (p.get('city') || '').trim().toLowerCase();
+      var promo = (p.get('promo') || '').trim();
+      if (ref) localStorage.setItem('remo_pending_ref', ref.toUpperCase().slice(0, 24));
+      if (city && /^[a-z0-9_-]{2,24}$/.test(city)) localStorage.setItem('remo_user_picked_city', city);
+      if (ref || city || promo) {
+        document.querySelectorAll('a[href]').forEach(function(a){
+          var h = a.getAttribute('href') || '';
+          if (h.indexOf('index.html') !== -1 || h.indexOf('?from=seo') !== -1 || h.indexOf('?tv=') !== -1 || h.indexOf('?city=') !== -1 || h.indexOf('?open=') !== -1) {
+            var sep = h.indexOf('?') === -1 ? '?' : '&';
+            var tail = [];
+            if (ref && h.indexOf('ref=') === -1) tail.push('ref=' + encodeURIComponent(ref));
+            if (city && h.indexOf('city=') === -1) tail.push('city=' + encodeURIComponent(city));
+            if (promo && h.indexOf('promo=') === -1) tail.push('promo=' + encodeURIComponent(promo));
+            if (tail.length) a.setAttribute('href', h + sep + tail.join('&'));
+          }
+        });
+      }
+    } catch(e){}
+  })();
+  </script>
   </div>
   <script>
   (function(){

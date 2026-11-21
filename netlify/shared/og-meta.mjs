@@ -365,6 +365,44 @@ export function buildStudyRoomOgMeta(opts = {}, lang = 'en') {
   };
 }
 
+export function buildInviteOgMeta(opts = {}, lang = 'en') {
+  const isFr = lang === 'fr';
+  const rawCity = String(opts.city || 'montreal').trim().toLowerCase();
+  const city = getCityMeta(rawCity);
+  const cityName = getCityDisplayName(city, isFr ? 'fr' : 'en');
+  const cleanRef = String(opts.ref || opts.invite || opts.promo || 'REMO2026')
+    .replace(/[^a-zA-Z0-9_-]/g, '')
+    .toUpperCase()
+    .slice(0, 24) || 'REMO2026';
+
+  const qs = new URLSearchParams();
+  if (opts.ref || opts.invite) qs.set('ref', cleanRef);
+  if (opts.city && REMO_CITIES_META[rawCity]) qs.set('city', city.id);
+  if (opts.promo) qs.set('promo', String(opts.promo).replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 20));
+  const basePath = (opts.pathname && opts.pathname.startsWith('/fr/')) ? '/fr/' : '/';
+  const canonicalUrl = qs.toString() ? `${REMO_ORIGIN}${basePath}?${qs.toString()}` : `${REMO_ORIGIN}${basePath}`;
+
+  const langParam = isFr ? '&lang=fr' : '';
+  const ogImage = `${REMO_ORIGIN}/.netlify/functions/og-image?mode=invite&city=${encodeURIComponent(city.id)}&ref=${encodeURIComponent(cleanRef)}${langParam}`;
+
+  const title = isFr
+    ? `🎁 Coffre VIP pour ${city.flag} ${cityName} (+150 🪙 Pièces d'Or + 1 Carte 4D Gratuite) — REMO World`
+    : `🎁 Free VIP Welcome Chest for ${city.flag} ${cityName} (+150 🪙 Gold Coins & 1 4D City Card) — REMO World`;
+  const description = isFr
+    ? `Soutenez ${city.flag} ${cityName} dans le Classement Mondial des Villes 2026 ! Ouvrez votre Coffre VIP gratuit (+150 🪙, 1 Carte 4D & +50 PTS Ville) avec le code ${cleanRef} sur REMO World.`
+    : `Support ${city.flag} ${cityName} in the 2026 World Cities Live Ranking! Claim your free VIP Welcome Chest (+150 🪙, 1 Free 4D Card & +50 City PTS) with code ${cleanRef} on REMO World.`;
+
+  return {
+    canonicalUrl,
+    ogImage,
+    imageWidth: '1200',
+    imageHeight: '630',
+    title,
+    description,
+    imageAlt: title
+  };
+}
+
 export function buildPostOgMeta(post, lang = 'en', nowMs = Date.now(), recipientOverride = '') {
   if (!post || !post.id) return null;
   const isFr = lang === 'fr';

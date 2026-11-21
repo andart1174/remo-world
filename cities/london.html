@@ -118,10 +118,17 @@ footer{margin-top:34px;padding-top:20px;border-top:1px solid rgba(255,255,255,0.
             <small>Base Card Value</small>
             <b>🪙 9,200</b>
           </div>
+          <div class="kpi">
+            <small>Live World Ranking</small>
+            <b id="cityLiveRankVal">🏆 #-- • -- PTS</b>
+          </div>
         </div>
 
         <div class="cta-row">
-          <a class="btn-primary" href="../?tv=london&lang=en&from=seo">
+          <a class="btn-primary" href="../?city=london&promo=vip150&lang=en">
+            🎁 Boost London (+50 PTS & +150 🪙 Free Gift)
+          </a>
+          <a class="btn-sec" href="../?tv=london&lang=en&from=seo">
             📺 Launch 4D Focus TV · London
           </a>
           <a class="btn-sec" href="../?tv=london&fx=rain&lang=en&from=seo">
@@ -346,6 +353,31 @@ footer{margin-top:34px;padding-top:20px;border-top:1px solid rgba(255,255,255,0.
       <a href="../sitemap.xml">Sitemap</a>
     </div>
   </footer>
+  <script>
+  (function(){
+    try {
+      var p = new URLSearchParams(window.location.search);
+      var ref = (p.get('ref') || p.get('invite') || '').trim();
+      var city = (p.get('city') || '').trim().toLowerCase();
+      var promo = (p.get('promo') || '').trim();
+      if (ref) localStorage.setItem('remo_pending_ref', ref.toUpperCase().slice(0, 24));
+      if (city && /^[a-z0-9_-]{2,24}$/.test(city)) localStorage.setItem('remo_user_picked_city', city);
+      if (ref || city || promo) {
+        document.querySelectorAll('a[href]').forEach(function(a){
+          var h = a.getAttribute('href') || '';
+          if (h.indexOf('index.html') !== -1 || h.indexOf('?from=seo') !== -1 || h.indexOf('?tv=') !== -1 || h.indexOf('?city=') !== -1 || h.indexOf('?open=') !== -1) {
+            var sep = h.indexOf('?') === -1 ? '?' : '&';
+            var tail = [];
+            if (ref && h.indexOf('ref=') === -1) tail.push('ref=' + encodeURIComponent(ref));
+            if (city && h.indexOf('city=') === -1) tail.push('city=' + encodeURIComponent(city));
+            if (promo && h.indexOf('promo=') === -1) tail.push('promo=' + encodeURIComponent(promo));
+            if (tail.length) a.setAttribute('href', h + sep + tail.join('&'));
+          }
+        });
+      }
+    } catch(e){}
+  })();
+  </script>
   </div>
 
   
@@ -398,6 +430,21 @@ footer{margin-top:34px;padding-top:20px;border-top:1px solid rgba(255,255,255,0.
           document.getElementById('cityWeatherVal').textContent = Math.round(d.current_weather.temperature) + '°C • ' + Math.round(d.current_weather.windspeed) + ' km/h';
         }
       }).catch(function(){ document.getElementById('cityWeatherVal').textContent = '✨ Live Hub'; });
+    fetch('https://firestore.googleapis.com/v1/projects/remo-world/databases/(default)/documents/remo_ecosystem/live_state?mask.fieldPaths=cityScores')
+      .then(function(r){ return r.ok ? r.json() : null; })
+      .then(function(doc){
+        var el = document.getElementById('cityLiveRankVal');
+        if (!el || !doc || !doc.fields || !doc.fields.cityScores || !doc.fields.cityScores.mapValue || !doc.fields.cityScores.mapValue.fields) return;
+        var f = doc.fields.cityScores.mapValue.fields;
+        var list = Object.keys(f).map(function(k){
+          var v = f[k] ? Number(f[k].integerValue || f[k].doubleValue || 0) : 0;
+          return { id: k, pts: v };
+        }).filter(function(x){ return x.pts > 0; }).sort(function(a,b){ return b.pts - a.pts; });
+        var idx = list.findIndex(function(x){ return x.id === "london"; });
+        var myPts = idx >= 0 ? list[idx].pts : 9200;
+        var myRank = idx >= 0 ? (idx + 1) : 1;
+        el.textContent = '🏆 #' + myRank + ' • ' + myPts.toLocaleString() + ' PTS';
+      }).catch(function(){});
   })();
   </script>
 </body>

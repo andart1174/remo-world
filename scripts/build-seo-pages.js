@@ -261,7 +261,32 @@ function renderFooter(lang, prefix, stationCount = 56) {
       <a href="${prefix}llms.txt">AI / LLMs</a>
       <a href="${prefix}sitemap.xml">Sitemap</a>
     </div>
-  </footer>`;
+  </footer>
+  <script>
+  (function(){
+    try {
+      var p = new URLSearchParams(window.location.search);
+      var ref = (p.get('ref') || p.get('invite') || '').trim();
+      var city = (p.get('city') || '').trim().toLowerCase();
+      var promo = (p.get('promo') || '').trim();
+      if (ref) localStorage.setItem('remo_pending_ref', ref.toUpperCase().slice(0, 24));
+      if (city && /^[a-z0-9_-]{2,24}$/.test(city)) localStorage.setItem('remo_user_picked_city', city);
+      if (ref || city || promo) {
+        document.querySelectorAll('a[href]').forEach(function(a){
+          var h = a.getAttribute('href') || '';
+          if (h.indexOf('index.html') !== -1 || h.indexOf('?from=seo') !== -1 || h.indexOf('?tv=') !== -1 || h.indexOf('?city=') !== -1 || h.indexOf('?open=') !== -1) {
+            var sep = h.indexOf('?') === -1 ? '?' : '&';
+            var tail = [];
+            if (ref && h.indexOf('ref=') === -1) tail.push('ref=' + encodeURIComponent(ref));
+            if (city && h.indexOf('city=') === -1) tail.push('city=' + encodeURIComponent(city));
+            if (promo && h.indexOf('promo=') === -1) tail.push('promo=' + encodeURIComponent(promo));
+            if (tail.length) a.setAttribute('href', h + sep + tail.join('&'));
+          }
+        });
+      }
+    } catch(e){}
+  })();
+  </script>`;
 }
 
 /* ── 3. Build City Landing Page (EN & FR) ── */
@@ -414,10 +439,17 @@ function buildCityPage(city, lang, cities, elements, stations) {
             <small>${isFr ? 'Valeur de Base' : 'Base Card Value'}</small>
             <b>🪙 ${city.baseValue.toLocaleString('en-US')}</b>
           </div>
+          <div class="kpi">
+            <small>${isFr ? 'Classement Mondial Live' : 'Live World Ranking'}</small>
+            <b id="cityLiveRankVal">🏆 #-- • -- PTS</b>
+          </div>
         </div>
 
         <div class="cta-row">
-          <a class="btn-primary" href="${prefix}?tv=${city.id}&lang=${lang}&from=seo">
+          <a class="btn-primary" href="${prefix}?city=${city.id}&promo=vip150&lang=${lang}">
+            🎁 ${isFr ? `Soutenir ${esc(cName)} (+50 PTS & +150 🪙 Offerts)` : `Boost ${esc(cName)} (+50 PTS & +150 🪙 Free Gift)`}
+          </a>
+          <a class="btn-sec" href="${prefix}?tv=${city.id}&lang=${lang}&from=seo">
             📺 ${isFr ? `Ouvrir Focus TV 4D · ${esc(cName)}` : `Launch 4D Focus TV · ${esc(cName)}`}
           </a>
           <a class="btn-sec" href="${prefix}?tv=${city.id}&fx=rain&lang=${lang}&from=seo">
@@ -536,6 +568,21 @@ function buildCityPage(city, lang, cities, elements, stations) {
           document.getElementById('cityWeatherVal').textContent = Math.round(d.current_weather.temperature) + '°C • ' + Math.round(d.current_weather.windspeed) + ' km/h';
         }
       }).catch(function(){ document.getElementById('cityWeatherVal').textContent = '✨ Live Hub'; });
+    fetch('https://firestore.googleapis.com/v1/projects/remo-world/databases/(default)/documents/remo_ecosystem/live_state?mask.fieldPaths=cityScores')
+      .then(function(r){ return r.ok ? r.json() : null; })
+      .then(function(doc){
+        var el = document.getElementById('cityLiveRankVal');
+        if (!el || !doc || !doc.fields || !doc.fields.cityScores || !doc.fields.cityScores.mapValue || !doc.fields.cityScores.mapValue.fields) return;
+        var f = doc.fields.cityScores.mapValue.fields;
+        var list = Object.keys(f).map(function(k){
+          var v = f[k] ? Number(f[k].integerValue || f[k].doubleValue || 0) : 0;
+          return { id: k, pts: v };
+        }).filter(function(x){ return x.pts > 0; }).sort(function(a,b){ return b.pts - a.pts; });
+        var idx = list.findIndex(function(x){ return x.id === ${JSON.stringify(city.id)}; });
+        var myPts = idx >= 0 ? list[idx].pts : ${Number(city.baseValue || 9000)};
+        var myRank = idx >= 0 ? (idx + 1) : 1;
+        el.textContent = '🏆 #' + myRank + ' • ' + myPts.toLocaleString() + ' PTS';
+      }).catch(function(){});
   })();
   </script>
 </body>
@@ -828,6 +875,17 @@ function buildGuessCityHubPage(lang, cities) {
       <section class="card" style="margin-bottom:22px;border-color:rgba(56,189,248,0.45);">
         <h2>🎯 ${isFr ? 'Mini-Défi Instantané : Pouvez-vous trouver ces 3 villes ?' : 'Instant Warm-Up Round: Can You Guess All 3 Mystery Cities?'}</h2>
         <div id="quizBox" style="margin-top:12px;"></div>
+        <div id="quizVictoryBanner" style="display:none;margin-top:14px;padding:18px;border-radius:16px;background:linear-gradient(135deg,rgba(16,185,129,0.22),rgba(251,191,36,0.18));border:2px solid #fbbf24;text-align:center;">
+          <div style="font-size:1.08rem;font-weight:900;color:#fde047;margin-bottom:6px;">
+            ${isFr ? '🏆 Bravo ! Vous avez débloqué votre Coffre VIP (+150 🪙 Pièces d’Or + 1 Carte de Ville 4D Gratuite) !' : '🏆 Congrats! You unlocked your VIP Welcome Chest (+150 🪙 Gold Coins + 1 Free 4D City Card)!'}
+          </div>
+          <p style="font-size:0.86rem;color:#e2e8f0;margin-bottom:12px;">
+            ${isFr ? 'Entrez maintenant dans REMO World pour encaisser vos +150 🪙, choisir votre ville et jouer aux défis photos en direct !' : 'Enter REMO World now to claim your +150 🪙, pick your Home City, and play live citizen photo challenges!'}
+          </p>
+          <a class="btn-primary" href="${prefix}index.html?open=guess&promo=vip150&lang=${lang}">
+            🎁 ${isFr ? 'Réclamer mes +150 🪙 & ma Carte 4D sur REMO World →' : 'Claim My +150 🪙 & Free 4D Card on REMO World →'}
+          </a>
+        </div>
       </section>
 
       <section class="card">
@@ -876,11 +934,19 @@ function buildGuessCityHubPage(lang, cities) {
         }).join('') +
         '</div></div>';
     }).join('');
+    var solved = {};
     window.ansQuiz = function(ri, oi, ans, btn){
       var ok = oi === ans;
       btn.style.background = ok ? '#10b981' : '#ef4444';
       btn.style.color = '#fff';
-      btn.textContent += ok ? (isFr ? ' ✓ Bravo !' : ' ✓ Correct!') : ' ✕';
+      if (btn.textContent.indexOf('✓') === -1 && btn.textContent.indexOf('✕') === -1) {
+        btn.textContent += ok ? (isFr ? ' ✓ Bravo !' : ' ✓ Correct!') : ' ✕';
+      }
+      if (ok) {
+        solved[ri] = true;
+        var vb = document.getElementById('quizVictoryBanner');
+        if (vb) vb.style.display = 'block';
+      }
     };
   })();
   </script>

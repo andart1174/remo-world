@@ -3240,16 +3240,27 @@ const REMO_STORE = {
     this.state.directMessages = this.state.directMessages || [];
     const dmObj = {
       id: 'dm_ref_' + Date.now(),
-      fromUid: inviter.uid,
-      fromName: `🤝 @${inviter.name}`,
-      toUid: claimer.uid,
+      fromUid: claimer.uid,
+      fromName: `🤝 @${claimer.name || 'Citizen'}`,
+      toUid: inviter.uid,
       text: `🎉 Referral Bonus Activated! Both @${inviter.name} and @${claimer.name} earned +${bonus} 🪙 REMO Coins & +${warBonusPts} City War PTS!`,
       ts: Date.now()
     };
     this.state.directMessages.push(dmObj);
     if (typeof this.syncUserToCloud === 'function') {
       this.syncUserToCloud(claimer);
-      this.syncUserToCloud(inviter);
+      if (this.isCurrentUserAdmin() || inviter.uid === claimer.uid) {
+        this.syncUserToCloud(inviter);
+      } else if (this.fbDb && this.fbAuth && this.fbAuth.currentUser) {
+        const serverTs = (typeof firebase !== 'undefined' && firebase && firebase.firestore && firebase.firestore.FieldValue)
+          ? firebase.firestore.FieldValue.serverTimestamp()
+          : Date.now();
+        this.fbDb.collection('remo_users').doc(inviter.uid).update({
+          coins: Number(inviter.coins || 0),
+          lifetimeCoins: Number(inviter.lifetimeCoins || inviter.coins || 0),
+          updatedAt: serverTs
+        }).catch(() => {});
+      }
     }
     if (typeof this.syncDmToCloud === 'function') {
       this.syncDmToCloud(dmObj);
@@ -3391,18 +3402,27 @@ const REMO_STORE = {
       }
       const bonus = this.state.settings?.rewards?.signupBonus || 150;
       const finalEmail = cleanEmail || (fbUid ? `user_${fbUid.slice(0, 8)}@gmail.com` : '');
+      const guestSession = (this.state.users || []).find((x) => x && x.uid && String(x.uid).startsWith('u_guest_'));
+      const savedPickedCity = (() => {
+        try { return localStorage.getItem('remo_user_picked_city') || ''; } catch (e) { return ''; }
+      })();
+      const effHomeCity = (homeCity && homeCity !== 'montreal')
+        ? homeCity
+        : (savedPickedCity || (guestSession && guestSession.homeCity) || homeCity || 'montreal');
+      const guestExtraCoins = guestSession ? Math.max(0, Number(guestSession.coins || 100) - 100) : 0;
+      const startCoins = Math.min(400, bonus + guestExtraCoins);
 
       u = {
         uid: fbUid ? ('u_fb_' + fbUid) : ('u_' + Date.now().toString(36)),
         fbUid: fbUid || '',
-        name: (name && name !== 'REMO Pioneer') ? name : ('Citizen #' + pNum),
+        name: (name && name !== 'REMO Pioneer') ? name : ((guestSession && guestSession.name && guestSession.name !== 'Guest Explorer' && guestSession.name !== 'REMO Citizen') ? guestSession.name : ('Citizen #' + pNum)),
         email: finalEmail,
         role: isAdminTarget ? 'admin' : 'citizen',
         verified: true,
         emailVerified: Boolean(fbUid || (finalEmail && !finalEmail.includes('citizen') && !finalEmail.includes('pioneer'))),
         termsAcceptedAt: Date.now(),
         termsVersion: '1.0',
-        homeCity: homeCity || 'montreal',
+        homeCity: effHomeCity,
         passportNum: pNum,
         referralCode: `REMO-${pNum}`,
         referralsCount: 0,
@@ -3410,18 +3430,31 @@ const REMO_STORE = {
         ownedShopItems: [],
         equippedFrame: '',
         equippedTitleId: '',
-        coins: bonus,
-        lifetimeCoins: bonus,
+        coins: startCoins,
+        lifetimeCoins: startCoins,
         streak: 1,
         lastStreakClaimDate: '',
         following: [],
         joinedAt: Date.now(),
         lastSeenAt: Date.now(),
-        visas: [homeCity || 'montreal'],
+        visas: [effHomeCity],
         avatarColor: '#6366f1'
       };
+      if (guestSession && Array.isArray(guestSession.cards) && guestSession.cards.length > 0) {
+        u.cards = guestSession.cards.map((gc) => Object.assign({}, gc, { ownerUid: u.uid, ownerName: u.name }));
+        if (Array.isArray(this.state.droppedCardsPool)) {
+          this.state.droppedCardsPool.forEach((dc) => {
+            if (dc && dc.ownerUid === guestSession.uid) {
+              dc.ownerUid = u.uid;
+              dc.ownerName = u.name;
+            }
+          });
+        }
+      }
       this.state.users.push(u);
-      this.mintCardForUser(u.uid, homeCity || 'montreal', 'Rare', false);
+      if (!u.cards || u.cards.length === 0) {
+        this.mintCardForUser(u.uid, effHomeCity, 'Rare', false);
+      }
     } else {
       if (name && name !== 'REMO Pioneer' && (!u.name || u.name === 'Citizen' || u.name.startsWith('Citizen #') || u.name === 'REMO Pioneer')) {
         u.name = name;
@@ -3452,8 +3485,10 @@ const REMO_STORE = {
     // Auto-apply pending URL Referral Code (?ref=...) if present!
     const pendingRef = localStorage.getItem('remo_pending_ref');
     if (pendingRef && !u.referredBy) {
-      this.redeemReferralCode(u.uid, pendingRef);
-      localStorage.removeItem('remo_pending_ref');
+      const refRes = this.redeemReferralCode(u.uid, pendingRef);
+      if (refRes && (refRes.ok || refRes.reason === 'already_claimed' || refRes.reason === 'self')) {
+        localStorage.removeItem('remo_pending_ref');
+      }
     }
     this.save(true, 'auth');
     if (u.email && !/^citizen\d+@remo\.world$/i.test(u.email)) {
@@ -5895,6 +5930,16 @@ const REMO_STORE = {
         this._lastUsersVisualSig = visualSig;
 
         this.state.users = activeUsers;
+        try {
+          const pendingRefSnap = localStorage.getItem('remo_pending_ref');
+          const curActiveU = this.getCurrentUser();
+          if (pendingRefSnap && curActiveU && !this.isFakeOrGuestUser(curActiveU) && !curActiveU.referredBy) {
+            const refResSnap = this.redeemReferralCode(curActiveU.uid, pendingRefSnap);
+            if (refResSnap && (refResSnap.ok || refResSnap.reason === 'already_claimed' || refResSnap.reason === 'self')) {
+              localStorage.removeItem('remo_pending_ref');
+            }
+          }
+        } catch (e) {}
         this.save(false, 'cloud_users_sync');
         window.dispatchEvent(new CustomEvent('remo:stateupdate', { detail: { reason: 'cloud_users' } }));
         if (this.isAdminUnlocked() && this.isCurrentUserAdmin() && typeof refreshAllAdminPanels === 'function') refreshAllAdminPanels();

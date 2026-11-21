@@ -20492,6 +20492,31 @@ function bindGoldenScratchPointerEvents() {
   });
 }
 
+function syncGoldenScratchFeedBadge() {
+  const pillBadge = document.getElementById('feedScratchPillBadge');
+  if (!pillBadge) return;
+  const isFr = REMO_I18N.getLang() === 'fr';
+  const { usedCount, sharedUnlocked } = getGoldenScratchDayState();
+  if (usedCount === 0) {
+    pillBadge.textContent = isFr ? 'GRATUIT' : 'FREE';
+    pillBadge.style.background = '#fbbf24';
+    pillBadge.style.color = '#050816';
+  } else if (usedCount === 1 && !sharedUnlocked) {
+    pillBadge.textContent = 'BONUS #2';
+    pillBadge.style.background = '#38bdf8';
+    pillBadge.style.color = '#050816';
+  } else if (usedCount === 1 && sharedUnlocked) {
+    pillBadge.textContent = isFr ? 'PRÊT #2' : 'READY #2';
+    pillBadge.style.background = '#10b981';
+    pillBadge.style.color = '#050816';
+  } else {
+    pillBadge.textContent = '2/2 ✓';
+    pillBadge.style.background = 'rgba(255,255,255,0.16)';
+    pillBadge.style.color = '#cbd5e1';
+  }
+}
+window.syncGoldenScratchFeedBadge = syncGoldenScratchFeedBadge;
+
 function openGoldenScratchModal() {
   const modal = document.getElementById('goldenScratchModal');
   if (!modal) return;
@@ -20504,6 +20529,7 @@ function openGoldenScratchModal() {
   REMO_I18N.applyDOM(modal);
   modal.classList.add('open');
   bindGoldenScratchPointerEvents();
+  syncGoldenScratchFeedBadge();
 
   const badge = document.getElementById('scratchTicketStatusBadge');
   const instantBtn = document.getElementById('scratchInstantRevealBtn');
@@ -20573,6 +20599,7 @@ function revealGoldenScratchCardPrize(isInstant) {
   REMO_STORE.addCoins(u.uid, _activeScratchPrize.coins, _activeScratchPrize.pts);
   if (typeof spawnRemoCoinsFX === 'function') spawnRemoCoinsFX(18);
   syncHeaderAndSidebars();
+  syncGoldenScratchFeedBadge();
 
   const instantBtn = document.getElementById('scratchInstantRevealBtn');
   if (instantBtn) instantBtn.style.display = 'none';
@@ -20636,6 +20663,60 @@ window.shareToUnlockSecondScratchCard = shareToUnlockSecondScratchCard;
 let _detectedVipInviteCode = 'REMO2026';
 let _detectedVipCityId = '';
 
+function detectPreferredRemoCityId(citiesList) {
+  const cities = Array.isArray(citiesList) && citiesList.length ? citiesList : getRemoCities();
+  const validIds = new Set(cities.map((c) => c.id));
+  if (_detectedVipCityId && validIds.has(_detectedVipCityId)) return _detectedVipCityId;
+  try {
+    const picked = localStorage.getItem('remo_user_picked_city') || '';
+    if (picked && validIds.has(picked)) return picked;
+  } catch (e) {}
+  try {
+    const tz = (Intl.DateTimeFormat().resolvedOptions().timeZone || '').toLowerCase();
+    const tzMap = {
+      'europe/chisinau': 'chisinau',
+      'europe/tiraspol': 'chisinau',
+      'europe/bucharest': 'bucharest',
+      'europe/paris': 'paris',
+      'europe/brussels': 'paris',
+      'europe/luxembourg': 'paris',
+      'europe/monaco': 'monaco',
+      'europe/zurich': 'geneva',
+      'europe/geneva': 'geneva',
+      'europe/london': 'london',
+      'europe/dublin': 'london',
+      'europe/madrid': 'barcelona',
+      'europe/rome': 'rome',
+      'europe/berlin': 'berlin',
+      'europe/vienna': 'berlin',
+      'europe/amsterdam': 'amsterdam',
+      'europe/lisbon': 'lisbon',
+      'europe/istanbul': 'istanbul',
+      'africa/cairo': 'cairo',
+      'asia/dubai': 'dubai',
+      'asia/muscat': 'dubai',
+      'asia/tokyo': 'tokyo',
+      'asia/seoul': 'seoul',
+      'asia/singapore': 'singapore',
+      'australia/sydney': 'sydney',
+      'australia/melbourne': 'sydney',
+      'america/sao_paulo': 'rio',
+      'america/los_angeles': 'losangeles',
+      'america/vancouver': 'losangeles',
+      'america/new_york': 'newyork',
+      'america/detroit': 'newyork',
+      'america/miami': 'miami',
+      'america/montreal': 'montreal',
+      'america/toronto': 'montreal',
+      'america/halifax': 'montreal'
+    };
+    if (tz && tzMap[tz] && validIds.has(tzMap[tz])) return tzMap[tz];
+  } catch (e) {}
+  const u = REMO_STORE.getCurrentUser();
+  if (u && u.homeCity && validIds.has(u.homeCity)) return u.homeCity;
+  return 'montreal';
+}
+
 function openVipInviteWelcomeModal(isPreview = false) {
   const modal = document.getElementById('vipInviteWelcomeModal');
   if (!modal) return;
@@ -20648,7 +20729,7 @@ function openVipInviteWelcomeModal(isPreview = false) {
     params = new URLSearchParams(window.location.search);
   } catch (e) {}
 
-  const refParam = (params && (params.get('ref') || params.get('invite') || params.get('promo'))) || '';
+  const refParam = (params && (params.get('ref') || params.get('invite') || params.get('promo'))) || localStorage.getItem('remo_pending_ref') || '';
   const cityParam = (params && params.get('city')) || '';
   if (refParam) _detectedVipInviteCode = refParam.toUpperCase().slice(0, 24);
   else if (u && u.referralCode) _detectedVipInviteCode = u.referralCode;
@@ -20660,7 +20741,7 @@ function openVipInviteWelcomeModal(isPreview = false) {
   if (codeEl) codeEl.textContent = _detectedVipInviteCode || 'REMO2026';
 
   const sel = document.getElementById('vipInviteCitySelect');
-  const preferredCity = _detectedVipCityId || (u && u.homeCity) || 'montreal';
+  const preferredCity = detectPreferredRemoCityId(cities);
   if (sel) {
     sel.innerHTML = cities.map((c) =>
       `<option value="${c.id}" ${c.id === preferredCity ? 'selected' : ''}>${c.flag} ${escapeHtmlStr(getCityName(c, lang))} (+50 PTS)</option>`
@@ -20668,8 +20749,14 @@ function openVipInviteWelcomeModal(isPreview = false) {
   }
 
   const nameInp = document.getElementById('vipInviteNameInput');
-  if (nameInp && u && u.name && !u.name.startsWith('REMO Pioneer') && u.role !== 'guest') {
+  if (nameInp && u && u.name && !u.name.startsWith('REMO Pioneer') && u.name !== 'Guest Explorer' && u.role !== 'guest') {
     nameInp.value = u.name;
+  }
+
+  const saveAccBtn = document.getElementById('vipInviteSaveAccountBtn');
+  if (saveAccBtn) {
+    const isRealCitizen = Boolean(u && !REMO_STORE.isFakeOrGuestUser(u));
+    saveAccBtn.style.display = isRealCitizen ? 'none' : 'inline-flex';
   }
 
   REMO_I18N.applyDOM(modal);
@@ -20680,13 +20767,17 @@ function openVipInviteWelcomeModal(isPreview = false) {
 }
 window.openVipInviteWelcomeModal = openVipInviteWelcomeModal;
 
-function claimVipInviteWelcomePack() {
+function claimVipInviteWelcomePack(openAuthAfter = false) {
   const lang = REMO_I18N.getLang();
   const isFr = lang === 'fr';
   const sel = document.getElementById('vipInviteCitySelect');
   const nameInp = document.getElementById('vipInviteNameInput');
   const chosenCityId = (sel && sel.value) || _detectedVipCityId || 'montreal';
   const rawName = (nameInp && nameInp.value || '').trim().replace(/^@+/, '');
+
+  try {
+    localStorage.setItem('remo_user_picked_city', chosenCityId);
+  } catch (e) {}
 
   let u = REMO_STORE.getCurrentUser();
   if (!u) {
@@ -20703,7 +20794,14 @@ function claimVipInviteWelcomePack() {
   if (!alreadyClaimed) {
     localStorage.setItem('remo_vip_invite_claimed', '1');
     REMO_STORE.addCoins(u.uid, 150, 50);
-    if (_detectedVipInviteCode && typeof REMO_STORE.redeemReferralCode === 'function') {
+    if (typeof REMO_STORE.mintCardForUser === 'function') {
+      try {
+        REMO_STORE.mintCardForUser(u.uid, chosenCityId, 'Rare', false, {
+          subtitle: isFr ? 'ÉDITION BIENVENUE VIP' : 'VIP WELCOME EDITION'
+        });
+      } catch (e) {}
+    }
+    if (_detectedVipInviteCode && _detectedVipInviteCode !== 'REMO2026' && typeof REMO_STORE.redeemReferralCode === 'function') {
       try {
         referralResult = REMO_STORE.redeemReferralCode(u.uid, _detectedVipInviteCode);
       } catch (e) {}
@@ -20725,17 +20823,29 @@ function claimVipInviteWelcomePack() {
   if (referralResult && referralResult.ok) {
     remoToast(
       isFr
-        ? `🎉 Pack VIP (+150 🪙) + Bonus Parrainage @${referralResult.inviter.name} (+${referralResult.bonus} 🪙 & +${referralResult.warBonusPts || 150} PTS Ville) activés !`
-        : `🎉 VIP Pack (+150 🪙) + Referral Bonus with @${referralResult.inviter.name} (+${referralResult.bonus} 🪙 & +${referralResult.warBonusPts || 150} City PTS) activated!`,
+        ? `🎉 Pack VIP (+150 🪙 + Carte 4D) + Bonus Parrainage @${referralResult.inviter.name} (+${referralResult.bonus} 🪙 & +${referralResult.warBonusPts || 150} PTS Ville) activés !`
+        : `🎉 VIP Pack (+150 🪙 + 4D Card) + Referral Bonus with @${referralResult.inviter.name} (+${referralResult.bonus} 🪙 & +${referralResult.warBonusPts || 150} City PTS) activated!`,
       'fanfare'
     );
   } else {
     remoToast(
       isFr
-        ? `🎉 Pack VIP Réclamé ! +150 🪙 dans votre coffre & +50 PTS pour ${cityObj.flag} ${cityName} !`
-        : `🎉 VIP Pack Claimed! +150 🪙 added to your vault & +50 PTS for ${cityObj.flag} ${cityName}!`,
+        ? `🎉 Pack VIP Réclamé ! +150 🪙, 1 Carte 4D & +50 PTS pour ${cityObj.flag} ${cityName} !`
+        : `🎉 VIP Pack Claimed! +150 🪙, 1 Free 4D Card & +50 PTS for ${cityObj.flag} ${cityName}!`,
       'fanfare'
     );
+  }
+
+  if (openAuthAfter && (!u || REMO_STORE.isFakeOrGuestUser(u))) {
+    setTimeout(() => {
+      if (typeof openAuthModal === 'function') {
+        openAuthModal();
+        const authCitySel = document.getElementById('authCityInput');
+        if (authCitySel) authCitySel.value = chosenCityId;
+        const authNameInp = document.getElementById('authNameInput');
+        if (authNameInp && rawName && rawName.length >= 2) authNameInp.value = rawName;
+      }
+    }, 260);
   }
 }
 window.claimVipInviteWelcomePack = claimVipInviteWelcomePack;
@@ -21620,9 +21730,13 @@ async function copyViralPromoTemplateText(idx, platform = 'copy') {
 window.copyViralPromoTemplateText = copyViralPromoTemplateText;
 
 if (typeof window !== 'undefined') {
+  window.addEventListener('remo:langchange', () => {
+    try { syncGoldenScratchFeedBadge(); } catch (e) {}
+  });
   window.addEventListener('DOMContentLoaded', () => {
     try {
       syncRemoOdysseyBadges();
+      syncGoldenScratchFeedBadge();
       const params = new URLSearchParams(window.location.search);
       const openParam = params.get('open');
       if (params.get('claim_odyssey') === '1') {
@@ -21666,6 +21780,10 @@ if (typeof window !== 'undefined') {
         setTimeout(() => {
           if (typeof openCityAmbassadorModal === 'function') openCityAmbassadorModal();
         }, 380);
+      } else if (openParam === 'scratch' || openParam === 'scratchcard') {
+        setTimeout(() => {
+          if (typeof openGoldenScratchModal === 'function') openGoldenScratchModal();
+        }, 380);
       } else if (params.get('contact') === '1') {
         setTimeout(() => openContactSupportModal(), 350);
       } else if (params.get('promo_studio') === '1') {
@@ -21674,6 +21792,25 @@ if (typeof window !== 'undefined') {
         if (localStorage.getItem('remo_vip_invite_claimed') !== '1') {
           setTimeout(() => openVipInviteWelcomeModal(false), 550);
         }
+      } else if (
+        localStorage.getItem('remo_vip_invite_claimed') !== '1' &&
+        !openParam &&
+        !params.get('post') &&
+        !params.get('tv') &&
+        !params.get('room') &&
+        !params.get('contest') &&
+        !params.get('u') &&
+        !params.get('war') &&
+        !params.get('welcome') &&
+        !params.get('onboarding')
+      ) {
+        setTimeout(() => {
+          const curU = REMO_STORE.getCurrentUser();
+          const anyModalOpen = document.querySelector('.remo-modal-backdrop.open');
+          if (!anyModalOpen && localStorage.getItem('remo_vip_invite_claimed') !== '1' && (!curU || REMO_STORE.isFakeOrGuestUser(curU))) {
+            openVipInviteWelcomeModal(false);
+          }
+        }, 680);
       }
 
       // Realtime 60s countdown ticker for 24h boosted posts (in-place DOM update, no full feed rebuild)

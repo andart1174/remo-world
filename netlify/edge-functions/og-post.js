@@ -14,6 +14,7 @@ import {
   buildBlitzOgMeta,
   buildOdysseyOgMeta,
   buildStudyRoomOgMeta,
+  buildInviteOgMeta,
   sanitizeRecipientName,
   escapeHtmlAttr
 } from '../shared/og-meta.mjs';
@@ -91,8 +92,14 @@ export default async (request, context) => {
     (isOdysseyPath && Boolean(vsToken) && targetScore > 0)
   );
   const wantsBlitz = !wantsPost && !wantsRoom && !wantsOdyssey && (openTarget === 'blitz' || openTarget === 'worldblitz' || Boolean(decodeBlitzVsToken(vsToken)));
+  const wantsInvite = !wantsPost && !wantsRoom && !wantsOdyssey && !wantsBlitz && (
+    url.searchParams.has('ref') ||
+    url.searchParams.has('invite') ||
+    url.searchParams.has('promo') ||
+    url.searchParams.has('city')
+  );
 
-  if (!wantsPost && !wantsRoom && !wantsOdyssey && !wantsBlitz) {
+  if (!wantsPost && !wantsRoom && !wantsOdyssey && !wantsBlitz && !wantsInvite) {
     return context.next();
   }
 
@@ -135,6 +142,15 @@ export default async (request, context) => {
     originRes = await context.next();
     const vsData = decodeBlitzVsToken(vsToken);
     meta = buildBlitzOgMeta(vsData, vsData ? vsToken : '', lang);
+  } else if (wantsInvite) {
+    originRes = await context.next();
+    meta = buildInviteOgMeta({
+      ref: url.searchParams.get('ref') || '',
+      invite: url.searchParams.get('invite') || '',
+      promo: url.searchParams.get('promo') || '',
+      city: url.searchParams.get('city') || 'montreal',
+      pathname: url.pathname
+    }, lang);
   }
 
   if (!meta || !originRes || !originRes.ok) {
