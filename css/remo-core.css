@@ -11403,16 +11403,29 @@ select.remo-input option {
     z-index: 120;
     padding: 0 6px !important;
   }
+  @media (max-width: 540px) {
+    .remo-header .brand-name {
+      display: none !important;
+    }
+    .remo-header .header-right {
+      justify-content: space-between !important;
+      gap: 2px !important;
+      padding: 2px !important;
+    }
+    .remo-header .header-right > :first-child {
+      margin-left: 0 !important;
+    }
+  }
   body:has(#view-feed.active) #btnRadioToggle {
     padding: 4px 6px !important;
-    font-size: 0.64rem !important;
+    font-size: 0.63rem !important;
     min-height: 28px;
     max-width: none;
   }
   body:has(#view-feed.active) #hdrAuthBtn {
-    max-width: 110px !important;
+    max-width: 104px !important;
     padding: 4px 7px !important;
-    font-size: 0.65rem !important;
+    font-size: 0.64rem !important;
     min-height: 28px;
   }
   body:has(#view-feed.active) .admin-god-pill {
@@ -11600,6 +11613,9 @@ select.remo-input option {
   }
 
   /* Restored Mobile Bottom-Left Overlay (Author + Caption + Expandable Interactive Widgets) */
+  #view-feed.active .post-face-front .post-sound-disc {
+    display: none !important;
+  }
   #view-feed.active .tiktok-overlay-info {
     display: flex !important;
     flex-direction: column;
@@ -11609,8 +11625,8 @@ select.remo-input option {
     left: 0;
     right: 0;
     bottom: 0;
-    padding: 26px 64px 12px 12px;
-    background: linear-gradient(180deg, rgba(3, 6, 18, 0) 0%, rgba(3, 6, 18, 0.72) 55%, rgba(3, 6, 18, 0.92) 100%);
+    padding: 28px 64px 12px 12px;
+    background: linear-gradient(180deg, rgba(3, 6, 18, 0) 0%, rgba(3, 6, 18, 0.88) 42%, rgba(3, 6, 18, 0.98) 76%, #030612 100%);
     z-index: 16;
     pointer-events: none;
   }
