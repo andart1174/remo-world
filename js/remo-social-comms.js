@@ -1741,8 +1741,8 @@ function renderSinglePaneMedia(item, cityObj, lang) {
     return renderPostTextCardStage(item, cityObj, lang, { compact: true });
   }
   const flt = item.photoFilter || 'flt-none';
-  if (item.mediaType === 'html_app' && item.htmlCode) {
-    return `<iframe sandbox="allow-scripts" loading="lazy" data-post-id="${escapeHtmlStr(item.id || '')}" srcdoc="${escapeSrcDocAttr(item.htmlCode)}"></iframe>`;
+  if (item.mediaType === 'html_app') {
+    return `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:#050816;color:#38bdf8;font-weight:800;font-size:0.85rem;text-align:center;padding:14px;">🔐 REMO Live App</div>`;
   }
   if (item.mediaType === 'video' && item.mediaUrl) {
     const rawK = item.mediaUrl;
@@ -2124,11 +2124,10 @@ function _renderPostMediaStageInner(p, city, lang) {
     `;
   }
 
-  // 1. LIVE INTERACTIVE HTML / 3D MINI-APP
-  if (p.mediaType === 'html_app' && p.htmlCode) {
-    const cleanCode = buildFittedHtmlSrcdoc(p.htmlCode, p.id);
+  // 1. LIVE INTERACTIVE HTML MINI-APP (Level 2 Server Vault / Ephemeral Blob Shield — Zero raw srcdoc!)
+  if (typeof isHtmlAppPost === 'function' ? isHtmlAppPost(p) : (p.mediaType === 'html_app' && (p.hasVaultApp || p.vaultPayload || p.htmlCode))) {
     return `
-      <iframe class="html-post-frame" id="htmlFrame_${escapeHtmlStr(p.id)}" data-post-id="${escapeHtmlStr(p.id)}" sandbox="allow-scripts" loading="lazy" scrolling="no" srcdoc="${escapeSrcDocAttr(cleanCode)}" style="width:100%;height:100%;border:none;border-radius:12px;background:#050816;overflow:hidden;"></iframe>
+      <iframe class="html-post-frame" id="htmlFrame_${escapeHtmlStr(p.id)}" data-post-id="${escapeHtmlStr(p.id)}" data-vault-pending="1" sandbox="allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox" loading="lazy" scrolling="no" style="width:100%;height:100%;border:none;border-radius:12px;background:#050816;overflow:hidden;"></iframe>
     `;
   }
 
@@ -2277,6 +2276,8 @@ function renderAdminPostBar(p) {
         <button type="button" class="adm-pbtn gold" onclick="adminAwardFounderCrown('${escapeJsSingleArg(p.id)}')">${t('adm_bar_award')}</button>
         <button type="button" class="adm-pbtn" onclick="openAdminQuickModal('${escapeJsSingleArg(p.uid || '')}')">${t('adm_bar_coins')}</button>
         <button type="button" class="adm-pbtn" onclick="adminEditPostInline('${escapeJsSingleArg(p.id)}')">${t('adm_bar_edit')}</button>
+        ${p.mediaType === 'html_app' ? `<button type="button" class="adm-pbtn" onclick="adminToggleHtmlArcadeMode('${escapeJsSingleArg(p.id)}')">🎮 Jeu: ${p.isArcadeGame ? 'ON' : 'OFF'}</button>` : ''}
+        ${(p.mediaType === 'html_app' && p.vaultMode !== 'server') ? `<button type="button" class="adm-pbtn gold" onclick="adminMigrateSingleHtmlPostToVault('${escapeJsSingleArg(p.id)}')">🔐 Migrer Vault</button>` : ''}
       </div>
     </details>
   `;
@@ -2381,7 +2382,7 @@ function computePostRenderSig(p, u, lang) {
   const liked = (u && (p.likes || []).includes(u.uid)) ? 1 : 0;
   const boostMins = isPostBoostActive(p) ? Math.floor(Math.max(0, Number(p.boostedUntil) - Date.now()) / 60000) : 0;
   const mFp = (s) => (s ? `${s.length}:${s.slice(0, 24)}:${s.slice(-16)}` : '');
-  return `${p.id}_${lang}_${p.mediaType || ''}_${mFp(p.mediaUrl)}_${(p.mediaUrls || []).map(mFp).join(',')}_${(p.likes || []).length}_${liked}_${(p.comments || []).length}_${p.tipsTotal || 0}_${p.pinned ? 1 : 0}_${boostMins}_${p.founderAward ? 1 : 0}_${p.mintedCard ? 1 : 0}_${dualOpen}_${vSig}_${pollSig}_${btySig}_${capSig}_${lookSig}_${mboxSig}_${chSig}_${Object.keys(p.cityGuesses || {}).length}_${p.leaderboard?.[0]?.score || 0}_${isPostCapsuleSealed(p) ? 1 : 0}_${isAdminXrayOpen(p.id) ? 1 : 0}_${p._cloudSyncError ? 1 : 0}_${p._cloudSyncPending ? 1 : 0}`;
+  return `${p.id}_${lang}_${p.mediaType || ''}_${p.isArcadeGame ? 1 : 0}_${p.vaultMode || ''}_${mFp(p.mediaUrl)}_${(p.mediaUrls || []).map(mFp).join(',')}_${(p.likes || []).length}_${liked}_${(p.comments || []).length}_${p.tipsTotal || 0}_${p.pinned ? 1 : 0}_${boostMins}_${p.founderAward ? 1 : 0}_${p.mintedCard ? 1 : 0}_${dualOpen}_${vSig}_${pollSig}_${btySig}_${capSig}_${lookSig}_${mboxSig}_${chSig}_${Object.keys(p.cityGuesses || {}).length}_${p.leaderboard?.[0]?.score || 0}_${isPostCapsuleSealed(p) ? 1 : 0}_${isAdminXrayOpen(p.id) ? 1 : 0}_${p._cloudSyncError ? 1 : 0}_${p._cloudSyncPending ? 1 : 0}`;
 }
 
 function toggleTkCaptionExpand(postId, ev) {
@@ -2489,7 +2490,7 @@ function renderSinglePostCardHtml(p, lang, u, isAdm) {
     const capsuleHtml = hiddenByCapsule ? '' : renderSecretCapsuleWidget(p, lang, u);
     const viralHtml = hiddenByCapsule ? '' : renderViralGoalWidget(p, lang, isAdm);
     const audioHtml = (!hiddenByCapsule && p.voiceUrl) ? `<audio src="${voiceResolved}" ${voiceIdbAttr} controls style="width:100%;height:34px;margin-top:6px;"></audio>` : '';
-    const htmlGameLb = (!hiddenByCapsule && p.mediaType === 'html_app') ? renderHtmlGameLeaderboardWidget(p, lang, u) : '';
+    const htmlGameLb = (!hiddenByCapsule && typeof isHtmlPostArcadeGame === 'function' && isHtmlPostArcadeGame(p)) ? renderHtmlGameLeaderboardWidget(p, lang, u) : '';
     const adminBarHtml = renderAdminPostBar(p);
     const syncErrHtml = p._cloudSyncError ? `<button type="button" class="post-sync-retry-banner" onclick="retrySyncPostToCloud('${escapeJsSingleArg(p.id)}')" title="${escapeHtmlStr(p._cloudSyncError)}">${escapeHtmlStr(t('post_sync_retry_btn'))}</button>` : '';
 
@@ -2772,6 +2773,7 @@ function getEditorialShowcasePosts() {
       cityId: 'tokyo',
       vibe: 'energy',
       mediaType: 'html_app',
+      isArcadeGame: true,
       htmlCode: neonGameHtml,
       caption_en: '💻 Playable 4D Mini-App directly in the feed: Tokyo Neon Pulse ⚡ Tap the cyber orb right inside this card!',
       caption_fr: '💻 Mini-App 4D jouable directement dans le flux : Tokyo Neon Pulse ⚡ Touchez l’orbe cyber dans cette carte !',
@@ -2911,6 +2913,7 @@ function _patchSingleFeedCardElement(p, lang, u, isAdm) {
     }
     RemoMediaDB.hydrateDom(updatedEl);
     initAllMysteryBoxCanvases(updatedEl);
+    if (typeof hydrateAllHtmlVaultFrames === 'function') hydrateAllHtmlVaultFrames(updatedEl);
   }
   if (window._renderedCardSigs) {
     window._renderedCardSigs[p.id] = computePostRenderSig(p, u, lang);
@@ -3492,16 +3495,19 @@ function _pauseOffscreenFeedVideos() {
     const pid = fr.getAttribute('data-post-id') || '';
     if (!pid) return;
     if (r.bottom < -vh * 2.2 || r.top > vh * 2.2) {
-      if (fr.hasAttribute('srcdoc')) {
+      if (fr.hasAttribute('srcdoc') || (fr.getAttribute('src') && fr.getAttribute('src') !== 'about:blank')) {
         fr.dataset.suspendedHtmlPid = pid;
         fr.removeAttribute('srcdoc');
+        fr.setAttribute('src', 'about:blank');
+        fr.removeAttribute('data-vault-hydrated');
       }
-    } else if (fr.dataset.suspendedHtmlPid && !fr.hasAttribute('srcdoc') && r.bottom >= -vh * 1.8 && r.top <= vh * 1.8) {
+    } else if (fr.dataset.suspendedHtmlPid && r.bottom >= -vh * 1.8 && r.top <= vh * 1.8) {
       const post = findFeedPostById(fr.dataset.suspendedHtmlPid);
-      if (post && post.htmlCode && typeof buildFittedHtmlSrcdoc === 'function') {
-        fr.srcdoc = buildFittedHtmlSrcdoc(post.htmlCode, post.id);
-      }
       delete fr.dataset.suspendedHtmlPid;
+      if (post && typeof hydrateHtmlVaultFrame === 'function') {
+        fr.setAttribute('data-vault-pending', '1');
+        hydrateHtmlVaultFrame(fr, post);
+      }
     }
   });
 
@@ -3538,6 +3544,7 @@ function _pauseOffscreenFeedVideos() {
           card.replaceWith(restored);
           RemoMediaDB.hydrateDom(restored);
           initAllMysteryBoxCanvases(restored);
+          if (typeof hydrateAllHtmlVaultFrames === 'function') hydrateAllHtmlVaultFrames(restored);
         }
       }
     }
@@ -3763,6 +3770,7 @@ function renderSocialFeed(searchQuery = '', forceFull = false) {
         grid.insertBefore(node, sentinel);
         RemoMediaDB.hydrateDom(node);
         initAllMysteryBoxCanvases(node);
+        if (typeof hydrateAllHtmlVaultFrames === 'function') hydrateAllHtmlVaultFrames(node);
       });
       newlyVisible.forEach((p) => {
         window._renderedCardSigs[p.id] = computePostRenderSig(p, u, lang);
@@ -3786,9 +3794,10 @@ function renderSocialFeed(searchQuery = '', forceFull = false) {
   grid.innerHTML = visiblePosts.map((p) => renderSinglePostCardHtml(p, lang, u, isAdm)).join('');
   renderFeedInfiniteSentinel(grid, posts.length, visiblePosts.length, lang);
 
-  // Asynchronously attach any IndexedDB video/photo/audio Blobs
+  // Asynchronously attach any IndexedDB video/photo/audio Blobs & Protected Vault iframes
   RemoMediaDB.hydrateDom(grid);
   initAllMysteryBoxCanvases(grid);
+  if (typeof hydrateAllHtmlVaultFrames === 'function') hydrateAllHtmlVaultFrames(grid);
   if (typeof syncDesktopStageLayoutUI === 'function') {
     syncDesktopStageLayoutUI();
   }
@@ -4419,11 +4428,9 @@ function handleMediaDoubleTap(ev, postId, wrapEl) {
   }
 }
 
-function toggleHtmlCodeView(postId, btnEl) {
-  const pre = document.getElementById('htmlCodeView_' + postId);
-  if (!pre) return;
-  const open = pre.classList.toggle('open');
-  if (btnEl) btnEl.textContent = open ? t('act_live_app') : t('act_view_code');
+function toggleHtmlCodeView() {
+  // Disabled for security: HTML source code is strictly private inside REMO Vault
+  return;
 }
 
 let currentFullscreenPostId = null;
@@ -6180,14 +6187,26 @@ function shareFullscreenPostLink() {
 
 function openHtmlFullscreenModal(postId) {
   const p = findFeedPostById(postId);
-  if (!p || !p.htmlCode) return;
+  if (!p || !(typeof isHtmlAppPost === 'function' ? isHtmlAppPost(p) : (p.mediaType === 'html_app' && (p.hasVaultApp || p.vaultPayload || p.htmlCode)))) return;
   currentFullscreenPostId = postId;
+  const lang = REMO_I18N.getLang();
   const modal = document.getElementById('htmlFullscreenModal');
   const iframe = document.getElementById('htmlFsIframe');
   const titleEl = document.getElementById('htmlFsTitle');
   const shareBtn = document.getElementById('htmlFsShareBtn');
-  if (titleEl) titleEl.textContent = `💻 @${p.authorName} — LIVE HTML ARCADE`;
-  if (iframe) iframe.srcdoc = buildFittedHtmlSrcdoc(p.htmlCode, postId);
+  const rawCap = String((lang === 'fr' ? (p.caption_fr || p.caption_en) : (p.caption_en || p.caption_fr)) || '').replace(/^(?:🇬🇧|🇫🇷)\s+/u, '').trim();
+  const cleanTitle = rawCap ? (rawCap.length > 52 ? rawCap.slice(0, 52) + '…' : rawCap) : `@${p.authorName}`;
+  const icon = (typeof isHtmlPostArcadeGame === 'function' && isHtmlPostArcadeGame(p)) ? '🎮' : '✨';
+  if (titleEl) titleEl.textContent = `${icon} ${cleanTitle}`;
+  if (iframe) {
+    iframe.setAttribute('data-post-id', p.id);
+    iframe.removeAttribute('srcdoc');
+    iframe.removeAttribute('data-vault-hydrated');
+    iframe.setAttribute('data-vault-pending', '1');
+    if (typeof hydrateHtmlVaultFrame === 'function') {
+      hydrateHtmlVaultFrame(iframe, p);
+    }
+  }
   if (shareBtn) {
     shareBtn.onclick = () => {
       sharePostLink(postId);
@@ -6200,19 +6219,33 @@ function openHtmlFullscreenModal(postId) {
 function closeHtmlFullscreenModal() {
   remoExitNativeFullscreen();
   const iframe = document.getElementById('htmlFsIframe');
-  if (iframe) iframe.srcdoc = '';
+  if (iframe) {
+    iframe.removeAttribute('srcdoc');
+    iframe.setAttribute('src', 'about:blank');
+    iframe.removeAttribute('data-vault-hydrated');
+  }
   document.getElementById('htmlFullscreenModal')?.classList.remove('open');
 }
 
-function remixHtmlPost(postId) {
+async function remixHtmlPost(postId) {
   if (!REMO_STORE.isAdminUnlocked() && !REMO_STORE.isCurrentUserAdmin()) {
     sharePostLink(postId);
     return;
   }
   const p = REMO_STORE.state.posts.find((x) => x.id === postId);
-  if (!p || !p.htmlCode) return;
+  if (!p || !(typeof isHtmlAppPost === 'function' ? isHtmlAppPost(p) : p.mediaType === 'html_app')) return;
   const lang = REMO_I18N.getLang();
-  openCreatePostModal('#LiveHTML ');
+  let sourceCode = '';
+  if (typeof fetchAdminHtmlSourceFromVault === 'function') {
+    sourceCode = await fetchAdminHtmlSourceFromVault(p);
+  } else {
+    sourceCode = p.htmlCode || '';
+  }
+  if (!sourceCode) {
+    remoToast(lang === 'fr' ? '⚠️ Source introuvable dans le Vault.' : '⚠️ Source not found in Vault.');
+    return;
+  }
+  openCreatePostModal('');
   switchCreateStudioTab('html');
   pendingRemixParent = { postId: p.id, authorUid: p.uid, authorName: p.authorName };
 
@@ -6220,11 +6253,13 @@ function remixHtmlPost(postId) {
   if (banner) {
     banner.style.display = 'block';
     banner.textContent = lang === 'fr'
-      ? `🧬 Remix du code de @${p.authorName} — +10 🪙 de royauté seront versés à @${p.authorName} à la publication !`
-      : `🧬 Remixing @${p.authorName}'s code — +10 🪙 creator royalty will be sent to @${p.authorName} when published!`;
+      ? `🧬 Édition / Remix Admin de la mini-app #${p.id.slice(-6)}`
+      : `🧬 Admin Remix of mini-app #${p.id.slice(-6)}`;
   }
   const area = document.getElementById('createHtmlCodeArea');
-  if (area) area.value = p.htmlCode;
+  if (area) area.value = sourceCode;
+  const arcToggle = document.getElementById('createHtmlArcadeToggle');
+  if (arcToggle) arcToggle.checked = Boolean(p.isArcadeGame);
   refreshStudioHtmlPreview();
 }
 
@@ -7382,7 +7417,7 @@ function openCreatePostModal(prefillTag = '') {
   const timerRow = document.getElementById('video60TimerRow');
   if (timerRow) timerRow.style.display = 'none';
   const htmlFrame = document.getElementById('studioHtmlLivePreview');
-  if (htmlFrame) { htmlFrame.style.display = 'none'; htmlFrame.srcdoc = ''; }
+  if (htmlFrame) { htmlFrame.style.display = 'none'; htmlFrame.removeAttribute('srcdoc'); htmlFrame.setAttribute('src', 'about:blank'); }
   const isAdm = REMO_STORE.isAdminUnlocked() || REMO_STORE.isCurrentUserAdmin();
   const admTplBox = document.getElementById('adminHtmlTemplatesBox');
   if (admTplBox) admTplBox.style.display = isAdm ? 'block' : 'none';
@@ -7414,12 +7449,13 @@ function openCreatePostModal(prefillTag = '') {
   }
 
   const htmlArea = document.getElementById('createHtmlCodeArea');
-  if (htmlArea) {
-    if (isAdm && !htmlArea.value.trim()) {
-      htmlArea.value = REMO_HTML_TEMPLATES.fireworks;
-    } else if (!isAdm) {
-      htmlArea.value = '';
-    }
+  if (htmlArea && !isAdm) {
+    htmlArea.value = '';
+  }
+  const htmlArcadeT = document.getElementById('createHtmlArcadeToggle');
+  if (htmlArcadeT) htmlArcadeT.checked = false;
+  if (isAdm && typeof refreshStudioVaultStatusUI === 'function') {
+    refreshStudioVaultStatusUI();
   }
 
   // Reset Mystery Box, Poll, Secret Capsule & Viral Goal toggles
@@ -7944,6 +7980,8 @@ function loadStudioHtmlTemplate(tplKey) {
   if (!code) return;
   const area = document.getElementById('createHtmlCodeArea');
   if (area) area.value = code;
+  const arcT = document.getElementById('createHtmlArcadeToggle');
+  if (arcT) arcT.checked = (tplKey === 'racer');
   refreshStudioHtmlPreview();
 }
 
@@ -7954,6 +7992,8 @@ function handleStudioHtmlFileUpload(ev) {
   rd.onload = (e) => {
     const area = document.getElementById('createHtmlCodeArea');
     if (area) area.value = String(e.target.result || '');
+    const arcT = document.getElementById('createHtmlArcadeToggle');
+    if (arcT) arcT.checked = false;
     refreshStudioHtmlPreview();
     document.getElementById('createMediaPreviewStatus').textContent = `✓ ${file.name} loaded!`;
   };
@@ -7966,7 +8006,14 @@ function refreshStudioHtmlPreview() {
   if (!area || !frame) return;
   const code = area.value.trim();
   if (!code) return;
-  frame.srcdoc = code;
+  const cityId = document.getElementById('createCitySelect')?.value || 'montreal';
+  const lang = REMO_I18N.getLang();
+  const isArcadeGame = Boolean(document.getElementById('createHtmlArcadeToggle')?.checked);
+  if (typeof renderEphemeralProtectedBlobIntoFrame === 'function') {
+    renderEphemeralProtectedBlobIntoFrame(frame, code, { id: 'studio_preview', cityId, isArcadeGame }, lang, { skipAntiCopy: true });
+  } else {
+    frame.srcdoc = code;
+  }
   frame.style.display = 'block';
 }
 
@@ -8082,10 +8129,15 @@ async function publishNewRemoPost() {
   const isMysteryCity = Boolean(document.getElementById('createMysteryCityToggle')?.checked) && !pendingDuetParent;
   const wantWindowStamp = Boolean(document.getElementById('createWindowStampToggle')?.checked) && !isMysteryCity;
 
+  const newPostId = 'post_' + Date.now();
   let mediaType = textCardPayload ? 'text_card' : 'city_art';
   let mediaUrl = '';
   let mediaUrls = [];
   let htmlCode = '';
+  let hasVaultApp = false;
+  let vaultMode = '';
+  let vaultPayload = '';
+  let isArcadeGame = false;
   let videoDuration = 0;
   let externalUrl = '';
   let soundtrackId = '';
@@ -8171,9 +8223,20 @@ async function publishNewRemoPost() {
       return;
     }
     mediaType = 'html_app';
-    htmlCode = rawHtml.includes('<html') || rawHtml.includes('<body') || rawHtml.includes('<canvas') || rawHtml.includes('<script')
+    isArcadeGame = Boolean(document.getElementById('createHtmlArcadeToggle')?.checked);
+    const preparedHtml = rawHtml.includes('<html') || rawHtml.includes('<body') || rawHtml.includes('<canvas') || rawHtml.includes('<script')
       ? rawHtml
       : `<!DOCTYPE html><html><body style="margin:0;background:#050816;color:#fff;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;">${rawHtml}</body></html>`;
+    setPubBusy(true, lang === 'fr' ? '🔐 Chiffrement & Envoi vers REMO Vault...' : '🔐 Encrypting & Securing in REMO Vault...');
+    if (typeof publishHtmlToVault === 'function') {
+      const vaultRes = await publishHtmlToVault(newPostId, preparedHtml, isArcadeGame);
+      hasVaultApp = true;
+      vaultMode = vaultRes.vaultMode;
+      vaultPayload = vaultRes.vaultPayload || '';
+      htmlCode = '';
+    } else {
+      htmlCode = preparedHtml;
+    }
   } else if (activeCreateStudioTab === 'versus') {
     const isAdm = REMO_STORE.isAdminUnlocked() || REMO_STORE.isCurrentUserAdmin();
     if (!isAdm) {
@@ -8284,7 +8347,7 @@ async function publishNewRemoPost() {
 
   const cloudAuthorUid = (typeof REMO_STORE.getCloudAuthorUid === 'function') ? REMO_STORE.getCloudAuthorUid(u) : u.uid;
   const newPost = {
-    id: 'post_' + Date.now(),
+    id: newPostId,
     uid: u.uid,
     authorUid: cloudAuthorUid || u.uid,
     authorName: u.name,
@@ -8310,6 +8373,10 @@ async function publishNewRemoPost() {
     videoDuration,
     enforce60sCap: !!window._pendingEnforce60sCap,
     htmlCode,
+    hasVaultApp,
+    vaultMode,
+    vaultPayload,
+    isArcadeGame,
     visualHeadline: artHeadline,
     textCard: textCardPayload,
     remixedFromAuthor: pendingRemixParent ? pendingRemixParent.authorName : '',
@@ -11539,6 +11606,7 @@ function openPostActionsSheet(postId) {
 
     <!-- Action Buttons List -->
     <div style="display:flex;flex-direction:column;gap:8px;">
+      ${p.mediaType !== 'html_app' ? `
       <button type="button" class="action-sheet-row" onclick="closePostActionsModal(); startCityDuetFromPost('${p.id}');">
         <span class="as-icon" style="background:rgba(244,114,182,0.15);color:#f472b6;">🎭</span>
         <div style="text-align:left;flex:1;">
@@ -11546,6 +11614,7 @@ function openPostActionsSheet(postId) {
           <div style="font-size:0.72rem;color:var(--muted);">${lang === 'fr' ? 'Répondez avec votre propre vidéo/photo (+20 🪙)' : 'Reply with your city moment (+20 🪙)'}</div>
         </div>
       </button>
+      ` : ''}
 
       <button type="button" class="action-sheet-row" onclick="closePostActionsModal(); openBoardingPassModal('${(u && u.homeCity) ? u.homeCity : 'montreal'}', '${p.cityId || 'chisinau'}');">
         <span class="as-icon" style="background:rgba(56,189,248,0.15);color:#38bdf8;">🎫</span>
@@ -11662,6 +11731,14 @@ function openPostActionsSheet(postId) {
             <button type="button" class="adm-pbtn" onclick="closePostActionsModal(); adminEditPostInline('${p.id}');">
               ✏️ Modifier Texte
             </button>
+            ${p.mediaType === 'html_app' ? `
+            <button type="button" class="adm-pbtn" onclick="closePostActionsModal(); adminToggleHtmlArcadeMode('${p.id}');">
+              🎮 Mode Jeu: ${p.isArcadeGame ? 'ON' : 'OFF'}
+            </button>
+            <button type="button" class="adm-pbtn gold" onclick="closePostActionsModal(); adminMigrateSingleHtmlPostToVault('${p.id}');">
+              🔐 ${p.vaultMode === 'server' ? 'Vault Niveau 2 ✓' : 'Sécuriser Vault'}
+            </button>
+            ` : ''}
             <button type="button" class="adm-pbtn danger" style="grid-column:span 2;" onclick="closePostActionsModal(); adminDeletePostInline('${p.id}');">
               🗑️ Supprimer (Admin)
             </button>
@@ -11707,6 +11784,9 @@ function userDeleteOwnPost(postId) {
   REMO_STORE.state.posts = (REMO_STORE.state.posts || []).filter((x) => x.id !== postId);
   REMO_STORE.save(true, 'user_delete_post');
   REMO_STORE.deletePostFromCloud(postId);
+  if (p && p.mediaType === 'html_app' && typeof deleteHtmlFromVault === 'function') {
+    deleteHtmlFromVault(postId);
+  }
   renderSocialFeed();
   remoToast(lang === 'fr' ? '🗑️ Votre publication a été supprimée avec succès.' : '🗑️ Your post was successfully deleted.');
 }
@@ -11717,8 +11797,12 @@ function adminDeletePostInline(postId) {
   if (!isAdm) return;
   const lang = REMO_I18N.getLang();
   if (!confirm(lang === 'fr' ? '🗑️ Supprimer définitivement cette publication ?' : '🗑️ Permanently delete this post?')) return;
+  const targetPost = findFeedPostById(postId);
   REMO_STORE.state.posts = (REMO_STORE.state.posts || []).filter((p) => p.id !== postId);
   REMO_STORE.deletePostFromCloud(postId);
+  if (targetPost && targetPost.mediaType === 'html_app' && typeof deleteHtmlFromVault === 'function') {
+    deleteHtmlFromVault(postId);
+  }
   REMO_STORE.save(true, 'admin_delete_post');
   renderSocialFeed();
   remoToast(lang === 'fr' ? '🗑️ Publication supprimée par Admin.' : '🗑️ Post deleted by Admin.');
@@ -12475,6 +12559,8 @@ function copilotGenerateCityHtmlGame(forcedGenre = '') {
 
   const area = document.getElementById('createHtmlCodeArea');
   if (area) area.value = code;
+  const arcT = document.getElementById('createHtmlArcadeToggle');
+  if (arcT) arcT.checked = true;
   refreshStudioHtmlPreview();
 
   const enCap = `✨ Experience this ${city.flag} ${city.name_en} "${titleEn}" interactive 4D moment directly inside this post! #${city.code} #LiveHTML`;
@@ -12777,6 +12863,10 @@ function startCityDuetFromPost(postId) {
   const p = (REMO_STORE.state.posts || []).find((x) => x.id === postId);
   if (!p) return;
   const lang = REMO_I18N.getLang();
+  if (p.mediaType === 'html_app') {
+    remoToast(lang === 'fr' ? '🔐 Les mini-apps protégées ne peuvent pas être dupliquées en Duo.' : '🔐 Protected mini-apps cannot be cloned into a Duet.');
+    return;
+  }
   const origCity = getCityById(p.cityId);
 
   openCreatePostModal(`#CityDuet `);
@@ -12787,7 +12877,7 @@ function startCityDuetFromPost(postId) {
     cityId: p.cityId,
     mediaType: p.mediaType === 'city_duet' ? 'city_art' : p.mediaType,
     mediaUrl: p.mediaUrl || (Array.isArray(p.mediaUrls) && p.mediaUrls[0]) || '',
-    htmlCode: p.htmlCode || '',
+    htmlCode: '',
     textCard: p.textCard || null,
     visualHeadline: p.visualHeadline || getCityName(origCity, 'en').toUpperCase()
   };
@@ -13415,7 +13505,7 @@ function openPostFullscreenMedia(postId) {
     remoToast(t('mbox_unlock_first_toast'));
     return;
   }
-  if (p.mediaType === 'html_app' && p.htmlCode) {
+  if (typeof isHtmlAppPost === 'function' ? isHtmlAppPost(p) : (p.mediaType === 'html_app' && (p.hasVaultApp || p.vaultPayload || p.htmlCode))) {
     if (typeof openHtmlFullscreenModal === 'function') {
       openHtmlFullscreenModal(p.id);
     }
@@ -13614,12 +13704,21 @@ const REMO_HTML_FIT_SCRIPT = '<script id="remo-fit-script">(function(){' +
   'setTimeout(fit,60);setTimeout(fit,700);window.addEventListener("resize",later);' +
   '})();<\/script>';
 
-function buildFittedHtmlSrcdoc(code, postId = '') {
+function isHtmlAppPost(p) {
+  return Boolean(p && p.mediaType === 'html_app' && (p.hasVaultApp || p.vaultPayload || p.htmlCode));
+}
+
+function isHtmlPostArcadeGame(p) {
+  return Boolean(p && p.mediaType === 'html_app' && p.isArcadeGame === true);
+}
+
+function buildFittedHtmlSrcdoc(code, postId = '', opts = {}) {
   let html = String(code || '');
   if (!html) return html;
   if (html.includes('remo-fit-script')) return html;
   const safePid = String(postId || '').replace(/[^a-zA-Z0-9_-]/g, '');
-  const scoreBridgeScript = safePid ? (
+  const isArcade = Boolean(opts && opts.isArcadeGame === true);
+  const scoreBridgeScript = (isArcade && safePid) ? (
     '<script id="remo-score-bridge">(function(){' +
     'var pid="' + safePid + '",best=0;' +
     'function emit(v){var n=Math.floor(Number(v||0));if(!isFinite(n)||n<=best||n<=0||n>9999999)return;best=n;' +
@@ -13649,6 +13748,366 @@ function buildFittedHtmlSrcdoc(code, postId = '') {
   }
   return html;
 }
+
+/* ══════════════════════════════════════════════════════════════
+   🔐 REMO HTML VAULT SHIELD (Level 2 Server Bunker + Level 1 Blob Fallback)
+   - Zero raw htmlCode in public Firestore (when Level 2 active)
+   - Zero srcdoc plaintext in DOM (ephemeral 25s HMAC server URL or auto-revoked Blob)
+   - Anti-Copy, Anti-Select, Anti-Shortcut & Domain-Lock + REMO_CONTEXT injection
+   ══════════════════════════════════════════════════════════════ */
+const _RMV_K = [0x52, 0x45, 0x4d, 0x4f, 0x34, 0x44, 0x56, 0x41, 0x55, 0x4c, 0x54, 0x32, 0x30, 0x32, 0x36, 0x21];
+let _vaultServerStatusCache = null;
+
+function encryptClientVaultPayload(rawHtml) {
+  const bytes = new TextEncoder().encode(String(rawHtml || ''));
+  const salt = new Uint8Array(4);
+  if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+    crypto.getRandomValues(salt);
+  } else {
+    for (let i = 0; i < 4; i++) salt[i] = Math.floor(Math.random() * 256);
+  }
+  const out = new Uint8Array(4 + bytes.length);
+  out.set(salt, 0);
+  for (let i = 0; i < bytes.length; i++) {
+    out[4 + i] = bytes[i] ^ _RMV_K[i & 15] ^ salt[i & 3] ^ ((i * 29 + 13) & 255);
+  }
+  let bin = '';
+  const step = 0x8000;
+  for (let i = 0; i < out.length; i += step) {
+    bin += String.fromCharCode.apply(null, out.subarray(i, i + step));
+  }
+  return 'RMV1::' + btoa(bin);
+}
+
+function decryptClientVaultPayload(payloadStr) {
+  const s = String(payloadStr || '');
+  if (!s.startsWith('RMV1::')) return s;
+  try {
+    const bin = atob(s.slice(6));
+    if (bin.length < 5) return '';
+    const salt = [bin.charCodeAt(0), bin.charCodeAt(1), bin.charCodeAt(2), bin.charCodeAt(3)];
+    const out = new Uint8Array(bin.length - 4);
+    for (let i = 0; i < out.length; i++) {
+      out[i] = bin.charCodeAt(4 + i) ^ _RMV_K[i & 15] ^ salt[i & 3] ^ ((i * 29 + 13) & 255);
+    }
+    return new TextDecoder('utf-8').decode(out);
+  } catch (e) {
+    return '';
+  }
+}
+
+function buildProtectedClientBlobDoc(rawHtml, p, lang, opts = {}) {
+  let html = String(rawHtml || '');
+  if (!html) return '';
+  const city = (typeof getCityById === 'function')
+    ? (getCityById((p && p.cityId) || 'montreal') || getCityById('montreal'))
+    : { id: 'montreal', name_en: 'Montréal', name_fr: 'Montréal', flag: '⚜️', lat: 45.5017, lng: -73.5673 };
+  const safeLang = lang === 'fr' ? 'fr' : 'en';
+  const safePid = String((p && p.id) || '').replace(/[^a-zA-Z0-9_-]/g, '');
+  const ctxObj = {
+    postId: safePid,
+    cityId: city.id || 'montreal',
+    cityName: safeLang === 'fr' ? (city.name_fr || city.name_en || 'Montréal') : (city.name_en || 'Montréal'),
+    cityNameEn: city.name_en || 'Montréal',
+    cityNameFr: city.name_fr || city.name_en || 'Montréal',
+    cityFlag: city.flag || '🌍',
+    lat: Number(city.lat ?? 45.5017),
+    lng: Number(city.lng ?? -73.5673),
+    lang: safeLang
+  };
+  const ctxJson = JSON.stringify(ctxObj);
+  const shieldStyle = opts.skipAntiCopy
+    ? REMO_HTML_FIT_STYLE
+    : '<style id="r-sh-s">html,body{scrollbar-width:none!important;-ms-overflow-style:none!important;}html::-webkit-scrollbar,body::-webkit-scrollbar{display:none!important;}*:not(input):not(textarea):not([contenteditable]){user-select:none!important;-webkit-user-select:none!important;-webkit-touch-callout:none!important;}</style>';
+  const ctxScript = `<script>(function(){try{Object.defineProperty(window,"REMO_CONTEXT",{value:Object.freeze(${ctxJson}),writable:false,configurable:false});}catch(e){window.REMO_CONTEXT=${ctxJson};}if(document.currentScript)document.currentScript.remove();})();<\/script>`;
+  const shieldScript = opts.skipAntiCopy ? '' : (
+    '<script>(function(){' +
+    'var ed=function(t){return t&&(t.tagName==="INPUT"||t.tagName==="TEXTAREA"||t.isContentEditable);};' +
+    'document.addEventListener("contextmenu",function(e){if(!ed(e.target))e.preventDefault();},true);' +
+    'document.addEventListener("dragstart",function(e){e.preventDefault();},true);' +
+    'document.addEventListener("selectstart",function(e){if(!ed(e.target))e.preventDefault();},true);' +
+    'document.addEventListener("copy",function(e){if(!ed(e.target))e.preventDefault();},true);' +
+    'document.addEventListener("cut",function(e){if(!ed(e.target))e.preventDefault();},true);' +
+    'document.addEventListener("keydown",function(e){var k=(e.key||"").toLowerCase(),m=e.ctrlKey||e.metaKey;' +
+    'if(e.key==="F12"||(m&&e.shiftKey&&(k==="i"||k==="j"||k==="c"))||(m&&(k==="u"||k==="s"||k==="p"))||(m&&k==="c"&&!ed(e.target))){e.preventDefault();e.stopPropagation();return false;}},true);' +
+    'if(window.top===window.self){document.body&&(document.body.innerHTML="<div style=\\"height:100vh;display:flex;align-items:center;justify-content:center;background:#050816;color:#38bdf8;font-family:sans-serif;font-weight:800;\\">🔒 Protected by REMO World™</div>");}' +
+    'if(document.currentScript)document.currentScript.remove();})();<\/script>'
+  );
+  const fitted = buildFittedHtmlSrcdoc(html, safePid, { isArcadeGame: Boolean(p && p.isArcadeGame === true) });
+  let out = fitted;
+  if (/<head[^>]*>/i.test(out)) {
+    out = out.replace(/<head([^>]*)>/i, `<head$1>${shieldStyle}${ctxScript}`);
+  } else {
+    out = `${shieldStyle}${ctxScript}${out}`;
+  }
+  const lower = out.toLowerCase();
+  const bodyEnd = lower.lastIndexOf('</body>');
+  if (shieldScript) {
+    out = bodyEnd !== -1 ? (out.slice(0, bodyEnd) + shieldScript + out.slice(bodyEnd)) : (out + shieldScript);
+  }
+  return out;
+}
+
+function renderEphemeralProtectedBlobIntoFrame(iframeEl, rawHtml, post, lang, opts = {}) {
+  if (!iframeEl || !rawHtml) return;
+  const fullDoc = buildProtectedClientBlobDoc(rawHtml, post, lang, opts);
+  try {
+    const blob = new Blob([fullDoc], { type: 'text/html;charset=utf-8' });
+    const blobUrl = URL.createObjectURL(blob);
+    iframeEl.removeAttribute('srcdoc');
+    iframeEl.onload = () => {
+      setTimeout(() => { try { URL.revokeObjectURL(blobUrl); } catch (e) {} }, 1800);
+    };
+    iframeEl.src = blobUrl;
+    iframeEl.setAttribute('data-vault-hydrated', '1');
+    iframeEl.removeAttribute('data-vault-pending');
+  } catch (e) {
+    iframeEl.srcdoc = fullDoc;
+    iframeEl.setAttribute('data-vault-hydrated', '1');
+    iframeEl.removeAttribute('data-vault-pending');
+  }
+}
+
+async function getAdminFirebaseBearerToken() {
+  try {
+    if (REMO_STORE && REMO_STORE.fbAuth && REMO_STORE.fbAuth.currentUser) {
+      return await REMO_STORE.fbAuth.currentUser.getIdToken();
+    }
+  } catch (e) {}
+  return '';
+}
+
+async function publishHtmlToVault(postId, rawHtml, isArcadeGame) {
+  const token = await getAdminFirebaseBearerToken();
+  const isRemoteHttp = typeof window !== 'undefined' && /^https?:$/i.test(window.location.protocol);
+  if (token && isRemoteHttp) {
+    try {
+      const res = await fetch('/.netlify/functions/html-vault-publish', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          action: 'save',
+          postId,
+          htmlCode: rawHtml,
+          isArcadeGame: Boolean(isArcadeGame)
+        })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data && data.ok && data.vaultMode === 'server') {
+        return { vaultMode: 'server', vaultPayload: '' };
+      }
+    } catch (e) {}
+  }
+  // Automatic Level 1 Shield Fallback (local preview or before Netlify env vars are pasted)
+  return {
+    vaultMode: 'client_shield',
+    vaultPayload: encryptClientVaultPayload(rawHtml)
+  };
+}
+
+async function deleteHtmlFromVault(postId) {
+  const token = await getAdminFirebaseBearerToken();
+  if (!token || !postId || !/^https?:$/i.test(window.location.protocol)) return;
+  try {
+    await fetch('/.netlify/functions/html-vault-publish', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ action: 'delete', postId })
+    });
+  } catch (e) {}
+}
+
+async function fetchAdminHtmlSourceFromVault(post) {
+  if (!post) return '';
+  if (post.vaultMode === 'server') {
+    const token = await getAdminFirebaseBearerToken();
+    if (token && /^https?:$/i.test(window.location.protocol)) {
+      try {
+        const res = await fetch('/.netlify/functions/html-vault-publish', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ action: 'get_source', postId: post.id })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data && data.ok && data.htmlCode) return data.htmlCode;
+      } catch (e) {}
+    }
+  }
+  if (post.vaultPayload) return decryptClientVaultPayload(post.vaultPayload);
+  return post.htmlCode || '';
+}
+
+async function hydrateHtmlVaultFrame(iframeEl, post) {
+  if (!iframeEl || !post || !isHtmlAppPost(post)) return;
+  if (iframeEl.getAttribute('data-vault-hydrated') === '1' && !iframeEl.getAttribute('data-vault-pending')) return;
+  iframeEl.removeAttribute('data-vault-pending');
+  iframeEl.setAttribute('data-vault-hydrated', 'loading');
+  const lang = REMO_I18N.getLang();
+
+  // Level 2 Server Bunker mode
+  if (post.vaultMode === 'server' && /^https?:$/i.test(window.location.protocol)) {
+    try {
+      const res = await fetch('/.netlify/functions/html-vault-ticket', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          postId: post.id,
+          cityId: post.cityId || 'montreal',
+          lang,
+          isArcadeGame: isHtmlPostArcadeGame(post)
+        })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data && data.ok && data.renderUrl) {
+        iframeEl.removeAttribute('srcdoc');
+        iframeEl.src = data.renderUrl;
+        iframeEl.setAttribute('data-vault-hydrated', '1');
+        return;
+      }
+    } catch (e) {}
+  }
+
+  // Level 1 Encrypted Blob Shield fallback (and seamless handling of legacy plaintext posts)
+  const rawHtml = post.vaultPayload
+    ? decryptClientVaultPayload(post.vaultPayload)
+    : (post.htmlCode || '');
+  if (rawHtml) {
+    renderEphemeralProtectedBlobIntoFrame(iframeEl, rawHtml, post, lang);
+  } else {
+    iframeEl.setAttribute('data-vault-hydrated', 'error');
+  }
+}
+
+function hydrateAllHtmlVaultFrames(rootEl = document) {
+  const scope = rootEl || document;
+  scope.querySelectorAll('iframe.html-post-frame[data-vault-pending="1"]').forEach((fr) => {
+    const pid = fr.getAttribute('data-post-id');
+    const post = pid ? findFeedPostById(pid) : null;
+    if (post && isHtmlAppPost(post)) {
+      hydrateHtmlVaultFrame(fr, post);
+    }
+  });
+}
+
+async function refreshStudioVaultStatusUI() {
+  const badge = document.getElementById('studioVaultStatusBadge');
+  const migBtn = document.getElementById('btnMigrateLegacyHtmlVault');
+  const lang = REMO_I18N.getLang();
+  const legacyCount = (REMO_STORE.state.posts || []).filter((p) =>
+    p && p.mediaType === 'html_app' && !p.isShowcase && p.vaultMode !== 'server' && (p.htmlCode || p.vaultPayload)
+  ).length;
+  if (migBtn) {
+    migBtn.style.display = legacyCount > 0 ? 'inline-flex' : 'none';
+  }
+  if (!badge) return;
+  const token = await getAdminFirebaseBearerToken();
+  if (!token || !/^https?:$/i.test(window.location.protocol)) {
+    badge.textContent = lang === 'fr' ? '🛡️ Bouclier Local (Niveau 1)' : '🛡️ Client Shield (Level 1)';
+    return;
+  }
+  try {
+    const res = await fetch('/.netlify/functions/html-vault-publish', {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    const data = await res.json().catch(() => ({}));
+    _vaultServerStatusCache = data;
+    if (data && data.configured) {
+      badge.style.color = '#34d399';
+      badge.textContent = lang === 'fr' ? '🔐 Bunker Serveur ACTIF (Niveau 2)' : '🔐 Server Bunker ACTIVE (Level 2)';
+    } else {
+      badge.style.color = '#fde047';
+      badge.textContent = lang === 'fr' ? '🛡️ Bouclier Niv. 1 (Ajoutez les 2 clés Netlify pour Niv. 2)' : '🛡️ Level 1 Shield (Add 2 Netlify env vars for Level 2)';
+    }
+  } catch (e) {
+    badge.textContent = lang === 'fr' ? '🛡️ Bouclier Automatique' : '🛡️ Auto Vault Shield';
+  }
+}
+
+function adminToggleHtmlArcadeMode(postId) {
+  if (!REMO_STORE.isAdminUnlocked() && !REMO_STORE.isCurrentUserAdmin()) return;
+  const p = (REMO_STORE.state.posts || []).find((x) => x.id === postId);
+  if (!p || p.mediaType !== 'html_app') return;
+  const lang = REMO_I18N.getLang();
+  p.isArcadeGame = !Boolean(p.isArcadeGame);
+  REMO_STORE.syncPostToCloud(p);
+  REMO_STORE.save(true, 'admin_toggle_arcade');
+  rerenderSinglePostCard(p.id);
+  remoToast(p.isArcadeGame
+    ? (lang === 'fr' ? '🎮 Mode Jeu Arcade activé (Top 3 affiché).' : '🎮 Arcade Game Mode ON (Top 3 enabled).')
+    : (lang === 'fr' ? '✨ Mode Publication Propre activé (Top 3 masqué).' : '✨ Clean Post Mode ON (Top 3 hidden).'));
+}
+
+async function adminMigrateSingleHtmlPostToVault(postId) {
+  if (!REMO_STORE.isAdminUnlocked() && !REMO_STORE.isCurrentUserAdmin()) return;
+  const p = (REMO_STORE.state.posts || []).find((x) => x.id === postId);
+  if (!p || p.mediaType !== 'html_app') return;
+  const lang = REMO_I18N.getLang();
+  const rawHtml = p.vaultPayload ? decryptClientVaultPayload(p.vaultPayload) : (p.htmlCode || '');
+  if (!rawHtml) {
+    remoToast(lang === 'fr' ? '✓ Déjà sécurisé dans le Vault.' : '✓ Already secured in Vault.');
+    return;
+  }
+  const res = await publishHtmlToVault(p.id, rawHtml, Boolean(p.isArcadeGame));
+  p.hasVaultApp = true;
+  p.vaultMode = res.vaultMode;
+  p.vaultPayload = res.vaultPayload || '';
+  p.htmlCode = '';
+  await REMO_STORE.syncPostToCloud(p);
+  REMO_STORE.save(true, 'vault_migrate');
+  rerenderSinglePostCard(p.id);
+  refreshStudioVaultStatusUI();
+  remoToast(res.vaultMode === 'server'
+    ? (lang === 'fr' ? '🔐 Post migré dans le Bunker Serveur Niveau 2 !' : '🔐 Post migrated to Level 2 Server Bunker!')
+    : (lang === 'fr' ? '🛡️ Chiffré en Niveau 1 (ajoutez les 2 clés Netlify pour Niveau 2).' : '🛡️ Encrypted in Level 1 (add 2 Netlify env vars for Level 2).'));
+}
+
+async function adminMigrateLegacyHtmlPostsToVault() {
+  if (!REMO_STORE.isAdminUnlocked() && !REMO_STORE.isCurrentUserAdmin()) return;
+  const lang = REMO_I18N.getLang();
+  const targets = (REMO_STORE.state.posts || []).filter((p) =>
+    p && p.mediaType === 'html_app' && !p.isShowcase && p.vaultMode !== 'server' && (p.htmlCode || p.vaultPayload)
+  );
+  if (!targets.length) {
+    remoToast(lang === 'fr' ? '✓ Tous les posts HTML sont déjà sécurisés !' : '✓ All HTML posts are already secured!');
+    return;
+  }
+  let serverCount = 0;
+  let clientCount = 0;
+  for (const p of targets) {
+    const rawHtml = p.vaultPayload ? decryptClientVaultPayload(p.vaultPayload) : (p.htmlCode || '');
+    if (!rawHtml) continue;
+    const res = await publishHtmlToVault(p.id, rawHtml, Boolean(p.isArcadeGame));
+    p.hasVaultApp = true;
+    p.vaultMode = res.vaultMode;
+    p.vaultPayload = res.vaultPayload || '';
+    p.htmlCode = '';
+    await REMO_STORE.syncPostToCloud(p);
+    if (res.vaultMode === 'server') serverCount++; else clientCount++;
+  }
+  REMO_STORE.save(true, 'vault_migrate_all');
+  renderSocialFeed('', true);
+  refreshStudioVaultStatusUI();
+  remoToast(serverCount > 0
+    ? (lang === 'fr' ? `🔐 ${serverCount} post(s) HTML migrés dans le Bunker Serveur Niveau 2 !` : `🔐 ${serverCount} HTML post(s) migrated to Level 2 Server Bunker!`)
+    : (lang === 'fr' ? `🛡️ ${clientCount} post(s) chiffrés en Niveau 1 (configurez les 2 clés Netlify pour Niveau 2).` : `🛡️ ${clientCount} post(s) encrypted in Level 1 (set the 2 Netlify env vars for Level 2).`));
+}
+
+window.isHtmlAppPost = isHtmlAppPost;
+window.isHtmlPostArcadeGame = isHtmlPostArcadeGame;
+window.hydrateHtmlVaultFrame = hydrateHtmlVaultFrame;
+window.hydrateAllHtmlVaultFrames = hydrateAllHtmlVaultFrames;
+window.renderEphemeralProtectedBlobIntoFrame = renderEphemeralProtectedBlobIntoFrame;
+window.publishHtmlToVault = publishHtmlToVault;
+window.deleteHtmlFromVault = deleteHtmlFromVault;
+window.fetchAdminHtmlSourceFromVault = fetchAdminHtmlSourceFromVault;
+window.refreshStudioVaultStatusUI = refreshStudioVaultStatusUI;
+window.adminToggleHtmlArcadeMode = adminToggleHtmlArcadeMode;
+window.adminMigrateSingleHtmlPostToVault = adminMigrateSingleHtmlPostToVault;
+window.adminMigrateLegacyHtmlPostsToVault = adminMigrateLegacyHtmlPostsToVault;
 
 function remoEnterNativeFullscreen(el) {
   try {
@@ -14987,7 +15446,7 @@ function openCitizenProfileModal(uidOrName, fallbackName = '', silentIfMissing =
           ${userPosts.slice(0, 12).map((p) => {
             const pc = getCityById(p.cityId || 'montreal');
             const cap = isFr ? (p.caption_fr || p.caption_en || '') : (p.caption_en || p.caption_fr || '');
-            const typeIcon = p.mediaType === 'html_app' ? '🕹️' : (p.mediaType === 'video' ? '🎬' : '📸');
+            const typeIcon = (typeof isHtmlPostArcadeGame === 'function' && isHtmlPostArcadeGame(p)) ? '🕹️' : (p.mediaType === 'html_app' ? '✨' : (p.mediaType === 'video' ? '🎬' : '📸'));
             return `
               <div class="pp-moment-thumb" onclick="document.getElementById('publicProfileModal').classList.remove('open');jumpToPostFromNotification('${p.id}', false)">
                 <div style="display:flex;justify-content:space-between;font-size:0.73rem;color:#94a3b8;margin-bottom:4px;">
@@ -15120,7 +15579,7 @@ function dismissGameChallengeHero() {
 window.dismissGameChallengeHero = dismissGameChallengeHero;
 
 function renderHtmlGameLeaderboardWidget(p, lang, u) {
-  if (!p || p.mediaType !== 'html_app') return '';
+  if (!p || !(typeof isHtmlPostArcadeGame === 'function' ? isHtmlPostArcadeGame(p) : (p.mediaType === 'html_app' && p.isArcadeGame === true))) return '';
   const lb = Array.isArray(p.leaderboard) ? p.leaderboard.slice(0, 3) : [];
   const sessScore = Number(_sessionGameScores[p.id] || 0);
   const medals = ['🥇', '🥈', '🥉'];
@@ -15181,7 +15640,7 @@ function refreshSingleGameLeaderboardDOM(postId) {
 
 function refreshAllGameLeaderboardsDOM() {
   (REMO_STORE.state.posts || []).forEach((p) => {
-    if (p && p.mediaType === 'html_app') {
+    if (p && typeof isHtmlPostArcadeGame === 'function' && isHtmlPostArcadeGame(p)) {
       refreshSingleGameLeaderboardDOM(p.id);
     }
   });
@@ -15786,7 +16245,7 @@ function _resolveSpotlightThumbHtml(post, entry, isLarge = true) {
   if (resolved && !String(resolved).startsWith('idb://') && !String(resolved).startsWith('data:image/svg')) {
     return `<div class="${cls}" ${idbAttr}><img src="${escapeHtmlStr(resolved)}" alt=""></div>`;
   }
-  const icon = mType === 'html_app' ? '🕹️' : mType === 'before_after' ? '🪞' : mType === 'video' ? '🎬' : '🌟';
+  const icon = (post && typeof isHtmlPostArcadeGame === 'function' && isHtmlPostArcadeGame(post)) ? '🕹️' : mType === 'html_app' ? '✨' : mType === 'before_after' ? '🪞' : mType === 'video' ? '🎬' : '🌟';
   return `<div class="${cls}" ${idbAttr}>${icon}</div>`;
 }
 

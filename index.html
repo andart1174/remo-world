@@ -123,14 +123,14 @@
   <link rel="preconnect" href="https://firebasestorage.googleapis.com" crossorigin>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="preload" as="style" href="css/remo-core.css?v=159">
+  <link rel="preload" as="style" href="css/remo-core.css?v=160">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800;900&family=Orbitron:wght@700;900&display=swap" media="print" onload="this.media='all'">
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800;900&family=Orbitron:wght@700;900&display=swap"></noscript>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha384-sHL9NAb7lN7rfvG5lfHpm643Xkcjzp4jFvuavGOndn6pjVqS6ny56CAt3nsEVT4H" crossorigin="anonymous" media="print" onload="this.media='all'">
   <noscript><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha384-sHL9NAb7lN7rfvG5lfHpm643Xkcjzp4jFvuavGOndn6pjVqS6ny56CAt3nsEVT4H" crossorigin="anonymous"></noscript>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha384-cxOPjt7s7Iz04uaHJceBmS+qpjv2JkIHNVcuOrM+YHwZOmJGBXI00mdUXEq65HTH" crossorigin="anonymous" defer></script>
 
-  <link rel="stylesheet" href="css/remo-core.css?v=159">
+  <link rel="stylesheet" href="css/remo-core.css?v=160">
 </head>
 <body>
 
@@ -1529,19 +1529,30 @@
           </div>
         </div>
 
-        <div style="margin-bottom:8px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
           <label class="fchip" style="border-color:#fbbf24;color:#fbbf24;cursor:pointer;display:inline-flex;">
             <span data-i18n="create_html_upload_file">📂 Upload .html File</span>
             <input type="file" accept=".html,.htm,text/html" style="display:none;" onchange="handleStudioHtmlFileUpload(event)">
           </label>
+          <span id="studioVaultStatusBadge" style="font-size:0.71rem;font-weight:800;color:#34d399;background:rgba(16,185,129,0.12);border:1px solid rgba(52,211,153,0.35);padding:4px 10px;border-radius:99px;">🔐 REMO Vault Shield</span>
+        </div>
+
+        <!-- Varianta B: Clean post by default — Admin opt-in for Arcade Leaderboard -->
+        <div style="background:rgba(15,23,42,0.72);border:1px solid rgba(148,163,184,0.28);border-radius:12px;padding:9px 11px;margin-bottom:8px;">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:0.77rem;font-weight:800;color:#e2e8f0;">
+            <input type="checkbox" id="createHtmlArcadeToggle" style="width:16px;height:16px;accent-color:#38bdf8;cursor:pointer;">
+            <span data-i18n="create_html_arcade_toggle">🎮 Enable Arcade Game Mode (Top 3 Leaderboard &amp; Challenge)</span>
+          </label>
+          <div style="font-size:0.7rem;color:#94a3b8;margin-top:4px;line-height:1.35;" data-i18n="create_html_arcade_hint">Unchecked by default: displays cleanly like normal posts with only your own title &amp; caption. Check only for arcade games.</div>
         </div>
 
         <textarea id="createHtmlCodeArea" class="code-editor-area" spellcheck="false" placeholder="<!DOCTYPE html>&#10;<html>...</html>"></textarea>
-        <div style="display:flex;justify-content:space-between;align-items:center;margin:8px 0;">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;margin:8px 0;">
           <button type="button" class="btn-ghost" onclick="refreshStudioHtmlPreview()" data-i18n="create_html_preview_btn">▶️ Refresh Live Preview</button>
-          <span style="font-size:0.72rem;color:#10b981;">✓ Sandboxed Interactive Engine</span>
+          <button type="button" id="btnMigrateLegacyHtmlVault" class="btn-ghost" style="display:none;font-size:0.72rem;border-color:rgba(251,191,36,0.45);color:#fde047;" onclick="adminMigrateLegacyHtmlPostsToVault()">🔐 <span data-i18n="vault_migrate_btn">Migrate Existing HTML Posts to Vault</span></button>
+          <span style="font-size:0.72rem;color:#10b981;">🔐 Vault Protected &amp; Sandboxed</span>
         </div>
-        <iframe id="studioHtmlLivePreview" sandbox="allow-scripts" style="display:none;width:100%;height:200px;border:1px solid rgba(56,189,248,0.4);border-radius:14px;background:#040714;margin-bottom:10px;"></iframe>
+        <iframe id="studioHtmlLivePreview" sandbox="allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox" style="display:none;width:100%;height:200px;border:1px solid rgba(56,189,248,0.4);border-radius:14px;background:#040714;margin-bottom:10px;"></iframe>
       </div>
 
       <!-- TAB 4: PROCEDURAL CITY POSTER -->
@@ -1790,17 +1801,17 @@
     </div>
   </div>
 
-  <!-- ⛶ Fullscreen Interactive HTML Arcade Modal -->
+  <!-- ⛶ Fullscreen Interactive HTML Mini-App Modal -->
   <div class="remo-modal-backdrop" id="htmlFullscreenModal" onclick="if(event.target===this)closeHtmlFullscreenModal()">
     <div class="remo-modal" style="max-width:94vw;width:1060px;height:86dvh;display:flex;flex-direction:column;padding:14px;">
       <div class="modal-hdr" style="margin-bottom:10px;">
-        <b id="htmlFsTitle" style="font-family:'Orbitron',sans-serif;color:#38bdf8;">💻 REMO LIVE HTML ARCADE</b>
+        <b id="htmlFsTitle" style="font-family:'Orbitron',sans-serif;color:#38bdf8;">✨ REMO LIVE APP</b>
         <div style="display:flex;gap:8px;align-items:center;">
           <button class="btn-cyber" id="htmlFsShareBtn" onclick="shareFullscreenPostLink()">🔗 Partager le Lien</button>
           <button class="modal-close" onclick="closeHtmlFullscreenModal()">✕</button>
         </div>
       </div>
-      <iframe id="htmlFsIframe" sandbox="allow-scripts" style="flex:1;width:100%;border:1px solid rgba(56,189,248,0.4);border-radius:16px;background:#040714;"></iframe>
+      <iframe id="htmlFsIframe" sandbox="allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox" style="flex:1;width:100%;border:1px solid rgba(56,189,248,0.4);border-radius:16px;background:#040714;"></iframe>
     </div>
   </div>
 
@@ -3002,15 +3013,15 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js" integrity="sha384-oFrOL1TiREYNET0lsYF3LjQuyi2gL7vhjH1X8vFr+umcmzAdPELopeSgbcrv4uRm" crossorigin="anonymous"></script>
 
   <!-- REMO Modular Engines -->
-  <script src="js/remo-i18n.js?v=159"></script>
-  <script src="js/remo-cities-data.js?v=159"></script>
-  <script src="js/remo-store.js?v=159"></script>
-  <script src="js/remo-card-engine.js?v=159"></script>
-  <script src="js/remo-radar-arena.js?v=159"></script>
-  <script src="js/remo-social-comms.js?v=159"></script>
-  <script src="js/remo-radio-engine.js?v=159"></script>
-  <script src="js/remo-focus-tv.js?v=159"></script>
-  <script src="js/remo-world-blitz.js?v=159"></script>
+  <script src="js/remo-i18n.js?v=160"></script>
+  <script src="js/remo-cities-data.js?v=160"></script>
+  <script src="js/remo-store.js?v=160"></script>
+  <script src="js/remo-card-engine.js?v=160"></script>
+  <script src="js/remo-radar-arena.js?v=160"></script>
+  <script src="js/remo-social-comms.js?v=160"></script>
+  <script src="js/remo-radio-engine.js?v=160"></script>
+  <script src="js/remo-focus-tv.js?v=160"></script>
+  <script src="js/remo-world-blitz.js?v=160"></script>
 
   <noscript>
     <nav aria-label="REMO World Static Directory" style="padding:20px;background:#050816;color:#f8fafc;">

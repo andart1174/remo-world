@@ -44,7 +44,7 @@ service cloud.firestore {
       return val is string && val.matches('^[a-zA-Z0-9_-]{3,90}$');
     }
 
-    // 1. Social Feed Posts (Strict HTML Mini-App & Versus Admin Gate + Safe ID + Anti-Tamper Interactions)
+    // 1. Social Feed Posts (Strict HTML Mini-App, Vault & Versus Admin Gate + Safe ID + Anti-Tamper Interactions)
     match /remo_posts/{postId} {
       allow read: if true;
       allow create: if isAdmin() || (
@@ -57,6 +57,14 @@ service cloud.firestore {
         ) &&
         (!('mediaType' in request.resource.data) || (request.resource.data.mediaType != 'html_app' && request.resource.data.mediaType != 'city_versus')) &&
         (!('htmlCode' in request.resource.data) || request.resource.data.htmlCode == '') &&
+        (!('vaultPayload' in request.resource.data) || request.resource.data.vaultPayload == '') &&
+        (!('hasVaultApp' in request.resource.data) || request.resource.data.hasVaultApp == false) &&
+        (!('isArcadeGame' in request.resource.data) || request.resource.data.isArcadeGame == false) &&
+        (!('duetOf' in request.resource.data) || request.resource.data.duetOf == null || (
+          (!('htmlCode' in request.resource.data.duetOf) || request.resource.data.duetOf.htmlCode == '') &&
+          (!('vaultPayload' in request.resource.data.duetOf) || request.resource.data.duetOf.vaultPayload == '') &&
+          (!('mediaType' in request.resource.data.duetOf) || request.resource.data.duetOf.mediaType != 'html_app')
+        )) &&
         (!('pinned' in request.resource.data) || request.resource.data.pinned == false) &&
         (!('founderAward' in request.resource.data) || request.resource.data.founderAward == false)
       );
@@ -67,6 +75,15 @@ service cloud.firestore {
             (!('pinned' in request.resource.data) || (('pinned' in resource.data) && request.resource.data.pinned == resource.data.pinned) || request.resource.data.pinned == false) &&
             (!('founderAward' in request.resource.data) || (('founderAward' in resource.data) && request.resource.data.founderAward == resource.data.founderAward) || request.resource.data.founderAward == false) &&
             (!('mediaType' in request.resource.data) || (request.resource.data.mediaType != 'html_app' && request.resource.data.mediaType != 'city_versus')) &&
+            (!('htmlCode' in request.resource.data) || request.resource.data.htmlCode == '') &&
+            (!('vaultPayload' in request.resource.data) || request.resource.data.vaultPayload == '') &&
+            (!('hasVaultApp' in request.resource.data) || request.resource.data.hasVaultApp == false) &&
+            (!('isArcadeGame' in request.resource.data) || request.resource.data.isArcadeGame == false) &&
+            (!('duetOf' in request.resource.data) || request.resource.data.duetOf == null || (
+              (!('htmlCode' in request.resource.data.duetOf) || request.resource.data.duetOf.htmlCode == '') &&
+              (!('vaultPayload' in request.resource.data.duetOf) || request.resource.data.duetOf.vaultPayload == '') &&
+              (!('mediaType' in request.resource.data.duetOf) || request.resource.data.duetOf.mediaType != 'html_app')
+            )) &&
             (!('uid' in resource.data) || request.resource.data.uid == resource.data.uid) &&
             (!('authorUid' in resource.data) || request.resource.data.authorUid == resource.data.authorUid)
           ) || (
@@ -87,6 +104,11 @@ service cloud.firestore {
         isUidMatch(resource.data.authorId) ||
         isAdmin()
       );
+    }
+
+    // 1A. Private HTML Mini-App Vault (Level 2 Server Bunker — Zero Public Read!)
+    match /remo_html_vault/{postId} {
+      allow read, write: if isAdmin();
     }
 
     // 1B. 24h Stories & Focus Study Rooms
