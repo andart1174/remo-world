@@ -650,7 +650,9 @@ function syncPwaInstallUI() {
       banner.style.display = 'none';
       return;
     }
-    const canInstall = Boolean(window._deferredPwaPrompt) || isRemoIosBrowser();
+    const heroEl = document.getElementById('remoWelcomeHeroStrip');
+    const heroVisible = Boolean(heroEl && heroEl.style.display !== 'none' && heroEl.offsetParent !== null);
+    const canInstall = !heroVisible && (Boolean(window._deferredPwaPrompt) || isRemoIosBrowser());
     banner.style.display = canInstall ? 'flex' : 'none';
   } catch (e) {
     banner.style.display = 'none';
@@ -880,6 +882,7 @@ function voteCityVersusDuel(postId, choice, ev) {
   remoToast(t('versus_voted_toast', { city: getCityName(chosenCity, lang) }), 'coin');
   rerenderSinglePostCard(p.id);
   syncHeaderAndSidebars();
+  if (typeof maybePromptGuestRewardSave === 'function') maybePromptGuestRewardSave(10);
 }
 window.voteCityVersusDuel = voteCityVersusDuel;
 
@@ -1419,27 +1422,43 @@ function renderStoriesAndBanners() {
     updateHeaderStoryBadge();
   }
 
-  // Daily Pulse Banner + 1-Click Live World Window
+  // Daily Pulse Banner + 1-Click Live World Window (with automatic Mon–Sun rotating themes when no custom admin theme is set)
   const pulseBox = document.getElementById('dailyPulseBox');
   const dp = REMO_STORE.state.settings.dailyPulse;
   if (pulseBox && dp && dp.active) {
+    const REMO_WEEKLY_PULSE_THEMES = [
+      { hashtag: '#RemoCityDuel', en: 'Sunday City Duel: Vote for your favorite world city tonight!', fr: 'Duel du Dimanche : Votez pour votre ville préférée ce soir !' },
+      { hashtag: '#RemoMorningCoffee', en: 'Monday Coffee Check: Show your morning view & coffee from your city!', fr: 'Café du Lundi : Montrez votre café & vue matinale depuis votre ville !' },
+      { hashtag: '#RemoWorldWindow', en: 'Tuesday World Window: Snap what you see outside right now!', fr: 'Fenêtre sur le Monde : Partagez ce que vous voyez par la fenêtre maintenant !' },
+      { hashtag: '#RemoStreetFood', en: 'Wednesday Food Duel: Share the best local dish in your city!', fr: 'Duel Street-Food : Partagez le meilleur plat local de votre ville !' },
+      { hashtag: '#RemoGoldenHour', en: 'Thursday Golden Hour: Capture your city sky or sunset vibe tonight!', fr: 'Heure Dorée : Capturez le ciel ou le coucher de soleil de votre ville !' },
+      { hashtag: '#RemoSecretSpot', en: 'Friday Secret Spot: Reveal a hidden corner only locals know!', fr: 'Lieu Secret du Vendredi : Révélez un endroit connu seulement des locaux !' },
+      { hashtag: '#RemoBeforeAfter', en: 'Saturday Time Warp: Slide or share a Before / After of your city!', fr: 'Voyage dans le Temps : Partagez un Avant / Après de votre ville !' }
+    ];
+    const isStockDefaultPulse = !dp.title_en || dp.title_en === 'Capture your city sky or street vibe tonight!';
+    const autoDayTheme = REMO_WEEKLY_PULSE_THEMES[new Date().getDay()] || REMO_WEEKLY_PULSE_THEMES[4];
+    const activeHashtag = isStockDefaultPulse ? autoDayTheme.hashtag : (dp.hashtag || '#RemoGoldenHour');
+    const ttl = isStockDefaultPulse
+      ? (lang === 'fr' ? autoDayTheme.fr : autoDayTheme.en)
+      : (lang === 'fr' ? dp.title_fr : dp.title_en);
     pulseBox.style.display = 'flex';
-    const ttl = lang === 'fr' ? dp.title_fr : dp.title_en;
     pulseBox.innerHTML = `
       <div>
-        <div style="font-size:0.72rem;font-weight:900;color:#38bdf8;">${t('pulse_badge')} · ${dp.hashtag}</div>
+        <div style="font-size:0.72rem;font-weight:900;color:#38bdf8;">${t('pulse_badge')} · ${activeHashtag}</div>
         <div class="pulse-title-text" style="font-weight:800;font-size:0.9rem;margin-top:2px;">${ttl}</div>
       </div>
       <div style="display:flex;gap:7px;flex-wrap:wrap;align-items:center;">
-        <button type="button" class="btn-window-sync" onclick="openLiveWindowCreator('${dp.hashtag}')">${t('win_pulse_btn')}</button>
-        <button type="button" class="btn-cyber" onclick="openCreatePostModal('${dp.hashtag}')">${t('pulse_join_btn')}</button>
+        <button type="button" class="btn-window-sync" onclick="openLiveWindowCreator('${activeHashtag}')">${t('win_pulse_btn')}</button>
+        <button type="button" class="btn-cyber" onclick="openCreatePostModal('${activeHashtag}')">${t('pulse_join_btn')}</button>
       </div>
     `;
   }
 
   renderWorldWeatherTicker();
   try {
-    if (localStorage.getItem('remo_genesis_dismissed') === '1') {
+    const heroEl = document.getElementById('remoWelcomeHeroStrip');
+    const heroVisible = Boolean(heroEl && heroEl.style.display !== 'none');
+    if (localStorage.getItem('remo_genesis_dismissed') === '1' || heroVisible) {
       const gFomo = document.getElementById('genesisFomoBar');
       if (gFomo) gFomo.style.display = 'none';
     }
@@ -2872,6 +2891,7 @@ function dismissWelcomeHeroStrip() {
   const el = document.getElementById('remoWelcomeHeroStrip');
   if (el) el.style.display = 'none';
   try { localStorage.setItem('remo_hero_strip_dismissed', '1'); } catch (e) {}
+  if (typeof syncPwaInstallUI === 'function') syncPwaInstallUI();
 }
 window.dismissWelcomeHeroStrip = dismissWelcomeHeroStrip;
 
@@ -2883,8 +2903,43 @@ function syncWelcomeHeroVisibility() {
   const u = REMO_STORE.getCurrentUser();
   const isSignedInCitizen = Boolean(u && u.role !== 'guest' && !(typeof REMO_STORE.isFakeOrGuestUser === 'function' && REMO_STORE.isFakeOrGuestUser(u)) && (u.email || u.fbUid));
   el.style.display = (dismissed || isSignedInCitizen) ? 'none' : '';
+  if (typeof syncPwaInstallUI === 'function') syncPwaInstallUI();
 }
 window.syncWelcomeHeroVisibility = syncWelcomeHeroVisibility;
+
+function maybePromptGuestRewardSave(coinsEarned = 10) {
+  try {
+    const u = REMO_STORE.getCurrentUser();
+    const isSignedIn = Boolean(u && u.role !== 'guest' && !(typeof REMO_STORE.isFakeOrGuestUser === 'function' && REMO_STORE.isFakeOrGuestUser(u)) && (u.email || u.fbUid));
+    if (isSignedIn) return;
+    if (sessionStorage.getItem('remo_guest_save_prompted') === '1') return;
+    sessionStorage.setItem('remo_guest_save_prompted', '1');
+  } catch (e) { return; }
+
+  const lang = typeof REMO_I18N !== 'undefined' ? REMO_I18N.getLang() : 'en';
+  const msg = lang === 'fr'
+    ? `🎉 +${coinsEarned} 🪙 gagnés ! Connectez-vous (1 clic) pour garder vos pièces & votre Passeport 3D.`
+    : `🎉 +${coinsEarned} 🪙 earned! Sign in (1 click) to keep your coins & unlock your 3D Passport.`;
+  const btnLbl = lang === 'fr' ? '🔐 Sauvegarder' : '🔐 Save My Coins';
+
+  setTimeout(() => {
+    const prev = document.getElementById('remoGuestSaveBar');
+    if (prev) prev.remove();
+    const bar = document.createElement('div');
+    bar.id = 'remoGuestSaveBar';
+    bar.className = 'remo-guest-save-bar';
+    bar.innerHTML = `
+      <span class="remo-guest-save-txt">${msg}</span>
+      <div class="remo-guest-save-actions">
+        <button type="button" class="btn-cyber btn-gold" style="padding:6px 12px;font-size:0.76rem;white-space:nowrap;" onclick="document.getElementById('remoGuestSaveBar')?.remove();if(typeof openAuthModal==='function')openAuthModal(false);">${btnLbl}</button>
+        <button type="button" class="fomo-close-btn" onclick="document.getElementById('remoGuestSaveBar')?.remove()" aria-label="Close">✕</button>
+      </div>
+    `;
+    document.body.appendChild(bar);
+    setTimeout(() => { try { if (bar.parentNode) bar.remove(); } catch (e) {} }, 14000);
+  }, 950);
+}
+window.maybePromptGuestRewardSave = maybePromptGuestRewardSave;
 
 function voteCityDuelShortcut() {
   const chip = document.querySelector('#feedModeChips button[onclick*="duets"]');
@@ -17085,6 +17140,7 @@ function submitMysteryCityGuess(postId, guessedCityId) {
       localStorage.setItem('remo_guest_mystery_coins', String(pending));
     }
     remoToast(t('guess_correct_msg', { city: `${realCity.flag} ${getCityName(realCity, lang)}` }), 'fanfare');
+    if (typeof maybePromptGuestRewardSave === 'function') maybePromptGuestRewardSave(10);
   } else {
     try { RemoAudio.play('hit'); } catch (e) {}
     remoToast(t('guess_wrong_msg', { picked: getCityName(pickedCity, lang), city: `${realCity.flag} ${getCityName(realCity, lang)}` }));

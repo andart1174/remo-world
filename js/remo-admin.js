@@ -34,7 +34,7 @@ function getAdminRealUsers() {
 }
 
 function _clearLockedAdminDom() {
-  ['admUsersTable', 'admDirectMsgsTable', 'admSupportOverviewTable', 'admSupportModTable', 'admPostsTable', 'admCitiesTableBody', 'admEuroEntriesTable', 'admPgpEntriesTable', 'admMintedCoinsTableBody'].forEach((id) => {
+  ['admUsersTable', 'admDirectMsgsTable', 'admSupportOverviewTable', 'admSupportModTable', 'admPostsTable', 'admCitiesTableBody', 'admEuroEntriesTable', 'admPgpEntriesTable', 'admMintedCoinsTableBody', 'admDeskQueueTable'].forEach((id) => {
     const el = document.getElementById(id);
     if (el) el.innerHTML = '';
   });
@@ -156,6 +156,8 @@ function switchAdminTab(tabId) {
   if (tabId === 'cards') {
     renderAdminCardStudio();
     renderAdminCommunityPhotoPicker();
+  } else if (tabId === 'content_desk') {
+    if (typeof renderAdminContentDeskPanel === 'function') renderAdminContentDeskPanel();
   } else {
     refreshAllAdminPanels();
   }
@@ -207,6 +209,9 @@ function refreshAllAdminPanels() {
   }
   if (typeof renderAdminSpotlightPanel === 'function') {
     renderAdminSpotlightPanel();
+  }
+  if (typeof renderAdminContentDeskPanel === 'function') {
+    renderAdminContentDeskPanel();
   }
 }
 
@@ -3236,5 +3241,450 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined' && !window.
     if (gPanel && gPanel.classList.contains('active')) {
       renderAdminSpotlightPanel();
     }
+    const dPanel = document.getElementById('adm-panel-content_desk');
+    if (dPanel && dPanel.classList.contains('active')) {
+      renderAdminContentDeskPanel();
+    }
   }, 30000);
 }
+
+/* ════════════════════════════════════════════════════════════════════
+   📅 MULTI-CITY CONTENT DESK & SCHEDULER (ADMIN ONLY)
+   ════════════════════════════════════════════════════════════════════ */
+const ADM_DESK_CHANNEL_PRESETS = {
+  montreal: 'Montréal Pulse ⚜️',
+  paris: 'Paris Instant 🗼',
+  chisinau: 'Chișinău Vibe 🍷',
+  bucharest: 'Bucharest Lights 🏛️',
+  newyork: 'NYC Pulse 🗽',
+  tokyo: 'Tokyo After Dark 🏯',
+  london: 'London Calling 🎡',
+  rome: 'Roma Eterna 🍕',
+  dubai: 'Dubai Horizon 🌆',
+  miami: 'Miami Neon 🌴',
+  barcelona: 'Barcelona Sol ☀️',
+  toronto: 'Toronto North 🍁',
+  monaco: 'Monaco Riviera 🏎️',
+  losangeles: 'LA Sunset 🎬',
+  seoul: 'Seoul Cyber ⚡',
+  geneva: 'Genève Lac ⌚',
+  singapore: 'Singapore Future 🦁',
+  sydney: 'Sydney Harbour ⛵',
+  rio: 'Rio Carnival 🎭',
+  istanbul: 'Istanbul Bridge 🕌',
+  berlin: 'Berlin Pulse 🎧',
+  amsterdam: 'Amsterdam Canals 🚲',
+  lisbon: 'Lisbon Golden 🚋',
+  cairo: 'Cairo Timeless 🔺'
+};
+
+let _admDeskPendingAvatarFile = null;
+let _admDeskPublishing = false;
+
+function _getAdmDeskAvatarCache() {
+  try { return JSON.parse(localStorage.getItem('remo_adm_desk_avatars') || '{}') || {}; } catch (e) { return {}; }
+}
+function _saveAdmDeskAvatarCache(cityId, url) {
+  try {
+    const map = _getAdmDeskAvatarCache();
+    map[cityId] = url;
+    localStorage.setItem('remo_adm_desk_avatars', JSON.stringify(map));
+  } catch (e) {}
+}
+
+function _formatLocalDatetimeInput(dt) {
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}T${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
+}
+
+function setAdminDeskSchedulePreset(preset) {
+  const inp = document.getElementById('admDeskScheduleAt');
+  if (!inp) return;
+  if (preset === 'now') {
+    inp.value = '';
+    return;
+  }
+  const d = new Date();
+  if (preset === 'plus6h') {
+    d.setHours(d.getHours() + 6, 0, 0, 0);
+  } else if (preset === 'tom9') {
+    d.setDate(d.getDate() + 1);
+    d.setHours(9, 0, 0, 0);
+  } else if (preset === 'tom18') {
+    d.setDate(d.getDate() + 1);
+    d.setHours(18, 0, 0, 0);
+  } else if (preset === 'plus2d') {
+    d.setDate(d.getDate() + 2);
+    d.setHours(10, 0, 0, 0);
+  } else if (preset === 'plus3d') {
+    d.setDate(d.getDate() + 3);
+    d.setHours(10, 0, 0, 0);
+  }
+  inp.value = _formatLocalDatetimeInput(d);
+}
+
+function onAdminDeskTypeChange() {
+  const tVal = document.getElementById('admDeskType')?.value || 'image';
+  const show = (id, on) => { const el = document.getElementById(id); if (el) el.style.display = on ? '' : 'none'; };
+  show('admDeskMediaImage', tVal === 'image');
+  show('admDeskMediaBA', tVal === 'before_after');
+  show('admDeskMediaDuel', tVal === 'city_versus');
+  show('admDeskMediaTextCard', tVal === 'text_card');
+}
+
+function onAdminDeskCityChange() {
+  const cid = document.getElementById('admDeskCity')?.value || 'montreal';
+  const authSel = document.getElementById('admDeskAuthorSel')?.value || '__channel__';
+  const nameInp = document.getElementById('admDeskAuthorName');
+  if (authSel === '__channel__' && nameInp) {
+    const c = getCityById(cid);
+    nameInp.value = ADM_DESK_CHANNEL_PRESETS[cid] || `${c.name_en} Live ${c.flag}`;
+  }
+  const cache = _getAdmDeskAvatarCache();
+  const avSt = document.getElementById('admDeskAvatarStatus');
+  if (avSt && !_admDeskPendingAvatarFile) {
+    avSt.textContent = cache[cid]
+      ? '✅ Saved cloud avatar ready for this city (reused automatically!)'
+      : 'Default city badge — upload once from 24_Avatars/ to save permanently';
+  }
+}
+
+function onAdminDeskAuthorChange() {
+  const authSel = document.getElementById('admDeskAuthorSel')?.value || '__channel__';
+  const nameInp = document.getElementById('admDeskAuthorName');
+  if (!nameInp) return;
+  if (authSel === '__channel__') {
+    onAdminDeskCityChange();
+  } else {
+    const u = getAdminRealUsers().find((x) => x.uid === authSel);
+    if (u) {
+      nameInp.value = u.name || 'Citizen';
+      const citySel = document.getElementById('admDeskCity');
+      if (citySel && u.homeCity) citySel.value = u.homeCity;
+    }
+  }
+}
+
+function onAdminDeskAvatarSelected(ev) {
+  const f = ev && ev.target && ev.target.files && ev.target.files[0];
+  _admDeskPendingAvatarFile = f || null;
+  const avSt = document.getElementById('admDeskAvatarStatus');
+  if (avSt) {
+    avSt.textContent = f ? `📎 Selected: ${f.name} (will upload & cache for this city)` : 'Default city badge or saved channel avatar';
+  }
+}
+
+function renderAdminContentDeskPanel() {
+  if (!isAdminSessionUnlocked()) return;
+  const lang = REMO_I18N.getLang();
+  const cities = getRemoCities();
+
+  // Populate city selects once (preserve selection on refresh)
+  ['admDeskCity', 'admDeskDuelLeftCity', 'admDeskDuelRightCity'].forEach((id, idx) => {
+    const sel = document.getElementById(id);
+    if (!sel) return;
+    const prev = sel.value;
+    if (!sel.options.length) {
+      sel.innerHTML = cities.map((c) => `<option value="${c.id}">${c.flag} ${getCityName(c, lang)}</option>`).join('');
+      sel.value = prev || (idx === 2 ? 'paris' : 'montreal');
+    }
+  });
+
+  // Populate existing registered user accounts in author selector
+  const authSel = document.getElementById('admDeskAuthorSel');
+  if (authSel) {
+    const prev = authSel.value || '__channel__';
+    const users = getAdminRealUsers();
+    authSel.innerHTML = `<option value="__channel__">🌍 City Channel Preset (Auto by City)</option>` +
+      users.map((u) => {
+        const c = getCityById(u.homeCity || 'montreal');
+        return `<option value="${escapeHtmlStr(u.uid)}">${c.flag} @${escapeHtmlStr(u.name)} (${escapeHtmlStr(u.homeCity || 'montreal')})</option>`;
+      }).join('');
+    if ([...authSel.options].some((o) => o.value === prev)) authSel.value = prev;
+  }
+
+  const nameInp = document.getElementById('admDeskAuthorName');
+  if (nameInp && !nameInp.value.trim()) {
+    onAdminDeskCityChange();
+  }
+  onAdminDeskTypeChange();
+
+  // Render Scheduled Queue + Recent Drops
+  const now = Date.now();
+  const allPosts = (REMO_STORE.state.posts || []).slice();
+  const scheduled = allPosts
+    .filter((p) => Number(p.scheduledAt || 0) > now)
+    .sort((a, b) => Number(a.scheduledAt) - Number(b.scheduledAt));
+  const recentLive = allPosts
+    .filter((p) => Number(p.scheduledAt || 0) <= now)
+    .sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0))
+    .slice(0, 12);
+
+  const badge = document.getElementById('admDeskSchedCountBadge');
+  if (badge) badge.textContent = `⏳ ${scheduled.length} Scheduled`;
+
+  const tbody = document.getElementById('admDeskQueueTable');
+  if (!tbody) return;
+  const rows = [...scheduled, ...recentLive];
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="4" style="color:#94a3b8;text-align:center;padding:16px;">No scheduled or recent posts yet.</td></tr>';
+    return;
+  }
+  const fmtBadgeMap = {
+    before_after: '🪞 Avant/Après',
+    city_versus: '⚔️ City Duel',
+    text_card: '✍️ Text Card',
+    html_app: '✨ Live App',
+    image: '📷 Photo',
+    carousel: '📷 Multi'
+  };
+  tbody.innerHTML = rows.map((p) => {
+    const isSched = Number(p.scheduledAt || 0) > now;
+    const c = getCityById(p.cityId || 'montreal');
+    const cap = String((lang === 'fr' ? (p.caption_fr || p.caption_en) : (p.caption_en || p.caption_fr)) || (p.textCard && p.textCard.raw) || '').replace(/\s+/g, ' ');
+    const safeId = escapeJsSingleArg(p.id);
+    const dtStr = isSched
+      ? new Date(Number(p.scheduledAt)).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+      : new Date(Number(p.createdAt || now)).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    return `
+      <tr style="${isSched ? 'background:rgba(56,189,248,0.08);' : ''}">
+        <td>${isSched ? `<span style="color:#fde047;font-weight:900;">⏳ ${escapeHtmlStr(dtStr)}</span>` : `<span style="color:#10b981;font-weight:800;">🟢 Live</span><div style="font-size:0.7rem;color:#94a3b8;">${escapeHtmlStr(dtStr)}</div>`}</td>
+        <td><b>${escapeHtmlStr(p.authorName || 'REMO')}</b><div style="font-size:0.72rem;color:#94a3b8;">${c.flag} ${escapeHtmlStr(getCityName(c, lang))}</div></td>
+        <td><span style="color:#7dd3fc;font-weight:800;font-size:0.76rem;">${fmtBadgeMap[p.mediaType] || '📷 Post'}</span>${p.mysteryCity ? ' <span style="color:#fbbf24;font-size:0.72rem;">🕵️ Guess</span>' : ''}<div style="font-size:0.76rem;color:#cbd5e1;">${escapeHtmlStr(cap.slice(0, 72))}${cap.length > 72 ? '…' : ''}</div></td>
+        <td style="display:flex;gap:6px;flex-wrap:wrap;">
+          ${isSched ? `<button type="button" class="adm-btn emerald" style="padding:5px 9px;font-size:0.74rem;" onclick="adminDeskPublishNow('${safeId}')">🚀 Publish Now</button>` : ''}
+          <button type="button" class="adm-btn rose" style="padding:5px 9px;font-size:0.74rem;" onclick="adminDeletePost('${safeId}');renderAdminContentDeskPanel();">🗑️</button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+async function adminDeskPublishNow(postId) {
+  if (!isAdminSessionUnlocked()) return;
+  const p = (REMO_STORE.state.posts || []).find((x) => x.id === postId);
+  if (!p) return;
+  p.scheduledAt = 0;
+  p.createdAt = Date.now();
+  REMO_STORE.save(true, 'desk_publish_now');
+  await REMO_STORE.syncPostToCloud(p);
+  renderAdminContentDeskPanel();
+  admToast('🚀 Post published LIVE to REMO Feed!');
+}
+
+async function adminDeskPublishPost() {
+  if (!isAdminSessionUnlocked() || _admDeskPublishing) return;
+  const btn = document.getElementById('btnAdmDeskPublish');
+  const origHtml = btn ? btn.innerHTML : '';
+  const setBusy = (on, txt) => {
+    _admDeskPublishing = on;
+    if (btn) {
+      btn.disabled = on;
+      btn.style.opacity = on ? '0.65' : '';
+      btn.innerHTML = on ? txt : origHtml;
+    }
+  };
+
+  const tVal = document.getElementById('admDeskType')?.value || 'image';
+  const cityId = document.getElementById('admDeskCity')?.value || 'montreal';
+  const vibe = document.getElementById('admDeskVibe')?.value || 'culture';
+  const authSel = document.getElementById('admDeskAuthorSel')?.value || '__channel__';
+  const rawName = document.getElementById('admDeskAuthorName')?.value.trim() || ADM_DESK_CHANNEL_PRESETS[cityId] || 'REMO World';
+  const capFrIn = document.getElementById('admDeskCapFr')?.value.trim() || '';
+  const capEnIn = document.getElementById('admDeskCapEn')?.value.trim() || '';
+  const finalFr = capFrIn || capEnIn;
+  const finalEn = capEnIn || capFrIn;
+
+  let scheduledAt = 0;
+  const rawSched = document.getElementById('admDeskScheduleAt')?.value || '';
+  if (rawSched) {
+    const parsed = Date.parse(rawSched);
+    if (Number.isFinite(parsed) && parsed > Date.now() + 30000) {
+      scheduledAt = parsed;
+    }
+  }
+
+  try {
+    setBusy(true, '⏳ Uploading media to REMO Cloud...');
+
+    // Resolve author metadata
+    const adminU = REMO_STORE.getCurrentUser();
+    const pickedUser = authSel !== '__channel__' ? getAdminRealUsers().find((u) => u.uid === authSel) : null;
+    const postUid = pickedUser ? pickedUser.uid : (adminU ? adminU.uid : 'u_admin_founder');
+    const cloudAuthorUid = pickedUser
+      ? (typeof REMO_STORE.getCloudAuthorUid === 'function' ? REMO_STORE.getCloudAuthorUid(pickedUser) : pickedUser.uid)
+      : (adminU && typeof REMO_STORE.getCloudAuthorUid === 'function' ? REMO_STORE.getCloudAuthorUid(adminU) : postUid);
+    let authorAvatar = pickedUser ? (pickedUser.avatarUrl || '') : (_getAdmDeskAvatarCache()[cityId] || '');
+    if (_admDeskPendingAvatarFile && typeof uploadMediaToCloudOrDataUrl === 'function') {
+      const avUrl = await uploadMediaToCloudOrDataUrl(_admDeskPendingAvatarFile, 'avatars', { maxDim: 512, quality: 0.82, inlineMaxChars: 15000, forceCloud: true });
+      if (avUrl) {
+        authorAvatar = avUrl;
+        _saveAdmDeskAvatarCache(cityId, avUrl);
+      }
+      _admDeskPendingAvatarFile = null;
+      const avInp = document.getElementById('admDeskAvatarFile');
+      if (avInp) avInp.value = '';
+    }
+
+    const newPostId = 'post_' + Date.now();
+    let mediaType = 'image';
+    let mediaUrl = '';
+    let mediaUrls = [];
+    let beforeLabel = '';
+    let afterLabel = '';
+    let lookRating = null;
+    let textCard = null;
+    let versus = null;
+    let mysteryCity = false;
+    let isSecretSpot = false;
+
+    if (tVal === 'image') {
+      const f1 = document.getElementById('admDeskPhoto1')?.files?.[0];
+      if (!f1) { admToast('⚠️ Select a photo first!'); return; }
+      if (!finalEn && !finalFr) { admToast('⚠️ Paste a FR or EN caption first!'); return; }
+      const url = await uploadMediaToCloudOrDataUrl(f1, 'posts', { inlineMaxChars: 15000, forceCloud: true });
+      mediaType = 'image';
+      mediaUrl = url;
+      mediaUrls = [url];
+      mysteryCity = Boolean(document.getElementById('admDeskMystery')?.checked);
+      isSecretSpot = Boolean(document.getElementById('admDeskSecretSpot')?.checked);
+    } else if (tVal === 'before_after') {
+      const fB = document.getElementById('admDeskBaBefore')?.files?.[0];
+      const fA = document.getElementById('admDeskBaAfter')?.files?.[0];
+      if (!fB || !fA) { admToast('⚠️ Select BOTH Avant and Acum photos!'); return; }
+      setBusy(true, '⏳ Uploading Avant/Après (1/2)...');
+      const uB = await uploadMediaToCloudOrDataUrl(fB, 'posts', { inlineMaxChars: 15000, forceCloud: true });
+      setBusy(true, '⏳ Uploading Avant/Après (2/2)...');
+      const uA = await uploadMediaToCloudOrDataUrl(fA, 'posts', { inlineMaxChars: 15000, forceCloud: true });
+      mediaType = 'before_after';
+      mediaUrls = [uB, uA];
+      mediaUrl = (uB && String(uB).startsWith('http')) ? uB : '';
+      beforeLabel = document.getElementById('admDeskBaBeforeLbl')?.value.trim() || '🕰️ AVANT';
+      afterLabel = document.getElementById('admDeskBaAfterLbl')?.value.trim() || '✨ 2026';
+      lookRating = { enabled: true, style: { sum: 0, count: 0 }, vibe: { sum: 0, count: 0 }, icon: { sum: 0, count: 0 }, voters: {} };
+    } else if (tVal === 'city_versus') {
+      const fL = document.getElementById('admDeskDuelLeftPhoto')?.files?.[0];
+      const fR = document.getElementById('admDeskDuelRightPhoto')?.files?.[0];
+      if (!fL || !fR) { admToast('⚠️ Select BOTH Left and Right duel photos!'); return; }
+      const lC = document.getElementById('admDeskDuelLeftCity')?.value || 'montreal';
+      const rC = document.getElementById('admDeskDuelRightCity')?.value || 'paris';
+      const durH = Math.max(1, Number(document.getElementById('admDeskDuelDuration')?.value || 24));
+      setBusy(true, '⏳ Uploading Duel photos (1/2)...');
+      const uL = await uploadMediaToCloudOrDataUrl(fL, 'posts', { inlineMaxChars: 15000, forceCloud: true, maxDim: 960, quality: 0.76 });
+      setBusy(true, '⏳ Uploading Duel photos (2/2)...');
+      const uR = await uploadMediaToCloudOrDataUrl(fR, 'posts', { inlineMaxChars: 15000, forceCloud: true, maxDim: 960, quality: 0.76 });
+      const baseTs = scheduledAt || Date.now();
+      mediaType = 'city_versus';
+      versus = {
+        leftCityId: lC,
+        rightCityId: rC,
+        leftMedia: uL,
+        rightMedia: uR,
+        leftVotes: 0,
+        rightVotes: 0,
+        durationHours: durH,
+        category: 'general',
+        createdAt: baseTs,
+        endsAt: baseTs + durH * 3600 * 1000,
+        voters: [],
+        voterSides: {},
+        closed: false,
+        winnerSide: null,
+        claimedBonus: []
+      };
+    } else if (tVal === 'text_card') {
+      const raw = document.getElementById('admDeskTextCardRaw')?.value.trim() || '';
+      if (!raw) { admToast('⚠️ Paste Text Card content first!'); return; }
+      const pages = raw.split(/\n\s*---+\s*\n/).map((s) => s.trim()).filter(Boolean);
+      mediaType = 'text_card';
+      textCard = {
+        raw,
+        pages: pages.length ? pages : [raw],
+        theme: document.getElementById('admDeskTcTheme')?.value || 'aurora',
+        fontStyle: 'modern',
+        badgeType: document.getElementById('admDeskTcBadge')?.value || 'proverb',
+        align: 'center',
+        motion: 'glow',
+        dedicatedTo: ''
+      };
+    }
+
+    const newPost = {
+      id: newPostId,
+      uid: postUid,
+      authorUid: cloudAuthorUid || postUid,
+      authorName: rawName,
+      authorAvatar,
+      authorVerified: true,
+      authorPassport: (pickedUser && pickedUser.passportNum) ? pickedUser.passportNum : '0001',
+      cityId,
+      vibe,
+      caption_en: finalEn || (textCard ? textCard.pages[0].slice(0, 120) : ''),
+      caption_fr: finalFr || (textCard ? textCard.pages[0].slice(0, 120) : ''),
+      mediaType,
+      mediaUrl,
+      mediaUrls,
+      photoFilter: 'flt-none',
+      beforeFilter: 'flt-none',
+      afterFilter: 'flt-none',
+      beforeLabel,
+      afterLabel,
+      lookRating,
+      textCard,
+      versus,
+      mysteryCity,
+      cityGuesses: {},
+      isSecretSpot,
+      secretSpotTitle: isSecretSpot ? 'Urban Secret Spot' : '',
+      scheduledAt,
+      reactions: {},
+      likes: [],
+      tipsTotal: 0,
+      comments: [],
+      createdAt: scheduledAt || Date.now()
+    };
+
+    setBusy(true, '☁️ Syncing to REMO Cloud...');
+    REMO_STORE.state.posts.unshift(newPost);
+    REMO_STORE.save(true, 'admin_desk_post');
+    const syncRes = await REMO_STORE.syncPostToCloud(newPost);
+    if (syncRes && !syncRes.ok) {
+      admToast(`⚠️ Cloud sync notice: ${syncRes.code || syncRes.message || 'offline'}`);
+    } else {
+      admToast(scheduledAt
+        ? `⏳ Scheduled for ${new Date(scheduledAt).toLocaleString()} (${rawName})!`
+        : `🚀 Published LIVE as ${rawName}!`);
+    }
+
+    // Reset file & text inputs cleanly for rapid next entry
+    ['admDeskPhoto1', 'admDeskBaBefore', 'admDeskBaAfter', 'admDeskDuelLeftPhoto', 'admDeskDuelRightPhoto'].forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) el.value = '';
+    });
+    ['admDeskCapFr', 'admDeskCapEn', 'admDeskTextCardRaw'].forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) el.value = '';
+    });
+    const mChk = document.getElementById('admDeskMystery');
+    const sChk = document.getElementById('admDeskSecretSpot');
+    if (mChk) mChk.checked = false;
+    if (sChk) sChk.checked = false;
+
+    renderAdminContentDeskPanel();
+    renderAdminModerationPanel();
+  } catch (err) {
+    console.error('Admin Content Desk publish error:', err);
+    admToast('❌ Publish error: ' + (err && err.message ? err.message : 'Check console'));
+  } finally {
+    setBusy(false, '');
+  }
+}
+
+window.setAdminDeskSchedulePreset = setAdminDeskSchedulePreset;
+window.onAdminDeskTypeChange = onAdminDeskTypeChange;
+window.onAdminDeskCityChange = onAdminDeskCityChange;
+window.onAdminDeskAuthorChange = onAdminDeskAuthorChange;
+window.onAdminDeskAvatarSelected = onAdminDeskAvatarSelected;
+window.renderAdminContentDeskPanel = renderAdminContentDeskPanel;
+window.adminDeskPublishNow = adminDeskPublishNow;
+window.adminDeskPublishPost = adminDeskPublishPost;

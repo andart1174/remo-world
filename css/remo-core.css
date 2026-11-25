@@ -11969,4 +11969,35 @@ select.remo-input option {
   flex-direction: column;
   gap: 8px;
 }
+.remo-guest-save-bar {
+  position: fixed;
+  left: 50%;
+  bottom: 74px;
+  transform: translateX(-50%);
+  z-index: 480;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  max-width: min(94vw, 560px);
+  padding: 10px 14px;
+  border-radius: 16px;
+  background: rgba(11, 17, 36, 0.96);
+  border: 1px solid rgba(251, 191, 36, 0.55);
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(12px);
+}
+.remo-guest-save-txt {
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: #f8fafc;
+  line-height: 1.35;
+}
+.remo-guest-save-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
 

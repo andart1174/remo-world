@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Outfit:wght@600;700;800;900&family=Orbitron:wght@700;900&display=swap" media="print" onload="this.media='all'">
-  <link rel="stylesheet" href="css/remo-admin.css?v=162">
+  <link rel="stylesheet" href="css/remo-admin.css?v=163">
   <link rel="icon" type="image/png" sizes="32x32" href="img/favicon-32x32.png">
   <link rel="icon" type="image/png" sizes="64x64" href="img/favicon-64x64.png">
   <link rel="apple-touch-icon" sizes="180x180" href="img/apple-touch-icon.png">
@@ -67,6 +67,7 @@
     <!-- Left Command Sidebar (Horizontal Scroll on Mobile) -->
     <aside class="adm-sidebar">
       <button class="adm-tab-btn active" data-adm-tab="overview" onclick="switchAdminTab('overview')" data-i18n="adm_tab_overview">📊 Overview &amp; Live</button>
+      <button class="adm-tab-btn" data-adm-tab="content_desk" onclick="switchAdminTab('content_desk')" style="border-color:rgba(16,185,129,0.55);color:#6ee7b7;">📅 Content Desk</button>
       <button class="adm-tab-btn" data-adm-tab="cards" onclick="switchAdminTab('cards')" data-i18n="adm_tab_cards">🎴 City Card Studio</button>
       <button class="adm-tab-btn" data-adm-tab="cities" onclick="switchAdminTab('cities')" data-i18n="adm_tab_cities">🌍 Cities &amp; Radar</button>
       <button class="adm-tab-btn" data-adm-tab="wars" onclick="switchAdminTab('wars')" data-i18n="adm_tab_wars">⚔️ Wars &amp; Pulse</button>
@@ -1121,6 +1122,189 @@
         </div>
       </section>
 
+      <!-- ══ TAB 10: 📅 MULTI-CITY CONTENT DESK & SCHEDULER (ADMIN ONLY — 0 IMPACT ON FEED SPEED) ══ -->
+      <section class="adm-panel" id="adm-panel-content_desk">
+        <div class="exec-card" style="border-color:rgba(16,185,129,0.5);background:linear-gradient(135deg,rgba(15,23,42,0.96),rgba(6,44,44,0.62));">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
+            <div>
+              <h3 style="color:#6ee7b7;margin:0;">📅 Multi-City Content Desk &amp; Scheduler (REMO Content Vault)</h3>
+              <span style="font-size:0.76rem;color:#94a3b8;">Publish or schedule Photos, Avant/Après Sliders, City Duels &amp; Text Cards across all 24 cities without switching accounts.</span>
+            </div>
+            <span id="admDeskSchedCountBadge" style="padding:4px 11px;border-radius:99px;background:rgba(56,189,248,0.16);border:1px solid rgba(56,189,248,0.45);color:#7dd3fc;font-size:0.75rem;font-weight:900;">⏳ 0 Scheduled</span>
+          </div>
+
+          <div class="adm-row-2" style="margin-bottom:10px;">
+            <div class="adm-field">
+              <label>Post Format</label>
+              <select id="admDeskType" class="adm-inp" onchange="onAdminDeskTypeChange()">
+                <option value="image">📷 Photo / Guess My City</option>
+                <option value="before_after">🪞 Avant / Après (2 Photos Slider)</option>
+                <option value="city_versus">⚔️ City Duel (2 Cities · 2 Photos)</option>
+                <option value="text_card">✍️ Text Card (Paginated EN/FR)</option>
+              </select>
+            </div>
+            <div class="adm-field">
+              <label>Target World City</label>
+              <select id="admDeskCity" class="adm-inp" onchange="onAdminDeskCityChange()"></select>
+            </div>
+          </div>
+
+          <div class="adm-row-2" style="margin-bottom:10px;">
+            <div class="adm-field">
+              <label>Publish As (Existing Account or City Channel)</label>
+              <select id="admDeskAuthorSel" class="adm-inp" onchange="onAdminDeskAuthorChange()">
+                <option value="__channel__">🌍 City Channel Preset (Auto by City)</option>
+              </select>
+            </div>
+            <div class="adm-field">
+              <label>Channel / Display Name</label>
+              <input type="text" id="admDeskAuthorName" class="adm-inp" placeholder="e.g. Montréal Pulse ⚜️">
+            </div>
+          </div>
+
+          <div class="adm-row-2" style="margin-bottom:12px;">
+            <div class="adm-field">
+              <label>Channel Avatar (Optional — cached per city from 24_Avatars/)</label>
+              <input type="file" id="admDeskAvatarFile" accept="image/*" class="adm-inp" onchange="onAdminDeskAvatarSelected(event)">
+              <span id="admDeskAvatarStatus" style="font-size:0.72rem;color:#94a3b8;">Default city badge or saved channel avatar</span>
+            </div>
+            <div class="adm-field">
+              <label>Vibe / Category</label>
+              <select id="admDeskVibe" class="adm-inp">
+                <option value="culture">🎭 Culture &amp; Heritage</option>
+                <option value="energy">⚡ High Energy / Skyline</option>
+                <option value="chill">🌙 Night &amp; Neon Chill</option>
+                <option value="food">🍽️ Local Food</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Dynamic Media Block: Single Photo -->
+          <div id="admDeskMediaImage" style="padding:12px;border-radius:12px;background:rgba(0,0,0,0.28);border:1px solid rgba(56,189,248,0.3);margin-bottom:12px;">
+            <div class="adm-row-2" style="margin-bottom:8px;">
+              <div class="adm-field">
+                <label>📷 Upload Photo from REMO Content Vault</label>
+                <input type="file" id="admDeskPhoto1" accept="image/*" class="adm-inp">
+              </div>
+              <div class="adm-field" style="justify-content:center;">
+                <label style="margin-bottom:6px;">Interactive Options</label>
+                <div style="display:flex;gap:14px;flex-wrap:wrap;">
+                  <label class="check-pill" style="margin:0;"><input type="checkbox" id="admDeskMystery"> 🕵️ Guess My City (+10 🪙)</label>
+                  <label class="check-pill" style="margin:0;"><input type="checkbox" id="admDeskSecretSpot"> 🗺️ Urban Secret Spot</label>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Dynamic Media Block: Avant / Après -->
+          <div id="admDeskMediaBA" style="display:none;padding:12px;border-radius:12px;background:rgba(0,0,0,0.28);border:1px solid rgba(251,191,36,0.4);margin-bottom:12px;">
+            <div class="adm-row-2" style="margin-bottom:8px;">
+              <div class="adm-field">
+                <label>🕰️ AVANT Photo (e.g. 01_avant_1910.jpg)</label>
+                <input type="file" id="admDeskBaBefore" accept="image/*" class="adm-inp">
+              </div>
+              <div class="adm-field">
+                <label>✨ ACUM Photo (e.g. 02_acum_2025.jpg)</label>
+                <input type="file" id="admDeskBaAfter" accept="image/*" class="adm-inp">
+              </div>
+            </div>
+            <div class="adm-row-2">
+              <div class="adm-field"><label>Before Label</label><input type="text" id="admDeskBaBeforeLbl" class="adm-inp" value="🕰️ AVANT"></div>
+              <div class="adm-field"><label>After Label</label><input type="text" id="admDeskBaAfterLbl" class="adm-inp" value="✨ 2026"></div>
+            </div>
+          </div>
+
+          <!-- Dynamic Media Block: City Duel -->
+          <div id="admDeskMediaDuel" style="display:none;padding:12px;border-radius:12px;background:rgba(0,0,0,0.28);border:1px solid rgba(244,63,94,0.45);margin-bottom:12px;">
+            <div class="adm-row-2" style="margin-bottom:8px;">
+              <div class="adm-field"><label>⚔️ Left City</label><select id="admDeskDuelLeftCity" class="adm-inp"></select></div>
+              <div class="adm-field"><label>⚔️ Right City</label><select id="admDeskDuelRightCity" class="adm-inp"></select></div>
+            </div>
+            <div class="adm-row-2" style="margin-bottom:8px;">
+              <div class="adm-field"><label>📷 Left Photo</label><input type="file" id="admDeskDuelLeftPhoto" accept="image/*" class="adm-inp"></div>
+              <div class="adm-field"><label>📷 Right Photo</label><input type="file" id="admDeskDuelRightPhoto" accept="image/*" class="adm-inp"></div>
+            </div>
+            <div class="adm-field" style="max-width:220px;">
+              <label>Duel Duration</label>
+              <select id="admDeskDuelDuration" class="adm-inp">
+                <option value="24" selected>24 Hours</option>
+                <option value="48">48 Hours</option>
+                <option value="72">72 Hours</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Dynamic Media Block: Text Card -->
+          <div id="admDeskMediaTextCard" style="display:none;padding:12px;border-radius:12px;background:rgba(0,0,0,0.28);border:1px solid rgba(168,85,247,0.45);margin-bottom:12px;">
+            <div class="adm-field" style="margin-bottom:8px;">
+              <label>✍️ Text Card Pages (Separate pages with --- on a new line, copy from text-cards-pack.txt)</label>
+              <textarea id="admDeskTextCardRaw" class="adm-inp" rows="6" placeholder="Page 1 text...&#10;---&#10;Page 2 text..."></textarea>
+            </div>
+            <div class="adm-row-2">
+              <div class="adm-field">
+                <label>Card Theme</label>
+                <select id="admDeskTcTheme" class="adm-inp">
+                  <option value="aurora">🌌 Aurora Cyber</option>
+                  <option value="gold">✨ Imperial Gold</option>
+                  <option value="sunset">🌅 Sunset Rose</option>
+                  <option value="midnight">🌙 Midnight Deep</option>
+                  <option value="emerald">💎 Emerald Pulse</option>
+                </select>
+              </div>
+              <div class="adm-field">
+                <label>Card Badge</label>
+                <select id="admDeskTcBadge" class="adm-inp">
+                  <option value="proverb">✨ Did You Know / Culture</option>
+                  <option value="quote">💬 Quote / Story</option>
+                  <option value="question">❓ Community Debate</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- Bilingual Captions -->
+          <div class="adm-row-2" style="margin-bottom:12px;">
+            <div class="adm-field">
+              <label>🇫🇷 Caption FR (Copy-paste from Vault)</label>
+              <textarea id="admDeskCapFr" class="adm-inp" rows="2" placeholder="Légende en français..."></textarea>
+            </div>
+            <div class="adm-field">
+              <label>🇬🇧 Caption EN (Copy-paste from Vault)</label>
+              <textarea id="admDeskCapEn" class="adm-inp" rows="2" placeholder="English caption..."></textarea>
+            </div>
+          </div>
+
+          <!-- Scheduling Row -->
+          <div style="display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:12px;padding:10px 12px;border-radius:12px;background:rgba(15,23,42,0.72);border:1px solid rgba(56,189,248,0.28);">
+            <div class="adm-field" style="min-width:240px;margin:0;">
+              <label>🕒 Schedule Publish Time (Leave blank = Publish Immediately)</label>
+              <input type="datetime-local" id="admDeskScheduleAt" class="adm-inp">
+            </div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;">
+              <button type="button" class="adm-btn outline" style="padding:6px 10px;font-size:0.75rem;" onclick="setAdminDeskSchedulePreset('now')">⚡ Now</button>
+              <button type="button" class="adm-btn outline" style="padding:6px 10px;font-size:0.75rem;" onclick="setAdminDeskSchedulePreset('plus6h')">+6h</button>
+              <button type="button" class="adm-btn outline" style="padding:6px 10px;font-size:0.75rem;" onclick="setAdminDeskSchedulePreset('tom9')">Tom. 09:00</button>
+              <button type="button" class="adm-btn outline" style="padding:6px 10px;font-size:0.75rem;" onclick="setAdminDeskSchedulePreset('tom18')">Tom. 18:00</button>
+              <button type="button" class="adm-btn outline" style="padding:6px 10px;font-size:0.75rem;" onclick="setAdminDeskSchedulePreset('plus2d')">+2 Days</button>
+              <button type="button" class="adm-btn outline" style="padding:6px 10px;font-size:0.75rem;" onclick="setAdminDeskSchedulePreset('plus3d')">+3 Days</button>
+            </div>
+            <button type="button" id="btnAdmDeskPublish" class="adm-btn gold" style="padding:10px 18px;font-size:0.88rem;" onclick="adminDeskPublishPost()">🚀 Publish / Schedule Post</button>
+          </div>
+        </div>
+
+        <!-- Scheduled & Recent Posts Queue -->
+        <div class="exec-card" style="overflow-x:auto;border-color:rgba(56,189,248,0.4);">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px;">
+            <h3 style="color:#38bdf8;margin:0;">📋 Scheduled Queue &amp; Recent Feed Drops</h3>
+            <button type="button" class="adm-btn outline" style="padding:5px 10px;font-size:0.75rem;" onclick="renderAdminContentDeskPanel()">🔄 Refresh Queue</button>
+          </div>
+          <table class="adm-table">
+            <thead><tr><th>Status / Schedule</th><th>Channel &amp; City</th><th>Format &amp; Caption</th><th>Actions</th></tr></thead>
+            <tbody id="admDeskQueueTable"></tbody>
+          </table>
+        </div>
+      </section>
+
     </main>
   </div>
 
@@ -1146,10 +1330,10 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js" integrity="sha384-oFrOL1TiREYNET0lsYF3LjQuyi2gL7vhjH1X8vFr+umcmzAdPELopeSgbcrv4uRm" crossorigin="anonymous"></script>
 
   <!-- Shared REMO Core + Admin Controller -->
-  <script src="js/remo-i18n.js?v=162"></script>
-  <script src="js/remo-cities-data.js?v=162"></script>
-  <script src="js/remo-store.js?v=162"></script>
-  <script src="js/remo-card-engine.js?v=162"></script>
-  <script src="js/remo-admin.js?v=162"></script>
+  <script src="js/remo-i18n.js?v=163"></script>
+  <script src="js/remo-cities-data.js?v=163"></script>
+  <script src="js/remo-store.js?v=163"></script>
+  <script src="js/remo-card-engine.js?v=163"></script>
+  <script src="js/remo-admin.js?v=163"></script>
 </body>
 </html>
