@@ -2277,6 +2277,8 @@ function renderAdminPostBar(p) {
         <button type="button" class="adm-pbtn" onclick="openAdminQuickModal('${escapeJsSingleArg(p.uid || '')}')">${t('adm_bar_coins')}</button>
         <button type="button" class="adm-pbtn" onclick="adminEditPostInline('${escapeJsSingleArg(p.id)}')">${t('adm_bar_edit')}</button>
         ${p.mediaType === 'html_app' ? `<button type="button" class="adm-pbtn" onclick="adminToggleHtmlArcadeMode('${escapeJsSingleArg(p.id)}')">🎮 Jeu: ${p.isArcadeGame ? 'ON' : 'OFF'}</button>` : ''}
+        ${p.mediaType === 'html_app' ? `<button type="button" class="adm-pbtn gold" onclick="adminToggleHtmlDailyDrop('${escapeJsSingleArg(p.id)}')">✨ Drop: ${p.isDailyDrop ? 'ON' : 'OFF'}</button>` : ''}
+        ${Number(p.scheduledAt || 0) > Date.now() ? `<button type="button" class="adm-pbtn" onclick="adminPublishScheduledPostNow('${escapeJsSingleArg(p.id)}')">🚀 Publish Now</button>` : ''}
         ${(p.mediaType === 'html_app' && p.vaultMode !== 'server') ? `<button type="button" class="adm-pbtn gold" onclick="adminMigrateSingleHtmlPostToVault('${escapeJsSingleArg(p.id)}')">🔐 Migrer Vault</button>` : ''}
       </div>
     </details>
@@ -2382,7 +2384,8 @@ function computePostRenderSig(p, u, lang) {
   const liked = (u && (p.likes || []).includes(u.uid)) ? 1 : 0;
   const boostMins = isPostBoostActive(p) ? Math.floor(Math.max(0, Number(p.boostedUntil) - Date.now()) / 60000) : 0;
   const mFp = (s) => (s ? `${s.length}:${s.slice(0, 24)}:${s.slice(-16)}` : '');
-  return `${p.id}_${lang}_${p.mediaType || ''}_${p.isArcadeGame ? 1 : 0}_${p.vaultMode || ''}_${mFp(p.mediaUrl)}_${(p.mediaUrls || []).map(mFp).join(',')}_${(p.likes || []).length}_${liked}_${(p.comments || []).length}_${p.tipsTotal || 0}_${p.pinned ? 1 : 0}_${boostMins}_${p.founderAward ? 1 : 0}_${p.mintedCard ? 1 : 0}_${dualOpen}_${vSig}_${pollSig}_${btySig}_${capSig}_${lookSig}_${mboxSig}_${chSig}_${Object.keys(p.cityGuesses || {}).length}_${p.leaderboard?.[0]?.score || 0}_${isPostCapsuleSealed(p) ? 1 : 0}_${isAdminXrayOpen(p.id) ? 1 : 0}_${p._cloudSyncError ? 1 : 0}_${p._cloudSyncPending ? 1 : 0}`;
+  const schedPending = Number(p.scheduledAt || 0) > Date.now() ? 1 : 0;
+  return `${p.id}_${lang}_${p.mediaType || ''}_${p.isArcadeGame ? 1 : 0}_${p.isDailyDrop ? 1 : 0}_${p.appCategory || ''}_${schedPending}_${p.vaultMode || ''}_${mFp(p.mediaUrl)}_${(p.mediaUrls || []).map(mFp).join(',')}_${(p.likes || []).length}_${liked}_${(p.comments || []).length}_${p.tipsTotal || 0}_${p.pinned ? 1 : 0}_${boostMins}_${p.founderAward ? 1 : 0}_${p.mintedCard ? 1 : 0}_${dualOpen}_${vSig}_${pollSig}_${btySig}_${capSig}_${lookSig}_${mboxSig}_${chSig}_${Object.keys(p.cityGuesses || {}).length}_${p.leaderboard?.[0]?.score || 0}_${isPostCapsuleSealed(p) ? 1 : 0}_${isAdminXrayOpen(p.id) ? 1 : 0}_${p._cloudSyncError ? 1 : 0}_${p._cloudSyncPending ? 1 : 0}`;
 }
 
 function toggleTkCaptionExpand(postId, ev) {
@@ -2550,6 +2553,8 @@ function renderSinglePostCardHtml(p, lang, u, isAdm) {
                   ${sealed ? `<span class="pbadge capsule">${t('capsule_locked_badge')}${xray ? ' · 👁️ X-RAY' : ''}</span>` : (p.wasTimeCapsule ? `<span class="pbadge unsealed">${t('capsule_unsealed_badge')}</span>` : '')}
                   ${!hiddenByCapsule && mboxLocked ? `<span class="pbadge mbox">${t('mbox_badge_locked')}</span>` : (!hiddenByCapsule && p.mysteryBox?.enabled ? `<span class="pbadge unboxed">${t('mbox_badge_unboxed', { n: (p.mysteryBox.unboxedBy || []).length })}</span>` : '')}
                   ${p.duetOf ? `<span class="pbadge duet">${t('post_duet_badge')}</span>` : ''}
+                  ${p.isDailyDrop ? `<span class="pbadge daily-drop">${t('live_app_drop_badge')}</span>` : ''}
+                  ${Number(p.scheduledAt || 0) > Date.now() ? `<span class="pbadge scheduled-drop">${t('live_app_scheduled_badge')} · ${new Date(Number(p.scheduledAt)).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>` : ''}
                   ${p.pinned ? `<span class="pbadge pinned">${t('post_pinned_badge')}</span>` : ''}
                   ${p.founderAward ? `<span class="pbadge founder">${t('post_founder_award_badge')}</span>` : ''}
                   ${getPostBoostBadgeHtml(p, lang)}
@@ -2943,15 +2948,25 @@ window.rerenderSinglePostCard = rerenderSinglePostCard;
 
 function getFilteredSortedFeedPosts(searchQuery = '') {
   const u = REMO_STORE.getCurrentUser();
+  const isAdmViewer = REMO_STORE.isAdminUnlocked() || REMO_STORE.isCurrentUserAdmin();
+  const nowTs = Date.now();
   const deepId = window._deepLinkedPostId || '';
-  const realPosts = (REMO_STORE.state.posts || []).filter((p) => p && p.mediaType !== 'beat_loop');
+  const realPosts = (REMO_STORE.state.posts || []).filter((p) => {
+    if (!p || p.mediaType === 'beat_loop') return false;
+    if (!isAdmViewer && Number(p.scheduledAt || 0) > nowTs) return false;
+    return true;
+  });
 
-  // Deep-linked shared post (?post=ID) floats #1 on arrival, then Official Pinned posts, then Boosted posts (most recently boosted first), then newest
+  // Deep-linked shared post (?post=ID) floats #1 on arrival, then Official Pinned posts, then active Daily Drop (in Live Apps), then Boosted posts, then newest
   realPosts.sort((a, b) => {
     const deepDiff = (deepId && b.id === deepId ? 1 : 0) - (deepId && a.id === deepId ? 1 : 0);
     if (deepDiff !== 0) return deepDiff;
     const pinDiff = (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0);
     if (pinDiff !== 0) return pinDiff;
+    if (currentFeedMode === 'html') {
+      const dropDiff = (b.isDailyDrop ? 1 : 0) - (a.isDailyDrop ? 1 : 0);
+      if (dropDiff !== 0) return dropDiff;
+    }
     const bBoost = isPostBoostActive(b) ? 1 : 0;
     const aBoost = isPostBoostActive(a) ? 1 : 0;
     if (bBoost !== aBoost) return bBoost - aBoost;
@@ -2978,7 +2993,13 @@ function getFilteredSortedFeedPosts(searchQuery = '') {
   } else if (currentFeedMode === 'capsules') {
     posts = posts.filter((p) => p.wasTimeCapsule || Boolean(p.unlockAt));
   } else if (currentFeedMode === 'html') {
-    posts = posts.filter((p) => p.mediaType === 'html_app');
+    const appCat = window.currentLiveAppCategory || 'all';
+    posts = posts.filter((p) => {
+      if (p.mediaType !== 'html_app') return false;
+      if (appCat === 'all') return true;
+      const inferredCat = p.appCategory || (p.isArcadeGame ? 'game' : 'culture');
+      return inferredCat === appCat;
+    });
   } else if (currentFeedMode === 'videos') {
     posts = posts.filter((p) => p.mediaType === 'video' || p.mediaType === 'video_link' || Boolean(p.externalUrl));
   } else if (currentFeedMode === 'photos') {
@@ -3034,7 +3055,7 @@ function computeVisibleFeedSignature(searchQuery = '', prefilteredPosts = null) 
   const u = REMO_STORE.getCurrentUser();
   const isAdm = REMO_STORE.isAdminUnlocked();
   const posts = prefilteredPosts || getFilteredSortedFeedPosts(searchQuery).slice(0, _feedVisibleLimit);
-  return `${lang}_${isAdm ? 1 : 0}_${u?.uid || 'guest'}_${u?.homeCity || ''}_${currentFeedMode}_${currentFeedCityFilter}_${currentFeedVibeFilter}_${searchQuery || ''}_${posts.length}::` +
+  return `${lang}_${isAdm ? 1 : 0}_${u?.uid || 'guest'}_${u?.homeCity || ''}_${currentFeedMode}_${window.currentLiveAppCategory || 'all'}_${currentFeedCityFilter}_${currentFeedVibeFilter}_${searchQuery || ''}_${posts.length}::` +
     posts.map((p) => computePostRenderSig(p, u, lang)).join('|');
 }
 
@@ -3673,6 +3694,9 @@ function renderSocialFeed(searchQuery = '', forceFull = false) {
   if (typeof renderFeedActiveContestsBanner === 'function') {
     renderFeedActiveContestsBanner();
   }
+  if (typeof syncLiveAppsSubbarUI === 'function') {
+    syncLiveAppsSubbarUI();
+  }
   syncMobileFeedLayoutModeUI();
   const grid = document.getElementById('remoPostsGrid');
   if (!grid) return;
@@ -3681,7 +3705,7 @@ function renderSocialFeed(searchQuery = '', forceFull = false) {
   const qStr = String(searchQuery || '');
   const u = REMO_STORE.getCurrentUser();
   const isAdm = REMO_STORE.isAdminUnlocked();
-  const filterKey = `${currentFeedMode}|${currentFeedCityFilter}|${currentFeedVibeFilter}|${qStr.trim().toLowerCase()}`;
+  const filterKey = `${currentFeedMode}|${window.currentLiveAppCategory || 'all'}|${currentFeedCityFilter}|${currentFeedVibeFilter}|${qStr.trim().toLowerCase()}`;
   const baseCtx = `${lang}|${isAdm ? 1 : 0}|${u?.uid || 'guest'}|${u?.homeCity || ''}|${filterKey}`;
 
   if (filterKey !== _lastFeedFilterKey) {
@@ -8138,6 +8162,10 @@ async function publishNewRemoPost() {
   let vaultMode = '';
   let vaultPayload = '';
   let isArcadeGame = false;
+  let appCategory = '';
+  let isDailyDrop = false;
+  let scheduledAt = 0;
+  let liveAppKey = '';
   let videoDuration = 0;
   let externalUrl = '';
   let soundtrackId = '';
@@ -8224,6 +8252,17 @@ async function publishNewRemoPost() {
     }
     mediaType = 'html_app';
     isArcadeGame = Boolean(document.getElementById('createHtmlArcadeToggle')?.checked);
+    appCategory = document.getElementById('createHtmlAppCategory')?.value || (isArcadeGame ? 'game' : 'culture');
+    isDailyDrop = Boolean(document.getElementById('createHtmlDailyDropToggle')?.checked);
+    const rawSched = document.getElementById('createHtmlScheduleInp')?.value || '';
+    if (rawSched) {
+      const parsedSched = Date.parse(rawSched);
+      if (Number.isFinite(parsedSched) && parsedSched > Date.now() + 30000) {
+        scheduledAt = parsedSched;
+      }
+    }
+    liveAppKey = String(window._pendingLiveAppKey || '');
+    window._pendingLiveAppKey = '';
     const preparedHtml = rawHtml.includes('<html') || rawHtml.includes('<body') || rawHtml.includes('<canvas') || rawHtml.includes('<script')
       ? rawHtml
       : `<!DOCTYPE html><html><body style="margin:0;background:#050816;color:#fff;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;">${rawHtml}</body></html>`;
@@ -8377,6 +8416,10 @@ async function publishNewRemoPost() {
     vaultMode,
     vaultPayload,
     isArcadeGame,
+    appCategory,
+    isDailyDrop,
+    scheduledAt,
+    liveAppKey,
     visualHeadline: artHeadline,
     textCard: textCardPayload,
     remixedFromAuthor: pendingRemixParent ? pendingRemixParent.authorName : '',
@@ -13802,6 +13845,11 @@ function buildProtectedClientBlobDoc(rawHtml, p, lang, opts = {}) {
   const city = (typeof getCityById === 'function')
     ? (getCityById((p && p.cityId) || 'montreal') || getCityById('montreal'))
     : { id: 'montreal', name_en: 'Montréal', name_fr: 'Montréal', flag: '⚜️', lat: 45.5017, lng: -73.5673 };
+  const curViewerUser = (typeof REMO_STORE !== 'undefined' && REMO_STORE.getCurrentUser) ? REMO_STORE.getCurrentUser() : null;
+  const viewerCityId = (opts && opts.viewerCityId) || (curViewerUser && curViewerUser.homeCity) || city.id || 'montreal';
+  const viewerCity = (typeof getCityById === 'function')
+    ? (getCityById(viewerCityId) || city)
+    : city;
   const safeLang = lang === 'fr' ? 'fr' : 'en';
   const safePid = String((p && p.id) || '').replace(/[^a-zA-Z0-9_-]/g, '');
   const ctxObj = {
@@ -13813,13 +13861,20 @@ function buildProtectedClientBlobDoc(rawHtml, p, lang, opts = {}) {
     cityFlag: city.flag || '🌍',
     lat: Number(city.lat ?? 45.5017),
     lng: Number(city.lng ?? -73.5673),
+    viewerCityId: viewerCity.id || city.id || 'montreal',
+    viewerCityName: safeLang === 'fr' ? (viewerCity.name_fr || viewerCity.name_en || 'Montréal') : (viewerCity.name_en || 'Montréal'),
+    viewerCityNameEn: viewerCity.name_en || 'Montréal',
+    viewerCityNameFr: viewerCity.name_fr || viewerCity.name_en || 'Montréal',
+    viewerCityFlag: viewerCity.flag || '🌍',
+    viewerLat: Number(viewerCity.lat ?? 45.5017),
+    viewerLng: Number(viewerCity.lng ?? -73.5673),
     lang: safeLang
   };
   const ctxJson = JSON.stringify(ctxObj);
   const shieldStyle = opts.skipAntiCopy
     ? REMO_HTML_FIT_STYLE
     : '<style id="r-sh-s">html,body{scrollbar-width:none!important;-ms-overflow-style:none!important;}html::-webkit-scrollbar,body::-webkit-scrollbar{display:none!important;}*:not(input):not(textarea):not([contenteditable]){user-select:none!important;-webkit-user-select:none!important;-webkit-touch-callout:none!important;}</style>';
-  const ctxScript = `<script>(function(){try{Object.defineProperty(window,"REMO_CONTEXT",{value:Object.freeze(${ctxJson}),writable:false,configurable:false});}catch(e){window.REMO_CONTEXT=${ctxJson};}if(document.currentScript)document.currentScript.remove();})();<\/script>`;
+  const ctxScript = `<script>(function(){try{Object.defineProperty(window,"REMO_CONTEXT",{value:Object.freeze(${ctxJson}),writable:false,configurable:false});}catch(e){window.REMO_CONTEXT=${ctxJson};}window.remoShareResult=function(pl){try{parent.postMessage(Object.assign({type:"REMO_APP_SHARE",postId:${JSON.stringify(safePid)}},pl||{}),"*");}catch(e){}};window.remoNotifyAudio=function(active){try{parent.postMessage({type:"REMO_APP_AUDIO_ACTIVE",postId:${JSON.stringify(safePid)},active:Boolean(active)},"*");}catch(e){}};if(document.currentScript)document.currentScript.remove();})();<\/script>`;
   const shieldScript = opts.skipAntiCopy ? '' : (
     '<script>(function(){' +
     'var ed=function(t){return t&&(t.tagName==="INPUT"||t.tagName==="TEXTAREA"||t.isContentEditable);};' +
@@ -13948,6 +14003,8 @@ async function hydrateHtmlVaultFrame(iframeEl, post) {
   const lang = REMO_I18N.getLang();
 
   // Level 2 Server Bunker mode
+  const curViewerU = (typeof REMO_STORE !== 'undefined' && REMO_STORE.getCurrentUser) ? REMO_STORE.getCurrentUser() : null;
+  const viewerCityId = (curViewerU && curViewerU.homeCity) || post.cityId || 'montreal';
   if (post.vaultMode === 'server' && /^https?:$/i.test(window.location.protocol)) {
     try {
       const res = await fetch('/.netlify/functions/html-vault-ticket', {
@@ -13956,6 +14013,7 @@ async function hydrateHtmlVaultFrame(iframeEl, post) {
         body: JSON.stringify({
           postId: post.id,
           cityId: post.cityId || 'montreal',
+          viewerCityId,
           lang,
           isArcadeGame: isHtmlPostArcadeGame(post)
         })

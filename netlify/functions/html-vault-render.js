@@ -48,7 +48,7 @@ exports.handler = async (event) => {
     return { statusCode: 403, headers: SECURITY_HEADERS, body: buildBlockedHtmlPage('Session expired — reload post on REMO World') };
   }
 
-  const { p: postId, c: cityId, l: lang, g: arcadeFlag } = ticketRes.payload;
+  const { p: postId, c: cityId, vc: viewerCityId, l: lang, g: arcadeFlag } = ticketRes.payload;
   try {
     const doc = await firestoreVaultGet(postId);
     if (!doc || !doc.htmlCode) {
@@ -57,6 +57,7 @@ exports.handler = async (event) => {
     const envelope = buildProtectedHtmlEnvelope(doc.htmlCode, {
       postId,
       cityId,
+      viewerCityId: viewerCityId || cityId,
       lang,
       isArcadeGame: Boolean(arcadeFlag) || Boolean(doc.isArcadeGame)
     });

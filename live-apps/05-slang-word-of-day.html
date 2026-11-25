@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>REMO Word of the Day</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+:root{--bg:#060919;--card:#0c132a;--line:rgba(148,163,184,0.22);--txt:#f8fafc;--muted:#94a3b8;--ac:#f472b6;--ac2:#8b5cf6;}
+html,body{width:100%;height:100%;background:radial-gradient(circle at top right,rgba(56,189,248,0.16),#050816 62%);color:var(--txt);font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;overflow:hidden;}
+.app{width:100%;height:100%;max-width:520px;margin:0 auto;padding:12px;display:flex;flex-direction:column;gap:9px;overflow-y:auto;}
+.top{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-shrink:0;}
+.brand{display:flex;align-items:center;gap:7px;min-width:0;}
+.brand-ic{width:30px;height:30px;border-radius:10px;display:grid;place-items:center;background:linear-gradient(135deg,var(--ac),var(--ac2));font-size:15px;flex-shrink:0;box-shadow:0 4px 14px rgba(56,189,248,0.28);}
+.brand-t{font-weight:900;font-size:13px;letter-spacing:0.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.brand-s{font-size:10.5px;color:var(--muted);}
+.sel{background:#0f172a;color:#e2e8f0;border:1px solid var(--line);border-radius:10px;padding:5px 8px;font-size:11.5px;font-weight:700;outline:none;max-width:142px;cursor:pointer;}
+.card{background:rgba(12,19,42,0.86);border:1px solid var(--line);border-radius:16px;padding:12px;position:relative;overflow:hidden;display:flex;flex-direction:column;gap:8px;flex:1;min-height:0;}
+.pill{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:99px;font-size:10.5px;font-weight:800;background:rgba(56,189,248,0.16);border:1px solid rgba(56,189,248,0.36);color:#bae6fd;width:fit-content;}
+.pill.gold{background:rgba(251,191,36,0.16);border-color:rgba(251,191,36,0.45);color:#fde68a;}
+.row{display:flex;gap:7px;align-items:center;}
+.btn{flex:1;border:none;border-radius:12px;padding:10px 12px;font-weight:900;font-size:12.5px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;transition:transform .12s,opacity .15s;}
+.btn:active{transform:scale(0.97);}
+.btn-pri{background:linear-gradient(135deg,var(--ac),var(--ac2));color:#040814;box-shadow:0 6px 18px rgba(56,189,248,0.25);}
+.btn-sec{background:rgba(255,255,255,0.08);color:#f1f5f9;border:1px solid var(--line);flex:0 0 auto;padding:10px 12px;}
+.btn-sec:hover{background:rgba(255,255,255,0.14);}
+.muted{color:var(--muted);font-size:11.5px;line-height:1.4;}
+.img-box{position:relative;width:100%;flex:1;min-height:155px;border-radius:12px;overflow:hidden;background:#090f24;border:1px solid rgba(255,255,255,0.08);display:grid;place-items:center;}
+.img-box img{width:100%;height:100%;object-fit:cover;display:block;transition:opacity .25s;}
+.badge-ov{position:absolute;top:8px;left:8px;padding:4px 9px;border-radius:99px;background:rgba(5,8,22,0.82);backdrop-filter:blur(6px);border:1px solid rgba(251,191,36,0.5);color:#fde68a;font-size:11px;font-weight:900;}
+.loader{font-size:12px;color:#7dd3fc;font-weight:700;padding:16px;text-align:center;}
+
+.word-hero{text-align:center;padding:12px 10px;border-radius:14px;background:linear-gradient(135deg,rgba(236,72,153,0.16),rgba(99,102,241,0.18));border:1px solid rgba(244,114,182,0.35);}
+.word-big{font-size:26px;font-weight:900;letter-spacing:0.3px;color:#fff;margin:4px 0;}
+.word-ph{font-size:12px;color:#f9a8d4;font-weight:700;}
+.quiz-q{font-size:11.5px;font-weight:800;color:#cbd5e1;text-align:center;}
+.qlist{display:flex;flex-direction:column;gap:6px;}
+.qbtn{width:100%;text-align:left;padding:9px 11px;border-radius:11px;border:1px solid var(--line);background:rgba(15,23,42,0.75);color:#f1f5f9;font-size:12px;font-weight:700;cursor:pointer;transition:.15s;}
+.qbtn:hover{border-color:#f472b6;}
+.qbtn.ok{background:rgba(16,185,129,0.22);border-color:#34d399;color:#a7f3d0;}
+.qbtn.bad{background:rgba(244,63,94,0.2);border-color:#fb7185;color:#fecdd3;}
+.note-box{background:rgba(2,6,23,0.62);border:1px solid rgba(56,189,248,0.28);border-radius:11px;padding:9px 10px;font-size:11.5px;color:#e2e8f0;line-height:1.4;display:none;}
+
+</style>
+</head>
+<body>
+
+<div class="app">
+  <div class="top">
+    <div class="brand">
+      <div class="brand-ic">🗣️</div>
+      <div>
+        <div class="brand-t" id="hdrTitle">Word of the Day</div>
+        <div class="brand-s" id="hdrSub">Slang &amp; untranslatable city expressions</div>
+      </div>
+    </div>
+    <span class="pill gold" id="scorePill">🔥 0</span>
+  </div>
+  <div class="card">
+    <div class="word-hero">
+      <div class="pill" id="cityPill" style="margin:0 auto;">⚜️ Montréal</div>
+      <div class="word-big" id="wordTxt">Tiguidou</div>
+      <div class="word-ph" id="wordPh">/ti.gi.du/</div>
+      <button class="btn btn-sec" id="btnSpeak" style="margin-top:8px;padding:6px 12px;font-size:11.5px;">🔊 Listen</button>
+    </div>
+    <div class="quiz-q" id="quizQ">Guess the real meaning:</div>
+    <div class="qlist" id="qList"></div>
+    <div class="note-box" id="noteBox"></div>
+    <div class="row">
+      <button class="btn btn-pri" id="btnNext">🎲 Another City</button>
+      <button class="btn btn-sec" id="btnShare" title="Share">💬</button>
+    </div>
+  </div>
+</div>
+<script>
+const CITIES = [{"id":"montreal","en":"Montréal","fr":"Montréal","flag":"⚜️","lat":45.5017,"lng":-73.5673,"cur":"CAD","c":4.9,"m":3.75,"f":18,"r":68},{"id":"paris","en":"Paris","fr":"Paris","flag":"🗼","lat":48.8566,"lng":2.3522,"cur":"EUR","c":3.8,"m":2.5,"f":16,"r":52},{"id":"chisinau","en":"Chișinău","fr":"Chișinău","flag":"🇲🇩","lat":47.0105,"lng":28.8638,"cur":"MDL","c":42,"m":6,"f":155,"r":360},{"id":"bucharest","en":"Bucharest","fr":"Bucarest","flag":"🇷🇴","lat":44.4268,"lng":26.1025,"cur":"RON","c":15,"m":5,"f":52,"r":120},{"id":"newyork","en":"New York","fr":"New York","flag":"🗽","lat":40.7128,"lng":-74.006,"cur":"USD","c":5.5,"m":2.9,"f":22,"r":125},{"id":"tokyo","en":"Tokyo","fr":"Tokyo","flag":"🏯","lat":35.6762,"lng":139.6503,"cur":"JPY","c":520,"m":210,"f":1200,"r":4600},{"id":"london","en":"London","fr":"Londres","flag":"🏰","lat":51.5074,"lng":-0.1278,"cur":"GBP","c":3.9,"m":2.9,"f":15,"r":72},{"id":"dubai","en":"Dubai","fr":"Dubaï","flag":"🌆","lat":25.2048,"lng":55.2708,"cur":"AED","c":22,"m":6,"f":55,"r":230},{"id":"miami","en":"Miami","fr":"Miami","flag":"🌴","lat":25.7617,"lng":-80.1918,"cur":"USD","c":5.2,"m":2.25,"f":19,"r":95},{"id":"barcelona","en":"Barcelona","fr":"Barcelone","flag":"☀️","lat":41.3874,"lng":2.1686,"cur":"EUR","c":2.4,"m":2.55,"f":14,"r":46},{"id":"rome","en":"Rome","fr":"Rome","flag":"🏛️","lat":41.9028,"lng":12.4964,"cur":"EUR","c":1.5,"m":1.5,"f":13,"r":42},{"id":"toronto","en":"Toronto","fr":"Toronto","flag":"🍁","lat":43.6532,"lng":-79.3832,"cur":"CAD","c":5.1,"m":3.35,"f":20,"r":82},{"id":"monaco","en":"Monaco","fr":"Monaco","flag":"🏎️","lat":43.7384,"lng":7.4246,"cur":"EUR","c":5.5,"m":2,"f":28,"r":160},{"id":"losangeles","en":"Los Angeles","fr":"Los Angeles","flag":"🎬","lat":34.0522,"lng":-118.2437,"cur":"USD","c":5.6,"m":1.75,"f":21,"r":92},{"id":"seoul","en":"Seoul","fr":"Séoul","flag":"⚡","lat":37.5665,"lng":126.978,"cur":"KRW","c":4800,"m":1400,"f":11000,"r":36000},{"id":"geneva","en":"Geneva","fr":"Genève","flag":"⌚","lat":46.2044,"lng":6.1432,"cur":"CHF","c":5.5,"m":3,"f":26,"r":88},{"id":"singapore","en":"Singapore","fr":"Singapour","flag":"🦁","lat":1.3521,"lng":103.8198,"cur":"SGD","c":5.8,"m":1.8,"f":9,"r":110},{"id":"sydney","en":"Sydney","fr":"Sydney","flag":"⛵","lat":-33.8688,"lng":151.2093,"cur":"AUD","c":5.2,"m":4.5,"f":22,"r":105},{"id":"rio","en":"Rio de Janeiro","fr":"Rio de Janeiro","flag":"🎭","lat":-22.9068,"lng":-43.1729,"cur":"BRL","c":11,"m":7.5,"f":42,"r":110},{"id":"istanbul","en":"Istanbul","fr":"Istanbul","flag":"🕌","lat":41.0082,"lng":28.9784,"cur":"TRY","c":110,"m":27,"f":320,"r":950},{"id":"berlin","en":"Berlin","fr":"Berlin","flag":"🎧","lat":52.52,"lng":13.405,"cur":"EUR","c":3.6,"m":3.5,"f":13,"r":44},{"id":"amsterdam","en":"Amsterdam","fr":"Amsterdam","flag":"🚲","lat":52.3676,"lng":4.9041,"cur":"EUR","c":4,"m":3.4,"f":17,"r":68},{"id":"lisbon","en":"Lisbon","fr":"Lisbonne","flag":"🚋","lat":38.7223,"lng":-9.1393,"cur":"EUR","c":1.6,"m":1.8,"f":12,"r":45},{"id":"cairo","en":"Cairo","fr":"Le Caire","flag":"🔺","lat":30.0444,"lng":31.2357,"cur":"EGP","c":85,"m":10,"f":220,"r":550}];
+const CTX = window.REMO_CONTEXT || {};
+const LANG = (CTX.lang === 'fr') ? 'fr' : 'en';
+const IS_FR = LANG === 'fr';
+const INIT_CITY_ID = (CTX.viewerCityId || CTX.cityId || 'montreal').toLowerCase();
+function getCity(id){ return CITIES.find(c => c.id === id) || CITIES[0]; }
+function cityLabel(c){ return c.flag + ' ' + (IS_FR ? c.fr : c.en); }
+function fillCitySelect(selEl, selectedId){
+  if(!selEl) return;
+  selEl.innerHTML = CITIES.map(c => '<option value="'+c.id+'"'+(c.id===selectedId?' selected':'')+'>'+cityLabel(c)+'</option>').join('');
+}
+function shareToRemo(payload){
+  if (typeof window.remoShareResult === 'function') {
+    window.remoShareResult(payload);
+    return;
+  }
+  try {
+    parent.postMessage(Object.assign({ type: 'REMO_APP_SHARE', postId: CTX.postId || '' }, payload || {}), '*');
+  } catch (e) {}
+}
+
+const WORDS = [
+  { city:'⚜️ Montréal', loc:'fr-CA', w:'Tiguidou', ph:'tee-gee-doo', en:'All good / Awesome / Sorted!', fr:'Tout est parfait / Impeccable !', dEn:['A tiny winter hat','A late-night snack'], dFr:['Un bonnet d’hiver','Une collation de minuit'], nEn:'Classic warm Québécois expression used daily across Montréal.', nFr:'Expression québécoise chaleureuse utilisée tous les jours à Montréal.' },
+  { city:'⚜️ Montréal', loc:'fr-CA', w:'Faire frette', ph:'fair fret', en:'To be freezing icy cold outside', fr:'Il fait un froid glacial dehors', dEn:['To play guitar fast','To hurry to work'], dFr:['Jouer de la guitare vite','Courir au travail'], nEn:'Essential Montréal winter vocabulary when temperatures drop below -20°C.', nFr:'Indispensable de l’hiver montréalais dès que le mercure chute sous -20°C.' },
+  { city:'🇲🇩 Chișinău · 🇷🇴 București', loc:'ro-RO', w:'Dor', ph:'dohr', en:'Deep nostalgic longing for someone or home', fr:'Nostalgie profonde mêlée d’amour et de manque', dEn:['Golden sunrise','Loud street party'], dFr:['Lever de soleil doré','Fête bruyante'], nEn:'One of the most famous untranslatable Romanian words — a bittersweet ache of love and distance.', nFr:'L’un des mots roumains intraduisibles les plus célèbres, entre tendresse et nostalgie.' },
+  { city:'🏯 Tokyo', loc:'ja-JP', w:'Komorebi (木漏れ日)', ph:'ko-mo-reh-bee', en:'Sunlight filtering through tree leaves', fr:'La lumière du soleil filtrant à travers les feuilles', dEn:['Midnight ramen craving','Neon rain puddle'], dFr:['Envie de ramen à minuit','Flaque de pluie néon'], nEn:'Japanese captures fleeting moments of beauty in a single poetic noun.', nFr:'Le japonais capture la beauté éphémère de la nature en un seul mot poétique.' },
+  { city:'🗼 Paris', loc:'fr-FR', w:'Flâner', ph:'flah-nay', en:'To stroll aimlessly just to soak up the city', fr:'Se promener sans but précis pour savourer la ville', dEn:['To bake a custard pie','To skip the metro line'], dFr:['Cuisiner un flan','Sauter le tourniquet'], nEn:'The quintessential Parisian art of wandering along the Seine with zero rush.', nFr:'L’art parisien par excellence de déambuler sans montre ni destination.' },
+  { city:'🎭 Rio de Janeiro', loc:'pt-BR', w:'Cafuné', ph:'kah-foo-neh', en:'Tenderly running fingers through someone’s hair', fr:'Passer tendrement ses doigts dans les cheveux de quelqu’un', dEn:['Strong espresso shot','Beach sunset dance'], dFr:['Un café très serré','Une danse au coucher du soleil'], nEn:'A warm Brazilian Portuguese word for pure affection.', nFr:'Un mot brésilien rempli de douceur et d’affection.' },
+  { city:'⚡ Seoul', loc:'ko-KR', w:'Nunchi (눈치)', ph:'noon-chee', en:'Subtle social intuition to read the room', fr:'L’art subtil de ressentir l’ambiance et les non-dits', dEn:['Spicy midnight noodles','Snowy mountain view'], dFr:['Nouilles épicées','Vue sur la neige'], nEn:'Korean superpower for harmony, empathy, and effortless social grace.', nFr:'Super-pouvoir coréen d’empathie et d’intelligence sociale.' },
+  { city:'🚲 Amsterdam', loc:'nl-NL', w:'Gezelligheid', ph:'heh-zel-ikh-hite', en:'Cozy, warm togetherness with good company', fr:'Atmosphère chaleureuse et conviviale entre amis', dEn:['Fast bicycle lane','Canal bridge toll'], dFr:['Piste cyclable rapide','Péage de canal'], nEn:'The heart of Dutch culture — candles, laughter, and feeling right at home.', nFr:'Le cœur de la culture néerlandaise : bougies, rires et bien-être partagé.' },
+  { city:'☀️ Barcelona', loc:'es-ES', w:'Sobremesa', ph:'soh-breh-meh-sah', en:'Lingering at the table chatting long after dinner', fr:'S’attarder à table à discuter longtemps après le repas', dEn:['A marble tablecloth','Evening street market'], dFr:['Une nappe en marbre','Marché nocturne'], nEn:'In Spain, the best part of the meal begins after the plates are empty.', nFr:'En Espagne, le meilleur moment du repas commence une fois les assiettes vides.' },
+  { city:'🎧 Berlin', loc:'de-DE', w:'Feierabend', ph:'fye-er-ah-bent', en:'That sacred peaceful joy right after work ends', fr:'La joie libératrice de la fin de journée de travail', dEn:['Bonfire festival','Midnight train'], dFr:['Festival de feu','Train de minuit'], nEn:'Literally "celebration evening" — the German ritual of fully switching off.', nFr:'Littéralement « soirée de fête » : l’art allemand de déconnecter après le boulot.' },
+  { city:'🏛️ Rome', loc:'it-IT', w:'Sprezzatura', ph:'spret-sah-too-rah', en:'Effortless elegance that looks completely natural', fr:'L’élégance désinvolte qui paraît totalement naturelle', dEn:['Sparkling citrus soda','Ancient marble arch'], dFr:['Soda aux agrumes','Arche en marbre'], nEn:'Coined in Renaissance Italy — mastering style without ever seeming to try.', nFr:'Né en Italie à la Renaissance : la maîtrise du style sans effort apparent.' },
+  { city:'🏰 London', loc:'en-GB', w:'Chuffed', ph:'chuhft', en:'Really pleased and quietly proud', fr:'Super content et agréablement ravi', dEn:['Exhausted from rain','Lost in the Tube'], dFr:['Épuisé par la pluie','Perdu dans le métro'], nEn:'Quintessential British slang: "Proper chuffed with that!"', nFr:'Argot britannique classique pour exprimer une vraie joie simple.' },
+  { city:'🏯 Tokyo', loc:'ja-JP', w:'Tsundoku (積ん読)', ph:'tsoon-doh-koo', en:'Buying books and letting them pile up unread', fr:'Acheter des livres et les empiler sans les lire', dEn:['Origami crane art','Quiet tea ceremony'], dFr:['Art de l’origami','Cérémonie du thé'], nEn:'Every book lover around the world immediately relates to this Tokyo gem.', nFr:'Tous les amoureux des livres se reconnaissent instantanément dans ce mot.' },
+  { city:'🕌 Istanbul', loc:'tr-TR', w:'Keyif', ph:'keh-yeef', en:'Pure relaxed enjoyment of the present moment', fr:'Plaisir paisible de savourer pleinement l’instant', dEn:['Strong Turkish spice','Bosphorus ferry bell'], dFr:['Épice turque','Cloche du ferry'], nEn:'Sipping tea by the Bosphorus with zero worries — pure keyif.', nFr:'Siroter un thé face au Bosphore sans aucun souci : le pur keyif.' },
+  { city:'🚋 Lisbon', loc:'pt-PT', w:'Desenrascanço', ph:'deh-zen-rash-kan-soo', en:'Cleverly improvising a solution out of nowhere', fr:'L’art ingénieux de se débrouiller avec les moyens du bord', dEn:['Steep tram hill','Atlantic sea breeze'], dFr:['Colline de tramway','Brise de l’Atlantique'], nEn:'Portuguese art of MacGyver-style creative problem solving.', nFr:'L’art portugais de trouver une solution brillante à la dernière seconde.' },
+  { city:'⚜️ Montréal', loc:'fr-CA', w:'Placoter', ph:'plah-koh-teh', en:'To chat happily and gossip for hours', fr:'Bavarder joyeusement pendant des heures', dEn:['To shovel fresh snow','To skate on a pond'], dFr:['Pelleter la neige','Patiner sur un lac'], nEn:'Grab a coffee in the Plateau and placoter all afternoon!', nFr:'Prendre un café sur le Plateau et placoter tout l’après-midi !' }
+];
+
+document.getElementById('hdrTitle').textContent = IS_FR ? 'Mot du Jour · Villes du Monde' : 'World City Word of the Day';
+document.getElementById('hdrSub').textContent = IS_FR ? 'Argot & mots intraduisibles locaux' : 'Local slang & untranslatable expressions';
+document.getElementById('btnSpeak').textContent = IS_FR ? '🔊 Prononciation' : '🔊 Listen';
+document.getElementById('quizQ').textContent = IS_FR ? 'Devinez la vraie signification :' : 'Guess the real meaning:';
+document.getElementById('btnNext').textContent = IS_FR ? '🎲 Autre Ville' : '🎲 Another City';
+
+const dayNum = Math.floor(Date.now() / 86400000);
+let idx = dayNum % WORDS.length;
+let streak = 0;
+let answered = false;
+
+function speakCurrent(){
+  const it = WORDS[idx];
+  try {
+    if (!('speechSynthesis' in window)) return;
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(it.w.replace(/\s*\([^)]*\)/g, ''));
+    u.lang = it.loc || 'en-US';
+    u.rate = 0.9;
+    window.speechSynthesis.speak(u);
+  } catch (e) {}
+}
+
+function renderWord(){
+  answered = false;
+  const it = WORDS[idx];
+  document.getElementById('cityPill').textContent = it.city;
+  document.getElementById('wordTxt').textContent = it.w;
+  document.getElementById('wordPh').textContent = '/' + it.ph + '/';
+  const note = document.getElementById('noteBox');
+  note.style.display = 'none';
+  note.textContent = '';
+
+  const correct = IS_FR ? it.fr : it.en;
+  const distractors = IS_FR ? it.dFr : it.dEn;
+  const opts = [
+    { txt: correct, ok: true },
+    { txt: distractors[0], ok: false },
+    { txt: distractors[1], ok: false }
+  ].sort(() => Math.random() - 0.5);
+
+  const list = document.getElementById('qList');
+  list.innerHTML = '';
+  opts.forEach(o => {
+    const b = document.createElement('button');
+    b.className = 'qbtn';
+    b.textContent = o.txt;
+    b.onclick = () => {
+      if (answered) return;
+      answered = true;
+      if (o.ok) {
+        streak++;
+        b.classList.add('ok');
+      } else {
+        streak = 0;
+        b.classList.add('bad');
+        list.querySelectorAll('.qbtn').forEach(el => { if (el.textContent === correct) el.classList.add('ok'); });
+      }
+      document.getElementById('scorePill').textContent = '🔥 ' + streak;
+      note.style.display = 'block';
+      note.textContent = '✨ ' + (IS_FR ? it.nFr : it.nEn);
+    };
+    list.appendChild(b);
+  });
+}
+
+document.getElementById('btnSpeak').addEventListener('click', speakCurrent);
+document.getElementById('btnNext').addEventListener('click', () => { idx = (idx + 1) % WORDS.length; renderWord(); });
+document.getElementById('btnShare').addEventListener('click', () => {
+  const it = WORDS[idx];
+  const meaning = IS_FR ? it.fr : it.en;
+  const txt = IS_FR
+    ? '🗣️ Mot du jour (' + it.city + ') : « ' + it.w + ' » = ' + meaning + ' ! Quel est le meilleur mot de votre ville ?'
+    : '🗣️ Word of the day (' + it.city + '): "' + it.w + '" = ' + meaning + '! What is the best local word in your city?';
+  shareToRemo({
+    badge: '🗣️ WORD OF THE DAY · ' + it.city,
+    title: it.w,
+    subtitle: '/' + it.ph + '/',
+    summaryText: txt,
+    accentColor: '#ec4899'
+  });
+});
+renderWord();
+
+</script>
+</body>
+</html>

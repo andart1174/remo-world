@@ -350,12 +350,15 @@ async function firestoreVaultDelete(postId) {
   return { ok: res.statusCode === 200 || res.statusCode === 404 };
 }
 
-function signVaultTicket({ postId, cityId = 'montreal', lang = 'en', isArcadeGame = false }) {
+function signVaultTicket({ postId, cityId = 'montreal', viewerCityId = '', lang = 'en', isArcadeGame = false }) {
   const secret = getVaultSecret();
   if (!secret || secret.length < 16) throw new Error('REMO_VAULT_SECRET not configured');
+  const safeCity = String(cityId || 'montreal').toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 32) || 'montreal';
+  const safeViewerCity = String(viewerCityId || safeCity).toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 32) || safeCity;
   const payload = {
     p: String(postId),
-    c: String(cityId || 'montreal').toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 32) || 'montreal',
+    c: safeCity,
+    vc: safeViewerCity,
     l: lang === 'fr' ? 'fr' : 'en',
     g: isArcadeGame ? 1 : 0,
     e: Date.now() + TICKET_TTL_MS,
@@ -394,6 +397,7 @@ function buildShieldedInnerHtml(rawHtml, ctx = {}) {
   if (!html) return '';
 
   const cityMeta = REMO_CITIES_COORDS[String(ctx.cityId || 'montreal').toLowerCase()] || REMO_CITIES_COORDS.montreal;
+  const viewerMeta = REMO_CITIES_COORDS[String(ctx.viewerCityId || ctx.cityId || 'montreal').toLowerCase()] || cityMeta;
   const lang = ctx.lang === 'fr' ? 'fr' : 'en';
   const safePid = String(ctx.postId || '').replace(/[^a-zA-Z0-9_-]/g, '');
   const contextPayload = JSON.stringify({
@@ -405,6 +409,13 @@ function buildShieldedInnerHtml(rawHtml, ctx = {}) {
     cityFlag: cityMeta.flag,
     lat: cityMeta.lat,
     lng: cityMeta.lng,
+    viewerCityId: viewerMeta.id,
+    viewerCityName: lang === 'fr' ? viewerMeta.name_fr : viewerMeta.name_en,
+    viewerCityNameEn: viewerMeta.name_en,
+    viewerCityNameFr: viewerMeta.name_fr,
+    viewerCityFlag: viewerMeta.flag,
+    viewerLat: viewerMeta.lat,
+    viewerLng: viewerMeta.lng,
     lang
   });
 
@@ -414,7 +425,10 @@ function buildShieldedInnerHtml(rawHtml, ctx = {}) {
     '*:not(input):not(textarea):not([contenteditable]){user-select:none!important;-webkit-user-select:none!important;-webkit-touch-callout:none!important;}' +
     '</style>';
 
-  const contextScript = `<script>(function(){try{Object.defineProperty(window,"REMO_CONTEXT",{value:Object.freeze(${contextPayload}),writable:false,configurable:false});}catch(e){window.REMO_CONTEXT=${contextPayload};}if(document.currentScript)document.currentScript.remove();})();</script>`;
+  const contextScript = `<script>(function(){try{Object.defineProperty(window,"REMO_CONTEXT",{value:Object.freeze(${contextPayload}),writable:false,configurable:false});}catch(e){window.REMO_CONTEXT=${contextPayload};}` +
+    `window.remoShareResult=function(p){try{parent.postMessage(Object.assign({type:"REMO_APP_SHARE",postId:${JSON.stringify(safePid)}},p||{}),"*");}catch(e){}};` +
+    `window.remoNotifyAudio=function(active){try{parent.postMessage({type:"REMO_APP_AUDIO_ACTIVE",postId:${JSON.stringify(safePid)},active:Boolean(active)},"*");}catch(e){}};` +
+    `if(document.currentScript)document.currentScript.remove();})();</script>`;
 
   const shieldAndFitScript = '<script>(function(){' +
     'var editable=function(t){return t&&(t.tagName==="INPUT"||t.tagName==="TEXTAREA"||t.isContentEditable);};' +

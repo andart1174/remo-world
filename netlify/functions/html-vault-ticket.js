@@ -44,6 +44,7 @@ exports.handler = async (event) => {
 
   let postId = '';
   let cityId = 'montreal';
+  let viewerCityId = '';
   let lang = 'en';
   let isArcadeGame = false;
 
@@ -52,6 +53,7 @@ exports.handler = async (event) => {
       const body = JSON.parse(event.body || '{}');
       postId = String(body.postId || '').trim();
       cityId = String(body.cityId || 'montreal').trim();
+      viewerCityId = String(body.viewerCityId || cityId || 'montreal').trim();
       lang = body.lang === 'fr' ? 'fr' : 'en';
       isArcadeGame = Boolean(body.isArcadeGame);
     } catch (e) {
@@ -61,6 +63,7 @@ exports.handler = async (event) => {
     const qs = (event && event.queryStringParameters) || {};
     postId = String(qs.postId || '').trim();
     cityId = String(qs.cityId || 'montreal').trim();
+    viewerCityId = String(qs.viewerCityId || qs.vc || cityId || 'montreal').trim();
     lang = qs.lang === 'fr' ? 'fr' : 'en';
     isArcadeGame = qs.g === '1' || qs.isArcadeGame === 'true';
   }
@@ -70,7 +73,7 @@ exports.handler = async (event) => {
   }
 
   try {
-    const ticket = signVaultTicket({ postId, cityId, lang, isArcadeGame });
+    const ticket = signVaultTicket({ postId, cityId, viewerCityId, lang, isArcadeGame });
     return jsonRes(200, {
       ok: true,
       configured: true,

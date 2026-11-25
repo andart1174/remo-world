@@ -11853,3 +11853,120 @@ select.remo-input option {
     display: none;
   }
 }
+
+/* ── ✨ Live Apps Toolbar Pill, Category Sub-Bar, Daily Drop & Social Share Modal ── */
+.live-apps-feed-pill {
+  border-color: rgba(167, 139, 250, 0.72) !important;
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.24), rgba(14, 165, 233, 0.22)) !important;
+  color: #e0e7ff !important;
+  font-weight: 900 !important;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.live-apps-feed-pill.active {
+  background: linear-gradient(135deg, #7c3aed, #0284c7) !important;
+  color: #fff !important;
+  box-shadow: 0 0 16px rgba(124, 58, 237, 0.55);
+}
+.live-apps-pill-badge {
+  padding: 1px 6px;
+  border-radius: 99px;
+  background: linear-gradient(135deg, #fbbf24, #f59e0b);
+  color: #050816;
+  font-size: 0.6rem;
+  font-weight: 900;
+  letter-spacing: 0.4px;
+}
+.live-apps-subbar {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.live-apps-cat-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.live-apps-drop-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: 13px;
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.14), rgba(124, 58, 237, 0.18));
+  border: 1px solid rgba(251, 191, 36, 0.45);
+  font-size: 0.78rem;
+  color: #f8fafc;
+}
+.live-app-studio-meta-box {
+  background: rgba(15, 23, 42, 0.72);
+  border: 1px solid rgba(167, 139, 250, 0.34);
+  border-radius: 12px;
+  padding: 9px 11px;
+  margin-bottom: 8px;
+}
+.pbadge.daily-drop {
+  background: linear-gradient(135deg, #fbbf24, #a855f7);
+  color: #050816;
+  font-weight: 900;
+  border: 1px solid rgba(254, 240, 138, 0.7);
+  box-shadow: 0 0 14px rgba(251, 191, 36, 0.45);
+}
+.pbadge.scheduled-drop {
+  background: rgba(14, 165, 233, 0.24);
+  color: #7dd3fc;
+  border: 1px solid rgba(56, 189, 248, 0.55);
+  font-weight: 900;
+}
+.live-app-share-preview {
+  border-radius: 16px;
+  padding: 16px;
+  margin-bottom: 12px;
+  background: radial-gradient(circle at top right, rgba(56, 189, 248, 0.22), rgba(15, 23, 42, 0.96));
+  border: 1px solid rgba(167, 139, 250, 0.45);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
+}
+.live-app-share-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 99px;
+  background: rgba(251, 191, 36, 0.18);
+  border: 1px solid rgba(251, 191, 36, 0.5);
+  color: #fde68a;
+  font-size: 0.7rem;
+  font-weight: 900;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+}
+.live-app-share-title-txt {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 1.02rem;
+  font-weight: 900;
+  color: #f8fafc;
+  margin-bottom: 4px;
+}
+.live-app-share-sub-txt {
+  font-size: 0.78rem;
+  color: #7dd3fc;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+.live-app-share-body-txt {
+  font-size: 0.84rem;
+  color: #e2e8f0;
+  line-height: 1.45;
+  background: rgba(2, 6, 23, 0.55);
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+}
+.live-app-share-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+

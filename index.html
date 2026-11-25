@@ -123,14 +123,14 @@
   <link rel="preconnect" href="https://firebasestorage.googleapis.com" crossorigin>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="preload" as="style" href="css/remo-core.css?v=160">
+  <link rel="preload" as="style" href="css/remo-core.css?v=161">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800;900&family=Orbitron:wght@700;900&display=swap" media="print" onload="this.media='all'">
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800;900&family=Orbitron:wght@700;900&display=swap"></noscript>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha384-sHL9NAb7lN7rfvG5lfHpm643Xkcjzp4jFvuavGOndn6pjVqS6ny56CAt3nsEVT4H" crossorigin="anonymous" media="print" onload="this.media='all'">
   <noscript><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha384-sHL9NAb7lN7rfvG5lfHpm643Xkcjzp4jFvuavGOndn6pjVqS6ny56CAt3nsEVT4H" crossorigin="anonymous"></noscript>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha384-cxOPjt7s7Iz04uaHJceBmS+qpjv2JkIHNVcuOrM+YHwZOmJGBXI00mdUXEq65HTH" crossorigin="anonymous" defer></script>
 
-  <link rel="stylesheet" href="css/remo-core.css?v=160">
+  <link rel="stylesheet" href="css/remo-core.css?v=161">
 </head>
 <body>
 
@@ -331,6 +331,7 @@
           <div class="clean-feed-toolbar">
             <div class="filter-row" id="feedModeChips">
               <button class="fchip active" onclick="setFeedMode('all', this)" data-i18n="filter_all">🌍 For You</button>
+              <button type="button" class="fchip live-apps-feed-pill" id="feedLiveAppsPill" onclick="setFeedMode('html', this)"><span data-i18n="filter_live_apps">✨ Live Apps</span><span class="live-apps-pill-badge" id="feedLiveAppsBadge" style="display:none;">DROP</span></button>
               <button class="fchip" onclick="openStoriesHubModal()" style="border-color:rgba(236,72,153,0.65);color:#f472b6;font-weight:900;" data-i18n="hdr_story_btn">📸 Story</button>
               <button type="button" class="fchip blitz-feed-pill" id="feedWorldBlitzPill" onclick="openWorldBlitzModal()"><span data-i18n="feed_blitz_pill">🧠 Blitz</span><span class="blitz-pill-status" id="feedBlitzPillStatus">5/5</span></button>
               <button type="button" class="fchip odyssey-feed-pill" id="feedRemoOdysseyPill" onclick="openRemoOdysseyModal()"><span data-i18n="feed_odyssey_pill">🧭 Odyssey</span><span class="odyssey-pill-tag" id="feedOdysseyPillBadge">4D</span></button>
@@ -404,6 +405,17 @@
               <button class="fchip" onclick="setFeedVibe('culture', this)" data-i18n="vibe_culture">🎭 Culture &amp; Art</button>
               <button class="fchip" onclick="setFeedVibe('food', this)" data-i18n="vibe_food">🍽️ Street Food</button>
             </div>
+          </div>
+
+          <div id="liveAppsSubbar" class="live-apps-subbar" style="display:none;">
+            <div class="live-apps-cat-row" id="liveAppsCatChips">
+              <button type="button" class="fchip active" onclick="setLiveAppCategory('all', this)" data-i18n="live_apps_cat_all">✨ All Apps</button>
+              <button type="button" class="fchip" onclick="setLiveAppCategory('planet', this)" data-i18n="live_apps_cat_planet">🌍 Planet &amp; Time</button>
+              <button type="button" class="fchip" onclick="setLiveAppCategory('culture', this)" data-i18n="live_apps_cat_culture">🧠 Daily Culture</button>
+              <button type="button" class="fchip" onclick="setLiveAppCategory('viral', this)" data-i18n="live_apps_cat_viral">⚡ Viral &amp; Tools</button>
+              <button type="button" class="fchip" onclick="setLiveAppCategory('game', this)" data-i18n="live_apps_cat_game">🎮 Arcade</button>
+            </div>
+            <div id="liveAppsDailyDropBanner" class="live-apps-drop-banner" style="display:none;"></div>
           </div>
 
           <div id="worldSpotlightBar" class="world-spotlight-bar" style="display:none;"></div>
@@ -1527,6 +1539,20 @@
               <button type="button" class="fchip" onclick="copilotGenerateCityHtmlGame('rhythm')">🎹 City Rhythm Piano</button>
             </div>
           </div>
+          <!-- 8 Official REMO Live Discovery Mini-Apps (1-Click Presets) -->
+          <div style="background:linear-gradient(135deg,rgba(139,92,246,0.12),rgba(14,165,233,0.1));border:1px solid rgba(167,139,250,0.42);border-radius:12px;padding:9px 10px;margin-bottom:8px;">
+            <div style="font-size:0.74rem;font-weight:900;color:#c4b5fd;margin-bottom:6px;" data-i18n="live_apps_studio_hdr">✨ REMO Live Discovery Apps (1-Click Load · EN/FR · Viewer City):</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;">
+              <button type="button" class="fchip" onclick="loadLiveDiscoveryAppPreset('time_portal')">📸 Time Portal 100y</button>
+              <button type="button" class="fchip" onclick="loadLiveDiscoveryAppPreset('nasa_birthday')">🔭 NASA Space Birthday</button>
+              <button type="button" class="fchip" onclick="loadLiveDiscoveryAppPreset('wiki_radar')">📍 Wikipedia Radar &lt;5km</button>
+              <button type="button" class="fchip" onclick="loadLiveDiscoveryAppPreset('wildlife_near')">🦜 Wildlife Near You</button>
+              <button type="button" class="fchip" onclick="loadLiveDiscoveryAppPreset('slang_word')">🗣️ Word of the Day</button>
+              <button type="button" class="fchip" onclick="loadLiveDiscoveryAppPreset('power_duel')">☕ 20$ Power Duel</button>
+              <button type="button" class="fchip" onclick="loadLiveDiscoveryAppPreset('ambient_studio')">🎧 Weather Ambient</button>
+              <button type="button" class="fchip" onclick="loadLiveDiscoveryAppPreset('cosmic_life')">🪐 Mars Age Counter</button>
+            </div>
+          </div>
         </div>
 
         <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
@@ -1544,6 +1570,29 @@
             <span data-i18n="create_html_arcade_toggle">🎮 Enable Arcade Game Mode (Top 3 Leaderboard &amp; Challenge)</span>
           </label>
           <div style="font-size:0.7rem;color:#94a3b8;margin-top:4px;line-height:1.35;" data-i18n="create_html_arcade_hint">Unchecked by default: displays cleanly like normal posts with only your own title &amp; caption. Check only for arcade games.</div>
+        </div>
+
+        <!-- Daily Drop, Category & Scheduled Reveal Controls -->
+        <div class="live-app-studio-meta-box">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:center;">
+            <div>
+              <label for="createHtmlAppCategory" style="font-size:0.7rem;font-weight:800;color:#93c5fd;display:block;margin-bottom:3px;" data-i18n="live_apps_cat_lbl">🗂️ Live App Category</label>
+              <select id="createHtmlAppCategory" class="remo-input" style="padding:7px 10px;font-size:0.78rem;">
+                <option value="planet">🌍 Planet &amp; Time</option>
+                <option value="culture">🧠 Daily Culture</option>
+                <option value="viral">⚡ Viral &amp; Tools</option>
+                <option value="game">🎮 Arcade Game</option>
+              </select>
+            </div>
+            <div>
+              <label for="createHtmlScheduleInp" style="font-size:0.7rem;font-weight:800;color:#fde68a;display:block;margin-bottom:3px;" data-i18n="live_apps_sched_lbl">⏰ Schedule Drop (Optional)</label>
+              <input type="datetime-local" id="createHtmlScheduleInp" class="remo-input" style="padding:6px 9px;font-size:0.76rem;">
+            </div>
+          </div>
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:0.76rem;font-weight:800;color:#fde047;margin-top:8px;">
+            <input type="checkbox" id="createHtmlDailyDropToggle" style="width:16px;height:16px;accent-color:#fbbf24;cursor:pointer;">
+            <span data-i18n="live_apps_daily_drop_toggle">✨ Pin as Official Drop of the Day (App du Jour · +5 PTS Daily Explorer)</span>
+          </label>
         </div>
 
         <textarea id="createHtmlCodeArea" class="code-editor-area" spellcheck="false" placeholder="<!DOCTYPE html>&#10;<html>...</html>"></textarea>
@@ -1798,6 +1847,22 @@
 
       <div id="createMediaPreviewStatus" style="font-size:0.78rem;color:#10b981;margin-bottom:10px;font-weight:700;"></div>
       <button type="button" id="btnPublishRemoPost" class="btn-cyber btn-gold" style="width:100%;justify-content:center;padding:13px;font-size:0.92rem;" onclick="publishNewRemoPost()" data-i18n="create_publish">🚀 Publish to REMO (+15 🪙)</button>
+    </div>
+  </div>
+
+  <!-- ✨ Live App Social Loop Share Modal (Comment Pre-Fill + 9:16 Story PNG Export) -->
+  <div class="remo-modal-backdrop" id="liveAppShareModal" onclick="if(event.target===this)closeLiveAppShareModal()">
+    <div class="remo-modal" style="max-width:440px;">
+      <div class="modal-hdr" style="margin-bottom:10px;">
+        <b style="font-family:'Orbitron',sans-serif;font-size:0.95rem;color:#38bdf8;" data-i18n="live_app_share_title">✨ Share Your Discovery</b>
+        <button type="button" class="modal-close" onclick="closeLiveAppShareModal()">✕</button>
+      </div>
+      <div id="liveAppSharePreviewCard" class="live-app-share-preview"></div>
+      <div class="live-app-share-actions">
+        <button type="button" class="btn-cyber" id="btnLiveAppShareComment" onclick="liveAppShareToComments()" style="width:100%;justify-content:center;" data-i18n="live_app_share_comment">💬 Post Result in Comments</button>
+        <button type="button" class="btn-cyber btn-gold" id="btnLiveAppShareStory" onclick="exportLiveAppShareStory916()" style="width:100%;justify-content:center;" data-i18n="live_app_share_story">📲 Export 9:16 Story Card (remoworld.com)</button>
+        <button type="button" class="btn-ghost" onclick="copyLiveAppShareText()" style="width:100%;justify-content:center;" data-i18n="live_app_share_copy">📋 Copy Result Text</button>
+      </div>
     </div>
   </div>
 
@@ -3013,15 +3078,16 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js" integrity="sha384-oFrOL1TiREYNET0lsYF3LjQuyi2gL7vhjH1X8vFr+umcmzAdPELopeSgbcrv4uRm" crossorigin="anonymous"></script>
 
   <!-- REMO Modular Engines -->
-  <script src="js/remo-i18n.js?v=160"></script>
-  <script src="js/remo-cities-data.js?v=160"></script>
-  <script src="js/remo-store.js?v=160"></script>
-  <script src="js/remo-card-engine.js?v=160"></script>
-  <script src="js/remo-radar-arena.js?v=160"></script>
-  <script src="js/remo-social-comms.js?v=160"></script>
-  <script src="js/remo-radio-engine.js?v=160"></script>
-  <script src="js/remo-focus-tv.js?v=160"></script>
-  <script src="js/remo-world-blitz.js?v=160"></script>
+  <script src="js/remo-i18n.js?v=161"></script>
+  <script src="js/remo-cities-data.js?v=161"></script>
+  <script src="js/remo-store.js?v=161"></script>
+  <script src="js/remo-card-engine.js?v=161"></script>
+  <script src="js/remo-radar-arena.js?v=161"></script>
+  <script src="js/remo-social-comms.js?v=161"></script>
+  <script src="js/remo-live-apps.js?v=161"></script>
+  <script src="js/remo-radio-engine.js?v=161"></script>
+  <script src="js/remo-focus-tv.js?v=161"></script>
+  <script src="js/remo-world-blitz.js?v=161"></script>
 
   <noscript>
     <nav aria-label="REMO World Static Directory" style="padding:20px;background:#050816;color:#f8fafc;">
