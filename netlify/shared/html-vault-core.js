@@ -14,7 +14,7 @@ const VAULT_COLLECTION = 'remo_html_vault';
 const ADMIN_EMAIL = 'andart1174@gmail.com';
 const GOOGLE_CERTS_URL = 'https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com';
 const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
-const TICKET_TTL_MS = 25000;
+const TICKET_TTL_MS = 10 * 60 * 1000; // 10 minutes (safe iframe-locked ephemeral ticket)
 const MAX_HTML_BYTES = 450 * 1024;
 
 const REMO_CITIES_COORDS = {
@@ -385,7 +385,7 @@ function verifyVaultTicket(ticketStr) {
   try {
     const payload = JSON.parse(Buffer.from(bodyB64, 'base64url').toString('utf8'));
     if (!payload || !isValidSafePostId(payload.p)) return { ok: false, reason: 'Invalid postId' };
-    if (!payload.e || Date.now() > Number(payload.e)) return { ok: false, reason: 'Ticket expired' };
+    if (!payload.e || Date.now() > Number(payload.e)) return { ok: false, reason: 'Ticket expired', postId: payload.p };
     return { ok: true, payload };
   } catch (e) {
     return { ok: false, reason: 'Corrupt payload' };
@@ -534,8 +534,15 @@ function buildProtectedHtmlEnvelope(rawHtml, ctx = {}) {
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="robots" content="noindex,nofollow"><style>html,body{margin:0;height:100%;background:#050816;color:#94a3b8;font-family:system-ui,sans-serif;overflow:hidden;user-select:none;}</style></head><body><script>(function(){try{var rf=String(document.referrer||"");var ok=window.top!==window.self&&/(^https?:\\/\\/(www\\.)?remoworld\\.com(\\/|$)|\\.netlify\\.app(\\/|$)|^https?:\\/\\/(localhost|127\\.0\\.0\\.1)(:|\\/|$))/i.test(rf);if(!ok){document.body.innerHTML='<div style="height:100vh;display:flex;align-items:center;justify-content:center;text-align:center;padding:24px;color:#38bdf8;font-weight:800;">🔒 Protected by REMO World™</div>';return;}var ${vK}=${JSON.stringify(keyHex)};var ${vC}=${JSON.stringify(chunks)};${vC}.sort(function(a,b){return a[0]-b[0];});var s="";for(var i=0;i<${vC}.length;i++)s+=${vC}[i][1];var bin=atob(s);var out=new Uint8Array(bin.length);for(var j=0;j<bin.length;j++){out[j]=bin.charCodeAt(j)^${vK}[j&15]^((j*31+17)&255);}var ${vF}=new TextDecoder("utf-8").decode(out);if(document.currentScript)document.currentScript.remove();document.open();document.write(${vF});document.close();}catch(e){document.body.innerHTML='<div style="height:100vh;display:flex;align-items:center;justify-content:center;color:#f87171;font-weight:700;">⚠️ Vault Error</div>';}})();</script></body></html>`;
 }
 
-function buildBlockedHtmlPage(reason = 'Protected by REMO World™') {
-  return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="robots" content="noindex,nofollow"><style>html,body{margin:0;height:100%;background:#050816;color:#e2e8f0;font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;text-align:center;user-select:none;}.box{padding:24px 28px;border:1px solid rgba(56,189,248,0.3);border-radius:16px;background:rgba(15,23,42,0.85);max-width:340px;}h3{margin:0 0 8px;color:#38bdf8;font-size:1rem;}p{margin:0;color:#94a3b8;font-size:0.82rem;}</style></head><body><div class="box"><h3>🔒 REMO Vault Protected</h3><p>${String(reason).replace(/[<>&"]/g, '')}</p></div></body></html>`;
+function buildBlockedHtmlPage(reason = 'Protected by REMO World™', opts = {}) {
+  const safeReason = String(reason).replace(/[<>&"]/g, '');
+  const retryable = Boolean(opts && opts.retryable);
+  const safePid = String((opts && opts.postId) || '').replace(/[^a-zA-Z0-9_-]/g, '');
+  const retryHtml = retryable
+    ? `<button type="button" onclick="try{parent.postMessage({type:'REMO_VAULT_RETRY',postId:'${safePid}'},'*');}catch(e){}" style="margin-top:12px;padding:7px 14px;border:none;border-radius:10px;background:linear-gradient(135deg,#0ea5e9,#6366f1);color:#fff;font-weight:800;font-size:0.78rem;cursor:pointer;">↻ Reload Mini-App</button>` +
+      `<script>(function(){try{if(window.top!==window.self){parent.postMessage({type:'REMO_VAULT_RETRY',postId:'${safePid}'},'*');}}catch(e){}})();</script>`
+    : '';
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="robots" content="noindex,nofollow"><style>html,body{margin:0;height:100%;background:#050816;color:#e2e8f0;font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;text-align:center;user-select:none;}.box{padding:24px 28px;border:1px solid rgba(56,189,248,0.3);border-radius:16px;background:rgba(15,23,42,0.85);max-width:340px;}h3{margin:0 0 8px;color:#38bdf8;font-size:1rem;}p{margin:0;color:#94a3b8;font-size:0.82rem;}</style></head><body><div class="box"><h3>🔒 REMO Vault Protected</h3><p>${safeReason}</p>${retryHtml}</div></body></html>`;
 }
 
 module.exports = {

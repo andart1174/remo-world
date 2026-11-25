@@ -45,7 +45,15 @@ exports.handler = async (event) => {
   const qs = (event && event.queryStringParameters) || {};
   const ticketRes = verifyVaultTicket(qs.t || '');
   if (!ticketRes.ok) {
-    return { statusCode: 403, headers: SECURITY_HEADERS, body: buildBlockedHtmlPage('Session expired — reload post on REMO World') };
+    const expired = ticketRes.reason === 'Ticket expired';
+    return {
+      statusCode: 403,
+      headers: SECURITY_HEADERS,
+      body: buildBlockedHtmlPage(
+        expired ? 'Session refreshed — reloading mini-app...' : 'Session expired — reload post on REMO World',
+        { retryable: expired, postId: ticketRes.postId || '' }
+      )
+    };
   }
 
   const { p: postId, c: cityId, vc: viewerCityId, l: lang, g: arcadeFlag } = ticketRes.payload;

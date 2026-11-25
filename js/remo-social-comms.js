@@ -2127,7 +2127,7 @@ function _renderPostMediaStageInner(p, city, lang) {
   // 1. LIVE INTERACTIVE HTML MINI-APP (Level 2 Server Vault / Ephemeral Blob Shield — Zero raw srcdoc!)
   if (typeof isHtmlAppPost === 'function' ? isHtmlAppPost(p) : (p.mediaType === 'html_app' && (p.hasVaultApp || p.vaultPayload || p.htmlCode))) {
     return `
-      <iframe class="html-post-frame" id="htmlFrame_${escapeHtmlStr(p.id)}" data-post-id="${escapeHtmlStr(p.id)}" data-vault-pending="1" sandbox="allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox" loading="lazy" scrolling="no" style="width:100%;height:100%;border:none;border-radius:12px;background:#050816;overflow:hidden;"></iframe>
+      <iframe class="html-post-frame" id="htmlFrame_${escapeHtmlStr(p.id)}" data-post-id="${escapeHtmlStr(p.id)}" data-vault-pending="1" sandbox="allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox" scrolling="no" style="width:100%;height:100%;border:none;border-radius:12px;background:#050816;overflow:hidden;"></iframe>
     `;
   }
 
@@ -3237,6 +3237,13 @@ function stepDesktopStagePost(delta) {
   const target = cards[nextIdx];
   if (!target) return;
   dismissStageOnboardingHint();
+  if (typeof hydrateAllHtmlVaultFrames === 'function') {
+    const tf = target.querySelector('iframe.html-post-frame[data-vault-pending="1"]');
+    if (tf) {
+      const tPost = findFeedPostById(tf.getAttribute('data-post-id'));
+      if (tPost && isHtmlAppPost(tPost)) hydrateHtmlVaultFrame(tf, tPost);
+    }
+  }
   grid.scrollTo({ top: target.offsetTop || 0, behavior: 'smooth' });
   if (nextIdx >= cards.length - 3) {
     triggerInfiniteFeedLoad(true);
@@ -14039,13 +14046,66 @@ async function hydrateHtmlVaultFrame(iframeEl, post) {
   }
 }
 
+let _htmlVaultLazyObserver = null;
+function _ensureHtmlVaultLazyObserver() {
+  if (_htmlVaultLazyObserver || typeof IntersectionObserver === 'undefined') return _htmlVaultLazyObserver;
+  _htmlVaultLazyObserver = new IntersectionObserver((entries) => {
+    entries.forEach((entry) => {
+      if (!entry.isIntersecting) return;
+      const fr = entry.target;
+      if (!fr) return;
+      _htmlVaultLazyObserver.unobserve(fr);
+      if (fr.getAttribute('data-vault-pending') !== '1') return;
+      const pid = fr.getAttribute('data-post-id');
+      const post = pid ? findFeedPostById(pid) : null;
+      if (post && isHtmlAppPost(post)) {
+        hydrateHtmlVaultFrame(fr, post);
+      }
+    });
+  }, { root: null, rootMargin: '420px 0px', threshold: 0.01 });
+  return _htmlVaultLazyObserver;
+}
+
 function hydrateAllHtmlVaultFrames(rootEl = document) {
   const scope = rootEl || document;
+  const obs = _ensureHtmlVaultLazyObserver();
+  const vh = window.innerHeight || 900;
   scope.querySelectorAll('iframe.html-post-frame[data-vault-pending="1"]').forEach((fr) => {
     const pid = fr.getAttribute('data-post-id');
     const post = pid ? findFeedPostById(pid) : null;
-    if (post && isHtmlAppPost(post)) {
+    if (!post || !isHtmlAppPost(post)) return;
+    if (!obs) {
       hydrateHtmlVaultFrame(fr, post);
+      return;
+    }
+    const r = fr.getBoundingClientRect();
+    const isNearViewport = r.width > 0 && r.height > 0 && r.top < (vh + 420) && r.bottom > -420;
+    if (isNearViewport) {
+      hydrateHtmlVaultFrame(fr, post);
+    } else {
+      obs.observe(fr);
+    }
+  });
+}
+
+// Self-Healing Vault Ticket Retry: if an old tab wakes up with an expired ticket, silently issue a fresh ticket
+if (typeof window !== 'undefined' && window.addEventListener && !window._remoVaultRetryBound) {
+  window._remoVaultRetryBound = true;
+  window.addEventListener('message', (ev) => {
+    const d = ev && ev.data;
+    if (!d || d.type !== 'REMO_VAULT_RETRY') return;
+    const frames = Array.from(document.querySelectorAll('iframe.html-post-frame, iframe#htmlFsIframe'));
+    const sender = frames.find((fr) => fr.contentWindow === ev.source);
+    if (!sender) return;
+    const retries = Number(sender.getAttribute('data-vault-retries') || 0);
+    if (retries >= 2) return;
+    sender.setAttribute('data-vault-retries', String(retries + 1));
+    const pid = String(d.postId || sender.getAttribute('data-post-id') || '');
+    const post = pid ? findFeedPostById(pid) : null;
+    if (post && isHtmlAppPost(post)) {
+      sender.setAttribute('data-vault-pending', '1');
+      sender.removeAttribute('data-vault-hydrated');
+      hydrateHtmlVaultFrame(sender, post);
     }
   });
 }
