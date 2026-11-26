@@ -2154,6 +2154,11 @@ const REMO_WEATHER = {
     if (!city || !city.id || typeof fetch === 'undefined') return;
     const cached = this._liveCache[city.id];
     if (cached && Date.now() - cached.ts < 15 * 60000) return;
+    if (!this._weatherBootDeferred) {
+      this._weatherBootDeferred = true;
+      setTimeout(() => this.hydrateAllCitiesBatch(), 1200);
+      return;
+    }
     this.hydrateAllCitiesBatch();
   },
 

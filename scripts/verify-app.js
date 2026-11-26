@@ -316,6 +316,15 @@ async function runStoreSimulations() {
   assert.ok(parisCityHtml.includes('https://remoworld.com/img/cities/paris.jpg'), 'cities/paris.html must use city-specific og:image');
   assert.ok(idxHtml.slice(idxHtml.indexOf('<body'), idxHtml.lastIndexOf('<noscript>')).includes('href="cities/montreal.html"'), 'index.html must include crawlable city hub links inside <body> outside <noscript>');
 
+  // 6C. Verify Performance (Faza 1), Decluttered UI (Faza 2) & Growth Loops (Faza 3)
+  assert.ok(idxHtml.includes('<script defer src="js/remo-social-comms.js?v='), 'Core scripts must load non-blocking with defer');
+  assert.ok(!idxHtml.includes('<script src="js/remo-focus-tv.js'), 'Heavy secondary engines must lazy-load via ensureRemoEngineLoaded instead of blocking initial boot');
+  assert.ok(comms.includes('function ensureRemoEngineLoaded(') && comms.includes('function scheduleIdleEnginePrefetch('), 'Lazy engine loader + idle prefetch must exist');
+  assert.ok(comms.includes('function openRemoDailyChallengeModal') || comms.includes('window.openRemoDailyChallengeModal ='), 'Daily 30s City Challenge modal must exist');
+  assert.ok(!comms.includes('openVipInviteWelcomeModal(false);\n          }\n        }, 680);'), 'Unprompted 680ms VIP modal popup must stay disabled on organic visits');
+  const cssSrc = read('css/remo-core.css');
+  assert.ok(cssSrc.includes('bottom: 174px !important;'), 'Mobile Before/After slider labels must clear the bottom caption overlay');
+
   // Verify non-admin cannot bypass GeoVault distance via simulated flag
   STORE.fbAuth = { currentUser: { uid: 'citizen1', email: 'citizen@example.com', emailVerified: true } };
   STORE.state.geoVaults = [{ id: 'gv_test_1', cityId: 'montreal', lat: 45.5017, lng: -73.5673, radiusMeters: 350, coinsReward: 250, unlockedBy: [] }];

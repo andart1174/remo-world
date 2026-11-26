@@ -4654,6 +4654,9 @@ function claimConcludedAuction(aucId) {
 window.claimConcludedAuction = claimConcludedAuction;
 
 function updateLiveAuctionCountdowns() {
+  if (typeof document !== 'undefined' && document.hidden) return;
+  const aucView = document.getElementById('view-auctions');
+  if (!aucView || !aucView.classList.contains('active')) return;
   const elements = document.querySelectorAll('.auc-timer-text');
   if (!elements || elements.length === 0) return;
   const now = Date.now();

@@ -11741,10 +11741,13 @@ select.remo-input option {
   #view-feed.active .post-card.is-before-after .ba-badge-before,
   #view-feed.active .post-card.is-before-after .ba-badge-after,
   #view-feed.active .post-card.is-before-after .ba-autoslide-btn {
-    bottom: 94px !important;
+    bottom: 174px !important;
+    z-index: 15 !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
   }
   #view-feed.active .post-card.is-before-after .ba-badge-after {
-    right: 60px !important;
+    right: 58px !important;
   }
   #view-feed.active .post-card.is-html-app .post-media-wrap {
     padding: 86px 0 74px !important;
@@ -11999,5 +12002,136 @@ select.remo-input option {
   gap: 6px;
   flex-shrink: 0;
 }
+
+/* ══════════════════════════════════════════════════════════════════════
+   ⚡ v165 PERFORMANCE, DECLUTTERED DESKTOP/MOBILE CHROME & GROWTH UX
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* 1. GPU Scroll Boost: avoid heavy per-card backdrop-filter blur during scrolling */
+.glass-box,
+.post-card,
+.pbadge,
+.weather-chip,
+.fchip,
+.city-tag,
+.toolbar-util-pill,
+.ba-badge-before,
+.ba-badge-after,
+.ba-autoslide-btn {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* 2. Desktop Declutter: spacious search bar, slim 1-row Welcome strip & full above-the-fold 4D card */
+@media (min-width: 861px) {
+  .remo-header {
+    gap: 10px;
+    padding: 8px 16px;
+  }
+  .header-search {
+    flex: 1 1 250px;
+    min-width: 210px;
+    max-width: 420px;
+  }
+  .header-right {
+    gap: 6px;
+    flex-shrink: 0;
+  }
+  .header-right .btn-ghost,
+  .header-right .btn-cyber {
+    padding: 6px 10px;
+    font-size: 0.78rem;
+  }
+  #remoWelcomeHeroStrip.welcome-hero-strip {
+    padding: 7px 32px 7px 12px;
+    margin-bottom: 6px;
+    gap: 8px;
+    flex-wrap: nowrap;
+    border-radius: 12px;
+  }
+  #remoWelcomeHeroStrip .welcome-hero-kicker {
+    display: none;
+  }
+  #remoWelcomeHeroStrip .welcome-hero-title {
+    font-size: 0.76rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  #remoWelcomeHeroStrip .welcome-hero-actions {
+    flex-wrap: nowrap;
+    flex-shrink: 0;
+    gap: 5px;
+  }
+  #remoWelcomeHeroStrip .welcome-hero-actions button {
+    padding: 5px 9px;
+    font-size: 0.72rem;
+    white-space: nowrap;
+  }
+  .clean-feed-toolbar {
+    margin-bottom: 6px;
+  }
+}
+
+/* 3. Mobile Declutter: airy 4-button top header with comfortable touch targets (zero cramming!) */
+@media (max-width: 860px) {
+  body:has(#view-feed.active) .remo-header {
+    min-height: 48px !important;
+    padding: 4px 10px !important;
+  }
+  body:has(#view-feed.active) .remo-header .lang-switch,
+  body:has(#view-feed.active) .remo-header .coin-pill {
+    display: none !important;
+  }
+  body:has(#view-feed.active) .header-right {
+    gap: 6px !important;
+  }
+  body:has(#view-feed.active) .header-right button {
+    min-height: 34px !important;
+    padding: 5px 10px !important;
+    font-size: 0.74rem !important;
+  }
+  #view-feed.active .post-badges-top {
+    top: 86px !important;
+  }
+  #view-feed.active .tk-ov-caption {
+    font-size: 0.78rem !important;
+    line-height: 1.3 !important;
+  }
+}
+
+/* 4. Growth & Retention: Daily 60s City Challenge + Emoji Share Card */
+.daily-challenge-pill {
+  border-color: rgba(251, 191, 36, 0.58) !important;
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.16), rgba(244, 63, 94, 0.14)) !important;
+  color: #fde68a !important;
+  font-weight: 900 !important;
+}
+.daily-challenge-result-card {
+  background: linear-gradient(145deg, rgba(15, 23, 42, 0.96), rgba(30, 27, 75, 0.9));
+  border: 1px solid rgba(251, 191, 36, 0.45);
+  border-radius: 16px;
+  padding: 16px;
+  text-align: center;
+}
+.daily-emoji-grid {
+  font-size: 1.35rem;
+  letter-spacing: 3px;
+  margin: 10px 0;
+  padding: 10px;
+  border-radius: 12px;
+  background: rgba(2, 6, 23, 0.75);
+  border: 1px solid rgba(56, 189, 248, 0.28);
+  font-family: monospace;
+}
+
 
 

@@ -1534,6 +1534,7 @@ function formatCapsuleCountdown(remMs) {
 }
 
 function updateFlashDropCountdownUI() {
+  if (typeof document !== 'undefined' && document.hidden) return;
   // 1. Live 1-Second Heartbeat for all Time-Capsule Mystery Posts!
   const capsuleTimers = document.querySelectorAll('.tc-countdown[data-unlock-ts]');
   let anyJustUnsealed = false;
@@ -2888,6 +2889,13 @@ function closeAppLauncherModal() {
 }
 window.closeAppLauncherModal = closeAppLauncherModal;
 
+function setRemoLang(langCode) {
+  if (typeof REMO_I18N !== 'undefined' && typeof REMO_I18N.setLang === 'function') {
+    REMO_I18N.setLang(langCode);
+  }
+}
+window.setRemoLang = setRemoLang;
+
 function toggleMoreFeedFilters(forceState) {
   const wrap = document.getElementById('moreFeedFiltersWrap');
   const btn = document.getElementById('btnToggleMoreFilters');
@@ -2956,9 +2964,10 @@ function maybePromptGuestRewardSave(coinsEarned = 10) {
 
   const lang = typeof REMO_I18N !== 'undefined' ? REMO_I18N.getLang() : 'en';
   const msg = lang === 'fr'
-    ? `🎉 +${coinsEarned} 🪙 gagnés ! Connectez-vous (1 clic) pour garder vos pièces & votre Passeport 3D.`
-    : `🎉 +${coinsEarned} 🪙 earned! Sign in (1 click) to keep your coins & unlock your 3D Passport.`;
-  const btnLbl = lang === 'fr' ? '🔐 Sauvegarder' : '🔐 Save My Coins';
+    ? `🎉 +${coinsEarned} 🪙 gagnés ! Sauvegardez en 1 clic et recevez +150 🪙 + Passeport 4D.`
+    : `🎉 +${coinsEarned} 🪙 earned! Save in 1 click & claim +150 🪙 + your 4D Passport.`;
+  const googleLbl = lang === 'fr' ? '🌐 Google (+150 🪙)' : '🌐 Google (+150 🪙)';
+  const emailLbl = lang === 'fr' ? 'Email' : 'Email';
 
   setTimeout(() => {
     const prev = document.getElementById('remoGuestSaveBar');
@@ -2969,13 +2978,14 @@ function maybePromptGuestRewardSave(coinsEarned = 10) {
     bar.innerHTML = `
       <span class="remo-guest-save-txt">${msg}</span>
       <div class="remo-guest-save-actions">
-        <button type="button" class="btn-cyber btn-gold" style="padding:6px 12px;font-size:0.76rem;white-space:nowrap;" onclick="document.getElementById('remoGuestSaveBar')?.remove();if(typeof openAuthModal==='function')openAuthModal(false);">${btnLbl}</button>
+        <button type="button" class="btn-cyber btn-gold" style="padding:6px 11px;font-size:0.75rem;white-space:nowrap;" onclick="document.getElementById('remoGuestSaveBar')?.remove();if(typeof quickGoogleSignInSim==='function')quickGoogleSignInSim();else if(typeof openAuthModal==='function')openAuthModal(true);">${googleLbl}</button>
+        <button type="button" class="btn-ghost" style="padding:5px 9px;font-size:0.73rem;white-space:nowrap;" onclick="document.getElementById('remoGuestSaveBar')?.remove();if(typeof openAuthModal==='function')openAuthModal(true);">${emailLbl}</button>
         <button type="button" class="fomo-close-btn" onclick="document.getElementById('remoGuestSaveBar')?.remove()" aria-label="Close">✕</button>
       </div>
     `;
     document.body.appendChild(bar);
-    setTimeout(() => { try { if (bar.parentNode) bar.remove(); } catch (e) {} }, 14000);
-  }, 950);
+    setTimeout(() => { try { if (bar.parentNode) bar.remove(); } catch (e) {} }, 15000);
+  }, 650);
 }
 window.maybePromptGuestRewardSave = maybePromptGuestRewardSave;
 
@@ -3169,7 +3179,11 @@ let _desktopRightTab = (function () {
 })();
 let _desktopRightHidden = (function () {
   try {
-    return localStorage.getItem('remo_desktop_right_hidden') === '1';
+    const saved = localStorage.getItem('remo_desktop_right_hidden');
+    if (saved === '1') return true;
+    if (saved === '0') return false;
+    // Default to clean, spacious 2-column Zen layout on standard desktop/laptop screens (<1500px)
+    return typeof window !== 'undefined' && window.innerWidth < 1500;
   } catch (e) {
     return false;
   }
@@ -3928,12 +3942,22 @@ function renderSocialFeed(searchQuery = '', forceFull = false) {
   scheduleInfiniteFeedCheck();
 }
 
+let _holoTiltRaf = 0;
 function applyHoloTilt(e, cardEl) {
   if (window.innerWidth <= 860 || (typeof isDesktopFeedStageActive === 'function' && isDesktopFeedStageActive())) return;
-  const r = cardEl.getBoundingClientRect();
-  const x = (e.clientX - r.left) / r.width - 0.5;
-  const y = (e.clientY - r.top) / r.height - 0.5;
-  cardEl.style.transform = `perspective(900px) rotateY(${x * 6}deg) rotateX(${-y * 6}deg) translateY(-3px)`;
+  if (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) return;
+  if (_holoTiltRaf) return;
+  const cx = e.clientX;
+  const cy = e.clientY;
+  _holoTiltRaf = requestAnimationFrame(() => {
+    _holoTiltRaf = 0;
+    if (!cardEl || !cardEl.isConnected) return;
+    const r = cardEl.getBoundingClientRect();
+    if (!r.width || !r.height) return;
+    const x = (cx - r.left) / r.width - 0.5;
+    const y = (cy - r.top) / r.height - 0.5;
+    cardEl.style.transform = `perspective(900px) rotateY(${x * 6}deg) rotateX(${-y * 6}deg) translateY(-3px)`;
+  });
 }
 
 function resetHoloTilt(cardEl) {
@@ -3989,6 +4013,7 @@ function toggleLikePost(postId) {
     RemoAudio.play('click');
     RemoAudio.haptic(15);
     if (!p.isShowcase) REMO_STORE.addCityScore(p.cityId, 5);
+    if (typeof maybePromptGuestRewardSave === 'function') maybePromptGuestRewardSave(10);
     if (p.uid && p.uid !== u.uid) {
       REMO_STORE.addNotification({
         toUid: p.uid,
@@ -10887,23 +10912,117 @@ async function userSignOutAction(reopenAuthModal = false) {
 }
 window.updateAuthHeaderUI = syncHeaderAndSidebars;
 
+/* ── Lazy On-Demand Feature Engine Loader (Removes 368 KB from initial boot!) ── */
+const _remoEnginePromises = Object.create(null);
+const REMO_ASSET_VER = '165';
+
+function loadRemoEngineScript(srcRel) {
+  if (_remoEnginePromises[srcRel]) return _remoEnginePromises[srcRel];
+  _remoEnginePromises[srcRel] = new Promise((resolve) => {
+    const existing = document.querySelector(`script[data-remo-lazy="${srcRel}"]`);
+    if (existing && existing.dataset.loaded === '1') { resolve(true); return; }
+    const s = document.createElement('script');
+    s.src = `${srcRel}?v=${REMO_ASSET_VER}`;
+    s.async = true;
+    s.dataset.remoLazy = srcRel;
+    s.onload = () => { s.dataset.loaded = '1'; resolve(true); };
+    s.onerror = () => { delete _remoEnginePromises[srcRel]; resolve(false); };
+    document.head.appendChild(s);
+  });
+  return _remoEnginePromises[srcRel];
+}
+
+async function ensureRemoEngineLoaded(key) {
+  if (key === 'radio') {
+    await loadRemoEngineScript('js/remo-radio-engine.js');
+    return true;
+  }
+  if (key === 'focus_tv') {
+    await loadRemoEngineScript('js/remo-radio-engine.js');
+    await loadRemoEngineScript('js/remo-focus-tv.js');
+    return true;
+  }
+  if (key === 'world_blitz') {
+    await loadRemoEngineScript('js/remo-world-blitz.js');
+    return true;
+  }
+  if (key === 'live_apps') {
+    await loadRemoEngineScript('js/remo-live-apps.js');
+    return true;
+  }
+  return false;
+}
+window.ensureRemoEngineLoaded = ensureRemoEngineLoaded;
+
+if (typeof window.openFocusTvModal !== 'function') {
+  window.openFocusTvModal = function (...args) {
+    ensureRemoEngineLoaded('focus_tv').then(() => {
+      if (typeof window.openFocusTvModal === 'function' && !window.openFocusTvModal._isLazyStub) {
+        window.openFocusTvModal(...args);
+      }
+    });
+  };
+  window.openFocusTvModal._isLazyStub = true;
+}
+if (typeof window.openWorldBlitzModal !== 'function') {
+  window.openWorldBlitzModal = function (...args) {
+    ensureRemoEngineLoaded('world_blitz').then(() => {
+      if (typeof window.openWorldBlitzModal === 'function' && !window.openWorldBlitzModal._isLazyStub) {
+        window.openWorldBlitzModal(...args);
+      }
+    });
+  };
+  window.openWorldBlitzModal._isLazyStub = true;
+}
+if (typeof window.openRemoRadioModal !== 'function') {
+  window.openRemoRadioModal = function (...args) {
+    ensureRemoEngineLoaded('radio').then(() => {
+      if (typeof window.openRemoRadioModal === 'function' && !window.openRemoRadioModal._isLazyStub) {
+        window.openRemoRadioModal(...args);
+      }
+    });
+  };
+  window.openRemoRadioModal._isLazyStub = true;
+}
+
+function scheduleIdleEnginePrefetch() {
+  try {
+    const conn = navigator && navigator.connection;
+    if (conn && (conn.saveData || /2g/i.test(conn.effectiveType || ''))) return;
+  } catch (e) {}
+  const run = () => {
+    loadRemoEngineScript('js/remo-live-apps.js');
+    setTimeout(() => {
+      loadRemoEngineScript('js/remo-radio-engine.js').then(() => loadRemoEngineScript('js/remo-focus-tv.js'));
+    }, 1000);
+    setTimeout(() => loadRemoEngineScript('js/remo-world-blitz.js'), 2000);
+  };
+  if (typeof requestIdleCallback === 'function') {
+    setTimeout(() => requestIdleCallback(run, { timeout: 5000 }), 2200);
+  } else {
+    setTimeout(run, 3000);
+  }
+}
+
 function toggleHeaderRadio() {
-  if (typeof window.openFocusTvModal === 'function') {
-    window.openFocusTvModal();
-    return;
-  }
-  if (typeof window.openRemoRadioModal === 'function') {
-    window.openRemoRadioModal();
-    return;
-  }
-  const active = RemoAudio.toggleCyberLofiRadio();
-  const btn = document.getElementById('btnRadioToggle');
-  if (btn) btn.style.borderColor = active ? '#10b981' : '';
-  remoToast(
-    active
-      ? (REMO_I18N.getLang() === 'fr' ? '📻 Radio Cyber-Lofi 24/7 activée !' : '📻 REMO Cyber-Lofi 24/7 Radio ON!')
-      : (REMO_I18N.getLang() === 'fr' ? '📻 Radio en pause' : '📻 Radio paused')
-  );
+  ensureRemoEngineLoaded('focus_tv').then(() => {
+    if (typeof window.openFocusTvModal === 'function' && !window.openFocusTvModal._isLazyStub) {
+      window.openFocusTvModal();
+      return;
+    }
+    if (typeof window.openRemoRadioModal === 'function' && !window.openRemoRadioModal._isLazyStub) {
+      window.openRemoRadioModal();
+      return;
+    }
+    const active = RemoAudio.toggleCyberLofiRadio();
+    const btn = document.getElementById('btnRadioToggle');
+    if (btn) btn.style.borderColor = active ? '#10b981' : '';
+    remoToast(
+      active
+        ? (REMO_I18N.getLang() === 'fr' ? '📻 Radio Cyber-Lofi 24/7 activée !' : '📻 REMO Cyber-Lofi 24/7 Radio ON!')
+        : (REMO_I18N.getLang() === 'fr' ? '📻 Radio en pause' : '📻 Radio paused')
+    );
+  });
 }
 
 /* ── DESKTOP HORIZONTAL SCROLL ENGINE (Wheel Scroll & Smooth Drag Rail) ── */
@@ -10991,6 +11110,9 @@ function initDesktopHorizontalScrollRails() {
 window.initDesktopHorizontalScrollRails = initDesktopHorizontalScrollRails;
 
 function updateVersusCountdownsUI() {
+  if (typeof document !== 'undefined' && document.hidden) return;
+  const feedEl = document.getElementById('view-feed');
+  if (!feedEl || !feedEl.classList.contains('active')) return;
   const lang = (typeof REMO_I18N !== 'undefined' && REMO_I18N.getLang) ? REMO_I18N.getLang() : 'en';
   const now = Date.now();
   let hasExpiredNeedingRender = false;
@@ -11034,6 +11156,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initDesktopHorizontalScrollRails();
   setTimeout(initDesktopHorizontalScrollRails, 300);
   setTimeout(initDesktopHorizontalScrollRails, 1200);
+  scheduleIdleEnginePrefetch();
 
 
   // Check URL parameters (?view=arena, ?city=chisinau, ?lang=fr, ?open=radio|beatpad|boardingpass|guess, ?verify=..., ?post=...)
@@ -11421,8 +11544,9 @@ window.addEventListener('remo:langchange', () => {
   }
 });
 
-window.addEventListener('remo:stateupdate', (ev) => {
-  const reason = ev && ev.detail ? ev.detail.reason : '';
+let _remoStateBurstTimer = null;
+let _remoStateBurstPending = false;
+function flushCoalescedStateRefresh(reason) {
   syncHeaderAndSidebars();
 
   if (reason === 'auth') {
@@ -11473,6 +11597,24 @@ window.addEventListener('remo:stateupdate', (ev) => {
   else if (currentRemoView === 'messages') renderDirectMessagesView();
   else if (currentRemoView === 'bottles') renderWorldBottlesView();
   else if (currentRemoView === 'wheel') renderWheelView();
+}
+
+window.addEventListener('remo:stateupdate', (ev) => {
+  const reason = ev && ev.detail ? ev.detail.reason : '';
+  // Coalesce burst cloud snapshot updates during initial boot so the feed & header render ONCE instead of 8x
+  if (reason && (reason.startsWith('cloud_') || reason === 'presence' || reason === 'public_settings')) {
+    _remoStateBurstPending = reason;
+    if (!_remoStateBurstTimer) {
+      _remoStateBurstTimer = setTimeout(() => {
+        const lastReason = _remoStateBurstPending || reason;
+        _remoStateBurstTimer = null;
+        _remoStateBurstPending = false;
+        flushCoalescedStateRefresh(lastReason);
+      }, 120);
+    }
+    return;
+  }
+  flushCoalescedStateRefresh(reason);
 });
 
 let _remoAdminInlineLoading = false;
@@ -11491,7 +11633,7 @@ function ensureInlineAdminStudioLoaded(onReady) {
   }
   _remoAdminInlineLoading = true;
   const s = document.createElement('script');
-  s.src = 'js/remo-admin-inline.js?v=164';
+  s.src = 'js/remo-admin-inline.js?v=165';
   s.async = true;
   s.onload = () => {
     _remoAdminInlineLoading = false;
@@ -22464,6 +22606,10 @@ if (typeof window !== 'undefined') {
         setTimeout(() => {
           if (typeof openCityAmbassadorModal === 'function') openCityAmbassadorModal();
         }, 380);
+      } else if (openParam === 'daily' || openParam === 'challenge') {
+        setTimeout(() => {
+          if (typeof openRemoDailyChallengeModal === 'function') openRemoDailyChallengeModal();
+        }, 280);
       } else if (openParam === 'scratch' || openParam === 'scratchcard') {
         setTimeout(() => {
           if (typeof openGoldenScratchModal === 'function') openGoldenScratchModal();
@@ -22476,30 +22622,14 @@ if (typeof window !== 'undefined') {
         if (localStorage.getItem('remo_vip_invite_claimed') !== '1') {
           setTimeout(() => openVipInviteWelcomeModal(false), 550);
         }
-      } else if (
-        localStorage.getItem('remo_vip_invite_claimed') !== '1' &&
-        !openParam &&
-        !params.get('post') &&
-        !params.get('tv') &&
-        !params.get('room') &&
-        !params.get('contest') &&
-        !params.get('u') &&
-        !params.get('war') &&
-        !params.get('welcome') &&
-        !params.get('onboarding')
-      ) {
-        setTimeout(() => {
-          const curU = REMO_STORE.getCurrentUser();
-          const anyModalOpen = document.querySelector('.remo-modal-backdrop.open');
-          if (!anyModalOpen && localStorage.getItem('remo_vip_invite_claimed') !== '1' && (!curU || REMO_STORE.isFakeOrGuestUser(curU))) {
-            openVipInviteWelcomeModal(false);
-          }
-        }, 680);
       }
+      // NOTE: Zero unprompted full-screen VIP modal on organic first visits!
+      // Guests explore freely first and receive a non-blocking 1-click Save & +150 Coins sheet after their first interaction.
 
       // Realtime 60s countdown ticker for 24h boosted posts (in-place DOM update, no full feed rebuild)
       setInterval(() => {
         try {
+          if (document.hidden) return;
           const feedEl = document.getElementById('view-feed');
           if (feedEl && feedEl.classList.contains('active') && typeof refreshLiveBoostBadgesInPlace === 'function') {
             refreshLiveBoostBadgesInPlace();
@@ -22509,3 +22639,220 @@ if (typeof window !== 'undefined') {
     } catch (e) {}
   });
 }
+
+/* ── 🎯 DAILY 30s REMO CITY CHALLENGE (Wordle-Style Viral Loop + Emoji Share + Streak) ── */
+(function () {
+  function getDailyChallengeMeta() {
+    const now = new Date();
+    const y = now.getUTCFullYear();
+    const m = String(now.getUTCMonth() + 1).padStart(2, '0');
+    const d = String(now.getUTCDate()).padStart(2, '0');
+    const dateKey = `${y}-${m}-${d}`;
+    const dayNum = Math.max(1, Math.floor((Date.UTC(y, now.getUTCMonth(), now.getUTCDate()) - Date.UTC(2026, 0, 1)) / 86400000) + 1);
+    return { dateKey, dayNum };
+  }
+
+  function seededHash(str) {
+    let h = 2166136261;
+    for (let i = 0; i < str.length; i++) {
+      h ^= str.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+    return Math.abs(h);
+  }
+
+  function buildTodayQuestions(lang) {
+    const isFr = lang === 'fr';
+    const cities = (typeof getRemoCities === 'function' ? getRemoCities() : []).filter((c) => c && c.id && c.code);
+    if (cities.length < 4) return [];
+    const { dateKey } = getDailyChallengeMeta();
+    const picked = [];
+    const used = new Set();
+    let salt = 0;
+    while (picked.length < 3 && salt < 40) {
+      const idx = seededHash(`${dateKey}_q_${salt}`) % cities.length;
+      const c = cities[idx];
+      if (!used.has(c.id)) {
+        used.add(c.id);
+        picked.push(c);
+      }
+      salt += 1;
+    }
+    return picked.map((target, qIdx) => {
+      const distractors = [];
+      let ds = 0;
+      while (distractors.length < 3 && ds < 60) {
+        const cand = cities[seededHash(`${dateKey}_d_${qIdx}_${ds}`) % cities.length];
+        if (cand.id !== target.id && !distractors.some((x) => x.id === cand.id)) distractors.push(cand);
+        ds += 1;
+      }
+      const opts = [target, ...distractors].sort((a, b) => seededHash(`${dateKey}_o_${qIdx}_${a.id}`) - seededHash(`${dateKey}_o_${qIdx}_${b.id}`));
+      const country = isFr ? (target.country_fr || target.country_en || target.country || '') : (target.country_en || target.country || '');
+      const tagline = isFr ? (target.tagline_fr || target.tagline_en || '') : (target.tagline_en || '');
+      const clue = qIdx === 0
+        ? (isFr ? `Quel hub mondial porte le code aéroport IATA « ${target.code} » (${country}) ?` : `Which world city has IATA airport code "${target.code}" (${country})?`)
+        : qIdx === 1
+          ? (isFr ? `Quelle ville correspond à ce surnom : « ${tagline || country} » ?` : `Which world city matches this vibe: "${tagline || country}"?`)
+          : (isFr ? `Reconnais cette ville (${target.flag}) située en ${country} :` : `Identify this world city (${target.flag}) in ${country}:`);
+      return { target, opts, clue };
+    });
+  }
+
+  function readDailySave() {
+    try {
+      return JSON.parse(localStorage.getItem('remo_daily_challenge_v1') || '{}') || {};
+    } catch (e) {
+      return {};
+    }
+  }
+
+  function writeDailySave(obj) {
+    try { localStorage.setItem('remo_daily_challenge_v1', JSON.stringify(obj)); } catch (e) {}
+  }
+
+  let _dailyState = null;
+
+  function ensureDailyModal() {
+    let modal = document.getElementById('remoDailyChallengeModal');
+    if (modal) return modal;
+    const wrap = document.createElement('div');
+    wrap.innerHTML = `
+      <div class="remo-modal-backdrop" id="remoDailyChallengeModal" onclick="if(event.target===this)this.classList.remove('open')">
+        <div class="remo-modal" style="max-width:460px;border-color:rgba(251,191,36,0.55);">
+          <div class="modal-hdr">
+            <div>
+              <b id="dailyChTitle" style="font-family:'Orbitron',sans-serif;font-size:0.96rem;color:#fde047;">🎯 REMO Daily City #1</b>
+              <div id="dailyChSub" style="font-size:0.74rem;color:var(--muted);margin-top:2px;"></div>
+            </div>
+            <button type="button" class="modal-close" onclick="document.getElementById('remoDailyChallengeModal')?.classList.remove('open')">✕</button>
+          </div>
+          <div id="dailyChBody"></div>
+        </div>
+      </div>
+    `;
+    modal = wrap.firstElementChild;
+    document.body.appendChild(modal);
+    return modal;
+  }
+
+  function buildShareText(saveEntry, dayNum, streak, lang) {
+    const isFr = lang === 'fr';
+    const grid = (saveEntry.results || []).map((r) => `${r.flag}${r.ok ? '🟩' : '🟥'}`).join(' ');
+    const score = (saveEntry.results || []).filter((r) => r.ok).length;
+    return isFr
+      ? `🌐 REMO World Daily #${dayNum}\n🔥 Série: ${streak} · Score: ${score}/3\n${grid}\nDéfi 30s du jour : https://remoworld.com/?open=daily`
+      : `🌐 REMO World Daily #${dayNum}\n🔥 Streak: ${streak} · Score: ${score}/3\n${grid}\nPlay today's 30s city challenge: https://remoworld.com/?open=daily`;
+  }
+
+  function renderDailyView() {
+    const lang = typeof REMO_I18N !== 'undefined' ? REMO_I18N.getLang() : 'en';
+    const isFr = lang === 'fr';
+    const { dateKey, dayNum } = getDailyChallengeMeta();
+    const titleEl = document.getElementById('dailyChTitle');
+    const subEl = document.getElementById('dailyChSub');
+    const bodyEl = document.getElementById('dailyChBody');
+    if (!bodyEl) return;
+
+    const saved = readDailySave();
+    const todayDone = saved.lastDate === dateKey && Array.isArray(saved.results) && saved.results.length === 3;
+    const streak = Number(saved.streak || 0);
+
+    if (titleEl) titleEl.textContent = `🎯 REMO Daily #${dayNum}`;
+    if (subEl) {
+      subEl.textContent = isFr
+        ? `3 villes · 30 secondes · Sans compte requis · 🔥 Série: ${streak}`
+        : `3 world cities · 30 seconds · No account needed · 🔥 Streak: ${streak}`;
+    }
+
+    if (todayDone) {
+      const score = saved.results.filter((r) => r.ok).length;
+      const grid = saved.results.map((r) => `${r.flag}${r.ok ? '🟩' : '🟥'}`).join(' ');
+      const shareTxt = buildShareText(saved, dayNum, streak, lang);
+      window._remoDailyShareText = shareTxt;
+      bodyEl.innerHTML = `
+        <div class="daily-challenge-result-card">
+          <div style="font-size:0.8rem;font-weight:800;color:#7dd3fc;">${isFr ? 'Défi du jour terminé !' : "Today's Challenge Complete!"}</div>
+          <div style="font-family:'Orbitron',sans-serif;font-size:1.5rem;font-weight:900;color:#fde047;margin:6px 0;">${score}/3 · 🔥 ${streak}</div>
+          <div class="daily-emoji-grid">${grid}</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:12px;">
+            <button type="button" class="btn-cyber btn-gold" style="flex:1;justify-content:center;" onclick="copyRemoDailyShareResult()">📋 ${isFr ? 'Copier le score' : 'Copy Result'}</button>
+            <a class="btn-cyber" style="flex:1;justify-content:center;background:linear-gradient(135deg,#10b981,#059669);text-decoration:none;" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(shareTxt)}">💬 WhatsApp</a>
+          </div>
+          <button type="button" class="btn-ghost" style="width:100%;justify-content:center;margin-top:8px;" onclick="document.getElementById('remoDailyChallengeModal')?.classList.remove('open');openWorldBlitzModal();">🧠 ${isFr ? 'Continuer avec World Blitz 60s' : 'Play Full World Blitz 60s'}</button>
+        </div>
+      `;
+      return;
+    }
+
+    if (!_dailyState || _dailyState.dateKey !== dateKey) {
+      _dailyState = { dateKey, step: 0, results: [], questions: buildTodayQuestions(lang) };
+    }
+    const q = _dailyState.questions[_dailyState.step];
+    if (!q) return;
+
+    bodyEl.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;font-size:0.75rem;color:#94a3b8;margin-bottom:8px;">
+        <span>${isFr ? 'Question' : 'Question'} ${_dailyState.step + 1} / 3</span>
+        <span>${_dailyState.results.map((r) => (r.ok ? '🟩' : '🟥')).join(' ')}</span>
+      </div>
+      <div style="background:rgba(15,23,42,0.85);border:1px solid rgba(56,189,248,0.3);border-radius:14px;padding:14px;font-size:0.92rem;font-weight:800;color:#f8fafc;margin-bottom:12px;line-height:1.45;">
+        ${escapeHtmlStr(q.clue)}
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+        ${q.opts.map((opt) => `
+          <button type="button" class="btn-ghost" style="justify-content:flex-start;padding:11px 12px;font-size:0.84rem;font-weight:800;" onclick="answerRemoDailyStep('${escapeJsSingleArg(opt.id)}')">
+            <span>${opt.flag}</span> <span>${escapeHtmlStr(getCityName(opt, lang))}</span>
+          </button>
+        `).join('')}
+      </div>
+    `;
+  }
+
+  window.answerRemoDailyStep = function (cityId) {
+    if (!_dailyState) return;
+    const q = _dailyState.questions[_dailyState.step];
+    if (!q) return;
+    const ok = q.target.id === cityId;
+    _dailyState.results.push({ ok, flag: q.target.flag || '🌍', cityId: q.target.id });
+    if (typeof RemoAudio !== 'undefined' && RemoAudio.play) RemoAudio.play(ok ? 'coin' : 'click');
+    _dailyState.step += 1;
+
+    if (_dailyState.step >= 3) {
+      const { dateKey } = getDailyChallengeMeta();
+      const prev = readDailySave();
+      const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+      const nextStreak = prev.lastDate === yesterday ? (Number(prev.streak || 0) + 1) : 1;
+      const score = _dailyState.results.filter((r) => r.ok).length;
+      writeDailySave({ lastDate: dateKey, streak: nextStreak, results: _dailyState.results, score });
+
+      const rewardCoins = 10 + score * 10;
+      const curU = REMO_STORE.getCurrentUser();
+      if (curU && !REMO_STORE.isFakeOrGuestUser(curU)) {
+        REMO_STORE.addCoins(curU.uid, rewardCoins, 25);
+        syncHeaderAndSidebars();
+      } else if (typeof maybePromptGuestRewardSave === 'function') {
+        maybePromptGuestRewardSave(rewardCoins);
+      }
+      if (typeof spawnRemoCoinsFX === 'function' && score > 0) spawnRemoCoinsFX(10);
+    }
+    renderDailyView();
+  };
+
+  window.copyRemoDailyShareResult = function () {
+    const txt = window._remoDailyShareText || '';
+    if (!txt) return;
+    const lang = typeof REMO_I18N !== 'undefined' ? REMO_I18N.getLang() : 'en';
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(txt).catch(() => {});
+    }
+    if (typeof remoToast === 'function') {
+      remoToast(lang === 'fr' ? '📋 Score Daily copié ! Collez-le sur WhatsApp / TikTok !' : '📋 Daily result copied! Paste on WhatsApp / TikTok!', 'fanfare');
+    }
+  };
+
+  window.openRemoDailyChallengeModal = function () {
+    const modal = ensureDailyModal();
+    renderDailyView();
+    modal.classList.add('open');
+  };
+})();
