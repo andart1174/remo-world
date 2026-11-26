@@ -2226,7 +2226,7 @@ function _renderPostMediaStageInner(p, city, lang) {
     }
     return `
       <div style="position:relative;width:100%;height:100%;touch-action:pan-y;" ontouchstart="initCarouselTouchSwipe(this, '${escapeJsSingleArg(p.id)}')">
-        <img src="${sanitizeSafeMediaUrl(curUrl)}" class="carousel-slide-img ${flt}" loading="lazy" decoding="async" alt="${escapeHtmlStr(getCityName(city, lang))}" style="width:100%;height:100%;object-fit:cover;transition:opacity 0.2s ease;">
+        <img src="${sanitizeSafeMediaUrl(curUrl)}" class="carousel-slide-img ${flt}" loading="lazy" decoding="async" alt="${escapeHtmlStr(getCityName(city, lang))}" style="width:100%;height:100%;object-fit:contain;background:radial-gradient(circle at center,#0d152a,#050816);transition:opacity 0.2s ease;">
         <button type="button" class="carousel-nav-btn prev" onclick="stepPostCarousel('${escapeJsSingleArg(p.id)}', -1, event)" title="Précédent">‹</button>
         <button type="button" class="carousel-nav-btn next" onclick="stepPostCarousel('${escapeJsSingleArg(p.id)}', 1, event)" title="Suivant">›</button>
         <div class="carousel-dots">
@@ -2602,7 +2602,7 @@ function renderSinglePostCardHtml(p, lang, u, isAdm) {
                   ${getPostBoostBadgeHtml(p, lang)}
                   ${p.bounty && !p.bounty.claimed ? `<span class="pbadge boost" style="background:#f59e0b;color:#000;">🎁 +${p.bounty.coins} 🪙</span>` : ''}
                   ${!hiddenByCapsule && p.mediaType === 'video' ? `<span class="pbadge vid60">${t('post_video60_badge')} · ${formatDurationMMSS(p.videoDuration || 60)}</span>` : ''}
-                  ${!hiddenByCapsule && (p.mediaType === 'video_link' || p.externalUrl) ? `<span class="pbadge vid60">🔗 ${lang === 'fr' ? 'LIEN VIDÉO' : 'VIDEO LINK'}</span>` : ''}
+                  ${!hiddenByCapsule && p.mediaType !== 'video_link' && p.externalUrl ? `<span class="pbadge vid60">🔗 ${lang === 'fr' ? 'LIEN VIDÉO' : 'VIDEO LINK'}</span>` : ''}
                   ${!hiddenByCapsule && p.mediaType === 'before_after' ? `<span class="pbadge html">${t('post_slider_badge')}</span>` : ''}
                   ${!mysteryMasked && p.verifiedGps ? `<span class="pbadge gps">${t('post_verified_gps')}</span>` : ''}
                   ${p.mintedCard ? `<span class="pbadge mint">${t('post_minted_badge')}</span>` : ''}
@@ -11640,7 +11640,7 @@ function ensureInlineAdminStudioLoaded(onReady) {
   }
   _remoAdminInlineLoading = true;
   const s = document.createElement('script');
-  s.src = 'js/remo-admin-inline.js?v=168';
+  s.src = 'js/remo-admin-inline.js?v=169';
   s.async = true;
   s.onload = () => {
     _remoAdminInlineLoading = false;

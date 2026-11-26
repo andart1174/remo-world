@@ -12133,5 +12133,20 @@ select.remo-input option {
   font-family: monospace;
 }
 
+/* 5. v169: Clean Carousel Uncropped Framing (4:5, 1:1, 9:16 slides stay 100% visible) */
+.post-media-wrap img.carousel-slide-img {
+  object-fit: contain !important;
+  background: radial-gradient(circle at center, #0d152a, #050816);
+}
+@media (min-width: 769px) {
+  .post-media-wrap:has(.carousel-slide-img) {
+    aspect-ratio: 4 / 4.4;
+    max-height: 520px;
+  }
+  .post-media-wrap:has(.carousel-slide-img) img.carousel-slide-img {
+    max-height: 520px;
+  }
+}
+
 
 
