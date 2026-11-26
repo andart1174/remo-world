@@ -123,14 +123,14 @@
   <link rel="preconnect" href="https://firebasestorage.googleapis.com" crossorigin>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="preload" as="style" href="css/remo-core.css?v=167">
+  <link rel="preload" as="style" href="css/remo-core.css?v=168">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800;900&family=Orbitron:wght@700;900&display=swap" media="print" onload="this.media='all'">
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800;900&family=Orbitron:wght@700;900&display=swap"></noscript>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha384-sHL9NAb7lN7rfvG5lfHpm643Xkcjzp4jFvuavGOndn6pjVqS6ny56CAt3nsEVT4H" crossorigin="anonymous" media="print" onload="this.media='all'">
   <noscript><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha384-sHL9NAb7lN7rfvG5lfHpm643Xkcjzp4jFvuavGOndn6pjVqS6ny56CAt3nsEVT4H" crossorigin="anonymous"></noscript>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha384-cxOPjt7s7Iz04uaHJceBmS+qpjv2JkIHNVcuOrM+YHwZOmJGBXI00mdUXEq65HTH" crossorigin="anonymous" defer></script>
 
-  <link rel="stylesheet" href="css/remo-core.css?v=167">
+  <link rel="stylesheet" href="css/remo-core.css?v=168">
 </head>
 <body>
 
@@ -278,7 +278,7 @@
               <span class="nav-ic">⊞</span>
               <span data-i18n="nav_explore_apps">Explore All Apps</span>
             </span>
-            <span class="apps-count-pill">25</span>
+            <span class="apps-count-pill">27</span>
           </button>
 
           <!-- Legal, Support & Crawlable 24-City SEO Directory Footer -->
@@ -2860,6 +2860,14 @@
           <span class="app-tile-ic">🎫</span>
           <span class="app-tile-lbl" data-i18n="nav_boarding_pass">4D Boarding Pass</span>
         </button>
+        <button type="button" class="app-tile cyan" onclick="closeAppLauncherModal();openTravelScoreModal()">
+          <span class="app-tile-ic">🌍</span>
+          <span class="app-tile-lbl" data-i18n="apps_travel_score">My Travel Score (24)</span>
+        </button>
+        <button type="button" class="app-tile gold" onclick="closeAppLauncherModal();openSoulCityModal()">
+          <span class="app-tile-ic">🧠</span>
+          <span class="app-tile-lbl" data-i18n="apps_soul_city">Soul City Quiz (20s)</span>
+        </button>
         <button type="button" class="app-tile" onclick="closeAppLauncherModal();switchRemoView('bottles')">
           <span class="app-tile-ic">🍾</span>
           <span class="app-tile-lbl" data-i18n="nav_bottles">City Bottle</span>
@@ -3030,12 +3038,13 @@
   <script defer src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js" integrity="sha384-oFrOL1TiREYNET0lsYF3LjQuyi2gL7vhjH1X8vFr+umcmzAdPELopeSgbcrv4uRm" crossorigin="anonymous"></script>
 
   <!-- REMO Core Engines (Non-blocking defer; Focus TV, Radio, Blitz & Live Apps lazy-loaded on demand / idle) -->
-  <script defer src="js/remo-i18n.js?v=167"></script>
-  <script defer src="js/remo-cities-data.js?v=167"></script>
-  <script defer src="js/remo-store.js?v=167"></script>
-  <script defer src="js/remo-card-engine.js?v=167"></script>
-  <script defer src="js/remo-radar-arena.js?v=167"></script>
-  <script defer src="js/remo-social-comms.js?v=167"></script>
+  <script defer src="js/remo-i18n.js?v=168"></script>
+  <script defer src="js/remo-cities-data.js?v=168"></script>
+  <script defer src="js/remo-store.js?v=168"></script>
+  <script defer src="js/remo-card-engine.js?v=168"></script>
+  <script defer src="js/remo-radar-arena.js?v=168"></script>
+  <script defer src="js/remo-social-comms.js?v=168"></script>
+  <script defer src="js/remo-viral-studios.js?v=168"></script>
 
   <noscript>
     <nav aria-label="REMO World Static Directory" style="padding:20px;background:#050816;color:#f8fafc;">

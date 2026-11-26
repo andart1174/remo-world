@@ -11321,6 +11321,10 @@ document.addEventListener('DOMContentLoaded', () => {
           const t = rawTo || (f === 'chisinau' ? 'montreal' : 'chisinau');
           setBoardingPassRoutePreset(f, t);
         }
+      } else if (openTarget === 'travelmap' || openTarget === 'travelscore') {
+        if (typeof window.openTravelScoreModal === 'function') window.openTravelScoreModal();
+      } else if (openTarget === 'soulcity' || openTarget === 'soul') {
+        if (typeof window.openSoulCityModal === 'function') window.openSoulCityModal();
       } else if (openTarget === 'guess') {
         const mysteryBtn = document.querySelector('.feed-top-widgets button[onclick*="mystery"]');
         if (typeof setFeedMode === 'function') setFeedMode('mystery', mysteryBtn);
@@ -11636,7 +11640,7 @@ function ensureInlineAdminStudioLoaded(onReady) {
   }
   _remoAdminInlineLoading = true;
   const s = document.createElement('script');
-  s.src = 'js/remo-admin-inline.js?v=167';
+  s.src = 'js/remo-admin-inline.js?v=168';
   s.async = true;
   s.onload = () => {
     _remoAdminInlineLoading = false;
