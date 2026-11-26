@@ -9528,8 +9528,11 @@ function getRemoIndexNowUrls() {
     'city-versus.html',
     'cities/index.html',
     'world-radio.html',
+    'travel-score.html',
+    'soul-city-quiz.html',
     'guess-the-city.html',
     'boarding-pass.html',
+    'ambassadors.html',
     'privacy.html',
     'terms.html'
   ];
@@ -9539,7 +9542,13 @@ function getRemoIndexNowUrls() {
     'monaco', 'losangeles', 'seoul', 'geneva', 'singapore', 'sydney',
     'rio', 'istanbul', 'berlin', 'amsterdam', 'lisbon', 'cairo'
   ];
-  const urls = ['https://remoworld.com/', 'https://remoworld.com/fr/'];
+  const versusSlugs = [
+    'montreal-vs-paris', 'chisinau-vs-bucharest', 'newyork-vs-london',
+    'tokyo-vs-seoul', 'barcelona-vs-rome', 'miami-vs-dubai',
+    'toronto-vs-losangeles', 'berlin-vs-amsterdam', 'lisbon-vs-istanbul',
+    'monaco-vs-geneva', 'sydney-vs-singapore', 'rio-vs-cairo'
+  ];
+  const urls = ['https://remoworld.com/', 'https://remoworld.com/fr/', 'https://remoworld.com/widget.html'];
   coreSlugs.forEach((s) => {
     urls.push(`https://remoworld.com/${s}`);
     urls.push(`https://remoworld.com/fr/${s}`);
@@ -9547,6 +9556,10 @@ function getRemoIndexNowUrls() {
   citySlugs.forEach((c) => {
     urls.push(`https://remoworld.com/cities/${c}.html`);
     urls.push(`https://remoworld.com/fr/cities/${c}.html`);
+  });
+  versusSlugs.forEach((v) => {
+    urls.push(`https://remoworld.com/versus/${v}.html`);
+    urls.push(`https://remoworld.com/fr/versus/${v}.html`);
   });
   return urls;
 }
@@ -9581,7 +9594,7 @@ function updateIndexNowStatusUI(statusText = '') {
   const isFr = (typeof REMO_I18N !== 'undefined' && REMO_I18N.getLang() === 'fr');
   const lastPing = localStorage.getItem('remo_indexnow_last_ping') || '';
   const lastStatus = localStorage.getItem('remo_indexnow_last_status') || 'HTTP 200';
-  const lastCount = Number(localStorage.getItem('remo_indexnow_last_count') || 72);
+  const lastCount = Number(localStorage.getItem('remo_indexnow_last_count') || 105);
   const badge = document.getElementById('indexNowStatusBadge');
   if (badge) {
     if (statusText) {
