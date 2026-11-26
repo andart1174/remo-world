@@ -28,3 +28,5 @@
 /fr/ranking             /fr/world-ranking.html     301
 /versus                 /city-versus.html          301
 /fr/versus              /fr/city-versus.html       301
+/city/:city             /cities/:city.html         301
+/fr/city/:city          /fr/cities/:city.html      301

@@ -8,7 +8,7 @@ const crypto = require('crypto');
 
 const HOST = 'remoworld.com';
 const FIREBASE_PROJECT_ID = 'remo-world';
-const ADMIN_EMAIL = 'andart1174@gmail.com';
+const ADMIN_EMAIL = String(process.env.REMO_ADMIN_EMAIL || 'andart1174@gmail.com').toLowerCase().trim();
 const GOOGLE_CERTS_URL = 'https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com';
 let _cachedCerts = null;
 let _cachedCertsExpiresAt = 0;

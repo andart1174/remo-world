@@ -11,12 +11,18 @@ service firebase.storage {
     match /{folder}/{allPaths=**} {
       allow read: if true;
       allow create: if request.auth != null
+        && (
+          isStorageAdmin() ||
+          request.auth.token.email_verified == true ||
+          request.auth.token.firebase.sign_in_provider == 'google.com' ||
+          request.auth.token.firebase.sign_in_provider == 'apple.com'
+        )
         && folder in ['remo_posts', 'remo_contests_audio', 'remo_contests_pgp', 'remo_global_sync', 'remo_avatars', 'remo_stories', 'remo_media']
         && request.resource != null
         && (
-          (request.resource.contentType.matches('image/.*') && !request.resource.contentType.matches('image/svg\\+xml.*') && request.resource.size <= 12 * 1024 * 1024) ||
+          (request.resource.contentType.matches('image/.*') && !request.resource.contentType.matches('image/svg\\+xml.*') && request.resource.size <= 10 * 1024 * 1024) ||
           (request.resource.contentType.matches('audio/.*') && request.resource.size <= 15 * 1024 * 1024) ||
-          (request.resource.contentType.matches('video/.*') && request.resource.size <= 30 * 1024 * 1024)
+          (request.resource.contentType.matches('video/.*') && request.resource.size <= 25 * 1024 * 1024)
         );
       allow update, delete: if isStorageAdmin();
     }

@@ -92,9 +92,10 @@ service cloud.firestore {
               'cityGuesses', 'leaderboard', 'capsuleWatchers',
               'bounty', 'secretCapsule', 'views', 'mintedCard'
             ]) &&
-            (!('comments' in resource.data) || !('comments' in request.resource.data) || (request.resource.data.comments is list && request.resource.data.comments.size() >= resource.data.comments.size())) &&
+            (!('comments' in resource.data) || !('comments' in request.resource.data) || (request.resource.data.comments is list && request.resource.data.comments.size() >= resource.data.comments.size() && request.resource.data.comments.size() <= resource.data.comments.size() + 1)) &&
             (!('likes' in resource.data) || !('likes' in request.resource.data) || (request.resource.data.likes is list && request.resource.data.likes.size() >= resource.data.likes.size() - 1 && request.resource.data.likes.size() <= resource.data.likes.size() + 1)) &&
-            (!('tipsTotal' in resource.data) || !('tipsTotal' in request.resource.data) || request.resource.data.tipsTotal >= resource.data.tipsTotal)
+            (!('tipsTotal' in resource.data) || !('tipsTotal' in request.resource.data) || (request.resource.data.tipsTotal >= resource.data.tipsTotal && (request.resource.data.tipsTotal - resource.data.tipsTotal) <= 1000)) &&
+            (!('views' in resource.data) || !('views' in request.resource.data) || (request.resource.data.views >= resource.data.views && (request.resource.data.views - resource.data.views) <= 5))
           )
         )
       );
@@ -106,9 +107,13 @@ service cloud.firestore {
       );
     }
 
-    // 1A. Private HTML Mini-App Vault (Level 2 Server Bunker — Zero Public Read!)
+    // 1A. Private HTML Mini-App Vault & Server Economy Security Claims (Zero Public Read/Write!)
     match /remo_html_vault/{postId} {
       allow read, write: if isAdmin();
+    }
+
+    match /remo_security_claims/{claimId} {
+      allow read, write: if false;
     }
 
     // 1B. 24h Stories & Focus Study Rooms
@@ -151,7 +156,7 @@ service cloud.firestore {
         (!('role' in request.resource.data) || request.resource.data.role == 'citizen') &&
         (!('banned' in request.resource.data) || request.resource.data.banned == false) &&
         (!('verified' in request.resource.data) || request.resource.data.verified == false) &&
-        (!('coins' in request.resource.data) || (request.resource.data.coins >= 0 && request.resource.data.coins <= 500))
+        (!('coins' in request.resource.data) || (request.resource.data.coins >= 0 && request.resource.data.coins <= 250))
       );
       allow update: if isAdmin() || (
         isOwner(userId) &&
@@ -162,7 +167,17 @@ service cloud.firestore {
         (!('role' in request.resource.data) || (('role' in resource.data) && request.resource.data.role == resource.data.role) || (!('role' in resource.data) && request.resource.data.role == 'citizen')) &&
         (!('banned' in request.resource.data) || (('banned' in resource.data) && request.resource.data.banned == resource.data.banned) || (!('banned' in resource.data) && request.resource.data.banned == false)) &&
         (!('verified' in request.resource.data) || (('verified' in resource.data) && request.resource.data.verified == resource.data.verified) || (!('verified' in resource.data) && request.resource.data.verified == false)) &&
-        (!('coins' in request.resource.data) || (request.resource.data.coins >= 0 && (!('coins' in resource.data) || (request.resource.data.coins - resource.data.coins) <= 600)))
+        (!('coins' in request.resource.data) || (
+          request.resource.data.coins >= 0 && (
+            !('coins' in resource.data) ||
+            request.resource.data.coins <= resource.data.coins || (
+              (request.resource.data.coins - resource.data.coins) <= 350 &&
+              request.resource.data.updatedAt == request.time &&
+              request.resource.data.lastCoinWriteAt == request.time &&
+              (!('lastCoinWriteAt' in resource.data) || request.time > resource.data.lastCoinWriteAt + duration.value(4, 's'))
+            )
+          )
+        ))
       ) || (
         isNotBanned() &&
         !isOwner(userId) &&
@@ -171,9 +186,14 @@ service cloud.firestore {
         (resource.data.coins is int || resource.data.coins is float) &&
         (request.resource.data.coins is int || request.resource.data.coins is float) &&
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['coins', 'lifetimeCoins', 'updatedAt']) &&
+        request.resource.data.updatedAt == request.time &&
+        (!('updatedAt' in resource.data) || request.time > resource.data.updatedAt + duration.value(4, 's')) &&
         (request.resource.data.coins - resource.data.coins) > 0 &&
-        (request.resource.data.coins - resource.data.coins) <= 1000 &&
-        (!('lifetimeCoins' in resource.data) || !('lifetimeCoins' in request.resource.data) || request.resource.data.lifetimeCoins >= resource.data.lifetimeCoins)
+        (request.resource.data.coins - resource.data.coins) <= 250 &&
+        (!('lifetimeCoins' in resource.data) || !('lifetimeCoins' in request.resource.data) || (
+          request.resource.data.lifetimeCoins >= resource.data.lifetimeCoins &&
+          (request.resource.data.lifetimeCoins - resource.data.lifetimeCoins) <= (request.resource.data.coins - resource.data.coins)
+        ))
       );
       allow delete: if isAdmin() || isOwner(userId);
     }
@@ -199,7 +219,12 @@ service cloud.firestore {
           'cityScores', 'duels', 'bottles', 'jukeboxTracks', 'auctions',
           'geoVaults', 'stories', 'viralContests', 'worldSystems',
           'remoOdyssey', 'worldSpotlight', 'updatedAt'
-        ])
+        ]) &&
+        (!('cityScores' in resource.data) || !('cityScores' in request.resource.data) || (request.resource.data.cityScores is map && request.resource.data.cityScores.size() >= resource.data.cityScores.size())) &&
+        (!('geoVaults' in resource.data) || !('geoVaults' in request.resource.data) || (request.resource.data.geoVaults is list && request.resource.data.geoVaults.size() >= resource.data.geoVaults.size())) &&
+        (!('duels' in resource.data) || !('duels' in request.resource.data) || (request.resource.data.duels is list && request.resource.data.duels.size() >= resource.data.duels.size())) &&
+        (!('auctions' in resource.data) || !('auctions' in request.resource.data) || (request.resource.data.auctions is list && request.resource.data.auctions.size() >= resource.data.auctions.size())) &&
+        (!('viralContests' in resource.data) || !('viralContests' in request.resource.data) || (request.resource.data.viralContests is list && request.resource.data.viralContests.size() >= resource.data.viralContests.size()))
       );
       allow delete: if isAdmin();
     }
@@ -216,8 +241,8 @@ service cloud.firestore {
         isNotBanned() &&
         isSafeId(cardId) &&
         isUidMatch(request.resource.data.ownerUid) &&
-        (!('rarity' in request.resource.data) || request.resource.data.rarity != 'Founder 1-of-1') &&
-        (!('coinValue' in request.resource.data) || (request.resource.data.coinValue >= 0 && request.resource.data.coinValue <= 25000))
+        (!('rarity' in request.resource.data) || (request.resource.data.rarity != 'Founder 1-of-1' && request.resource.data.rarity != 'Sovereign 1-of-1')) &&
+        (!('coinValue' in request.resource.data) || (request.resource.data.coinValue >= 0 && request.resource.data.coinValue <= 10000))
       );
       allow update: if isAdmin() || (isNotBanned() && (!('ownerUid' in resource.data) || isUidMatch(resource.data.ownerUid)));
       allow delete: if isAdmin();

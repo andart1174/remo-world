@@ -159,54 +159,19 @@ function syncHeaderAndSidebars() {
   const hhEl = document.getElementById('hdrHappyHourBadge');
   if (hhEl) hhEl.style.display = st.settings.happyHour2x ? 'inline-flex' : 'none';
 
-  // Admin God-Mode Header Pill & Navigation Links (Strictly visible ONLY when verified admin AND non-guest session)
+  // Admin God-Mode Header Pill & Navigation Links (Strictly lazy-loaded & injected ONLY when verified admin AND non-guest session)
   const isAdmUser = REMO_STORE.isCurrentUserAdmin();
   const isAdmUnlocked = REMO_STORE.isAdminUnlocked();
   const isGuestSession = Boolean(!u || (typeof REMO_STORE.isFakeOrGuestUser === 'function' && REMO_STORE.isFakeOrGuestUser(u)) || u.role === 'guest');
   const showAdminControls = Boolean(isAdmUser && isAdmUnlocked && !isGuestSession);
 
-  const admBtn = document.getElementById('hdrAdminGodBtn');
-  if (admBtn) {
-    admBtn.style.display = showAdminControls ? 'inline-flex' : 'none';
-    admBtn.classList.toggle('active', isAdmUnlocked);
-    admBtn.textContent = isAdmUnlocked ? t('btn_admin_mode_on') : t('btn_admin_mode_off');
+  if (showAdminControls) {
+    ensureInlineAdminStudioLoaded();
+  } else if (window.REMO_ADMIN_INLINE && typeof window.REMO_ADMIN_INLINE.unmount === 'function') {
+    window.REMO_ADMIN_INLINE.unmount();
+  } else {
+    document.querySelectorAll('[data-remo-admin-injected="1"]').forEach((el) => el.remove());
   }
-
-  const admOfficeHdr = document.getElementById('hdrAdminOfficeLink');
-  if (admOfficeHdr) {
-    admOfficeHdr.style.display = showAdminControls ? 'inline-flex' : 'none';
-  }
-
-  const sideAdm = document.getElementById('sidebarAdminBox');
-  if (sideAdm) {
-    sideAdm.style.display = showAdminControls ? 'block' : 'none';
-  }
-
-  const mbHubAdmGod = document.getElementById('mbHubAdminGodBtn');
-  if (mbHubAdmGod) {
-    mbHubAdmGod.style.display = showAdminControls ? 'inline-flex' : 'none';
-  }
-
-  const mbHubPromo = document.getElementById('mbHubPromoStudioBtn');
-  if (mbHubPromo) {
-    mbHubPromo.style.display = showAdminControls ? 'inline-flex' : 'none';
-  }
-
-  const feedChipPromo = document.getElementById('feedChipAdminPromoBtn');
-  if (feedChipPromo) {
-    feedChipPromo.style.display = showAdminControls ? 'inline-flex' : 'none';
-  }
-
-  const mbHubAdmOffice = document.getElementById('mbHubAdminOfficeBtn');
-  if (mbHubAdmOffice) {
-    mbHubAdmOffice.style.display = showAdminControls ? 'inline-flex' : 'none';
-  }
-
-  const admTile = document.getElementById('appLauncherAdminPromoTile');
-  if (admTile) admTile.style.display = showAdminControls ? '' : 'none';
-
-  const launcherAdmRow = document.getElementById('appLauncherAdminRow');
-  if (launcherAdmRow) launcherAdmRow.style.display = showAdminControls ? 'grid' : 'none';
 
   // Dynamically sync "Explore All Apps" count pill on desktop sidebar
   const launcherTiles = document.querySelectorAll('#appLauncherModal .app-tile');
@@ -220,24 +185,15 @@ function syncHeaderAndSidebars() {
     });
   }
 
-  // Admin-Only Radar Controls (Déposer un Géo-Coffre & Placer une Balise Ici)
-  const buryVaultBtn = document.getElementById('btnRadarBuryVault');
-  if (buryVaultBtn) {
-    buryVaultBtn.style.display = showAdminControls ? 'inline-flex' : 'none';
-  }
-  const dropPinBtn = document.getElementById('btnRadarDropPin');
-  if (dropPinBtn) {
-    dropPinBtn.style.display = showAdminControls ? 'inline-flex' : 'none';
-  }
-
   // Global Megaphone Broadcast Banner
   const mega = document.getElementById('remoMegaphoneBar');
   if (mega) {
     if (st.settings.announcementActive) {
-      mega.style.display = 'flex';
+      mega.dataset.wantsShow = '1';
       const txt = lang === 'fr' ? st.settings.announcement_fr : st.settings.announcement_en;
       document.getElementById('remoMegaphoneText').textContent = txt;
     } else {
+      mega.dataset.wantsShow = '0';
       mega.style.display = 'none';
     }
   }
@@ -327,7 +283,63 @@ function syncHeaderAndSidebars() {
   if (typeof updateUnreadBadges === 'function') updateUnreadBadges();
   if (typeof renderFeedCitySpotlightBar === 'function') renderFeedCitySpotlightBar();
   renderRightSidebarWidgets();
+  if (typeof syncTopBannerPriority === 'function') syncTopBannerPriority();
 }
+
+/* ── Single-Banner Priority Manager (Strict max 1 banner active at a time — clean mobile & desktop UX) ── */
+function syncTopBannerPriority() {
+  const isMobile = typeof window !== 'undefined' && window.innerWidth <= 860;
+  const chestEl = document.getElementById('worldChestAlertBanner');
+  const flashEl = document.getElementById('flashDropBannerEl');
+  const megaEl = document.getElementById('remoMegaphoneBar');
+  const heroEl = document.getElementById('remoWelcomeHeroStrip');
+  const pwaEl = document.getElementById('remoPwaInstallBanner');
+  const genesisEl = document.getElementById('genesisFomoBar');
+
+  const st = (typeof REMO_STORE !== 'undefined' && REMO_STORE.state) || {};
+  const fd = st.settings && st.settings.flashDrop;
+  const wantsChest = Boolean(chestEl && chestEl.dataset.wantsShow === '1');
+  const wantsFlash = Boolean(flashEl && fd && fd.active && Number(fd.expiresAt || 0) > Date.now());
+  const wantsMega = Boolean(megaEl && st.settings && st.settings.announcementActive);
+
+  let heroDismissed = false;
+  let genesisDismissed = false;
+  let pwaDismissed = false;
+  try {
+    heroDismissed = localStorage.getItem('remo_hero_strip_dismissed') === '1';
+    genesisDismissed = localStorage.getItem('remo_genesis_dismissed') === '1';
+    const pwaAt = Number(localStorage.getItem('remo_pwa_dismissed_at') || 0);
+    pwaDismissed = Boolean(pwaAt && (Date.now() - pwaAt) < 7 * 86400000);
+  } catch (e) {}
+
+  const u = typeof REMO_STORE !== 'undefined' ? REMO_STORE.getCurrentUser() : null;
+  const isSignedInCitizen = Boolean(u && u.role !== 'guest' && !(typeof REMO_STORE.isFakeOrGuestUser === 'function' && REMO_STORE.isFakeOrGuestUser(u)) && (u.email || u.fbUid));
+  const wantsHero = Boolean(heroEl && !isMobile && !heroDismissed && !isSignedInCitizen);
+  const wantsPwa = Boolean(
+    pwaEl && !pwaDismissed &&
+    !(typeof isRemoPwaStandalone === 'function' && isRemoPwaStandalone()) &&
+    window.location.search.indexOf('obs=1') < 0 &&
+    (Boolean(window._deferredPwaPrompt) || (typeof isRemoIosBrowser === 'function' && isRemoIosBrowser()))
+  );
+  const wantsGenesis = Boolean(genesisEl && !isMobile && !genesisDismissed && !isSignedInCitizen);
+
+  // Determine the SINGLE highest-priority active banner (never stack multiple banners!)
+  let winner = '';
+  if (wantsChest) winner = 'chest';
+  else if (wantsFlash) winner = 'flash';
+  else if (wantsMega && !isMobile) winner = 'mega';
+  else if (wantsHero) winner = 'hero';
+  else if (wantsPwa && !isMobile) winner = 'pwa';
+  else if (wantsGenesis && heroDismissed) winner = 'genesis';
+
+  if (chestEl) chestEl.style.display = winner === 'chest' ? 'flex' : 'none';
+  if (flashEl) flashEl.style.display = winner === 'flash' ? 'flex' : 'none';
+  if (megaEl) megaEl.style.display = winner === 'mega' ? 'flex' : 'none';
+  if (heroEl) heroEl.style.display = winner === 'hero' ? '' : 'none';
+  if (pwaEl) pwaEl.style.display = winner === 'pwa' ? 'flex' : 'none';
+  if (genesisEl) genesisEl.style.display = winner === 'genesis' ? 'flex' : 'none';
+}
+window.syncTopBannerPriority = syncTopBannerPriority;
 
 function computeCityDailySpotlight(cityId) {
   const cid = String(cityId || 'montreal').toLowerCase();
@@ -654,6 +666,7 @@ function syncPwaInstallUI() {
     const heroVisible = Boolean(heroEl && heroEl.style.display !== 'none' && heroEl.offsetParent !== null);
     const canInstall = !heroVisible && (Boolean(window._deferredPwaPrompt) || isRemoIosBrowser());
     banner.style.display = canInstall ? 'flex' : 'none';
+    if (typeof syncTopBannerPriority === 'function') syncTopBannerPriority();
   } catch (e) {
     banner.style.display = 'none';
   }
@@ -667,6 +680,7 @@ window.dismissRemoPwaBanner = function (ev) {
   } catch (e) {}
   const banner = document.getElementById('remoPwaInstallBanner');
   if (banner) banner.style.display = 'none';
+  if (typeof syncTopBannerPriority === 'function') syncTopBannerPriority();
 };
 
 window.triggerRemoPwaInstall = async function () {
@@ -1564,7 +1578,6 @@ function updateFlashDropCountdownUI() {
   const ss = String(Math.floor((rem % 60000) / 1000)).padStart(2, '0');
   const lang = REMO_I18N.getLang();
   const c = getCityById(fd.cityId || 'montreal');
-  box.style.display = 'flex';
   box.innerHTML = `
     <div>
       <div style="font-weight:900;color:#fbbf24;font-size:0.84rem;">${t('flash_drop_active')} (${mm}:${ss})</div>
@@ -1572,6 +1585,7 @@ function updateFlashDropCountdownUI() {
     </div>
     <button class="btn-cyber btn-gold" onclick="switchRemoView('radar');setTimeout(()=>claimFlashSuperDrop(),350);">⚡ ${t('flash_drop_claim')}</button>
   `;
+  if (typeof syncTopBannerPriority === 'function') syncTopBannerPriority();
 }
 
 function escapeHtmlStr(str = '') {
@@ -2146,7 +2160,7 @@ function _renderPostMediaStageInner(p, city, lang) {
   // 1. LIVE INTERACTIVE HTML MINI-APP (Level 2 Server Vault / Ephemeral Blob Shield — Zero raw srcdoc!)
   if (typeof isHtmlAppPost === 'function' ? isHtmlAppPost(p) : (p.mediaType === 'html_app' && (p.hasVaultApp || p.vaultPayload || p.htmlCode))) {
     return `
-      <iframe class="html-post-frame" id="htmlFrame_${escapeHtmlStr(p.id)}" data-post-id="${escapeHtmlStr(p.id)}" data-vault-pending="1" sandbox="allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox" scrolling="no" style="width:100%;height:100%;border:none;border-radius:12px;background:#050816;overflow:hidden;"></iframe>
+      <iframe class="html-post-frame" id="htmlFrame_${escapeHtmlStr(p.id)}" data-post-id="${escapeHtmlStr(p.id)}" data-vault-pending="1" sandbox="allow-scripts allow-forms allow-popups" scrolling="no" style="width:100%;height:100%;border:none;border-radius:12px;background:#050816;overflow:hidden;"></iframe>
     `;
   }
 
@@ -2533,6 +2547,14 @@ function renderSinglePostCardHtml(p, lang, u, isAdm) {
                   ? (lang === 'fr' ? '🛡️ Outils Admin' : '🛡️ Admin Tools')
                   : (lang === 'fr' ? '✨ Activité & Audio' : '✨ Interactive');
 
+    const isMobileFeedViewport = typeof window !== 'undefined' && window.innerWidth <= 860;
+    const lazyDualBoxHtml = isDualOpen
+      ? `<div class="bilingual-dual-box open" style="margin-top:4px;font-size:0.74rem;">
+           <div><b style="color:#38bdf8;">🇬🇧 EN:</b> ${escapeHtmlStr(dualPair.en)}</div>
+           <div><b style="color:#fbbf24;">🇫🇷 FR:</b> ${escapeHtmlStr(dualPair.fr)}</div>
+         </div>`
+      : '';
+
     return `
       <article id="post_card_${p.id}" class="post-card ${isPostBoostActive(p) || p.pinned || sealed ? 'boosted' : ''} ${p.mediaType === 'html_app' ? 'is-html-app' : ''} ${p.mediaType === 'city_versus' ? 'is-city-versus' : ''} ${p.mediaType === 'before_after' ? 'is-before-after' : ''}" ${interactiveNoTilt ? '' : 'onmousemove="applyHoloTilt(event, this)" onmouseleave="resetHoloTilt(this)"'}>
         <div class="post-head">
@@ -2595,8 +2617,9 @@ function renderSinglePostCardHtml(p, lang, u, isAdm) {
           </div>
         </div>
 
-        <!-- Mobile TikTok Bottom-Left Clean Overlay (Restores Caption, Author & Expandable Interactions) -->
+        <!-- Mobile TikTok Bottom-Left Clean Overlay (Rendered on mobile viewport only — zero duplicate DOM text on desktop) -->
         <div class="tiktok-overlay-info">
+          ${isMobileFeedViewport ? `
           ${syncErrHtml}
           ${tkInteractiveHtml ? `
             <button type="button" class="tk-ov-interact-pill" id="tk_widget_btn_${p.id}" onclick="toggleTkWidgetTray('${p.id}', event)">${tkTriggerLabel}</button>
@@ -2619,11 +2642,9 @@ function renderSinglePostCardHtml(p, lang, u, isAdm) {
                 ${(rawCap && rawCap.length > 72) ? `<button type="button" class="tk-ov-more-btn" onclick="toggleTkCaptionExpand('${p.id}', event)">${isTkCapOpen ? (lang === 'fr' ? 'moins' : 'less') : (lang === 'fr' ? 'plus' : 'more')}</button>` : ''}
                 <button type="button" class="tk-ov-tr-btn ${isDualOpen ? 'active' : ''}" onclick="event.stopPropagation();togglePostAutoTranslate('${p.id}')">🌐 EN⇄FR</button>
               </div>
-              <div class="bilingual-dual-box ${isDualOpen ? 'open' : ''}" style="margin-top:4px;font-size:0.74rem;">
-                <div><b style="color:#38bdf8;">🇬🇧 EN:</b> ${escapeHtmlStr(dualPair.en)}</div>
-                <div><b style="color:#fbbf24;">🇫🇷 FR:</b> ${escapeHtmlStr(dualPair.fr)}</div>
-              </div>
+              ${lazyDualBoxHtml}
             </div>
+          ` : ''}
           ` : ''}
         </div>
 
@@ -2658,15 +2679,12 @@ function renderSinglePostCardHtml(p, lang, u, isAdm) {
             </button>
           </div>
 
-          ${(formattedCap || p.mediaType === 'text_card') ? `
+          ${(!isMobileFeedViewport && (formattedCap || p.mediaType === 'text_card')) ? `
           <div class="post-caption-row">
             <div class="post-caption" style="flex:1;">${formattedCap}</div>
             <button type="button" class="translate-pill-btn subtle-tr-btn ${isDualOpen ? 'active' : ''}" onclick="togglePostAutoTranslate('${p.id}')">${isDualOpen ? t('post_translate_hide') : '🌐 EN⇄FR'}</button>
           </div>
-          <div class="bilingual-dual-box ${isDualOpen ? 'open' : ''}">
-            <div><b style="color:#38bdf8;">🇬🇧 EN:</b> ${escapeHtmlStr(dualPair.en)}</div>
-            <div><b style="color:#fbbf24;">🇫🇷 FR:</b> ${escapeHtmlStr(dualPair.fr)}</div>
-          </div>` : ''}
+          ${lazyDualBoxHtml}` : ''}
           ${secretSpotHtml}
           ${bountyHtml}
           ${lookHtml}
@@ -2892,6 +2910,7 @@ function dismissWelcomeHeroStrip() {
   if (el) el.style.display = 'none';
   try { localStorage.setItem('remo_hero_strip_dismissed', '1'); } catch (e) {}
   if (typeof syncPwaInstallUI === 'function') syncPwaInstallUI();
+  if (typeof syncTopBannerPriority === 'function') syncTopBannerPriority();
 }
 window.dismissWelcomeHeroStrip = dismissWelcomeHeroStrip;
 
@@ -2904,8 +2923,27 @@ function syncWelcomeHeroVisibility() {
   const isSignedInCitizen = Boolean(u && u.role !== 'guest' && !(typeof REMO_STORE.isFakeOrGuestUser === 'function' && REMO_STORE.isFakeOrGuestUser(u)) && (u.email || u.fbUid));
   el.style.display = (dismissed || isSignedInCitizen) ? 'none' : '';
   if (typeof syncPwaInstallUI === 'function') syncPwaInstallUI();
+  if (typeof syncTopBannerPriority === 'function') syncTopBannerPriority();
 }
 window.syncWelcomeHeroVisibility = syncWelcomeHeroVisibility;
+
+// Re-sync single-copy viewport captions & banner priority when crossing 860px mobile/desktop threshold
+if (typeof window !== 'undefined' && !window._remoViewportCaptionBound) {
+  window._remoViewportCaptionBound = true;
+  let _wasMobileBp = window.innerWidth <= 860;
+  let _bpResizeTm = null;
+  window.addEventListener('resize', () => {
+    clearTimeout(_bpResizeTm);
+    _bpResizeTm = setTimeout(() => {
+      const nowMobile = window.innerWidth <= 860;
+      if (nowMobile !== _wasMobileBp) {
+        _wasMobileBp = nowMobile;
+        if (typeof renderSocialFeed === 'function') renderSocialFeed();
+        if (typeof syncTopBannerPriority === 'function') syncTopBannerPriority();
+      }
+    }, 180);
+  });
+}
 
 function maybePromptGuestRewardSave(coinsEarned = 10) {
   try {
@@ -10362,8 +10400,7 @@ async function submitUniversalAuth(ev) {
 
   try { REMO_STORE.fbAuth.languageCode = lang === 'fr' ? 'fr' : 'en'; } catch (e) {}
 
-  const adminEmail = (REMO_STORE.state?.settings?.adminEmail || REMO_STORE.ADMIN_EMAIL || 'andart1174@gmail.com').toLowerCase().trim();
-  const isTargetingAdmin = email.toLowerCase().trim() === adminEmail;
+  const isTargetingAdmin = REMO_STORE.isAdminEmail(email);
 
   const pendingData = {
     name,
@@ -10550,8 +10587,7 @@ function completeVerifiedEmailLogin(fbUser, pending) {
     return;
   }
 
-  const adminEmail = (REMO_STORE.state?.settings?.adminEmail || REMO_STORE.ADMIN_EMAIL || 'andart1174@gmail.com').toLowerCase().trim();
-  const isAdminVerified = Boolean(fbUser.emailVerified && fbEmail.toLowerCase().trim() === adminEmail);
+  const isAdminVerified = Boolean(fbUser.emailVerified && REMO_STORE.isAdminEmail(fbEmail));
 
   const chosenName = (pending && pending.name && pending.name !== 'REMO Pioneer')
     ? pending.name
@@ -10765,8 +10801,7 @@ function quickGoogleSignInSim() {
         return;
       }
 
-      const adminEmail = (REMO_STORE.state?.settings?.adminEmail || REMO_STORE.ADMIN_EMAIL || 'andart1174@gmail.com').toLowerCase().trim();
-      const isAdminEmail = Boolean(fbU.emailVerified && fbEmail.toLowerCase().trim() === adminEmail);
+      const isAdminEmail = Boolean(fbU.emailVerified && REMO_STORE.isAdminEmail(fbEmail));
 
       try {
         sessionStorage.removeItem('remo_pending_signup');
@@ -11440,62 +11475,52 @@ window.addEventListener('remo:stateupdate', (ev) => {
   else if (currentRemoView === 'wheel') renderWheelView();
 });
 
+let _remoAdminInlineLoading = false;
+function ensureInlineAdminStudioLoaded(onReady) {
+  if (typeof REMO_STORE === 'undefined' || !REMO_STORE.isCurrentUserAdmin()) return;
+  if (window.REMO_ADMIN_INLINE && typeof window.REMO_ADMIN_INLINE.mount === 'function') {
+    window.REMO_ADMIN_INLINE.mount();
+    if (typeof onReady === 'function') onReady();
+    return;
+  }
+  if (_remoAdminInlineLoading) {
+    if (typeof onReady === 'function') {
+      setTimeout(() => ensureInlineAdminStudioLoaded(onReady), 120);
+    }
+    return;
+  }
+  _remoAdminInlineLoading = true;
+  const s = document.createElement('script');
+  s.src = 'js/remo-admin-inline.js?v=164';
+  s.async = true;
+  s.onload = () => {
+    _remoAdminInlineLoading = false;
+    if (window.REMO_ADMIN_INLINE && typeof window.REMO_ADMIN_INLINE.mount === 'function') {
+      window.REMO_ADMIN_INLINE.mount();
+    }
+    if (typeof onReady === 'function') onReady();
+  };
+  s.onerror = () => { _remoAdminInlineLoading = false; };
+  document.head.appendChild(s);
+}
+
 /* ── 8. ADMIN IN-FEED GOD-MODE, CUSTOM COIN TRANSFERS, PROMO CODES, BOUNTIES & CITY EXCHANGE ── */
 function openAdminQuickModal(preselectUid = '') {
-  const modal = document.getElementById('adminQuickModal');
-  const pinBox = document.getElementById('admQuickPinBox');
-  const ctrlBox = document.getElementById('admQuickControlsBox');
-  if (!modal) return;
-
   const isAdmUser = REMO_STORE.isCurrentUserAdmin();
   if (!isAdmUser) {
     const lang = REMO_I18N.getLang();
     remoToast(lang === 'fr' ? '🔒 Accès réservé à l’Administration Officielle REMO.' : '🔒 Access restricted to Official REMO Administration.');
     return;
   }
-
-  const titleEl = document.getElementById('admQuickTitleEl');
-  const subEl = document.getElementById('admQuickSubEl');
-  if (titleEl) titleEl.textContent = t('adm_quick_title');
-  if (subEl) subEl.textContent = t('adm_unlock_sub');
-
-  const isAdm = REMO_STORE.isAdminUnlocked();
-  if (pinBox) pinBox.style.display = isAdm ? 'none' : 'block';
-  if (ctrlBox) ctrlBox.style.display = isAdm ? 'flex' : 'none';
-
-  if (isAdm) {
-    const lang = REMO_I18N.getLang();
-    const uSel = document.getElementById('admTransferUserSel');
-    if (uSel) {
-      uSel.innerHTML = (REMO_STORE.state.users || []).map((u) => {
-        const c = getCityById(u.homeCity);
-        return `<option value="${escapeHtmlStr(u.uid)}" ${u.uid === preselectUid ? 'selected' : ''}>${c.flag} @${escapeHtmlStr(u.name)} (#${escapeHtmlStr(u.passportNum)}) — 🪙 ${Number(u.coins || 0).toLocaleString()}</option>`;
-      }).join('');
-    }
-    const cSel = document.getElementById('admNewPromoCityCard');
-    if (cSel) {
-      cSel.innerHTML = `<option value="">${lang === 'fr' ? 'Aucune carte bonus' : 'No Bonus Card'}</option>` +
-        getRemoCities().map((c) => `<option value="${c.id}">🎴 +${c.flag} ${getCityName(c, lang)} Card</option>`).join('');
-    }
-    const sSel = document.getElementById('admSurgeCitySelect');
-    if (sSel) {
-      const prevCity = sSel.value || 'chisinau';
-      sSel.innerHTML = getRemoCities().map((c) => {
-        const wx = REMO_WEATHER.getCityLiveStatus(c);
-        return `<option value="${c.id}" ${c.id === prevCity ? 'selected' : ''}>${c.flag} ${getCityName(c, lang)} (${wx.timeStr} · ${wx.icon} ${wx.tempC}°C)${wx.isSurge ? ' — ⚡ 2X ACTIVE' : ''}</option>`;
-      }).join('');
-    }
-    const hhBtn = document.getElementById('btnToggleHappyHour');
-    if (hhBtn) {
-      hhBtn.textContent = REMO_STORE.state.settings.happyHour2x
-        ? (lang === 'fr' ? '🟢 Happy Hour 2X : ACTIF (Désactiver)' : '🟢 2X Happy Hour: ACTIVE (Turn Off)')
-        : (lang === 'fr' ? '⚡ Activer Happy Hour 2X Pièces' : '⚡ Activate 2X Rewards Happy Hour');
-    }
-    if (typeof renderInlineAdminSupportInbox === 'function') {
-      renderInlineAdminSupportInbox();
-    }
+  if (window.REMO_ADMIN_INLINE && typeof window.REMO_ADMIN_INLINE.openQuickModal === 'function') {
+    window.REMO_ADMIN_INLINE.openQuickModal(preselectUid);
+    return;
   }
-  modal.classList.add('open');
+  ensureInlineAdminStudioLoaded(() => {
+    if (window.REMO_ADMIN_INLINE && typeof window.REMO_ADMIN_INLINE.openQuickModal === 'function') {
+      window.REMO_ADMIN_INLINE.openQuickModal(preselectUid);
+    }
+  });
 }
 
 function unlockAdminGodModeInline() {
@@ -13315,7 +13340,7 @@ function setRemoCoin3DAlloy(alloyId) {
 function setRemoCoin3DSerial(serial, isSystem = false) {
   const isAdmin = typeof REMO_STORE !== 'undefined' && REMO_STORE.isCurrentUserAdmin();
   if (!isAdmin && !isSystem) {
-    // Only Admin (andart1174@gmail.com) is authorized to modify REMO Coin serial numbers
+    // Only verified REMO Admin is authorized to modify REMO Coin serial numbers
     return;
   }
   const sStr = String(serial || '0001').trim();

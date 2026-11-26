@@ -79,8 +79,7 @@ async function adminGoogleSignIn() {
     provider.setCustomParameters({ prompt: 'select_account' });
     const cred = await REMO_STORE.fbAuth.signInWithPopup(provider);
     const fbU = cred && cred.user;
-    const adminEmail = (REMO_STORE.state?.settings?.adminEmail || 'andart1174@gmail.com').toLowerCase().trim();
-    if (!fbU || (fbU.email || '').toLowerCase().trim() !== adminEmail || fbU.emailVerified !== true) {
+    if (!fbU || fbU.emailVerified !== true || !REMO_STORE.isAdminEmail(fbU.email)) {
       await REMO_STORE.fbAuth.signOut();
       alert(lang === 'fr' ? '❌ Accès refusé : compte Fondateur vérifié requis.' : '❌ Access denied: verified Founder account required.');
       return;
@@ -100,7 +99,7 @@ async function unlockAdminOffice(ev) {
   if (ev) ev.preventDefault();
   const lang = REMO_I18N.getLang();
   const email = (document.getElementById('admEmailInput')?.value || '').trim();
-  const pass = document.getElementById('admPinInput')?.value || '';
+  const pass = (document.getElementById('admPasswordInput') || document.getElementById('admPinInput'))?.value || '';
   if (!email || !pass) {
     alert(lang === 'fr' ? 'Email et mot de passe Admin requis.' : 'Admin email and password required.');
     return;
@@ -115,8 +114,7 @@ async function unlockAdminOffice(ev) {
   try {
     const cred = await REMO_STORE.fbAuth.signInWithEmailAndPassword(email, pass);
     const fbU = cred && cred.user;
-    const adminEmail = (REMO_STORE.state?.settings?.adminEmail || 'andart1174@gmail.com').toLowerCase().trim();
-    if (!fbU || (fbU.email || '').toLowerCase().trim() !== adminEmail || fbU.emailVerified !== true) {
+    if (!fbU || fbU.emailVerified !== true || !REMO_STORE.isAdminEmail(fbU.email)) {
       await REMO_STORE.fbAuth.signOut();
       alert(lang === 'fr' ? '❌ Compte non autorisé pour l’Administration.' : '❌ Unauthorized Admin credentials.');
       return;

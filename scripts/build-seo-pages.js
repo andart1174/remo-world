@@ -194,16 +194,19 @@ const INLINE_RADIO_PLAYER_JS = `
 </script>
 `;
 
-function renderSocialMeta(title, desc, url) {
-  const img = `${DOMAIN}/img/remo_og_cover.jpg`;
+function renderSocialMeta(title, desc, url, customImg = '') {
+  const img = customImg || `${DOMAIN}/img/remo_og_cover.jpg`;
+  const hasDefaultSize = !customImg;
+  const sizeMeta = hasDefaultSize
+    ? `\n  <meta property="og:image:width" content="1200">\n  <meta property="og:image:height" content="630">`
+    : '';
   return `<meta property="og:type" content="website">
   <meta property="og:site_name" content="REMO World">
   <meta property="og:url" content="${url}">
   <meta property="og:title" content="${esc(title)}">
   <meta property="og:description" content="${esc(desc)}">
-  <meta property="og:image" content="${img}">
-  <meta property="og:image:width" content="1200">
-  <meta property="og:image:height" content="630">
+  <meta property="og:image" content="${img}">${sizeMeta}
+  <meta property="og:image:alt" content="${esc(title)}">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="${esc(title)}">
   <meta name="twitter:description" content="${esc(desc)}">
@@ -313,8 +316,8 @@ function buildCityPage(city, lang, cities, elements, stations) {
     : `${city.flag} ${cName} (${country}) — Live Radio, Local Time, Weather & 4D City Hub | REMO World`;
 
   const metaDesc = isFr
-    ? `Explorez ${cName} (${country}) en direct sur REMO World : écoutez la radio locale sans publicité, consultez l’heure et la météo live, réclamez votre Passeport 4D (${city.code}) et gagnez +25 Pièces d’Or.`
-    : `Explore ${cName} (${country}) live on REMO World: stream free local city radio, check live local time & weather, claim your ${city.code} 4D Citizen Passport, and earn +25 Gold Coins.`;
+    ? `Explorez ${cName} (${country}) en direct sur REMO World : écoutez la radio locale sans publicité, consultez l’heure et la météo live, réclamez votre Passeport 4D (${city.code}) et gagnez +150 Pièces d’Or.`
+    : `Explore ${cName} (${country}) live on REMO World: stream free local city radio, check live local time & weather, claim your ${city.code} 4D Citizen Passport, and earn +150 Gold Coins.`;
 
   const faqs = isFr
     ? [
@@ -324,7 +327,7 @@ function buildCityPage(city, lang, cities, elements, stations) {
         },
         {
           q: `Comment obtenir le Passeport Citoyen 4D et la Carte ${cName} (${city.code}) ?`,
-          a: `Ouvrez le Hub interactif ${cName} sur REMO World. En un clic, vous recevez un Passeport Citoyen officiel +25 Pièces d’Or REMO et pouvez collectionner la carte ${city.rarity} de ${cName}.`
+          a: `Ouvrez le Hub interactif ${cName} sur REMO World. En un clic, vous recevez un Passeport Citoyen officiel +150 Pièces d’Or REMO et pouvez collectionner la carte ${city.rarity} de ${cName}.`
         },
         {
           q: `Quels jeux et outils gratuits sont disponibles pour ${cName} ?`,
@@ -342,7 +345,7 @@ function buildCityPage(city, lang, cities, elements, stations) {
         },
         {
           q: `How do I claim an official ${cName} (${city.code}) 4D Citizen Passport & Card?`,
-          a: `Click "Enter Live ${cName} Hub" to open REMO World filtered to ${cName}. New citizens instantly receive +25 Gold Coins, a numbered 4D Citizen Passport, and daily packs featuring ${city.rarity} city cards.`
+          a: `Click "Enter Live ${cName} Hub" to open REMO World filtered to ${cName}. New citizens instantly receive +150 Gold Coins, a numbered 4D Citizen Passport, and daily packs featuring ${city.rarity} city cards.`
         },
         {
           q: `What free online city games can I play for ${cName}?`,
@@ -354,6 +357,11 @@ function buildCityPage(city, lang, cities, elements, stations) {
         }
       ];
 
+  const cityImgRel = path.join('img', 'cities', `${city.id}.jpg`);
+  const cityOgImg = fs.existsSync(path.join(ROOT, cityImgRel))
+    ? `${DOMAIN}/img/cities/${city.id}.jpg`
+    : `${DOMAIN}/img/remo_og_cover.jpg`;
+
   const jsonLd = {
     '@context': 'https://schema.org',
     '@graph': [
@@ -363,11 +371,13 @@ function buildCityPage(city, lang, cities, elements, stations) {
         'url': canonical,
         'name': title,
         'description': metaDesc,
+        'image': cityOgImg,
         'inLanguage': lang,
         'isPartOf': { '@id': `${DOMAIN}/#website` },
         'about': {
           '@type': 'City',
           'name': cName,
+          'image': cityOgImg,
           'containedInPlace': { '@type': 'Country', 'name': country },
           'geo': { '@type': 'GeoCoordinates', 'latitude': city.lat, 'longitude': city.lng }
         }
@@ -407,7 +417,7 @@ function buildCityPage(city, lang, cities, elements, stations) {
   <link rel="alternate" hreflang="en" href="${enUrl}">
   <link rel="alternate" hreflang="fr" href="${frUrl}">
   <link rel="alternate" hreflang="x-default" href="${enUrl}">
-  ${renderSocialMeta(title, metaDesc, canonical)}
+  ${renderSocialMeta(title, metaDesc, canonical, cityOgImg)}
   <link rel="icon" type="image/png" sizes="32x32" href="${prefix}img/favicon-32x32.png">
   <script type="application/ld+json">${JSON.stringify(jsonLd)}</script>
   <style>${SHARED_CSS}</style>
@@ -456,7 +466,7 @@ function buildCityPage(city, lang, cities, elements, stations) {
             🌧️ ${isFr ? `Ambiance Pluie Lofi · ${esc(cName)}` : `Rain Lofi Window · ${esc(cName)}`}
           </a>
           <a class="btn-sec" href="${prefix}?city=${city.id}&lang=${lang}&from=seo">
-            🚀 ${isFr ? `Hub Live de ${esc(cName)} (+25 🪙)` : `Enter Live ${esc(cName)} Hub (+25 🪙)`}
+            🚀 ${isFr ? `Hub Live de ${esc(cName)} (+150 🪙)` : `Enter Live ${esc(cName)} Hub (+150 🪙)`}
           </a>
           <a class="btn-sec" href="${prefix}?open=boardingpass&city=${city.id}&lang=${lang}&from=seo">
             🎫 ${isFr ? `Billet 4D vers ${esc(city.code)}` : `4D Boarding Pass to ${esc(city.code)}`}
@@ -657,7 +667,7 @@ function buildDirectoryPage(lang, cities, stationCount = 56) {
         <p class="lead">${esc(desc)}</p>
         <div class="cta-row">
           <a class="btn-primary" href="${prefix}?tv=montreal&lang=${lang}&from=seo">📺 ${isFr ? 'Ouvrir Focus TV 4D (Direct)' : 'Open 4D Focus TV (Live)'}</a>
-          <a class="btn-sec" href="${prefix}?lang=${lang}&from=seo">🚀 ${isFr ? 'Flux Social (+25 🪙)' : 'Live World Feed (+25 🪙)'}</a>
+          <a class="btn-sec" href="${prefix}?lang=${lang}&from=seo">🚀 ${isFr ? 'Flux Social (+150 🪙)' : 'Live World Feed (+150 🪙)'}</a>
           <a class="btn-sec" href="../world-radio.html">📻 ${isFr ? `${stationCount} Radios en Direct` : `Stream ${stationCount} World Radios`}</a>
           <a class="btn-sec" href="../focus-tv.html">🌆 ${isFr ? 'Guide Focus TV 4D' : 'Focus TV Guide'}</a>
           <a class="btn-sec" href="../world-blitz.html">⚡ ${isFr ? 'World Blitz 60s' : 'World Blitz 60s'}</a>

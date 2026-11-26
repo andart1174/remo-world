@@ -1088,7 +1088,7 @@ function createDefaultState() {
   const now = Date.now();
   return {
     settings: {
-      adminEmail: 'andart1174@gmail.com',
+      adminEmail: '',
       customDomain: '',
       announcement_en: '🌐 Welcome to REMO! Choose your Home City, open your Free Daily 4D City Card Pack & join the World City Cup!',
       announcement_fr: '🌐 Bienvenue sur REMO ! Choisissez votre Ville, ouvrez votre Pack Carte 4D gratuit et rejoignez la Coupe des Villes !',
@@ -1111,7 +1111,7 @@ function createDefaultState() {
         reward: 25
       },
       flashDrop: {
-        active: true,
+        active: false,
         cityId: 'montreal',
         spotName_en: 'Mont-Royal Belvédère Golden Beacon',
         spotName_fr: 'Balise Dorée du Belvédère Mont-Royal',
@@ -1119,7 +1119,7 @@ function createDefaultState() {
         lng: -73.5876,
         coins: 300,
         bonusCardCityId: 'montreal',
-        expiresAt: now + 15 * 60 * 1000
+        expiresAt: 0
       }
     },
 
@@ -1142,7 +1142,7 @@ function createDefaultState() {
       {
         uid: 'u_admin_founder',
         name: 'REMO Founder',
-        email: 'andart1174@gmail.com',
+        email: '',
         role: 'admin',
         verified: true,
         homeCity: 'montreal',
@@ -2761,24 +2761,117 @@ const REMO_STORE = {
     return false;
   },
 
+  ADMIN_EMAIL_SHA256: 'cb24179a6c34d4dcadd79214a30c61734f93795aa80fa3a50ea2fa36360c42ad',
+
+  _sha256Hex(str) {
+    const s = unescape(encodeURIComponent(String(str || '')));
+    const bytes = [];
+    for (let i = 0; i < s.length; i++) bytes.push(s.charCodeAt(i));
+    const bitLen = bytes.length * 8;
+    bytes.push(0x80);
+    while ((bytes.length % 64) !== 56) bytes.push(0);
+    const hi = Math.floor(bitLen / 0x100000000);
+    const lo = bitLen >>> 0;
+    bytes.push((hi >>> 24) & 255, (hi >>> 16) & 255, (hi >>> 8) & 255, hi & 255);
+    bytes.push((lo >>> 24) & 255, (lo >>> 16) & 255, (lo >>> 8) & 255, lo & 255);
+    const K = [
+      0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,
+      0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,
+      0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,
+      0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,
+      0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,
+      0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,
+      0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,
+      0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2
+    ];
+    let h0 = 0x6a09e667, h1 = 0xbb67ae85, h2 = 0x3c6ef372, h3 = 0xa54ff53a;
+    let h4 = 0x510e527f, h5 = 0x9b05688c, h6 = 0x1f83d9ab, h7 = 0x5be0cd19;
+    const rotr = (n, x) => (x >>> n) | (x << (32 - n));
+    const W = new Array(64);
+    for (let i = 0; i < bytes.length; i += 64) {
+      for (let t = 0; t < 16; t++) {
+        W[t] = ((bytes[i + t * 4] << 24) | (bytes[i + t * 4 + 1] << 16) | (bytes[i + t * 4 + 2] << 8) | bytes[i + t * 4 + 3]) >>> 0;
+      }
+      for (let t = 16; t < 64; t++) {
+        const s0 = rotr(7, W[t - 15]) ^ rotr(18, W[t - 15]) ^ (W[t - 15] >>> 3);
+        const s1 = rotr(17, W[t - 2]) ^ rotr(19, W[t - 2]) ^ (W[t - 2] >>> 10);
+        W[t] = (W[t - 16] + s0 + W[t - 7] + s1) >>> 0;
+      }
+      let a = h0, b = h1, c = h2, d = h3, e = h4, f = h5, g = h6, h = h7;
+      for (let t = 0; t < 64; t++) {
+        const S1 = rotr(6, e) ^ rotr(11, e) ^ rotr(25, e);
+        const ch = (e & f) ^ ((~e) & g);
+        const temp1 = (h + S1 + ch + K[t] + W[t]) >>> 0;
+        const S0 = rotr(2, a) ^ rotr(13, a) ^ rotr(22, a);
+        const maj = (a & b) ^ (a & c) ^ (b & c);
+        const temp2 = (S0 + maj) >>> 0;
+        h = g; g = f; f = e; e = (d + temp1) >>> 0;
+        d = c; c = b; b = a; a = (temp1 + temp2) >>> 0;
+      }
+      h0 = (h0 + a) >>> 0; h1 = (h1 + b) >>> 0; h2 = (h2 + c) >>> 0; h3 = (h3 + d) >>> 0;
+      h4 = (h4 + e) >>> 0; h5 = (h5 + f) >>> 0; h6 = (h6 + g) >>> 0; h7 = (h7 + h) >>> 0;
+    }
+    return [h0, h1, h2, h3, h4, h5, h6, h7].map((v) => v.toString(16).padStart(8, '0')).join('');
+  },
+
   isAdminEmail(email) {
-    if (!email) return false;
-    const adminEmail = (this.state && this.state.settings && this.state.settings.adminEmail) || 'andart1174@gmail.com';
-    return String(email).toLowerCase().trim() === adminEmail.toLowerCase().trim();
+    const norm = String(email || '').toLowerCase().trim();
+    if (!norm) return false;
+    const configured = String((this.state && this.state.settings && this.state.settings.adminEmail) || '').toLowerCase().trim();
+    if (configured && norm === configured) return true;
+    return this._sha256Hex(norm) === this.ADMIN_EMAIL_SHA256;
+  },
+
+  async verifyAdminSessionOnServer(fbUser) {
+    if (!fbUser || !fbUser.uid) {
+      this._fbAdminClaim = false;
+      this._serverVerifiedAdminUid = '';
+      return false;
+    }
+    try {
+      if (typeof fbUser.getIdTokenResult === 'function') {
+        const res = await fbUser.getIdTokenResult();
+        this._fbAdminClaim = Boolean(res && res.claims && res.claims.admin === true);
+      }
+    } catch (e) {}
+    if (typeof window !== 'undefined' && /^https?:$/i.test(window.location.protocol) && typeof fetch === 'function' && typeof fbUser.getIdToken === 'function') {
+      try {
+        const token = await fbUser.getIdToken();
+        const r = await fetch('/.netlify/functions/admin-session', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (r.ok) {
+          const data = await r.json().catch(() => ({}));
+          if (data && data.ok && data.isAdmin === true) {
+            this._serverVerifiedAdminUid = fbUser.uid;
+            return true;
+          }
+        } else if (r.status === 401 || r.status === 403) {
+          this._serverVerifiedAdminUid = '';
+          return false;
+        }
+      } catch (e) {}
+    }
+    return this.isCurrentUserAdmin();
   },
 
   isCurrentUserAdmin() {
     const fbUser = this.fbAuth && this.fbAuth.currentUser;
     const fbEmail = this._getFbEmail(fbUser);
-    if (!fbUser || !fbEmail || fbUser.emailVerified !== true) return false;
-    const adminEmail = (this.state && this.state.settings && this.state.settings.adminEmail) || 'andart1174@gmail.com';
-    if (fbEmail.toLowerCase().trim() !== adminEmail.toLowerCase().trim()) return false;
+    if (!fbUser || fbUser.emailVerified !== true) return false;
+    const hasAdminIdentity = Boolean(
+      this._fbAdminClaim === true ||
+      (this._serverVerifiedAdminUid && this._serverVerifiedAdminUid === fbUser.uid) ||
+      (fbEmail && this.isAdminEmail(fbEmail))
+    );
+    if (!hasAdminIdentity) return false;
     // Prevent admin/guest split-brain if local session is currently pinned to a non-admin citizen or guest
     const uid = localStorage.getItem(this.USER_KEY) || '';
     if (uid && Array.isArray(this.state?.users)) {
       const cur = this.state.users.find((x) => x && x.uid === uid);
       if (cur && cur.fbUid && cur.fbUid !== fbUser.uid) return false;
-      if (cur && cur.email && cur.email.toLowerCase().trim() !== adminEmail.toLowerCase().trim() && !this.isFakeOrGuestUser(cur)) return false;
+      if (cur && cur.email && !this.isAdminEmail(cur.email) && !this.isFakeOrGuestUser(cur)) return false;
     }
     return true;
   },
@@ -2809,6 +2902,66 @@ const REMO_STORE = {
     return Boolean(active);
   },
 
+  async callEconomyServer(action, payload = {}) {
+    if (typeof window === 'undefined' || !/^https?:$/i.test(window.location.protocol) || typeof fetch !== 'function') {
+      return { ok: false, fallback: true, reason: 'offline' };
+    }
+    const fbU = this.fbAuth && this.fbAuth.currentUser;
+    if (!fbU || typeof fbU.getIdToken !== 'function') {
+      return { ok: false, fallback: true, reason: 'unauthenticated' };
+    }
+    try {
+      const token = await fbU.getIdToken();
+      const res = await fetch('/.netlify/functions/remo-economy', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify(Object.assign({ action }, payload || {}))
+      });
+      const data = await res.json().catch(() => ({}));
+      if (data && data.configured === false) {
+        return { ok: false, fallback: true, reason: 'server_not_configured' };
+      }
+      if (res.ok && data && data.ok) {
+        return Object.assign({ ok: true, serverVerified: true }, data);
+      }
+      if (res.status >= 400 && res.status < 500) {
+        return Object.assign({ ok: false, fallback: false, statusCode: res.status }, data);
+      }
+      return { ok: false, fallback: true, reason: 'server_unavailable' };
+    } catch (e) {
+      return { ok: false, fallback: true, reason: 'network_error' };
+    }
+  },
+
+  _checkAntiTeleport(uid, lat, lng, allowBypass = false) {
+    if (allowBypass) return { ok: true };
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return { ok: false, reason: 'invalid_gps' };
+    const key = 'remo_last_gps_fix_' + String(uid || 'anon');
+    const now = Date.now();
+    try {
+      const raw = localStorage.getItem(key);
+      if (raw) {
+        const prev = JSON.parse(raw);
+        if (prev && Number.isFinite(prev.lat) && Number.isFinite(prev.lng) && Number(prev.ts) > 0) {
+          const elapsedMs = Math.max(1, now - Number(prev.ts));
+          const distKm = this._calcGeoDistKm(prev.lat, prev.lng, lat, lng);
+          if (elapsedMs < 15000) {
+            return { ok: false, reason: 'cooldown', waitSec: Math.ceil((15000 - elapsedMs) / 1000) };
+          }
+          const speedKmh = distKm / (elapsedMs / 3600000);
+          if (distKm > 5 && speedKmh > 950) {
+            return { ok: false, reason: 'anti_teleport', distanceKm: Math.round(distKm), speedKmh: Math.round(speedKmh) };
+          }
+        }
+      }
+      localStorage.setItem(key, JSON.stringify({ lat, lng, ts: now }));
+    } catch (e) {}
+    return { ok: true };
+  },
+
   creditSystemCoins(targetUid, amount = 0, note = '', maxCap = 5000) {
     const u = this.state.users.find((x) => x && x.uid === targetUid);
     if (!u || u.banned) return null;
@@ -2836,11 +2989,16 @@ const REMO_STORE = {
     if (!curMe || curMe.uid === u.uid || this.isCurrentUserAdmin()) {
       this.syncUserToCloud(u);
     } else if (this.fbDb && typeof firebase !== 'undefined') {
-      this.fbDb.collection('remo_users').doc(u.uid).update({
-        coins: Number(u.coins || 0),
-        lifetimeCoins: Number(u.lifetimeCoins || u.coins || 0),
-        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-      }).catch(() => {});
+      // Attempt server-authoritative atomic tip first, fall back cleanly to Firestore bounded update
+      this.callEconomyServer('tip_user', { toUid: u.uid, amount: val }).then((srv) => {
+        if (srv && srv.ok && srv.serverVerified) return;
+        if (srv && srv.fallback === false) return;
+        this.fbDb.collection('remo_users').doc(u.uid).update({
+          coins: Number(u.coins || 0),
+          lifetimeCoins: Number(u.lifetimeCoins || u.coins || 0),
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        }).catch(() => {});
+      });
     }
     return u;
   },
@@ -3115,8 +3273,7 @@ const REMO_STORE = {
     // Self-heal session mismatch between Firebase Auth and local USER_KEY
     if (fbU && fbVerified) {
       const fbEmail = this._getFbEmail(fbU).toLowerCase().trim();
-      const adminEmail = (this.state?.settings?.adminEmail || 'andart1174@gmail.com').toLowerCase().trim();
-      const isAdminFb = Boolean(fbEmail && fbEmail === adminEmail && fbU.emailVerified === true);
+      const isAdminFb = Boolean(fbU.emailVerified === true && (this._fbAdminClaim === true || this.isAdminEmail(fbEmail)));
       const expectedFbUid = 'u_fb_' + fbU.uid;
       const hasPrimaryFounder = isAdminFb && (this.state.users || []).some((x) => x && x.uid === 'u_admin_founder');
       const needsSwitch = !u ||
@@ -3129,7 +3286,7 @@ const REMO_STORE = {
         let match = null;
         if (isAdminFb) {
           match = (this.state.users || []).find((x) => x && x.uid === 'u_admin_founder') ||
-            (this.state.users || []).filter((x) => x && x.email && x.email.toLowerCase().trim() === adminEmail)
+            (this.state.users || []).filter((x) => x && x.email && this.isAdminEmail(x.email))
               .sort((a, b) => Number(b.coins || 0) - Number(a.coins || 0))[0] || null;
         }
         if (!match) {
@@ -3287,8 +3444,7 @@ const REMO_STORE = {
       const curFb = this.fbAuth && this.fbAuth.currentUser;
       if (curFb && this._isFbUserVerified(curFb)) {
         const fbEmail = this._getFbEmail(curFb);
-        const adminEmail = (this.state?.settings?.adminEmail || 'andart1174@gmail.com').toLowerCase().trim();
-        const isFbAdmin = Boolean(curFb.emailVerified === true && fbEmail.toLowerCase() === adminEmail);
+        const isFbAdmin = Boolean(curFb.emailVerified === true && (this._fbAdminClaim === true || this.isAdminEmail(fbEmail)));
         return this.ensureGuestOrCitizen(curFb.displayName || (isFbAdmin ? 'REMO Founder' : 'Citizen'), fbEmail, homeCity, isFbAdmin, curFb.uid);
       }
       // Never fallback to this.state.users[0]! Create an isolated Guest Explorer session
@@ -3311,8 +3467,8 @@ const REMO_STORE = {
         ownedShopItems: [],
         equippedFrame: '',
         equippedTitleId: '',
-        coins: 100,
-        lifetimeCoins: 100,
+        coins: 0,
+        lifetimeCoins: 0,
         streak: 1,
         lastStreakClaimDate: '',
         following: [],
@@ -3328,15 +3484,14 @@ const REMO_STORE = {
     }
 
     const cleanEmail = email ? String(email).trim() : '';
-    const adminEmail = (this.state && this.state.settings && this.state.settings.adminEmail) || 'andart1174@gmail.com';
     const curFb = this.fbAuth && this.fbAuth.currentUser;
     const matchesVerifiedFbAdmin = Boolean(
       curFb && curFb.emailVerified === true &&
-      this._getFbEmail(curFb).toLowerCase().trim() === adminEmail.toLowerCase().trim() &&
+      (this._fbAdminClaim === true || this.isAdminEmail(this._getFbEmail(curFb))) &&
       (!fbUid || curFb.uid === fbUid)
     );
     const isAdminTarget = Boolean(
-      cleanEmail && cleanEmail.toLowerCase() === adminEmail.toLowerCase().trim() &&
+      ((cleanEmail && this.isAdminEmail(cleanEmail)) || this._fbAdminClaim === true) &&
       (isAdmin || matchesVerifiedFbAdmin)
     );
 
@@ -3344,7 +3499,7 @@ const REMO_STORE = {
     let u = null;
     if (isAdminTarget) {
       u = this.state.users.find((x) => x && x.uid === 'u_admin_founder') ||
-        this.state.users.filter((x) => x && x.email && x.email.toLowerCase().trim() === adminEmail.toLowerCase().trim())
+        this.state.users.filter((x) => x && x.email && this.isAdminEmail(x.email))
           .sort((a, b) => Number(b.coins || 0) - Number(a.coins || 0))[0] || null;
     }
     if (!u && fbUid) {
@@ -3411,8 +3566,8 @@ const REMO_STORE = {
       const effHomeCity = (homeCity && homeCity !== 'montreal')
         ? homeCity
         : (savedPickedCity || (guestSession && guestSession.homeCity) || homeCity || 'montreal');
-      const guestExtraCoins = guestSession ? Math.max(0, Number(guestSession.coins || 100) - 100) : 0;
-      const startCoins = Math.min(400, bonus + guestExtraCoins);
+      const guestExtraCoins = guestSession ? Math.max(0, Number(guestSession.coins || 0)) : 0;
+      const startCoins = Math.min(250, bonus + guestExtraCoins);
 
       u = {
         uid: fbUid ? ('u_fb_' + fbUid) : ('u_' + Date.now().toString(36)),
@@ -3475,11 +3630,11 @@ const REMO_STORE = {
     // Evict any leftover temporary guest sessions once authenticated as a real citizen
     this.state.users = (this.state.users || []).filter((x) => x && (x.uid === u.uid || !this.isFakeOrGuestUser(x)));
     localStorage.setItem(this.USER_KEY, u.uid);
-    if (u && u.email && u.email.toLowerCase().trim() === adminEmail.toLowerCase().trim() && matchesVerifiedFbAdmin) {
+    if (u && ((u.email && this.isAdminEmail(u.email)) || this._fbAdminClaim === true) && matchesVerifiedFbAdmin) {
       u.role = 'admin';
       this.setAdminUnlocked(true);
     } else {
-      if (u && u.role === 'admin' && (!u.email || u.email.toLowerCase().trim() !== adminEmail.toLowerCase().trim())) {
+      if (u && u.role === 'admin' && !this._fbAdminClaim && (!u.email || !this.isAdminEmail(u.email))) {
         u.role = 'citizen';
       }
       this.setAdminUnlocked(false);
@@ -3541,6 +3696,12 @@ const REMO_STORE = {
         lastPhotoCardMintMonth: user.lastPhotoCardMintMonth || '',
         updatedAt: serverTs
       };
+      this._lastCloudCoinsMap = this._lastCloudCoinsMap || Object.create(null);
+      const prevCloudCoins = Number(this._lastCloudCoinsMap[cleanUser.uid] ?? -1);
+      if (cleanUser.coins > prevCloudCoins) {
+        cleanUser.lastCoinWriteAt = serverTs;
+        this._lastCloudCoinsMap[cleanUser.uid] = cleanUser.coins;
+      }
       if (compactCards !== undefined) cleanUser.cards = compactCards;
       if (isAdm) {
         cleanUser.role = user.role || 'citizen';
@@ -5013,17 +5174,19 @@ const REMO_STORE = {
       return { success: false, reason: 'already_claimed', vault: v };
     }
 
-    // Cooldown anti-spoofing guard between GPS vault claims
-    const nowTs = Date.now();
-    if (!isSimulated && this._lastVaultClaimTs && (nowTs - this._lastVaultClaimTs) < 12000) {
-      return { success: false, reason: 'cooldown', vault: v };
+    // Strictly restrict simulated GPS unlock to verified Admin testing only
+    const allowSim = Boolean(isSimulated && (this.isAdminUnlocked() || this.isCurrentUserAdmin()));
+
+    // Anti-teleport + cooldown guard between GPS vault claims
+    const tpCheck = this._checkAntiTeleport(u.uid, userLat, userLng, allowSim);
+    if (!tpCheck.ok) {
+      return Object.assign({ success: false, vault: v }, tpCheck);
     }
-    this._lastVaultClaimTs = nowTs;
 
     const distKm = this._calcGeoDistKm(userLat, userLng, v.lat, v.lng);
     const radiusKm = (v.radiusMeters || 350) / 1000;
 
-    if (!isSimulated && distKm > radiusKm) {
+    if (!allowSim && distKm > radiusKm) {
       return {
         success: false,
         reason: 'too_far',
@@ -5397,8 +5560,7 @@ const REMO_STORE = {
             if (res && res.user) {
               const fbU = res.user;
               const fbEmail = this._getFbEmail(fbU);
-              const adminEmail = (this.state?.settings?.adminEmail || 'andart1174@gmail.com').toLowerCase().trim();
-              const isAdminEmail = Boolean(fbU.emailVerified === true && fbEmail.toLowerCase() === adminEmail);
+              const isAdminEmail = Boolean(fbU.emailVerified === true && (this._fbAdminClaim === true || this.isAdminEmail(fbEmail)));
               let chosenCity = 'montreal';
               try {
                 const rawG = sessionStorage.getItem('remo_pending_google') || localStorage.getItem('remo_pending_google');
@@ -5449,8 +5611,11 @@ const REMO_STORE = {
               return;
             }
             const fbEmail = this._getFbEmail(fbU);
-            const adminEmail = (this.state?.settings?.adminEmail || 'andart1174@gmail.com').toLowerCase().trim();
-            const isAdminEmail = Boolean(fbU.emailVerified === true && fbEmail.toLowerCase() === adminEmail);
+            let isAdminEmail = Boolean(fbU.emailVerified === true && (this._fbAdminClaim === true || this.isAdminEmail(fbEmail)));
+            if (fbU.emailVerified === true) {
+              const serverAdminOk = await this.verifyAdminSessionOnServer(fbU).catch(() => isAdminEmail);
+              if (serverAdminOk || this._fbAdminClaim === true) isAdminEmail = true;
+            }
 
             // Hydrate authoritative Cloud profile BEFORE creating/updating local profile so default values never overwrite Cloud coins/avatar/cards
             if (this.fbDb && !this._usersCloudSyncedOnce) {
@@ -5813,7 +5978,6 @@ const REMO_STORE = {
         const curFb = this.fbAuth && this.fbAuth.currentUser;
         const curFbVerified = this._isFbUserVerified(curFb);
         const curFbEmail = this._getFbEmail(curFb);
-        const adminEmail = (this.state?.settings?.adminEmail || 'andart1174@gmail.com').toLowerCase().trim();
 
         snap.forEach((doc) => {
           const uData = doc.data();
@@ -5892,14 +6056,15 @@ const REMO_STORE = {
             if (existingLocal.emailVerified && uData.emailVerified === undefined) uData.emailVerified = existingLocal.emailVerified;
             if (existingLocal.verified && uData.verified === undefined) uData.verified = existingLocal.verified;
           }
-          if (curFb && curFbVerified && (uData.uid === ('u_fb_' + curFb.uid) || uData.fbUid === curFb.uid || (curFbEmail && uData.email && uData.email.toLowerCase().trim() === curFbEmail.toLowerCase()) || (uData.uid === 'u_admin_founder' && curFb.emailVerified === true && curFbEmail.toLowerCase() === adminEmail))) {
-            const isVerifiedFounderDoc = Boolean(uData.uid === 'u_admin_founder' && curFb.emailVerified === true && curFbEmail.toLowerCase() === adminEmail);
+          const curFbIsAdmin = Boolean(curFb && curFb.emailVerified === true && (this._fbAdminClaim === true || this.isAdminEmail(curFbEmail)));
+          if (curFb && curFbVerified && (uData.uid === ('u_fb_' + curFb.uid) || uData.fbUid === curFb.uid || (curFbEmail && uData.email && uData.email.toLowerCase().trim() === curFbEmail.toLowerCase()) || (uData.uid === 'u_admin_founder' && curFbIsAdmin))) {
+            const isVerifiedFounderDoc = Boolean(uData.uid === 'u_admin_founder' && curFbIsAdmin);
             if (curFbEmail && !uData.email) uData.email = curFbEmail;
             if (!uData.fbUid || isVerifiedFounderDoc) uData.fbUid = curFb.uid;
             uData.emailVerified = true;
             uData.verified = true;
             if (!uData.role || uData.role === 'guest' || isVerifiedFounderDoc) {
-              uData.role = (curFb.emailVerified === true && curFbEmail.toLowerCase() === adminEmail) ? 'admin' : 'citizen';
+              uData.role = curFbIsAdmin ? 'admin' : 'citizen';
             }
           }
 
@@ -5908,7 +6073,7 @@ const REMO_STORE = {
         });
 
         // Clean up any accidental duplicate Admin u_fb_<uid> profile when u_admin_founder is present
-        if (curFb && curFbVerified && curFb.emailVerified === true && curFbEmail.toLowerCase() === adminEmail) {
+        if (curFb && curFbVerified && curFb.emailVerified === true && (this._fbAdminClaim === true || this.isAdminEmail(curFbEmail))) {
           const founder = cloudUsers.find((x) => x && x.uid === 'u_admin_founder');
           const dupIdx = cloudUsers.findIndex((x) => x && x.uid === ('u_fb_' + curFb.uid) && x.uid !== 'u_admin_founder' && x.passportNum !== '0001');
           if (founder && dupIdx >= 0 && Number(founder.coins || 0) >= Number(cloudUsers[dupIdx].coins || 0)) {

@@ -6,6 +6,7 @@
  * - Automatic server-to-server fallback to images-api.nasa.gov (zero API key, high quota) if APOD is busy or returns video.
  */
 const https = require('https');
+const { resolveSafeCorsHeaders, checkMemoryRateLimit } = require('../shared/html-vault-core');
 
 const _cache = new Map(); // cacheKey -> { data, exp }
 const APOD_START = '1995-06-16';
@@ -50,15 +51,13 @@ function getJson(urlStr, timeoutMs = 7500) {
   });
 }
 
-function respond(statusCode, payload, maxAgeSec = 3600) {
+function respond(statusCode, payload, maxAgeSec = 3600, corsHeaders = {}) {
   return {
     statusCode,
-    headers: {
+    headers: Object.assign({
       'Content-Type': 'application/json; charset=utf-8',
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, OPTIONS',
       'Cache-Control': `public, max-age=${maxAgeSec}`
-    },
+    }, corsHeaders),
     body: JSON.stringify(payload)
   };
 }
@@ -136,8 +135,17 @@ async function fetchNasaImagesFallback(dateInfo) {
 }
 
 exports.handler = async (event) => {
+  const cors = resolveSafeCorsHeaders(event, { allowNullOrigin: true });
+  if (!cors.ok) {
+    return respond(403, { ok: false, error: cors.reason || 'Forbidden origin' }, 60);
+  }
   if (String((event && event.httpMethod) || 'GET').toUpperCase() === 'OPTIONS') {
-    return respond(204, {}, 60);
+    return respond(204, {}, 60, cors.headers);
+  }
+  const ip = String((event.headers && (event.headers['x-nf-client-connection-ip'] || event.headers['x-forwarded-for'])) || 'unknown').split(',')[0].trim();
+  const rl = checkMemoryRateLimit('nasa_apod:' + ip, 45, 60000);
+  if (!rl.allowed) {
+    return respond(429, { ok: false, error: 'Rate limit exceeded' }, 10, Object.assign({}, cors.headers, { 'Retry-After': String(rl.retryAfterSec) }));
   }
 
   const qs = (event && event.queryStringParameters) || {};
@@ -147,7 +155,7 @@ exports.handler = async (event) => {
 
   const cached = _cache.get(cacheKey);
   if (cached && Date.now() < cached.exp) {
-    return respond(200, cached.data, dateInfo.matchedMode === 'today' ? 1800 : 86400);
+    return respond(200, cached.data, dateInfo.matchedMode === 'today' ? 1800 : 86400, cors.headers);
   }
 
   const apiKey = String(process.env.NASA_API_KEY || 'DEMO_KEY').trim() || 'DEMO_KEY';
@@ -180,12 +188,12 @@ exports.handler = async (event) => {
     try {
       result = await fetchNasaImagesFallback(dateInfo);
     } catch (e2) {
-      return respond(502, { ok: false, error: 'NASA upstream temporarily busy' }, 30);
+      return respond(502, { ok: false, error: 'NASA upstream temporarily busy' }, 30, cors.headers);
     }
   }
 
   const ttlMs = dateInfo.matchedMode === 'today' ? (6 * 3600 * 1000) : (24 * 3600 * 1000);
   _cache.set(cacheKey, { data: result, exp: Date.now() + ttlMs });
   if (_cache.size > 400) _cache.clear();
-  return respond(200, result, dateInfo.matchedMode === 'today' ? 1800 : 86400);
+  return respond(200, result, dateInfo.matchedMode === 'today' ? 1800 : 86400, cors.headers);
 };

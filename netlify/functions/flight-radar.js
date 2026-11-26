@@ -4,6 +4,7 @@
  * server-to-server (avoiding browser CORS blocks) and returns clean normalized JSON.
  */
 const https = require('https');
+const { resolveSafeCorsHeaders, checkMemoryRateLimit } = require('../shared/html-vault-core');
 
 const _cache = new Map(); // gridKey -> { data, exp }
 
@@ -29,22 +30,29 @@ function getJson(urlStr, timeoutMs = 6500) {
   });
 }
 
-function respond(statusCode, payload) {
+function respond(statusCode, payload, corsHeaders = {}) {
   return {
     statusCode,
-    headers: {
+    headers: Object.assign({
       'Content-Type': 'application/json; charset=utf-8',
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, OPTIONS',
       'Cache-Control': 'public, max-age=8'
-    },
+    }, corsHeaders),
     body: JSON.stringify(payload)
   };
 }
 
 exports.handler = async (event) => {
+  const cors = resolveSafeCorsHeaders(event, { allowNullOrigin: true });
+  if (!cors.ok) {
+    return respond(403, { ok: false, error: cors.reason || 'Forbidden origin' });
+  }
   if (String(event.httpMethod || 'GET').toUpperCase() === 'OPTIONS') {
-    return respond(204, {});
+    return respond(204, {}, cors.headers);
+  }
+  const ip = String((event.headers && (event.headers['x-nf-client-connection-ip'] || event.headers['x-forwarded-for'])) || 'unknown').split(',')[0].trim();
+  const rl = checkMemoryRateLimit('flight_radar:' + ip, 45, 60000);
+  if (!rl.allowed) {
+    return respond(429, { ok: false, error: 'Rate limit exceeded' }, Object.assign({}, cors.headers, { 'Retry-After': String(rl.retryAfterSec) }));
   }
   const qs = (event && event.queryStringParameters) || {};
   const lat = Number(qs.lat);
@@ -52,13 +60,13 @@ exports.handler = async (event) => {
   const distNm = Math.min(120, Math.max(25, Number(qs.dist) || 80));
 
   if (!Number.isFinite(lat) || !Number.isFinite(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
-    return respond(400, { ok: false, error: 'Invalid lat/lng' });
+    return respond(400, { ok: false, error: 'Invalid lat/lng' }, cors.headers);
   }
 
   const gridKey = `${lat.toFixed(2)},${lng.toFixed(2)},${Math.round(distNm)}`;
   const cached = _cache.get(gridKey);
   if (cached && Date.now() < cached.exp) {
-    return respond(200, cached.data);
+    return respond(200, cached.data, cors.headers);
   }
 
   let planes = [];
@@ -103,12 +111,12 @@ exports.handler = async (event) => {
         hdg: Math.round(Number(s[10] || 0))
       }));
     } catch (e2) {
-      return respond(502, { ok: false, error: 'Live radar upstream busy' });
+      return respond(502, { ok: false, error: 'Live radar upstream busy' }, cors.headers);
     }
   }
 
   const payload = { ok: true, source, total, planes, ts: Date.now() };
   _cache.set(gridKey, { data: payload, exp: Date.now() + 8000 });
   if (_cache.size > 80) _cache.clear();
-  return respond(200, payload);
+  return respond(200, payload, cors.headers);
 };

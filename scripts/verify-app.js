@@ -16,11 +16,14 @@ function runSyntaxChecks() {
   const jsFiles = fs.readdirSync(path.join(ROOT, 'js'))
     .filter((f) => f.endsWith('.js'))
     .map((f) => path.join('js', f));
-  jsFiles.push('sw.js');
+  const nfFiles = fs.readdirSync(path.join(ROOT, 'netlify', 'functions'))
+    .filter((f) => f.endsWith('.js'))
+    .map((f) => path.join('netlify', 'functions', f));
+  jsFiles.push('sw.js', path.join('netlify', 'shared', 'html-vault-core.js'), ...nfFiles);
   for (const rel of jsFiles) {
     execFileSync(process.execPath, ['--check', path.join(ROOT, rel)], { stdio: 'pipe' });
   }
-  console.log(`PASS: Syntax check OK across ${jsFiles.length} JS files.`);
+  console.log(`PASS: Syntax check OK across ${jsFiles.length} JS & serverless files.`);
 }
 
 function runCssBalanceCheck() {
@@ -278,19 +281,47 @@ async function runStoreSimulations() {
   assert.strictEqual(savedAfterPrune.length, 80);
   assert.ok(savedAfterPrune.some((p) => p.id === 'post_unsynced_tail'), '_prunePostsForLocalSave must preserve unsynced posts');
 
-  assert.ok(!comms.includes('sandbox="allow-scripts allow-same-origin"'), 'HTML mini-app iframes must NOT use allow-same-origin!');
-  assert.ok(comms.includes('sandbox="allow-scripts"'), 'HTML mini-app iframes must isolate games with sandbox="allow-scripts"');
+  assert.ok(!comms.includes('allow-same-origin'), 'HTML mini-app iframes must NOT use allow-same-origin!');
+  assert.ok(!comms.includes('allow-popups-to-escape-sandbox'), 'HTML mini-app iframes must NOT allow popups to escape sandbox!');
+  assert.ok(/sandbox="allow-scripts\b/.test(comms), 'HTML mini-app iframes must isolate games with sandbox="allow-scripts..."');
   assert.ok(comms.includes("await uploadMediaToCloudOrDataUrl(leftImg, 'posts'"), 'city_versus must upload left/right photos through Cloud Storage');
 
-  // 6B. Verify Admin & User Data Security Hardening
+  // 6B. Verify Admin, Economy, Guest UX & City SEO Hardening (P0-P3)
+  const idxHtml = read('index.html');
   const admHtml = read('admin.html');
   const admJs = read('js/remo-admin.js');
+  const radarJs = read('js/remo-radar-arena.js');
   const redirects = read('_redirects');
-  assert.ok(!admHtml.includes('value="andart1174@gmail.com"'), 'admin.html must NOT pre-fill Founder Gmail address publicly');
+  assert.ok(!idxHtml.includes('id="hdrAdminGodBtn"') && !idxHtml.includes('id="hdrAdminOfficeLink"') && !idxHtml.includes('id="adminQuickModal"'), 'index.html must NOT ship static Admin UI controls/modal to visitors');
+  assert.ok(!idxHtml.includes('allow-popups-to-escape-sandbox') && !idxHtml.includes('allow-same-origin'), 'index.html iframes must remain strictly sandboxed');
+  assert.ok(!admHtml.includes('andart1174@gmail.com') && !idxHtml.includes('andart1174@gmail.com'), 'Public HTML must NOT expose Founder personal Gmail');
+  for (const jsName of fs.readdirSync(path.join(ROOT, 'js')).filter((f) => f.endsWith('.js'))) {
+    const src = read(path.join('js', jsName));
+    assert.ok(!src.includes('andart1174@gmail.com'), `Public js/${jsName} must NOT hardcode plaintext Founder Gmail`);
+  }
   assert.ok(admJs.includes('function isAdminSessionUnlocked()') && admJs.includes('if (!isAdminSessionUnlocked())'), 'js/remo-admin.js must gate DOM rendering and actions behind isAdminSessionUnlocked()');
   assert.ok(rules.includes("!('email' in request.resource.data)"), 'firestore.rules must block writing plaintext email to public remo_users');
+  assert.ok(rules.includes('match /remo_security_claims/{claimId}'), 'firestore.rules must define private server-only remo_security_claims collection');
+  assert.ok(rules.includes('lastCoinWriteAt'), 'firestore.rules must enforce server-clock rate-limiting on user coin writes');
   assert.ok(rules.includes("'customCities', 'cityMayors', 'posts'"), 'firestore.rules must block non-admin writes to customCities, cityMayors, and posts in remo_ecosystem');
   assert.ok(redirects.includes('/firestore.rules') && redirects.includes('404!'), '_redirects must block public download of /firestore.rules');
+  assert.ok(redirects.includes('/city/:city') && redirects.includes('/cities/:city.html'), '_redirects must expose clean /city/:city route aliases');
+  assert.ok(!radarJs.includes('Demo Teleport'), 'Public Demo Teleport button must be removed from non-admin UI');
+  assert.ok(radarJs.includes("uid: 'u_guest_preview'") && radarJs.includes('coins: 0,'), 'Guest Explorer preview coins must sync with header (0 coins)');
+  assert.ok(comms.includes('function syncTopBannerPriority()'), 'Single-banner priority manager must exist');
+  assert.ok(idxHtml.includes('id="remoMegaphoneBar" style="display:none;"'), 'Megaphone banner must default to display:none to prevent FOUC');
+  const mtlCityHtml = read(path.join('cities', 'montreal.html'));
+  const parisCityHtml = read(path.join('cities', 'paris.html'));
+  assert.ok(mtlCityHtml.includes('https://remoworld.com/img/cities/montreal.jpg'), 'cities/montreal.html must use city-specific og:image');
+  assert.ok(parisCityHtml.includes('https://remoworld.com/img/cities/paris.jpg'), 'cities/paris.html must use city-specific og:image');
+  assert.ok(idxHtml.slice(idxHtml.indexOf('<body'), idxHtml.lastIndexOf('<noscript>')).includes('href="cities/montreal.html"'), 'index.html must include crawlable city hub links inside <body> outside <noscript>');
+
+  // Verify non-admin cannot bypass GeoVault distance via simulated flag
+  STORE.fbAuth = { currentUser: { uid: 'citizen1', email: 'citizen@example.com', emailVerified: true } };
+  STORE.state.geoVaults = [{ id: 'gv_test_1', cityId: 'montreal', lat: 45.5017, lng: -73.5673, radiusMeters: 350, coinsReward: 250, unlockedBy: [] }];
+  const blockedSim = STORE.claimGeoVault('gv_test_1', 48.8566, 2.3522, true);
+  assert.strictEqual(blockedSim.success, false, 'Non-admin must NOT unlock GeoVault via isSimulated=true');
+  assert.strictEqual(blockedSim.reason, 'too_far', 'Non-admin simulated GeoVault unlock must still enforce real GPS distance');
 
   const stRules = read('storage.rules');
   assert.ok(stRules.includes('allow create:') && stRules.includes('allow update, delete: if isStorageAdmin();'), 'storage.rules must prevent non-admin overwrite');

@@ -442,14 +442,16 @@ function openGeoVaultInspector(vaultId) {
         ${admDelBtn}
       `;
     } else {
+      const adminTestBtn = isAdmUser ? `
+          <button class="btn-ghost" style="width:100%;justify-content:center;border-color:#38bdf8;color:#7dd3fc;padding:9px;font-size:0.8rem;" onclick="executeGeoVaultUnlock('${v.id}', true)">
+            🧪 ${lang === 'fr' ? 'Tester l’Ouverture AR (Admin Test)' : 'Test AR Unlock (Admin Only)'}
+          </button>` : '';
       actionsBox.innerHTML = `
         <div style="display:flex;flex-direction:column;gap:8px;width:100%;">
           <button class="btn-cyber btn-gold" style="width:100%;justify-content:center;padding:13px;font-size:0.92rem;" onclick="executeGeoVaultUnlock('${v.id}', false)">
             ⚡ ${lang === 'fr' ? 'Ouvrir avec GPS en Direct' : 'Unlock Geo-Vault with Live GPS'}
           </button>
-          <button class="btn-ghost" style="width:100%;justify-content:center;border-color:#38bdf8;color:#7dd3fc;padding:9px;font-size:0.8rem;" onclick="executeGeoVaultUnlock('${v.id}', true)">
-            🧪 ${lang === 'fr' ? 'Tester l’Ouverture AR (Téléportation Démo)' : 'Test AR Unlock (Demo Teleport)'}
-          </button>
+          ${adminTestBtn}
           ${admDelBtn}
         </div>
       `;
@@ -513,13 +515,25 @@ function executeGeoVaultUnlock(vaultId, isSimulated = false) {
 
   remoToast(lang === 'fr' ? '🛰️ Acquisition du signal satellite GPS...' : '🛰️ Acquiring live satellite lock...');
   navigator.geolocation.getCurrentPosition(
-    (pos) => {
+    async (pos) => {
       window._lastUserGps = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      if (typeof REMO_STORE.callEconomyServer === 'function') {
+        const srv = await REMO_STORE.callEconomyServer('claim_geovault', {
+          vaultId,
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          isSimulated: false
+        });
+        if (srv && srv.fallback === false && !srv.ok) {
+          handleGeoVaultUnlockResult(Object.assign({ success: false, vault: v }, srv), v, lang);
+          return;
+        }
+      }
       const res = REMO_STORE.claimGeoVault(vaultId, pos.coords.latitude, pos.coords.longitude, false);
       handleGeoVaultUnlockResult(res, v, lang);
     },
     (err) => {
-      remoToast(lang === 'fr' ? 'Permission GPS refusée. Utilisez la téléportation démo pour tester.' : 'GPS access denied. Use demo teleport to test.');
+      remoToast(lang === 'fr' ? 'Permission GPS requise pour déverrouiller ce Géo-Coffre sur place.' : 'Live GPS permission is required to unlock this Geo-Vault on site.');
     },
     { enableHighAccuracy: true, timeout: 9000 }
   );
@@ -539,6 +553,18 @@ function handleGeoVaultUnlockResult(res, v, lang) {
       ? `🎉 GÉO-COFFRE OUVERT ! +${res.coinsWon} 🪙 et Carte 4D obtenue !`
       : `🎉 GEO-VAULT UNLOCKED! +${res.coinsWon} 🪙 and 4D Card claimed!`;
     remoToast(toastMsg, 'fanfare');
+  } else if (res.reason === 'anti_teleport') {
+    remoToast(
+      lang === 'fr'
+        ? `🛡️ Sécurité anti-téléportation GPS déclenchée (${res.distanceKm || ''} km trop vite). Réessayez sur place.`
+        : `🛡️ GPS anti-teleport protection triggered (${res.distanceKm || ''} km too fast). Please retry on site.`
+    );
+  } else if (res.reason === 'cooldown' || res.reason === 'rate_limited') {
+    remoToast(
+      lang === 'fr'
+        ? `⏳ Patientez ${res.waitSec || res.retryAfterSec || 15}s avant la prochaine revendication GPS.`
+        : `⏳ Please wait ${res.waitSec || res.retryAfterSec || 15}s before your next GPS claim.`
+    );
   } else if (res.reason === 'too_far') {
     updateGeoVaultProximityUI(v);
     const distM = Math.round((res.distanceKm || 0) * 1000);
@@ -789,16 +815,35 @@ function claimRadarSpot(pinId, reward) {
   remoToast(lang === 'fr' ? `💎 +${reward} Pièces REMO réclamées !` : `💎 +${reward} REMO Coins claimed!`, 'coin');
 }
 
-function claimFlashSuperDrop() {
+async function claimFlashSuperDrop() {
   const lang = REMO_I18N.getLang();
   const fd = REMO_STORE.state.settings.flashDrop;
   if (!fd || !fd.active || fd.expiresAt <= Date.now()) return;
-  const claimKey = 'remo_flash_claimed_' + fd.expiresAt;
-  if (localStorage.getItem(claimKey)) {
+  const eventKey = String(Math.floor(Number(fd.expiresAt)));
+  const claimKey = 'remo_flash_claimed_' + eventKey;
+  const curU = REMO_STORE.getCurrentUser();
+  const alreadyOnProfile = Boolean(curU && Array.isArray(curU.claimedFlashDrops) && curU.claimedFlashDrops.includes(eventKey));
+  if (localStorage.getItem(claimKey) || alreadyOnProfile) {
     remoToast(lang === 'fr' ? 'Déjà réclamé pour cet événement !' : 'Already claimed for this flash event!');
     return;
   }
-  const u = REMO_STORE.getCurrentUser() || REMO_STORE.ensureGuestOrCitizen('Flash Pioneer', '', fd.cityId || 'montreal');
+  if (typeof REMO_STORE.callEconomyServer === 'function') {
+    const srv = await REMO_STORE.callEconomyServer('claim_flash_drop', { eventKey });
+    if (srv && srv.fallback === false && !srv.ok) {
+      if (srv.reason === 'already_claimed') {
+        localStorage.setItem(claimKey, '1');
+        remoToast(lang === 'fr' ? 'Déjà réclamé pour cet événement !' : 'Already claimed for this flash event!');
+      } else if (srv.reason === 'rate_limited') {
+        remoToast(lang === 'fr' ? '⏳ Trop de requêtes. Réessayez dans un instant.' : '⏳ Too many requests. Try again shortly.');
+      } else {
+        remoToast(lang === 'fr' ? '⚠️ Flash Drop expiré ou indisponible.' : '⚠️ Flash Drop expired or unavailable.');
+      }
+      return;
+    }
+  }
+  const u = curU || REMO_STORE.ensureGuestOrCitizen('Flash Pioneer', '', fd.cityId || 'montreal');
+  u.claimedFlashDrops = Array.isArray(u.claimedFlashDrops) ? u.claimedFlashDrops : [];
+  if (!u.claimedFlashDrops.includes(eventKey)) u.claimedFlashDrops.push(eventKey);
   localStorage.setItem(claimKey, '1');
   REMO_STORE.addCoins(u.uid, fd.coins || 300, 60);
   if (fd.bonusCardCityId) {
@@ -947,18 +992,26 @@ function showWorldChestDropAlert(v) {
       : `A secret chest landed in ${cityName} (+${v.coinsReward} 🪙)! Tap to hunt ➔`;
   }
 
+  banner.dataset.wantsShow = '1';
   banner.style.display = 'flex';
+  if (typeof syncTopBannerPriority === 'function') syncTopBannerPriority();
   RemoAudio.play('fanfare');
 
   if (window._chestAlertTimer) clearTimeout(window._chestAlertTimer);
   window._chestAlertTimer = setTimeout(() => {
+    banner.dataset.wantsShow = '0';
     banner.style.display = 'none';
+    if (typeof syncTopBannerPriority === 'function') syncTopBannerPriority();
   }, 15000);
 }
 
 function trackWorldChestOnRadar(vaultId) {
   const banner = document.getElementById('worldChestAlertBanner');
-  if (banner) banner.style.display = 'none';
+  if (banner) {
+    banner.dataset.wantsShow = '0';
+    banner.style.display = 'none';
+    if (typeof syncTopBannerPriority === 'function') syncTopBannerPriority();
+  }
   switchRemoView('radar');
   const vaults = (REMO_STORE.state && REMO_STORE.state.geoVaults) || [];
   const v = (vaultId ? vaults.find((x) => x.id === vaultId) : null) || vaults[0];
@@ -2433,9 +2486,9 @@ function renderPassportView() {
     homeCity: 'montreal',
     passportNum: '0000',
     referralCode: 'REMO-0000',
-    coins: 100,
+    coins: 0,
     visas: [],
-    bio: lang === 'fr' ? 'Connectez-vous pour sauvegarder votre passeport & vos cartes 4D.' : 'Sign in to save your Passport & 4D City Cards.'
+    bio: lang === 'fr' ? 'Connectez-vous pour débloquer +150 🪙 & sauvegarder votre passeport 4D.' : 'Sign in to claim +150 🪙 & save your 4D Citizen Passport.'
   };
   const userAvatar = u.avatarUrl || (typeof REMO_STORE.getUserAvatar === 'function' ? REMO_STORE.getUserAvatar(u.uid) : '') || localStorage.getItem('remo_avatar_' + u.uid) || '';
   const home = getCityById(u.homeCity || 'montreal');

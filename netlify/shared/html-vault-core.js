@@ -11,7 +11,7 @@ const crypto = require('crypto');
 
 const FIREBASE_PROJECT_ID = 'remo-world';
 const VAULT_COLLECTION = 'remo_html_vault';
-const ADMIN_EMAIL = 'andart1174@gmail.com';
+const ADMIN_EMAIL = String(process.env.REMO_ADMIN_EMAIL || 'andart1174@gmail.com').toLowerCase().trim();
 const GOOGLE_CERTS_URL = 'https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com';
 const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const TICKET_TTL_MS = 10 * 60 * 1000; // 10 minutes (safe iframe-locked ephemeral ticket)
@@ -545,6 +545,163 @@ function buildBlockedHtmlPage(reason = 'Protected by REMO World™', opts = {}) 
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="robots" content="noindex,nofollow"><style>html,body{margin:0;height:100%;background:#050816;color:#e2e8f0;font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;text-align:center;user-select:none;}.box{padding:24px 28px;border:1px solid rgba(56,189,248,0.3);border-radius:16px;background:rgba(15,23,42,0.85);max-width:340px;}h3{margin:0 0 8px;color:#38bdf8;font-size:1rem;}p{margin:0;color:#94a3b8;font-size:0.82rem;}</style></head><body><div class="box"><h3>🔒 REMO Vault Protected</h3><p>${safeReason}</p>${retryHtml}</div></body></html>`;
 }
 
+const _rateLimitBuckets = new Map();
+
+function getClientIp(event) {
+  const headers = (event && event.headers) || {};
+  const raw = getHeader(headers, 'x-nf-client-connection-ip') ||
+    getHeader(headers, 'x-forwarded-for') ||
+    getHeader(headers, 'client-ip') ||
+    'unknown';
+  return String(raw).split(',')[0].trim().slice(0, 64) || 'unknown';
+}
+
+function checkMemoryRateLimit(bucketKey, maxRequests = 45, windowMs = 60000) {
+  const now = Date.now();
+  const key = String(bucketKey || 'default');
+  let entry = _rateLimitBuckets.get(key);
+  if (!entry || now >= entry.resetAt) {
+    entry = { count: 0, resetAt: now + windowMs };
+    _rateLimitBuckets.set(key, entry);
+  }
+  entry.count += 1;
+  if (_rateLimitBuckets.size > 2000) {
+    for (const [k, v] of _rateLimitBuckets.entries()) {
+      if (now >= v.resetAt) _rateLimitBuckets.delete(k);
+    }
+    if (_rateLimitBuckets.size > 2000) _rateLimitBuckets.clear();
+  }
+  return {
+    allowed: entry.count <= maxRequests,
+    remaining: Math.max(0, maxRequests - entry.count),
+    retryAfterSec: Math.max(1, Math.ceil((entry.resetAt - now) / 1000))
+  };
+}
+
+function resolveSafeCorsHeaders(event, opts = {}) {
+  const headers = (event && event.headers) || {};
+  const origin = getHeader(headers, 'origin').trim();
+  const referer = getHeader(headers, 'referer').trim();
+  const allowNullOrigin = Boolean(opts && opts.allowNullOrigin);
+
+  if (origin === 'null') {
+    if (!allowNullOrigin) {
+      return { ok: false, reason: 'Null origin blocked' };
+    }
+    if (referer) {
+      try {
+        const refUrl = new URL(referer);
+        if (!isAllowedHost(refUrl.hostname)) {
+          return { ok: false, reason: 'Unauthorized referer' };
+        }
+      } catch (e) {
+        return { ok: false, reason: 'Invalid referer' };
+      }
+    }
+    return {
+      ok: true,
+      headers: {
+        'Access-Control-Allow-Origin': 'null',
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        'Vary': 'Origin'
+      }
+    };
+  }
+
+  if (origin) {
+    try {
+      const u = new URL(origin);
+      if (!isAllowedHost(u.hostname)) {
+        return { ok: false, reason: 'Unauthorized origin' };
+      }
+      return {
+        ok: true,
+        headers: {
+          'Access-Control-Allow-Origin': origin,
+          'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+          'Vary': 'Origin'
+        }
+      };
+    } catch (e) {
+      return { ok: false, reason: 'Invalid origin' };
+    }
+  }
+
+  if (referer) {
+    try {
+      const refUrl = new URL(referer);
+      if (!isAllowedHost(refUrl.hostname)) {
+        return { ok: false, reason: 'Unauthorized referer' };
+      }
+    } catch (e) {
+      return { ok: false, reason: 'Invalid referer' };
+    }
+  }
+
+  return {
+    ok: true,
+    headers: {
+      'Access-Control-Allow-Origin': 'https://remoworld.com',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+      'Vary': 'Origin'
+    }
+  };
+}
+
+async function verifyFirebaseUserBearer(event) {
+  const headers = (event && event.headers) || {};
+  const authHeader = getHeader(headers, 'authorization');
+  if (!authHeader.startsWith('Bearer ')) {
+    return { ok: false, statusCode: 401, error: 'Missing Authorization Bearer token.' };
+  }
+  const token = authHeader.slice(7).trim();
+  const parts = token.split('.');
+  if (parts.length !== 3) {
+    return { ok: false, statusCode: 401, error: 'Malformed Bearer token.' };
+  }
+  try {
+    const headerJson = JSON.parse(Buffer.from(parts[0], 'base64url').toString('utf8'));
+    const payloadJson = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'));
+    if (headerJson.alg !== 'RS256' || !headerJson.kid) {
+      return { ok: false, statusCode: 401, error: 'Unsupported token algorithm.' };
+    }
+    const certs = await fetchGoogleCerts();
+    const certPem = certs && certs[headerJson.kid];
+    if (!certPem) {
+      return { ok: false, statusCode: 401, error: 'Unknown signing key.' };
+    }
+    const verifier = crypto.createVerify('RSA-SHA256');
+    verifier.update(`${parts[0]}.${parts[1]}`);
+    verifier.end();
+    if (!verifier.verify(certPem, Buffer.from(parts[2], 'base64url'))) {
+      return { ok: false, statusCode: 401, error: 'Invalid token signature.' };
+    }
+    const nowSec = Math.floor(Date.now() / 1000);
+    if (payloadJson.aud !== FIREBASE_PROJECT_ID) {
+      return { ok: false, statusCode: 401, error: 'Invalid token audience.' };
+    }
+    if (payloadJson.iss !== `https://securetoken.google.com/${FIREBASE_PROJECT_ID}`) {
+      return { ok: false, statusCode: 401, error: 'Invalid token issuer.' };
+    }
+    if (!payloadJson.exp || Number(payloadJson.exp) <= nowSec) {
+      return { ok: false, statusCode: 401, error: 'Expired session token.' };
+    }
+    const uid = String(payloadJson.sub || payloadJson.user_id || '').trim();
+    if (!uid) {
+      return { ok: false, statusCode: 401, error: 'Missing user subject.' };
+    }
+    const email = String(payloadJson.email || '').toLowerCase();
+    const emailVerified = payloadJson.email_verified === true;
+    const isAdmin = (email === ADMIN_EMAIL && emailVerified) || payloadJson.admin === true;
+    return { ok: true, uid, email, emailVerified, isAdmin, claims: payloadJson };
+  } catch (e) {
+    return { ok: false, statusCode: 401, error: 'Authentication failed.' };
+  }
+}
+
 module.exports = {
   FIREBASE_PROJECT_ID,
   VAULT_COLLECTION,
@@ -553,11 +710,17 @@ module.exports = {
   REMO_CITIES_COORDS,
   isValidSafePostId,
   getHeader,
+  getClientIp,
+  checkMemoryRateLimit,
+  resolveSafeCorsHeaders,
   parseServiceAccount,
   getVaultSecret,
   isServerVaultConfigured,
   isAllowedHost,
   isAllowedRequestOrigin,
+  httpsRequest,
+  getGoogleAccessToken,
+  verifyFirebaseUserBearer,
   verifyFirebaseAdminBearer,
   firestoreVaultGet,
   firestoreVaultSet,
