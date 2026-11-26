@@ -11314,9 +11314,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (typeof switchCreateStudioTab === 'function') switchCreateStudioTab('beat');
       } else if (openTarget === 'boardingpass') {
         if (typeof openBoardingPassModal === 'function') openBoardingPassModal();
-        const destCity = (params.get('city') || '').trim().toLowerCase();
-        if (destCity && typeof setBoardingPassRoutePreset === 'function') {
-          setBoardingPassRoutePreset(destCity === 'montreal' ? 'paris' : 'montreal', destCity);
+        const rawFrom = (params.get('dep') || (params.get('from') !== 'seo' ? params.get('from') : '') || '').trim().toLowerCase();
+        const rawTo = (params.get('arr') || params.get('to') || params.get('city') || '').trim().toLowerCase();
+        if ((rawFrom || rawTo) && typeof setBoardingPassRoutePreset === 'function') {
+          const f = rawFrom || (rawTo === 'montreal' ? 'paris' : 'montreal');
+          const t = rawTo || (f === 'chisinau' ? 'montreal' : 'chisinau');
+          setBoardingPassRoutePreset(f, t);
         }
       } else if (openTarget === 'guess') {
         const mysteryBtn = document.querySelector('.feed-top-widgets button[onclick*="mystery"]');
@@ -11633,7 +11636,7 @@ function ensureInlineAdminStudioLoaded(onReady) {
   }
   _remoAdminInlineLoading = true;
   const s = document.createElement('script');
-  s.src = 'js/remo-admin-inline.js?v=165';
+  s.src = 'js/remo-admin-inline.js?v=166';
   s.async = true;
   s.onload = () => {
     _remoAdminInlineLoading = false;

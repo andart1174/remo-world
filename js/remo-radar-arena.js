@@ -3465,7 +3465,7 @@ function closeStoryExportModal() {
    ══════════════════════════════════════════════════════════════════════ */
 const CITY_AIRPORT_CODES = {
   montreal: 'YUL',
-  chisinau: 'KIV',
+  chisinau: 'RMO',
   paris: 'CDG',
   bucharest: 'OTP',
   newyork: 'JFK',
@@ -3474,8 +3474,47 @@ const CITY_AIRPORT_CODES = {
   london: 'LHR',
   miami: 'MIA',
   barcelona: 'BCN',
+  rome: 'FCO',
+  toronto: 'YYZ',
   monaco: 'MCM',
-  seoul: 'ICN'
+  losangeles: 'LAX',
+  seoul: 'ICN',
+  geneva: 'GVA',
+  singapore: 'SIN',
+  sydney: 'SYD',
+  rio: 'GIG',
+  istanbul: 'IST',
+  berlin: 'BER',
+  amsterdam: 'AMS',
+  lisbon: 'LIS',
+  cairo: 'CAI'
+};
+
+const CITY_TIMEZONES = {
+  montreal: 'America/Toronto',
+  chisinau: 'Europe/Chisinau',
+  paris: 'Europe/Paris',
+  bucharest: 'Europe/Bucharest',
+  newyork: 'America/New_York',
+  tokyo: 'Asia/Tokyo',
+  dubai: 'Asia/Dubai',
+  london: 'Europe/London',
+  miami: 'America/New_York',
+  barcelona: 'Europe/Madrid',
+  rome: 'Europe/Rome',
+  toronto: 'America/Toronto',
+  monaco: 'Europe/Monaco',
+  losangeles: 'America/Los_Angeles',
+  seoul: 'Asia/Seoul',
+  geneva: 'Europe/Zurich',
+  singapore: 'Asia/Singapore',
+  sydney: 'Australia/Sydney',
+  rio: 'America/Sao_Paulo',
+  istanbul: 'Europe/Istanbul',
+  berlin: 'Europe/Berlin',
+  amsterdam: 'Europe/Amsterdam',
+  lisbon: 'Europe/Lisbon',
+  cairo: 'Africa/Cairo'
 };
 
 function getCityAirportCode(cityId) {
@@ -3483,6 +3522,36 @@ function getCityAirportCode(cityId) {
   const id = String(cityId).toLowerCase();
   if (CITY_AIRPORT_CODES[id]) return CITY_AIRPORT_CODES[id];
   return id.replace(/[^a-z]/g, '').slice(0, 3).toUpperCase() || 'RMO';
+}
+
+function getCityLocalTimeMeta(city) {
+  const id = String((city && city.id) || '').toLowerCase();
+  const tz = CITY_TIMEZONES[id];
+  const now = new Date();
+  if (!tz) {
+    // Fallback approximate solar offset from longitude
+    const approxH = Math.round(((city && typeof city.lng === 'number' ? city.lng : 0) / 15));
+    const d = new Date(now.getTime() + approxH * 3600000);
+    const hh = String(d.getUTCHours()).padStart(2, '0');
+    const mm = String(d.getUTCMinutes()).padStart(2, '0');
+    return { hhmm: `${hh}:${mm}`, offsetHours: approxH };
+  }
+  try {
+    const fmt = new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour: '2-digit', minute: '2-digit', hour12: false });
+    const hhmm = fmt.format(now);
+    const utcMs = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), now.getUTCHours(), now.getUTCMinutes());
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', hour12: false
+    }).formatToParts(now);
+    const map = {};
+    parts.forEach((p) => { map[p.type] = p.value; });
+    const localMs = Date.UTC(Number(map.year), Number(map.month) - 1, Number(map.day), Number(map.hour) % 24, Number(map.minute));
+    const offsetHours = Math.round((localMs - utcMs) / 3600000);
+    return { hhmm, offsetHours };
+  } catch (e) {
+    return { hhmm: '12:00', offsetHours: 0 };
+  }
 }
 
 function resolveCityFromQuery(rawQuery) {
@@ -3609,9 +3678,17 @@ function drawBoardingPassCanvas(cv, fromQuery, toQuery, u, lang = 'fr') {
         }));
 
     const km = Math.round(fnHaversine(fromCity.lat, fromCity.lng, toCity.lat, toCity.lng)) || 7140;
-    const fromCode = fromCity.code || getCityAirportCode(fromCity.id);
-    const toCode = toCity.code || getCityAirportCode(toCity.id);
+    const fromCode = CITY_AIRPORT_CODES[String(fromCity.id || '').toLowerCase()] || fromCity.code || getCityAirportCode(fromCity.id);
+    const toCode = CITY_AIRPORT_CODES[String(toCity.id || '').toLowerCase()] || toCity.code || getCityAirportCode(toCity.id);
     const flightNum = `RM-${km > 9999 ? String(km).slice(0, 4) : km}`;
+    const fromClk = getCityLocalTimeMeta(fromCity);
+    const toClk = getCityLocalTimeMeta(toCity);
+    const tzDiff = toClk.offsetHours - fromClk.offsetHours;
+    const tzDiffStr = tzDiff === 0 ? 'SAME TZ' : (tzDiff > 0 ? `+${tzDiff}h` : `${tzDiff}h`);
+    const customNameInp = document.getElementById('boardingPassNameInput');
+    const customName = customNameInp && customNameInp.value ? customNameInp.value.trim().slice(0, 24) : '';
+    const displayPassenger = customName || userObj.name || 'Pioneer';
+    const moodTag = (window._boardingPassMoodTag || '❤️ DOR DE CASĂ').trim();
 
     // 1. Cyber Aviation Background
     const bg = ctx.createLinearGradient(0, 0, 1080, 1920);
@@ -3740,13 +3817,26 @@ function drawBoardingPassCanvas(cv, fromQuery, toQuery, u, lang = 'fr') {
     ctx.strokeStyle = '#38bdf8';
     ctx.lineWidth = 1.5;
     ctx.beginPath();
-    ctx.roundRect(400, routeY + 10, 280, 42, 21);
+    ctx.roundRect(380, routeY + 4, 320, 40, 20);
     ctx.fill();
     ctx.stroke();
 
-    ctx.font = '900 20px "Orbitron", sans-serif';
+    ctx.font = '900 19px "Orbitron", sans-serif';
     ctx.fillStyle = '#e0f2fe';
-    ctx.fillText(`${km.toLocaleString()} KM · 4D TELEPORT`, 540, routeY + 38);
+    ctx.fillText(`${km.toLocaleString()} KM · 4D BRIDGE`, 540, routeY + 31);
+
+    // Live Dual-City Local Clocks Strip
+    ctx.fillStyle = 'rgba(251,191,36,0.12)';
+    ctx.strokeStyle = 'rgba(251,191,36,0.45)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.roundRect(230, routeY + 56, 620, 42, 21);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.font = '800 20px "Orbitron", sans-serif';
+    ctx.fillStyle = '#fde047';
+    ctx.fillText(`🕒 ${fromCode} ${fromClk.hhmm}   •   ${toCode} ${toClk.hhmm}  (${tzDiffStr})`, 540, routeY + 84);
 
     // 6. Flight Info 4-Box Grid
     const infoY = tY + 410;
@@ -3754,7 +3844,7 @@ function drawBoardingPassCanvas(cv, fromQuery, toQuery, u, lang = 'fr') {
       { label: lang === 'fr' ? 'VOL / FLIGHT' : 'FLIGHT', val: flightNum },
       { label: lang === 'fr' ? 'PORTE / GATE' : 'GATE', val: '4D-01' },
       { label: lang === 'fr' ? 'SIÈGE / SEAT' : 'SEAT', val: '01A' },
-      { label: lang === 'fr' ? 'EMBARQ. / TIME' : 'TIME', val: 'INSTANT' }
+      { label: lang === 'fr' ? 'DÉCALAGE / TZ' : 'TIME DIFF', val: tzDiffStr }
     ];
     const boxW = (tW - 80 - 30) / 4;
     gridCols.forEach((col, idx) => {
@@ -3777,33 +3867,43 @@ function drawBoardingPassCanvas(cv, fromQuery, toQuery, u, lang = 'fr') {
       ctx.fillText(col.val, bx + boxW / 2, infoY + 65);
     });
 
-    // 7. Passenger Identity Strip
-    const passY = tY + 535;
+    // 7. Passenger Identity Strip + Diaspora Mood Pill
+    const passY = tY + 528;
     ctx.fillStyle = 'rgba(15,23,42,0.95)';
-    ctx.strokeStyle = 'rgba(251,191,36,0.4)';
-    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = 'rgba(251,191,36,0.48)';
+    ctx.lineWidth = 1.8;
     ctx.beginPath();
-    ctx.roundRect(tX + 40, passY, tW - 80, 105, 16);
+    ctx.roundRect(tX + 40, passY, tW - 80, 122, 18);
     ctx.fill();
     ctx.stroke();
 
     ctx.textAlign = 'left';
     ctx.font = '800 17px "Outfit", sans-serif';
     ctx.fillStyle = '#94a3b8';
-    ctx.fillText(lang === 'fr' ? 'PASSAGER OFFICIEL / PASSENGER' : 'OFFICIAL PASSENGER', tX + 65, passY + 36);
+    ctx.fillText(lang === 'fr' ? 'PASSAGER OFFICIEL / PASSENGER' : 'OFFICIAL PASSENGER', tX + 65, passY + 34);
 
     ctx.font = '900 32px "Orbitron", sans-serif';
     ctx.fillStyle = '#fde047';
-    ctx.fillText(`@${userObj.name}`, tX + 65, passY + 78);
+    ctx.fillText(customName ? displayPassenger.toUpperCase() : `@${displayPassenger}`, tX + 65, passY + 76);
+
+    if (moodTag) {
+      ctx.font = '800 18px "Outfit", sans-serif';
+      ctx.fillStyle = '#fda4af';
+      ctx.fillText(moodTag, tX + 65, passY + 108);
+    }
 
     ctx.textAlign = 'right';
     ctx.font = '800 17px "Outfit", sans-serif';
     ctx.fillStyle = '#94a3b8';
-    ctx.fillText(lang === 'fr' ? 'PASSEPORT №' : 'PASSPORT №', tX + tW - 65, passY + 36);
+    ctx.fillText(lang === 'fr' ? 'PASSEPORT №' : 'PASSPORT №', tX + tW - 65, passY + 34);
 
     ctx.font = '900 28px "Orbitron", sans-serif';
     ctx.fillStyle = '#38bdf8';
-    ctx.fillText(`#${userObj.passportNum || '0001'}`, tX + tW - 65, passY + 78);
+    ctx.fillText(`#${userObj.passportNum || '0001'}`, tX + tW - 65, passY + 76);
+
+    ctx.font = '700 16px "Outfit", sans-serif';
+    ctx.fillStyle = '#10b981';
+    ctx.fillText('remoworld.com', tX + tW - 65, passY + 108);
 
     // 8. Destination City Landmark Visual (Center Artwork)
     const artY = tY + 840;
@@ -3879,7 +3979,7 @@ function drawBoardingPassCanvas(cv, fromQuery, toQuery, u, lang = 'fr') {
 
     ctx.font = '800 20px "Outfit", sans-serif';
     ctx.fillStyle = '#10b981';
-    ctx.fillText(lang === 'fr' ? '✓ +100 🪙 offerts à l’arrivée !' : '✓ +100 🪙 welcome bonus!', 440, stubY + 85);
+    ctx.fillText(lang === 'fr' ? '✓ +150 🪙 offerts à l’arrivée !' : '✓ +150 🪙 welcome bonus!', 440, stubY + 85);
 
     ctx.font = '800 18px "Orbitron", sans-serif';
     ctx.fillStyle = '#38bdf8';
@@ -3999,6 +4099,44 @@ function setBoardingPassRoutePreset(fromId, toId) {
   onBoardingPassRouteChanged();
 }
 
+function setBoardingPassMood(tag, btnEl) {
+  window._boardingPassMoodTag = tag || '';
+  const row = document.getElementById('boardingPassMoodRow');
+  if (row) {
+    row.querySelectorAll('.bp-mood-pill').forEach((b) => {
+      b.classList.remove('active');
+      b.style.borderColor = 'rgba(255,255,255,0.18)';
+      b.style.color = '';
+    });
+  }
+  if (btnEl) {
+    btnEl.classList.add('active');
+    btnEl.style.borderColor = 'rgba(250,204,21,0.55)';
+    btnEl.style.color = '#fde047';
+  }
+  onBoardingPassRouteChanged();
+}
+
+function shareBoardingPassWhatsApp() {
+  const fInp = document.getElementById('boardingPassFromInput');
+  const tInp = document.getElementById('boardingPassToInput');
+  const u = REMO_STORE.getCurrentUser() || { name: 'Pioneer', passportNum: '0001', referralCode: 'REMO-0001' };
+  const lang = REMO_I18N.getLang();
+  const c1 = resolveCityFromQuery(fInp ? fInp.value : 'chisinau');
+  const c2 = resolveCityFromQuery(tInp ? tInp.value : 'montreal');
+  const fName = getCityName(c1, lang) || c1.name_en;
+  const tName = getCityName(c2, lang) || c2.name_en;
+  const fCode = CITY_AIRPORT_CODES[String(c1.id || '').toLowerCase()] || getCityAirportCode(c1.id);
+  const tCode = CITY_AIRPORT_CODES[String(c2.id || '').toLowerCase()] || getCityAirportCode(c2.id);
+  const mood = window._boardingPassMoodTag || '❤️ DOR DE CASĂ';
+  const ref = encodeURIComponent(u.referralCode || 'REMO-0001');
+  const link = `https://remoworld.com/?open=boardingpass&dep=${encodeURIComponent(c1.id)}&arr=${encodeURIComponent(c2.id)}&ref=${ref}`;
+  const msg = lang === 'fr'
+    ? `🎫 Mon Billet 4D REMO : ${c1.flag || '✈️'} ${fName} (${fCode}) ⇄ ${c2.flag || '🌍'} ${tName} (${tCode}) — ${mood} !\nCrée le tien gratuitement + gagne +150 🪙 : ${link}`
+    : `🎫 My REMO 4D Boarding Pass: ${c1.flag || '✈️'} ${fName} (${fCode}) ⇄ ${c2.flag || '🌍'} ${tName} (${tCode}) — ${mood}!\nCreate yours FREE + claim +150 🪙: ${link}`;
+  window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank', 'noopener');
+}
+
 async function shareBoardingPassNative() {
   const cv = document.getElementById('boardingPassCanvasPreview');
   const u = REMO_STORE.getCurrentUser() || { name: 'Pioneer', passportNum: '0001', referralCode: 'REMO-0001' };
@@ -4007,8 +4145,8 @@ async function shareBoardingPassNative() {
 
   const shareTitle = lang === 'fr' ? 'REMO Airways · Billet de Vol Holographique 4D' : 'REMO Airways · 4D Holographic Boarding Pass';
   const shareText = lang === 'fr'
-    ? `🎫 Voici mon Billet de Téléportation 4D sur REMO ! Rejoins le vol avec mon code ${u.referralCode || ('REMO-' + u.passportNum)} et gagne +100 🪙 de bienvenue !`
-    : `🎫 Here is my 4D Holographic Boarding Pass on REMO! Join the flight with code ${u.referralCode || ('REMO-' + u.passportNum)} to earn +100 🪙 welcome bonus!`;
+    ? `🎫 Voici mon Billet de Téléportation 4D sur REMO ! Rejoins le vol avec mon code ${u.referralCode || ('REMO-' + u.passportNum)} et gagne +150 🪙 de bienvenue !`
+    : `🎫 Here is my 4D Holographic Boarding Pass on REMO! Join the flight with code ${u.referralCode || ('REMO-' + u.passportNum)} to earn +150 🪙 welcome bonus!`;
 
   if (typeof copyTextToClipboard === 'function') copyTextToClipboard(inviteUrl);
   downloadBoardingPassPNG();
@@ -4059,8 +4197,8 @@ function downloadBoardingPassPNG() {
 
   const c1 = resolveCityFromQuery(fInp ? fInp.value : 'montreal');
   const c2 = resolveCityFromQuery(tInp ? tInp.value : 'chisinau');
-  const fCode = c1.code || getCityAirportCode(c1.id);
-  const tCode = c2.code || getCityAirportCode(c2.id);
+  const fCode = CITY_AIRPORT_CODES[String(c1.id || '').toLowerCase()] || c1.code || getCityAirportCode(c1.id);
+  const tCode = CITY_AIRPORT_CODES[String(c2.id || '').toLowerCase()] || c2.code || getCityAirportCode(c2.id);
 
   downloadCanvasAsPNG(cv, `REMO_BoardingPass_${fCode}_${tCode}_${u.passportNum || '0001'}.png`);
   remoToast(REMO_I18N.getLang() === 'fr' ? '📥 Billet 4D HD téléchargé !' : '📥 4D HD Boarding Pass downloaded!', 'coin');
@@ -5026,6 +5164,8 @@ window.closeBoardingPassModal = closeBoardingPassModal;
 window.onBoardingPassRouteChanged = onBoardingPassRouteChanged;
 window.swapBoardingPassRoute = swapBoardingPassRoute;
 window.setBoardingPassRoutePreset = setBoardingPassRoutePreset;
+window.setBoardingPassMood = setBoardingPassMood;
+window.shareBoardingPassWhatsApp = shareBoardingPassWhatsApp;
 window.resolveCityFromQuery = resolveCityFromQuery;
 window.shareBoardingPassNative = shareBoardingPassNative;
 window.downloadBoardingPassPNG = downloadBoardingPassPNG;
