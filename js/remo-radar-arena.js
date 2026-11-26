@@ -3517,6 +3517,73 @@ const CITY_TIMEZONES = {
   cairo: 'Africa/Cairo'
 };
 
+const BOARDING_MOOD_LABELS = {
+  home: { en: '❤️ HOME IN MY HEART', fr: '❤️ PRÈS DU CŒUR' },
+  two:  { en: '🌍 HEART IN 2 CITIES', fr: '🌍 CŒUR ENTRE 2 VILLES' },
+  next: { en: '✈️ NEXT STOP', fr: '✈️ PROCHAINE ESCALE' },
+  vip:  { en: '✨ SOVEREIGN VIP', fr: '✨ VOYAGEUR VIP' }
+};
+
+const BOARDING_KNOWN_CITY_IMAGES = new Set([
+  'amsterdam', 'barcelona', 'berlin', 'bucharest', 'cairo', 'chisinau',
+  'dubai', 'geneva', 'istanbul', 'lisbon', 'london', 'losangeles',
+  'miami', 'monaco', 'montreal', 'newyork', 'paris', 'rio',
+  'rome', 'seoul', 'singapore', 'sydney', 'tokyo', 'toronto'
+]);
+
+function getBoardingMoodLabel(lang) {
+  const key = window._boardingPassMoodKey || 'home';
+  const entry = BOARDING_MOOD_LABELS[key] || BOARDING_MOOD_LABELS.home;
+  return lang === 'fr' ? entry.fr : entry.en;
+}
+
+function formatEstimatedFlightDuration(km) {
+  const totalMin = Math.max(45, Math.round((Number(km || 1000) / 840) * 60 + 25));
+  const h = Math.floor(totalMin / 60);
+  const m = Math.round((totalMin % 60) / 5) * 5;
+  const adjH = h + (m === 60 ? 1 : 0);
+  const adjM = m === 60 ? 0 : m;
+  return `~${adjH}h ${String(adjM).padStart(2, '0')}m`;
+}
+
+function getBoardingPassImage(url, onReady) {
+  if (!url) return null;
+  if (!window._remoBoardingImgCache) window._remoBoardingImgCache = {};
+  const cache = window._remoBoardingImgCache;
+  if (cache[url]) {
+    const entry = cache[url];
+    if (entry.loaded && entry.img && entry.img.naturalWidth > 0) return entry.img;
+    if (!entry.failed && typeof onReady === 'function') entry.callbacks.push(onReady);
+    return null;
+  }
+  const img = new Image();
+  const entry = { img, loaded: false, failed: false, callbacks: typeof onReady === 'function' ? [onReady] : [] };
+  cache[url] = entry;
+  img.onload = () => {
+    entry.loaded = true;
+    const cbs = entry.callbacks.splice(0);
+    cbs.forEach((fn) => { try { fn(); } catch (e) {} });
+  };
+  img.onerror = () => {
+    entry.failed = true;
+    entry.callbacks.length = 0;
+  };
+  img.src = url;
+  return null;
+}
+
+function drawCoverImage(ctx, img, dx, dy, dw, dh) {
+  if (!img || !img.naturalWidth || !img.naturalHeight) return;
+  const iw = img.naturalWidth;
+  const ih = img.naturalHeight;
+  const scale = Math.max(dw / iw, dh / ih);
+  const sw = dw / scale;
+  const sh = dh / scale;
+  const sx = (iw - sw) / 2;
+  const sy = (ih - sh) / 2;
+  ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh);
+}
+
 function getCityAirportCode(cityId) {
   if (!cityId) return 'RMO';
   const id = String(cityId).toLowerCase();
@@ -3678,9 +3745,12 @@ function drawBoardingPassCanvas(cv, fromQuery, toQuery, u, lang = 'fr') {
         }));
 
     const km = Math.round(fnHaversine(fromCity.lat, fromCity.lng, toCity.lat, toCity.lng)) || 7140;
-    const fromCode = CITY_AIRPORT_CODES[String(fromCity.id || '').toLowerCase()] || fromCity.code || getCityAirportCode(fromCity.id);
-    const toCode = CITY_AIRPORT_CODES[String(toCity.id || '').toLowerCase()] || toCity.code || getCityAirportCode(toCity.id);
+    const fromIdLow = String(fromCity.id || '').toLowerCase();
+    const toIdLow = String(toCity.id || '').toLowerCase();
+    const fromCode = CITY_AIRPORT_CODES[fromIdLow] || fromCity.code || getCityAirportCode(fromCity.id);
+    const toCode = CITY_AIRPORT_CODES[toIdLow] || toCity.code || getCityAirportCode(toCity.id);
     const flightNum = `RM-${km > 9999 ? String(km).slice(0, 4) : km}`;
+    const flightDur = formatEstimatedFlightDuration(km);
     const fromClk = getCityLocalTimeMeta(fromCity);
     const toClk = getCityLocalTimeMeta(toCity);
     const tzDiff = toClk.offsetHours - fromClk.offsetHours;
@@ -3688,7 +3758,22 @@ function drawBoardingPassCanvas(cv, fromQuery, toQuery, u, lang = 'fr') {
     const customNameInp = document.getElementById('boardingPassNameInput');
     const customName = customNameInp && customNameInp.value ? customNameInp.value.trim().slice(0, 24) : '';
     const displayPassenger = customName || userObj.name || 'Pioneer';
-    const moodTag = (window._boardingPassMoodTag || '❤️ DOR DE CASĂ').trim();
+    const moodTag = getBoardingMoodLabel(lang);
+
+    // Async image preload guard so panoramic dual-city + jet photos pop in seamlessly once loaded
+    const drawSeq = (cv._bpDrawSeq = (cv._bpDrawSeq || 0) + 1);
+    const scheduleRedraw = () => {
+      if (cv._bpDrawSeq === drawSeq) {
+        drawBoardingPassCanvas(cv, fromQuery, toQuery, u, lang);
+      }
+    };
+    const jetImg = getBoardingPassImage('img/remo_boarding_jet.jpg', scheduleRedraw);
+    const fromCityImg = BOARDING_KNOWN_CITY_IMAGES.has(fromIdLow)
+      ? getBoardingPassImage(`img/cities/${fromIdLow}.jpg`, scheduleRedraw)
+      : jetImg;
+    const toCityImg = BOARDING_KNOWN_CITY_IMAGES.has(toIdLow)
+      ? getBoardingPassImage(`img/cities/${toIdLow}.jpg`, scheduleRedraw)
+      : jetImg;
 
     // 1. Cyber Aviation Background
     const bg = ctx.createLinearGradient(0, 0, 1080, 1920);
@@ -3785,7 +3870,7 @@ function drawBoardingPassCanvas(cv, fromQuery, toQuery, u, lang = 'fr') {
     ctx.font = '800 24px "Outfit", sans-serif';
     ctx.fillStyle = '#38bdf8';
     const fromName = getCityName(fromCity, lang) || fromCity.name_fr || fromCity.name_en;
-    ctx.fillText(`${fromCity.flag || '🏙️'} ${fromName.toUpperCase()}`, tX + 50, routeY + 40);
+    ctx.fillText(fromName.toUpperCase(), tX + 50, routeY + 40);
 
     // Arrival Airport Code
     ctx.textAlign = 'right';
@@ -3796,7 +3881,7 @@ function drawBoardingPassCanvas(cv, fromQuery, toQuery, u, lang = 'fr') {
     ctx.font = '800 24px "Outfit", sans-serif';
     ctx.fillStyle = '#fbbf24';
     const toName = getCityName(toCity, lang) || toCity.name_fr || toCity.name_en;
-    ctx.fillText(`${toCity.flag || '🏙️'} ${toName.toUpperCase()}`, tX + tW - 50, routeY + 40);
+    ctx.fillText(toName.toUpperCase(), tX + tW - 50, routeY + 40);
 
     // Flight Arc & Airplane
     ctx.textAlign = 'center';
@@ -3842,7 +3927,7 @@ function drawBoardingPassCanvas(cv, fromQuery, toQuery, u, lang = 'fr') {
     const infoY = tY + 410;
     const gridCols = [
       { label: lang === 'fr' ? 'VOL / FLIGHT' : 'FLIGHT', val: flightNum },
-      { label: lang === 'fr' ? 'PORTE / GATE' : 'GATE', val: '4D-01' },
+      { label: lang === 'fr' ? 'DURÉE / EST.' : 'DURATION', val: flightDur },
       { label: lang === 'fr' ? 'SIÈGE / SEAT' : 'SEAT', val: '01A' },
       { label: lang === 'fr' ? 'DÉCALAGE / TZ' : 'TIME DIFF', val: tzDiffStr }
     ];
@@ -3905,36 +3990,161 @@ function drawBoardingPassCanvas(cv, fromQuery, toQuery, u, lang = 'fr') {
     ctx.fillStyle = '#10b981';
     ctx.fillText('remoworld.com', tX + tW - 65, passY + 108);
 
-    // 8. Destination City Landmark Visual (Center Artwork)
-    const artY = tY + 840;
-    ctx.textAlign = 'center';
+    // 8. Panoramic Dual-City Split + Real Photorealistic Jetliner Medallion (Ideea C)
+    const artX0 = tX + 40;
+    const artY0 = passY + 144;
+    const artW = tW - 80; // 860
+    const artH = 388;
+    const artMidX = artX0 + artW / 2; // 540
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.roundRect(artX0, artY0, artW, artH, 26);
+    ctx.clip();
+
+    // Base dark backdrop while images load
+    const artBg = ctx.createLinearGradient(artX0, artY0, artX0 + artW, artY0 + artH);
+    artBg.addColorStop(0, '#0b1c3d');
+    artBg.addColorStop(0.5, '#071024');
+    artBg.addColorStop(1, '#1e1b4b');
+    ctx.fillStyle = artBg;
+    ctx.fillRect(artX0, artY0, artW, artH);
+
+    // Left Half: Real Departure City Photo
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(artX0, artY0, artW / 2, artH);
+    ctx.clip();
+    if (fromCityImg) {
+      drawCoverImage(ctx, fromCityImg, artX0, artY0, artW / 2, artH);
+    }
+    ctx.restore();
+
+    // Right Half: Real Destination City Photo
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(artMidX, artY0, artW / 2, artH);
+    ctx.clip();
+    if (toCityImg) {
+      drawCoverImage(ctx, toCityImg, artMidX, artY0, artW / 2, artH);
+    }
+    ctx.restore();
+
+    // Soft cinematic top & bottom readability vignettes over split photos
+    const topVig = ctx.createLinearGradient(0, artY0, 0, artY0 + 110);
+    topVig.addColorStop(0, 'rgba(3,7,18,0.68)');
+    topVig.addColorStop(1, 'rgba(3,7,18,0)');
+    ctx.fillStyle = topVig;
+    ctx.fillRect(artX0, artY0, artW, 110);
+
+    const botVig = ctx.createLinearGradient(0, artY0 + artH - 145, 0, artY0 + artH);
+    botVig.addColorStop(0, 'rgba(3,7,18,0)');
+    botVig.addColorStop(1, 'rgba(3,7,18,0.88)');
+    ctx.fillStyle = botVig;
+    ctx.fillRect(artX0, artY0 + artH - 145, artW, 145);
+
+    // Glowing vertical split divider
+    const divGlow = ctx.createLinearGradient(artMidX - 14, 0, artMidX + 14, 0);
+    divGlow.addColorStop(0, 'rgba(250,204,21,0)');
+    divGlow.addColorStop(0.5, 'rgba(250,204,21,0.75)');
+    divGlow.addColorStop(1, 'rgba(250,204,21,0)');
+    ctx.fillStyle = divGlow;
+    ctx.fillRect(artMidX - 14, artY0, 28, artH);
+    ctx.fillStyle = 'rgba(255,255,255,0.92)';
+    ctx.fillRect(artMidX - 1.5, artY0, 3, artH);
+
+    // Top Corner Labels (FROM / TO)
+    ctx.font = '800 16px "Orbitron", sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillStyle = 'rgba(125,211,252,0.95)';
+    ctx.fillText(lang === 'fr' ? `DÉPART · ${fromCode}` : `DEPARTURE · ${fromCode}`, artX0 + 22, artY0 + 36);
+
+    ctx.textAlign = 'right';
+    ctx.fillStyle = 'rgba(253,224,71,0.95)';
+    ctx.fillText(lang === 'fr' ? `ARRIVÉE · ${toCode}` : `ARRIVAL · ${toCode}`, artX0 + artW - 22, artY0 + 36);
+
+    // Bottom Corner City Name Pills
+    ctx.font = '900 22px "Orbitron", sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(fromName.toUpperCase().slice(0, 14), artX0 + 22, artY0 + artH - 22);
+
+    ctx.textAlign = 'right';
+    ctx.fillStyle = '#fde047';
+    ctx.fillText(toName.toUpperCase().slice(0, 14), artX0 + artW - 22, artY0 + artH - 22);
+
+    ctx.restore(); // end panoramic clip
+
+    // Panoramic frame glowing gold/cyan border
+    ctx.save();
+    const frameGrad = ctx.createLinearGradient(artX0, artY0, artX0 + artW, artY0);
+    frameGrad.addColorStop(0, '#38bdf8');
+    frameGrad.addColorStop(0.5, '#facc15');
+    frameGrad.addColorStop(1, '#fbbf24');
+    ctx.strokeStyle = frameGrad;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.roundRect(artX0, artY0, artW, artH, 26);
+    ctx.stroke();
+    ctx.restore();
+
+    // Center Circular Real Luxury Jetliner Medallion
+    const jetCx = artMidX;
+    const jetCy = artY0 + 180;
+    const jetR = 96;
+
+    ctx.save();
+    ctx.shadowColor = 'rgba(250, 204, 21, 0.55)';
+    ctx.shadowBlur = 28;
+    ctx.beginPath();
+    ctx.arc(jetCx, jetCy, jetR + 5, 0, Math.PI * 2);
+    ctx.fillStyle = '#071024';
+    ctx.fill();
+    ctx.restore();
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(jetCx, jetCy, jetR, 0, Math.PI * 2);
+    ctx.clip();
+    if (jetImg) {
+      drawCoverImage(ctx, jetImg, jetCx - jetR, jetCy - jetR, jetR * 2, jetR * 2);
+    } else {
+      ctx.fillStyle = '#0b1c3d';
+      ctx.fillRect(jetCx - jetR, jetCy - jetR, jetR * 2, jetR * 2);
+      ctx.textAlign = 'center';
+      ctx.font = '72px sans-serif';
+      ctx.fillText('✈️', jetCx, jetCy + 24);
+    }
+    ctx.restore();
+
+    // Crisp double metallic ring around jet medallion
+    ctx.beginPath();
+    ctx.arc(jetCx, jetCy, jetR, 0, Math.PI * 2);
+    ctx.strokeStyle = '#facc15';
+    ctx.lineWidth = 5;
+    ctx.stroke();
 
     ctx.beginPath();
-    ctx.arc(540, artY, 150, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(6,182,212,0.08)';
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(56,189,248,0.3)';
+    ctx.arc(jetCx, jetCy, jetR + 6, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(56,189,248,0.75)';
     ctx.lineWidth = 2;
     ctx.stroke();
 
-    if (toCity.id && typeof drawCityLandmark === 'function' && !toCity.id.startsWith('custom_')) {
-      try {
-        drawCityLandmark(ctx, toCity.id, '#38bdf8', 540, artY, 190);
-      } catch (err) {
-        console.warn('Landmark draw error:', err);
-      }
-    } else {
-      // Custom skyline vector badge for custom typed cities
-      ctx.font = '90px sans-serif';
-      ctx.fillText(toCity.flag || '🌍', 540, artY + 15);
-      ctx.font = '900 34px "Orbitron", sans-serif';
-      ctx.fillStyle = '#38bdf8';
-      ctx.fillText(toCode, 540, artY + 70);
-    }
+    // Sleek Direct Flight Pill underneath medallion (above bottom city labels -> zero overlap for long names)
+    const flPillW = 306;
+    const flPillY = artY0 + 296;
+    ctx.fillStyle = 'rgba(6,12,28,0.92)';
+    ctx.strokeStyle = 'rgba(250,204,21,0.85)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.roundRect(jetCx - flPillW / 2, flPillY, flPillW, 36, 18);
+    ctx.fill();
+    ctx.stroke();
 
-    ctx.font = '900 22px "Orbitron", sans-serif';
-    ctx.fillStyle = '#ffffff';
-    ctx.fillText(`${toCity.flag || '🏙️'} ${toName.toUpperCase()} · DESTINATION 4D`, 540, artY + 175);
+    ctx.textAlign = 'center';
+    ctx.font = '800 16px "Orbitron", sans-serif';
+    ctx.fillStyle = '#fde047';
+    ctx.fillText(lang === 'fr' ? `✈️ VOL DIRECT 4D · ${flightDur}` : `✈️ DIRECT 4D FLIGHT · ${flightDur}`, jetCx, flPillY + 24);
 
     // 9. Classic Ticket Perforation (Tear Line with Notches)
     const tearY = tY + 1090;
@@ -4099,8 +4309,8 @@ function setBoardingPassRoutePreset(fromId, toId) {
   onBoardingPassRouteChanged();
 }
 
-function setBoardingPassMood(tag, btnEl) {
-  window._boardingPassMoodTag = tag || '';
+function setBoardingPassMood(moodKey, btnEl) {
+  window._boardingPassMoodKey = BOARDING_MOOD_LABELS[moodKey] ? moodKey : 'home';
   const row = document.getElementById('boardingPassMoodRow');
   if (row) {
     row.querySelectorAll('.bp-mood-pill').forEach((b) => {
@@ -4122,18 +4332,18 @@ function shareBoardingPassWhatsApp() {
   const tInp = document.getElementById('boardingPassToInput');
   const u = REMO_STORE.getCurrentUser() || { name: 'Pioneer', passportNum: '0001', referralCode: 'REMO-0001' };
   const lang = REMO_I18N.getLang();
-  const c1 = resolveCityFromQuery(fInp ? fInp.value : 'chisinau');
-  const c2 = resolveCityFromQuery(tInp ? tInp.value : 'montreal');
+  const c1 = resolveCityFromQuery(fInp ? fInp.value : 'montreal');
+  const c2 = resolveCityFromQuery(tInp ? tInp.value : 'chisinau');
   const fName = getCityName(c1, lang) || c1.name_en;
   const tName = getCityName(c2, lang) || c2.name_en;
   const fCode = CITY_AIRPORT_CODES[String(c1.id || '').toLowerCase()] || getCityAirportCode(c1.id);
   const tCode = CITY_AIRPORT_CODES[String(c2.id || '').toLowerCase()] || getCityAirportCode(c2.id);
-  const mood = window._boardingPassMoodTag || '❤️ DOR DE CASĂ';
+  const mood = getBoardingMoodLabel(lang);
   const ref = encodeURIComponent(u.referralCode || 'REMO-0001');
   const link = `https://remoworld.com/?open=boardingpass&dep=${encodeURIComponent(c1.id)}&arr=${encodeURIComponent(c2.id)}&ref=${ref}`;
   const msg = lang === 'fr'
-    ? `🎫 Mon Billet 4D REMO : ${c1.flag || '✈️'} ${fName} (${fCode}) ⇄ ${c2.flag || '🌍'} ${tName} (${tCode}) — ${mood} !\nCrée le tien gratuitement + gagne +150 🪙 : ${link}`
-    : `🎫 My REMO 4D Boarding Pass: ${c1.flag || '✈️'} ${fName} (${fCode}) ⇄ ${c2.flag || '🌍'} ${tName} (${tCode}) — ${mood}!\nCreate yours FREE + claim +150 🪙: ${link}`;
+    ? `🎫 Mon Billet 4D REMO : ✈️ ${fName} (${fCode}) ⇄ ${tName} (${tCode}) — ${mood} !\nCrée le tien gratuitement + gagne +150 🪙 : ${link}`
+    : `🎫 My REMO 4D Boarding Pass: ✈️ ${fName} (${fCode}) ⇄ ${tName} (${tCode}) — ${mood}!\nCreate yours FREE + claim +150 🪙: ${link}`;
   window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank', 'noopener');
 }
 

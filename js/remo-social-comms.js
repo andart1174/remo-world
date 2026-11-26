@@ -11636,7 +11636,7 @@ function ensureInlineAdminStudioLoaded(onReady) {
   }
   _remoAdminInlineLoading = true;
   const s = document.createElement('script');
-  s.src = 'js/remo-admin-inline.js?v=166';
+  s.src = 'js/remo-admin-inline.js?v=167';
   s.async = true;
   s.onload = () => {
     _remoAdminInlineLoading = false;

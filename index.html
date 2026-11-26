@@ -123,14 +123,14 @@
   <link rel="preconnect" href="https://firebasestorage.googleapis.com" crossorigin>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="preload" as="style" href="css/remo-core.css?v=166">
+  <link rel="preload" as="style" href="css/remo-core.css?v=167">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800;900&family=Orbitron:wght@700;900&display=swap" media="print" onload="this.media='all'">
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800;900&family=Orbitron:wght@700;900&display=swap"></noscript>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha384-sHL9NAb7lN7rfvG5lfHpm643Xkcjzp4jFvuavGOndn6pjVqS6ny56CAt3nsEVT4H" crossorigin="anonymous" media="print" onload="this.media='all'">
   <noscript><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha384-sHL9NAb7lN7rfvG5lfHpm643Xkcjzp4jFvuavGOndn6pjVqS6ny56CAt3nsEVT4H" crossorigin="anonymous"></noscript>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha384-cxOPjt7s7Iz04uaHJceBmS+qpjv2JkIHNVcuOrM+YHwZOmJGBXI00mdUXEq65HTH" crossorigin="anonymous" defer></script>
 
-  <link rel="stylesheet" href="css/remo-core.css?v=166">
+  <link rel="stylesheet" href="css/remo-core.css?v=167">
 </head>
 <body>
 
@@ -1195,25 +1195,25 @@
       </div>
       <datalist id="boardingPassCitiesList"></datalist>
 
-      <!-- Custom Passenger Name + Diaspora Mood Tag -->
+      <!-- Custom Passenger Name + Bilingual Mood Tag (EN / FR only) -->
       <div style="margin-bottom:8px;text-align:left;">
-        <input type="text" id="boardingPassNameInput" maxlength="24" class="remo-input" style="padding:7px 10px;font-size:0.82rem;width:100%;" placeholder="✍️ Your name on ticket (optional) / Numele tău pe bilet..." oninput="onBoardingPassRouteChanged()">
+        <input type="text" id="boardingPassNameInput" maxlength="24" class="remo-input" style="padding:7px 10px;font-size:0.82rem;width:100%;" placeholder="✍️ Votre nom sur le billet (optionnel)..." data-i18n-placeholder="boarding_name_ph" oninput="onBoardingPassRouteChanged()">
       </div>
       <div id="boardingPassMoodRow" style="display:flex;gap:5px;flex-wrap:wrap;justify-content:center;margin-bottom:8px;">
-        <button type="button" class="btn-ghost bp-mood-pill active" style="padding:3px 8px;font-size:0.7rem;border-color:rgba(250,204,21,0.55);color:#fde047;" onclick="setBoardingPassMood('❤️ DOR DE CASĂ', this)">❤️ Dor de casă</button>
-        <button type="button" class="btn-ghost bp-mood-pill" style="padding:3px 8px;font-size:0.7rem;border-color:rgba(255,255,255,0.18);" onclick="setBoardingPassMood('🌍 HEART IN 2 CITIES', this)">🌍 Heart in 2 Cities</button>
-        <button type="button" class="btn-ghost bp-mood-pill" style="padding:3px 8px;font-size:0.7rem;border-color:rgba(255,255,255,0.18);" onclick="setBoardingPassMood('✈️ NEXT STOP', this)">✈️ Next Stop</button>
-        <button type="button" class="btn-ghost bp-mood-pill" style="padding:3px 8px;font-size:0.7rem;border-color:rgba(255,255,255,0.18);" onclick="setBoardingPassMood('✨ DIASPORA VIP', this)">✨ Diaspora VIP</button>
+        <button type="button" class="btn-ghost bp-mood-pill active" data-mood-key="home" data-i18n="boarding_mood_home" style="padding:3px 9px;font-size:0.7rem;border-color:rgba(250,204,21,0.55);color:#fde047;" onclick="setBoardingPassMood('home', this)">❤️ Près du Cœur</button>
+        <button type="button" class="btn-ghost bp-mood-pill" data-mood-key="two" data-i18n="boarding_mood_two" style="padding:3px 9px;font-size:0.7rem;border-color:rgba(255,255,255,0.18);" onclick="setBoardingPassMood('two', this)">🌍 Cœur entre 2 Villes</button>
+        <button type="button" class="btn-ghost bp-mood-pill" data-mood-key="next" data-i18n="boarding_mood_next" style="padding:3px 9px;font-size:0.7rem;border-color:rgba(255,255,255,0.18);" onclick="setBoardingPassMood('next', this)">✈️ Prochaine Escale</button>
+        <button type="button" class="btn-ghost bp-mood-pill" data-mood-key="vip" data-i18n="boarding_mood_vip" style="padding:3px 9px;font-size:0.7rem;border-color:rgba(255,255,255,0.18);" onclick="setBoardingPassMood('vip', this)">✨ Voyageur VIP</button>
       </div>
 
-      <!-- Popular Diaspora & World Route Pills -->
+      <!-- Popular World Route Pills (Clean IATA codes on all OS) -->
       <div style="display:flex;gap:5px;flex-wrap:wrap;justify-content:center;margin-bottom:10px;">
-        <button type="button" class="btn-ghost" style="padding:3px 8px;font-size:0.71rem;border-color:rgba(56,189,248,0.4);" onclick="setBoardingPassRoutePreset('chisinau', 'montreal')">🇲🇩 RMO ➔ ⚜️ YUL</button>
-        <button type="button" class="btn-ghost" style="padding:3px 8px;font-size:0.71rem;border-color:rgba(56,189,248,0.4);" onclick="setBoardingPassRoutePreset('bucharest', 'london')">🇷🇴 OTP ➔ 🇬🇧 LHR</button>
-        <button type="button" class="btn-ghost" style="padding:3px 8px;font-size:0.71rem;border-color:rgba(56,189,248,0.4);" onclick="setBoardingPassRoutePreset('bucharest', 'paris')">🇷🇴 OTP ➔ 🇫🇷 CDG</button>
-        <button type="button" class="btn-ghost" style="padding:3px 8px;font-size:0.71rem;border-color:rgba(56,189,248,0.4);" onclick="setBoardingPassRoutePreset('chisinau', 'rome')">🇲🇩 RMO ➔ 🇮🇹 FCO</button>
-        <button type="button" class="btn-ghost" style="padding:3px 8px;font-size:0.71rem;border-color:rgba(56,189,248,0.4);" onclick="setBoardingPassRoutePreset('montreal', 'paris')">⚜️ YUL ➔ 🇫🇷 CDG</button>
-        <button type="button" class="btn-ghost" style="padding:3px 8px;font-size:0.71rem;border-color:rgba(56,189,248,0.4);" onclick="setBoardingPassRoutePreset('paris', 'tokyo')">🗼 CDG ➔ 🏯 HND</button>
+        <button type="button" class="btn-ghost" style="padding:3px 9px;font-size:0.71rem;border-color:rgba(56,189,248,0.4);" onclick="setBoardingPassRoutePreset('montreal', 'chisinau')">✈️ YUL ➔ RMO</button>
+        <button type="button" class="btn-ghost" style="padding:3px 9px;font-size:0.71rem;border-color:rgba(56,189,248,0.4);" onclick="setBoardingPassRoutePreset('bucharest', 'london')">✈️ OTP ➔ LHR</button>
+        <button type="button" class="btn-ghost" style="padding:3px 9px;font-size:0.71rem;border-color:rgba(56,189,248,0.4);" onclick="setBoardingPassRoutePreset('bucharest', 'paris')">✈️ OTP ➔ CDG</button>
+        <button type="button" class="btn-ghost" style="padding:3px 9px;font-size:0.71rem;border-color:rgba(56,189,248,0.4);" onclick="setBoardingPassRoutePreset('chisinau', 'rome')">✈️ RMO ➔ FCO</button>
+        <button type="button" class="btn-ghost" style="padding:3px 9px;font-size:0.71rem;border-color:rgba(56,189,248,0.4);" onclick="setBoardingPassRoutePreset('montreal', 'paris')">✈️ YUL ➔ CDG</button>
+        <button type="button" class="btn-ghost" style="padding:3px 9px;font-size:0.71rem;border-color:rgba(56,189,248,0.4);" onclick="setBoardingPassRoutePreset('paris', 'tokyo')">✈️ CDG ➔ HND</button>
       </div>
 
       <div style="display:flex;justify-content:center;margin-bottom:12px;">
@@ -3030,12 +3030,12 @@
   <script defer src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js" integrity="sha384-oFrOL1TiREYNET0lsYF3LjQuyi2gL7vhjH1X8vFr+umcmzAdPELopeSgbcrv4uRm" crossorigin="anonymous"></script>
 
   <!-- REMO Core Engines (Non-blocking defer; Focus TV, Radio, Blitz & Live Apps lazy-loaded on demand / idle) -->
-  <script defer src="js/remo-i18n.js?v=166"></script>
-  <script defer src="js/remo-cities-data.js?v=166"></script>
-  <script defer src="js/remo-store.js?v=166"></script>
-  <script defer src="js/remo-card-engine.js?v=166"></script>
-  <script defer src="js/remo-radar-arena.js?v=166"></script>
-  <script defer src="js/remo-social-comms.js?v=166"></script>
+  <script defer src="js/remo-i18n.js?v=167"></script>
+  <script defer src="js/remo-cities-data.js?v=167"></script>
+  <script defer src="js/remo-store.js?v=167"></script>
+  <script defer src="js/remo-card-engine.js?v=167"></script>
+  <script defer src="js/remo-radar-arena.js?v=167"></script>
+  <script defer src="js/remo-social-comms.js?v=167"></script>
 
   <noscript>
     <nav aria-label="REMO World Static Directory" style="padding:20px;background:#050816;color:#f8fafc;">
