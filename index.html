@@ -39,12 +39,26 @@
     "@context": "https://schema.org",
     "@graph": [
       {
+        "@type": "Organization",
+        "@id": "https://remoworld.com/#organization",
+        "name": "REMO World",
+        "url": "https://remoworld.com/",
+        "logo": {
+          "@type": "ImageObject",
+          "url": "https://remoworld.com/img/remo_icon_512.png",
+          "width": 512,
+          "height": 512
+        },
+        "description": "Bilingual (English & French) 4D World Cities Social Network connecting 24 iconic metropolises with 4D Focus TV, 56 live city radio stations, 1910 vs 2026 historical comparisons, synced Pomodoro Study Rooms, and viral travel tools."
+      },
+      {
         "@type": "WebSite",
         "@id": "https://remoworld.com/#website",
         "url": "https://remoworld.com/",
         "name": "REMO World",
         "alternateName": ["REMO App", "REMO 4D World Cities"],
-        "description": "4D World Cities Social Network, 4D Focus TV, Synced Study Rooms, 56 Live City Radios & Daily World Blitz Geography Game",
+        "publisher": { "@id": "https://remoworld.com/#organization" },
+        "description": "4D World Cities Social Network, 4D Focus TV, Synced Study Rooms, 56 Live City Radios, 1910 vs 2026 Time-Warp & Daily World Blitz Geography Game",
         "inLanguage": ["en", "fr"],
         "potentialAction": {
           "@type": "SearchAction",
@@ -57,6 +71,7 @@
         "@id": "https://remoworld.com/#app",
         "name": "REMO World",
         "url": "https://remoworld.com/",
+        "publisher": { "@id": "https://remoworld.com/#organization" },
         "applicationCategory": "SocialNetworkingApplication",
         "operatingSystem": "All",
         "browserRequirements": "Requires JavaScript. Requires HTML5.",
@@ -64,9 +79,12 @@
           "4D Focus TV Ambient City Windows & Zen Desk Clock",
           "Synced Pomodoro Focus Together Study Rooms",
           "56 Ad-Free Live World City Radio Stations",
-          "REMO Odyssey Official 4D World Game & 1v1 Friend Duels",
-          "Daily World Blitz 60s Geography Trivia & 1v1 Friend Duels",
-          "Live Top 24 Cities Ranking & City Showdown Duels"
+          "1910 vs 2026 Historical City Time-Warp Comparisons",
+          "30-Second Daily City Challenge & Daily World Blitz 60s Duels",
+          "My Travel Score 24 Interactive World Checklist & 9:16 Story Card",
+          "Soul City Personality Quiz & Dual-City 4D Boarding Pass Studio",
+          "Free Embeddable Notion & Blog Live City Clock/Weather/Radio Widget",
+          "REMO Odyssey Official 4D World Game & Live Top 24 Cities Ranking"
         ],
         "offers": {
           "@type": "Offer",
@@ -83,7 +101,7 @@
             "name": "What is REMO World?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "REMO World is a free bilingual (English & French) 4D City Social Network connecting 24 world cities including Montréal, Paris, Chișinău, Bucharest, New York, London, Tokyo, and Dubai with 4D Focus TV ambient windows, Synced Study Rooms, 56 live city radio stations, Citizen Passports, and Daily World Blitz trivia."
+              "text": "REMO World is a free bilingual (English & French) 4D City Social Network connecting 24 world cities including Montréal, Paris, Chișinău, Bucharest, New York, London, Tokyo, and Dubai with 4D Focus TV ambient windows, Synced Study Rooms, 56 live city radio stations, 1910 vs 2026 historical comparisons, My Travel Score /24, Soul City Quiz, and Daily World Blitz trivia."
             }
           },
           {
@@ -96,10 +114,10 @@
           },
           {
             "@type": "Question",
-            "name": "What free browser games are inside REMO World?",
+            "name": "What free browser games and viral travel studios are inside REMO World?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "You can play REMO Odyssey (our official 4D city runner & hover-coin game across 24 live cities), Daily World Blitz 60-second city trivia with 1v1 friend challenge links, Guess My City photo trivia, live cross-city Clicker Wars, City Versus voting, and create 9:16 holographic 4D Boarding Passes."
+              "text": "You can play REMO Odyssey (our official 4D city runner across 24 live cities), the 30-second Daily City Challenge, Daily World Blitz 60s trivia with 1v1 friend duels, Guess My City photo trivia, My Travel Score /24 checklist, Soul City personality quiz, dual-city 9:16 4D Boarding Passes, and Notion/Blog live city widgets."
             }
           }
         ]
@@ -123,14 +141,14 @@
   <link rel="preconnect" href="https://firebasestorage.googleapis.com" crossorigin>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="preload" as="style" href="css/remo-core.css?v=169">
+  <link rel="preload" as="style" href="css/remo-core.css?v=170">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800;900&family=Orbitron:wght@700;900&display=swap" media="print" onload="this.media='all'">
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800;900&family=Orbitron:wght@700;900&display=swap"></noscript>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha384-sHL9NAb7lN7rfvG5lfHpm643Xkcjzp4jFvuavGOndn6pjVqS6ny56CAt3nsEVT4H" crossorigin="anonymous" media="print" onload="this.media='all'">
   <noscript><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha384-sHL9NAb7lN7rfvG5lfHpm643Xkcjzp4jFvuavGOndn6pjVqS6ny56CAt3nsEVT4H" crossorigin="anonymous"></noscript>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha384-cxOPjt7s7Iz04uaHJceBmS+qpjv2JkIHNVcuOrM+YHwZOmJGBXI00mdUXEq65HTH" crossorigin="anonymous" defer></script>
 
-  <link rel="stylesheet" href="css/remo-core.css?v=169">
+  <link rel="stylesheet" href="css/remo-core.css?v=170">
 </head>
 <body>
 
@@ -870,6 +888,9 @@
       <a href="cities/index.html">24 Cities</a>
       <a href="world-ranking.html">2026 Ranking</a>
       <a href="city-versus.html">City Duels</a>
+      <a href="travel-score.html">Travel Score /24</a>
+      <a href="soul-city-quiz.html">Soul City Quiz</a>
+      <a href="widget.html">Notion Widget</a>
       <a href="ambassadors.html" data-i18n="nav_ambassadors">🤝 Ambassadors</a>
       <a href="fr/" hreflang="fr">Version Française</a>
       <a href="privacy.html">Privacy</a>
@@ -3038,13 +3059,13 @@
   <script defer src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js" integrity="sha384-oFrOL1TiREYNET0lsYF3LjQuyi2gL7vhjH1X8vFr+umcmzAdPELopeSgbcrv4uRm" crossorigin="anonymous"></script>
 
   <!-- REMO Core Engines (Non-blocking defer; Focus TV, Radio, Blitz & Live Apps lazy-loaded on demand / idle) -->
-  <script defer src="js/remo-i18n.js?v=169"></script>
-  <script defer src="js/remo-cities-data.js?v=169"></script>
-  <script defer src="js/remo-store.js?v=169"></script>
-  <script defer src="js/remo-card-engine.js?v=169"></script>
-  <script defer src="js/remo-radar-arena.js?v=169"></script>
-  <script defer src="js/remo-social-comms.js?v=169"></script>
-  <script defer src="js/remo-viral-studios.js?v=169"></script>
+  <script defer src="js/remo-i18n.js?v=170"></script>
+  <script defer src="js/remo-cities-data.js?v=170"></script>
+  <script defer src="js/remo-store.js?v=170"></script>
+  <script defer src="js/remo-card-engine.js?v=170"></script>
+  <script defer src="js/remo-radar-arena.js?v=170"></script>
+  <script defer src="js/remo-social-comms.js?v=170"></script>
+  <script defer src="js/remo-viral-studios.js?v=170"></script>
 
   <noscript>
     <nav aria-label="REMO World Static Directory" style="padding:20px;background:#050816;color:#f8fafc;">
@@ -3056,10 +3077,15 @@
         <li><a href="world-blitz.html">Daily World Blitz 60s Geography Game &amp; 1v1 Duels (EN)</a> | <a href="fr/world-blitz.html">Daily World Blitz 60s (FR)</a></li>
         <li><a href="world-ranking.html">Top 24 World Cities Live Ranking 2026 (EN)</a> | <a href="fr/world-ranking.html">Classement des 24 Villes du Monde 2026 (FR)</a></li>
         <li><a href="cities/index.html">All 24 Connected World Cities (EN)</a> | <a href="fr/cities/index.html">Les 24 Villes du Monde (FR)</a></li>
-        <li><a href="city-versus.html">World City Duels &amp; Comparison Tool (Montréal vs Paris, Chișinău vs Bucharest)</a> | <a href="fr/city-versus.html">Duels &amp; Comparateur des Villes (FR)</a></li>
+        <li><a href="city-versus.html">World City Duels &amp; Comparison Tool</a> | <a href="fr/city-versus.html">Duels &amp; Comparateur des Villes (FR)</a></li>
+        <li><a href="versus/montreal-vs-paris.html">Montréal vs Paris</a> · <a href="versus/chisinau-vs-bucharest.html">Chișinău vs Bucharest</a> · <a href="versus/newyork-vs-london.html">New York vs London</a> · <a href="versus/tokyo-vs-seoul.html">Tokyo vs Seoul</a></li>
+        <li><a href="travel-score.html">My Travel Score — How Many of 24 World Cities Have You Visited? (EN)</a> | <a href="fr/travel-score.html">Score de Voyage /24 (FR)</a></li>
+        <li><a href="soul-city-quiz.html">Which World City Matches Your Soul? Personality Quiz (EN)</a> | <a href="fr/soul-city-quiz.html">Quiz Ville de Votre Âme (FR)</a></li>
+        <li><a href="widget.html">Free Live World City Clock, Weather &amp; Radio Widget Studio (Notion &amp; Blog Embed)</a></li>
         <li><a href="world-radio.html">Free Live World Cities Radio — 56 Stations</a> | <a href="fr/world-radio.html">56 Radios du Monde (FR)</a></li>
         <li><a href="guess-the-city.html">Guess The City Photo Game Free</a> | <a href="fr/guess-the-city.html">Deviner la Ville (FR)</a></li>
         <li><a href="boarding-pass.html">Free 4D Holographic Boarding Pass Generator</a> | <a href="fr/boarding-pass.html">Billet de Vol 4D (FR)</a></li>
+        <li><a href="ambassadors.html">REMO City Ambassadors Official Program (EN)</a> | <a href="fr/ambassadors.html">Ambassadeurs REMO (FR)</a></li>
         <li><a href="terms.html">Terms of Service &amp; Community Guidelines</a> | <a href="fr/terms.html">Conditions d'Utilisation (FR)</a></li>
         <li><a href="privacy.html">Privacy Policy &amp; Data Rights (GDPR)</a> | <a href="fr/privacy.html">Politique de Confidentialité (FR)</a></li>
         <li><a href="cities/montreal.html">Montréal Hub</a> · <a href="cities/paris.html">Paris Hub</a> · <a href="cities/chisinau.html">Chișinău Hub</a> · <a href="cities/bucharest.html">Bucharest Hub</a> · <a href="cities/newyork.html">New York Hub</a> · <a href="cities/tokyo.html">Tokyo Hub</a></li>

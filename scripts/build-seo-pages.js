@@ -1,18 +1,48 @@
 /* ════════════════════════════════════════════════════════════════════
-   🌐 REMO WORLD — Static Programmatic SEO, Sitemap, Widget & AI Search Builder (v61)
-   Generates 58 crawlable EN/FR static HTML landing pages, widget.html,
-   sitemap.xml (with hreflang), robots.txt, llms.txt, llms-full.txt & IndexNow key.
+   🌐 REMO WORLD — Static Programmatic SEO, Sitemap & AI Search Builder (v170)
+   Generates 100+ crawlable EN/FR static HTML landing pages (24 enriched cities,
+   12 City-vs-City comparison guides, Travel Score, Soul City Quiz, Focus TV,
+   Study Rooms, World Blitz, World Radio, Guess City, Boarding Pass),
+   Google Images sitemap.xml (with hreflang), robots.txt, llms.txt & llms-full.txt.
    Strict Bilingual Output: English (EN) & French (FR) ONLY.
    ════════════════════════════════════════════════════════════════════ */
 
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { SEO_CITY_EXTRA, SEO_VERSUS_DUELS } = require('./seo-city-enrichment');
 
 const ROOT = path.resolve(__dirname, '..');
 const DOMAIN = 'https://remoworld.com';
-const TODAY = '2026-11-12';
+const TODAY = new Date().toISOString().slice(0, 10);
 const INDEXNOW_KEY = 'remoindexnow2026key8f4a2b9c1d7e3a5f';
+
+function seoCityCode(city) {
+  const extra = SEO_CITY_EXTRA[city.id];
+  return (extra && extra.seoCode) ? extra.seoCode : city.code;
+}
+
+function seoCityIata(city) {
+  const extra = SEO_CITY_EXTRA[city.id];
+  return (extra && extra.iata) ? extra.iata : city.code;
+}
+
+function haversineKm(lat1, lon1, lat2, lon2) {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon / 2) ** 2;
+  return Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+}
+
+function estimateFlightTime(km) {
+  const mins = Math.round((km / 835) * 60 + 35);
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return `~${h}h ${String(m).padStart(2, '0')}m`;
+}
 
 /* ── 1. Load Canonical Cities & Radio Stations Directly from Source ── */
 function loadCitiesAndStations() {
@@ -150,6 +180,16 @@ details.faq p{margin-top:8px;color:#cbd5e1;font-size:0.9rem}
 .city-link{display:flex;align-items:center;gap:9px;padding:10px 12px;background:rgba(255,255,255,0.035);border:1px solid rgba(255,255,255,0.09);border-radius:13px;color:#f1f5f9;font-weight:700;font-size:0.86rem;text-decoration:none;transition:0.18s}
 .city-link:hover{border-color:var(--gold);background:rgba(251,191,36,0.08);text-decoration:none;transform:translateY(-1px)}
 .embed-code{width:100%;background:#020617;color:#7dd3fc;border:1px solid rgba(56,189,248,0.35);border-radius:10px;padding:9px;font-family:monospace;font-size:0.76rem;resize:none;margin:8px 0}
+.hero-photo-wrap{margin:16px 0 18px;border-radius:18px;overflow:hidden;border:1px solid rgba(251,191,36,0.34);position:relative;max-height:360px;background:#020617}
+.hero-photo-wrap img{width:100%;height:100%;max-height:360px;object-fit:cover;display:block}
+.hero-photo-cap{position:absolute;left:12px;bottom:12px;background:rgba(5,8,22,0.82);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,0.16);color:#f8fafc;padding:5px 11px;border-radius:999px;font-size:0.76rem;font-weight:800}
+.fact-list{list-style:none;display:flex;flex-direction:column;gap:10px;margin-top:8px}
+.fact-list li{display:flex;align-items:flex-start;gap:10px;padding:11px 13px;border-radius:13px;background:rgba(255,255,255,0.035);border:1px solid rgba(255,255,255,0.09);font-size:0.89rem;color:#e2e8f0}
+.fact-num{flex-shrink:0;width:24px;height:24px;border-radius:50%;background:linear-gradient(135deg,#f59e0b,#fbbf24);color:#090d16;font-weight:900;font-size:0.78rem;display:inline-flex;align-items:center;justify-content:center;margin-top:1px}
+.vs-split{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;margin:16px 0}
+.vs-photo-card{position:relative;border-radius:18px;overflow:hidden;border:1px solid rgba(56,189,248,0.34);background:#020617}
+.vs-photo-card img{width:100%;height:220px;object-fit:cover;display:block}
+.vs-photo-meta{padding:12px 14px;display:flex;justify-content:space-between;align-items:center;gap:8px}
 footer{margin-top:34px;padding-top:20px;border-top:1px solid rgba(255,255,255,0.1);display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;font-size:0.82rem;color:var(--muted)}
 @media(max-width:680px){
   .topbar{padding:10px 12px;gap:8px;margin-bottom:14px}
@@ -194,12 +234,11 @@ const INLINE_RADIO_PLAYER_JS = `
 </script>
 `;
 
-function renderSocialMeta(title, desc, url, customImg = '') {
+function renderSocialMeta(title, desc, url, customImg = '', imgW = 1200, imgH = 630) {
   const img = customImg || `${DOMAIN}/img/remo_og_cover.jpg`;
-  const hasDefaultSize = !customImg;
-  const sizeMeta = hasDefaultSize
-    ? `\n  <meta property="og:image:width" content="1200">\n  <meta property="og:image:height" content="630">`
-    : '';
+  const w = customImg ? imgW : 1200;
+  const h = customImg ? imgH : 630;
+  const sizeMeta = `\n  <meta property="og:image:width" content="${w}">\n  <meta property="og:image:height" content="${h}">`;
   return `<meta property="og:type" content="website">
   <meta property="og:site_name" content="REMO World">
   <meta property="og:url" content="${url}">
@@ -259,8 +298,13 @@ function renderFooter(lang, prefix, stationCount = 56) {
       <a href="${langDir}world-radio.html">${isFr ? `${stationCount} Radios en Direct` : `${stationCount} Live Radios`}</a>
       <a href="${langDir}guess-the-city.html">${isFr ? 'Deviner la Ville' : 'Guess City'}</a>
       <a href="${langDir}boarding-pass.html">${isFr ? 'Billet 4D' : 'Boarding Pass'}</a>
+      <a href="${langDir}travel-score.html">${isFr ? 'Score Voyage /24' : 'Travel Score /24'}</a>
+      <a href="${langDir}soul-city-quiz.html">${isFr ? 'Quiz Ville Âme' : 'Soul City Quiz'}</a>
       <a href="${langDir}world-ranking.html">${isFr ? 'Classement 2026' : 'World Ranking 2026'}</a>
       <a href="${langDir}city-versus.html">${isFr ? 'Duels Villes' : 'City Duels'}</a>
+      <a href="${prefix}widget.html">${isFr ? 'Widget Notion' : 'Notion Widget'}</a>
+      <a href="${langDir}odyssey.html">REMO Odyssey</a>
+      <a href="${langDir}ambassadors.html">${isFr ? 'Ambassadeurs' : 'Ambassadors'}</a>
       <a href="${prefix}llms.txt">AI / LLMs</a>
       <a href="${prefix}sitemap.xml">Sitemap</a>
     </div>
@@ -304,6 +348,13 @@ function buildCityPage(city, lang, cities, elements, stations) {
   const elName = isFr ? elInfo.name_fr : elInfo.name_en;
   const tz = CITY_TIMEZONES[city.id] || 'UTC';
   const cityStations = getStationsForCity(city, stations);
+  const cCode = seoCityCode(city);
+  const cIata = seoCityIata(city);
+  const extra = SEO_CITY_EXTRA[city.id] || null;
+  const historyCopy = extra ? (isFr ? extra.history_fr : extra.history_en) : desc;
+  const factsList = extra ? (isFr ? extra.facts_fr : extra.facts_en) : [];
+  const relatedDuel = SEO_VERSUS_DUELS.find((d) => d.a === city.id || d.b === city.id);
+  const rivalCity = relatedDuel ? cities.find((c) => c.id === (relatedDuel.a === city.id ? relatedDuel.b : relatedDuel.a)) : null;
 
   const enUrl = `${DOMAIN}/cities/${city.id}.html`;
   const frUrl = `${DOMAIN}/fr/cities/${city.id}.html`;
@@ -312,12 +363,12 @@ function buildCityPage(city, lang, cities, elements, stations) {
   const prefix = isFr ? '../../' : '../';
 
   const title = isFr
-    ? `${city.flag} ${cName} (${country}) — Radio en Direct, Heure, Météo & Hub 4D | REMO World`
-    : `${city.flag} ${cName} (${country}) — Live Radio, Local Time, Weather & 4D City Hub | REMO World`;
+    ? `${city.flag} ${cName} (${country}) — Radio en Direct, Heure, Météo & 1910 vs 2026 | REMO World`
+    : `${city.flag} ${cName} (${country}) — Live Radio, Local Time, Weather & 1910 vs 2026 | REMO World`;
 
   const metaDesc = isFr
-    ? `Explorez ${cName} (${country}) en direct sur REMO World : écoutez la radio locale sans publicité, consultez l’heure et la météo live, réclamez votre Passeport 4D (${city.code}) et gagnez +150 Pièces d’Or.`
-    : `Explore ${cName} (${country}) live on REMO World: stream free local city radio, check live local time & weather, claim your ${city.code} 4D Citizen Passport, and earn +150 Gold Coins.`;
+    ? `Explorez ${cName} (${country}) en direct sur REMO World : radio locale gratuite, heure & météo live, voyage 1910 vs 2026, faits fascinants et Passeport 4D (${cCode}) +150 Pièces d’Or.`
+    : `Explore ${cName} (${country}) live on REMO World: stream free local city radio, check live local time & weather, explore 1910 vs 2026 history, and claim your ${cCode} 4D Citizen Passport (+150 Gold Coins).`;
 
   const faqs = isFr
     ? [
@@ -326,16 +377,16 @@ function buildCityPage(city, lang, cities, elements, stations) {
           a: `Cliquez simplement sur le bouton « Écouter » ci-dessus sur REMO World pour écouter les stations liées à ${cName} (${cityStations.map((s) => s.name).join(', ')}) gratuitement, sans compte requis et sans coupure.`
         },
         {
-          q: `Comment obtenir le Passeport Citoyen 4D et la Carte ${cName} (${city.code}) ?`,
-          a: `Ouvrez le Hub interactif ${cName} sur REMO World. En un clic, vous recevez un Passeport Citoyen officiel +150 Pièces d’Or REMO et pouvez collectionner la carte ${city.rarity} de ${cName}.`
+          q: `Comment a évolué ${cName} entre 1910 et 2026 ?`,
+          a: historyCopy
         },
         {
-          q: `Quels jeux et outils gratuits sont disponibles pour ${cName} ?`,
-          a: `Vous pouvez jouer à « Deviner la Ville » en photo, participer aux Guerres de Villes en direct pour ${cName}, partager des vidéos et des liens web ou générer un Billet d’Embarquement Story 9:16 vers ${cName}.`
+          q: `Comment obtenir le Passeport Citoyen 4D et un Billet d’Embarquement vers ${cName} (${cIata}) ?`,
+          a: `Ouvrez le Hub interactif ${cName} sur REMO World ou le Générateur de Billet 4D. En un clic, créez une Story 9:16 panoramique vers ${cIata} et recevez +150 Pièces d’Or REMO.`
         },
         {
-          q: `Puis-je intégrer l’horloge, la météo et la radio live de ${cName} sur mon site ou blog ?`,
-          a: `Oui ! Copiez gratuitement le code HTML du Widget Live ${cName} présent sur cette page pour afficher l’heure locale (${tz}), la météo en °C et la radio en direct sur votre blog ou site web.`
+          q: `Puis-je intégrer l’horloge, la météo et la radio live de ${cName} dans Notion ou sur mon blog ?`,
+          a: `Oui ! Copiez gratuitement le code HTML ou utilisez notre Studio Widget Notion pour afficher l’heure locale de ${cName} (${tz}), la météo en °C et la radio en direct.`
         }
       ]
     : [
@@ -344,21 +395,22 @@ function buildCityPage(city, lang, cities, elements, stations) {
           a: `Press the instant "Listen Live" button right on this page to stream curated ${cName} & regional radio (${cityStations.map((s) => s.name).join(', ')}) 24/7 in your browser with zero sign-up required.`
         },
         {
-          q: `How do I claim an official ${cName} (${city.code}) 4D Citizen Passport & Card?`,
-          a: `Click "Enter Live ${cName} Hub" to open REMO World filtered to ${cName}. New citizens instantly receive +150 Gold Coins, a numbered 4D Citizen Passport, and daily packs featuring ${city.rarity} city cards.`
+          q: `How has ${cName} transformed from 1910 to 2026?`,
+          a: historyCopy
         },
         {
-          q: `What free online city games can I play for ${cName}?`,
-          a: `Citizens represent ${cName} in the live World City Clicker Cup, test their geography in the "Guess My City" photo game, share videos and web links, and generate 9:16 Story Boarding Passes flying to ${city.code}.`
+          q: `How do I claim an official ${cName} (${cIata}) 4D Boarding Pass & Citizen Passport?`,
+          a: `Click "Enter Live ${cName} Hub" or "4D Boarding Pass to ${cIata}" to open REMO World. Generate a 9:16 HD dual-city boarding pass and instantly unlock +150 Gold Coins.`
         },
         {
-          q: `Can I embed a free live ${cName} clock, weather, and radio widget on my website?`,
-          a: `Yes! Copy the 1-click HTML iframe snippet below to display ${cName}'s live local clock (${tz}), current °C temperature, and 1-click radio stream on any blog, forum, or personal website.`
+          q: `Can I embed a free live ${cName} clock, weather, and radio widget into Notion or my website?`,
+          a: `Yes! Copy the 1-click HTML iframe snippet below or open the REMO Notion Widget Studio to display ${cName}'s live local clock (${tz}), °C weather, and 1-click radio stream anywhere for free.`
         }
       ];
 
   const cityImgRel = path.join('img', 'cities', `${city.id}.jpg`);
-  const cityOgImg = fs.existsSync(path.join(ROOT, cityImgRel))
+  const hasCityImg = fs.existsSync(path.join(ROOT, cityImgRel));
+  const cityOgImg = hasCityImg
     ? `${DOMAIN}/img/cities/${city.id}.jpg`
     : `${DOMAIN}/img/remo_og_cover.jpg`;
 
@@ -401,7 +453,7 @@ function buildCityPage(city, lang, cities, elements, stations) {
     ]
   };
 
-  const embedSnippet = `<iframe src="${DOMAIN}/widget.html?city=${city.id}&lang=${lang}" width="320" height="156" style="border:0;border-radius:16px;overflow:hidden;" loading="lazy" title="${cName} Live Time, Weather & Radio — REMO World"></iframe>\n<div style="font-size:12px;margin-top:4px;"><a href="${canonical}" target="_blank" rel="noopener">🌐 ${cName} ${isFr ? 'en direct sur REMO World' : 'Live on REMO World'}</a></div>`;
+  const embedSnippet = `<iframe src="${DOMAIN}/widget.html?city=${city.id}&lang=${lang}&embed=1" width="340" height="156" style="border:0;border-radius:16px;overflow:hidden;" loading="lazy" title="${cName} Live Time, Weather & Radio — REMO World"></iframe>\n<div style="font-size:12px;margin-top:4px;"><a href="${canonical}" target="_blank" rel="noopener">🌐 ${cName} ${isFr ? 'en direct sur REMO World' : 'Live on REMO World'}</a></div>`;
 
   const otherCities = cities.filter((c) => c.id !== city.id);
 
@@ -417,7 +469,7 @@ function buildCityPage(city, lang, cities, elements, stations) {
   <link rel="alternate" hreflang="en" href="${enUrl}">
   <link rel="alternate" hreflang="fr" href="${frUrl}">
   <link rel="alternate" hreflang="x-default" href="${enUrl}">
-  ${renderSocialMeta(title, metaDesc, canonical, cityOgImg)}
+  ${renderSocialMeta(title, metaDesc, canonical, cityOgImg, hasCityImg ? 800 : 1200, hasCityImg ? 500 : 630)}
   <link rel="icon" type="image/png" sizes="32x32" href="${prefix}img/favicon-32x32.png">
   <script type="application/ld+json">${JSON.stringify(jsonLd)}</script>
   <style>${SHARED_CSS}</style>
@@ -428,9 +480,14 @@ function buildCityPage(city, lang, cities, elements, stations) {
 
     <main>
       <section class="hero">
-        <div class="eyebrow">${city.flag} ${esc(continent)} • ${esc(country)} • IATA ${esc(city.code)} • ${esc(city.rarity)}</div>
+        <div class="eyebrow">${city.flag} ${esc(continent)} • ${esc(country)} • IATA ${esc(cIata)} • ${esc(city.rarity)}</div>
         <h1>${city.flag} ${esc(cName)} — ${esc(tagline)}</h1>
         <p class="lead">${esc(desc)}</p>
+
+        ${hasCityImg ? `<figure class="hero-photo-wrap">
+          <img src="${prefix}img/cities/${city.id}.jpg" alt="${esc(cName)} (${esc(country)}) skyline & landmark view — REMO World 4D City Hub" width="800" height="500" loading="eager">
+          <figcaption class="hero-photo-cap">${city.flag} ${esc(cName)}, ${esc(country)} • ${esc(cIata)} • 4D Live City Hub</figcaption>
+        </figure>` : ''}
 
         <div class="live-strip">
           <div class="kpi">
@@ -465,12 +522,12 @@ function buildCityPage(city, lang, cities, elements, stations) {
           <a class="btn-sec" href="${prefix}?tv=${city.id}&fx=rain&lang=${lang}&from=seo">
             🌧️ ${isFr ? `Ambiance Pluie Lofi · ${esc(cName)}` : `Rain Lofi Window · ${esc(cName)}`}
           </a>
-          <a class="btn-sec" href="${prefix}?city=${city.id}&lang=${lang}&from=seo">
-            🚀 ${isFr ? `Hub Live de ${esc(cName)} (+150 🪙)` : `Enter Live ${esc(cName)} Hub (+150 🪙)`}
+          <a class="btn-sec" href="${prefix}?open=boardingpass&arr=${city.id}&lang=${lang}&from=seo">
+            🎫 ${isFr ? `Billet 4D vers ${esc(cIata)}` : `4D Boarding Pass to ${esc(cIata)}`}
           </a>
-          <a class="btn-sec" href="${prefix}?open=boardingpass&city=${city.id}&lang=${lang}&from=seo">
-            🎫 ${isFr ? `Billet 4D vers ${esc(city.code)}` : `4D Boarding Pass to ${esc(city.code)}`}
-          </a>
+          ${relatedDuel && rivalCity ? `<a class="btn-sec" href="../versus/${relatedDuel.slug}.html">
+            ⚔️ ${isFr ? `${esc(cName)} vs ${esc(rivalCity.name_fr)}` : `${esc(cName)} vs ${esc(rivalCity.name_en)}`}
+          </a>` : ''}
         </div>
       </section>
 
@@ -513,17 +570,36 @@ function buildCityPage(city, lang, cities, elements, stations) {
           <div class="stat-row"><span>🍽️ ${isFr ? 'Gastronomie' : 'Gastronomy & Street Food'}</span><b>${city.stats.gastronomy}/100</b></div>
           <div class="bar"><i style="width:${city.stats.gastronomy}%"></i></div>
           <p style="font-size:0.8rem;color:var(--muted);margin-top:6px;">
-            📍 ${isFr ? 'Localité' : 'Location'}: ${esc(cName)} (${esc(city.code || '')}) • ${esc(tz)}
+            📍 ${isFr ? 'Localité' : 'Location'}: ${esc(cName)} (${esc(cIata)}) • ${esc(tz)}
           </p>
         </section>
       </div>
 
+      <div class="grid-2">
+        <section class="card">
+          <h2>⏳ ${isFr ? `${esc(cName)} : 1910 vs 2026 (Voyage dans le Temps)` : `${esc(cName)}: 1910 vs 2026 Historical Time-Warp`}</h2>
+          <p style="font-size:0.92rem;color:#cbd5e1;margin-bottom:14px;">${esc(historyCopy)}</p>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <a class="pill gold" href="${prefix}?city=${city.id}&lang=${lang}&from=seo">📸 ${isFr ? `Voir ${esc(cName)} en Direct sur REMO` : `Explore Live ${esc(cName)} Feed`}</a>
+            <a class="pill" href="../travel-score.html">🌍 ${isFr ? 'Cocher dans mon Score /24' : 'Check Off on Travel Score /24'}</a>
+            <a class="pill" href="../soul-city-quiz.html">🧠 ${isFr ? 'Quiz : Est-ce la ville de votre âme ?' : 'Is This Your Soul City?'}</a>
+          </div>
+        </section>
+
+        ${factsList.length ? `<section class="card">
+          <h2>💡 ${isFr ? `Le Saviez-Vous ? 3 Faits Fascinants sur ${esc(cName)}` : `Did You Know? 3 Amazing Facts About ${esc(cName)}`}</h2>
+          <ul class="fact-list">
+            ${factsList.map((f, idx) => `<li><span class="fact-num">${idx + 1}</span><span>${esc(f)}</span></li>`).join('')}
+          </ul>
+        </section>` : ''}
+      </div>
+
       <section class="card" style="margin-bottom:22px;border-color:rgba(251,191,36,0.35);">
-        <h2>🧲 ${isFr ? `Widget Gratuit ${esc(cName)} pour Votre Site ou Blog` : `Free Live ${esc(cName)} Badge for Your Blog or Website`}</h2>
+        <h2>🧲 ${isFr ? `Widget Gratuit ${esc(cName)} pour Notion, Site ou Blog` : `Free Live ${esc(cName)} Badge for Notion, Blog or Website`}</h2>
         <p style="font-size:0.88rem;color:#cbd5e1;margin-bottom:8px;">
           ${isFr
-            ? `Affichez gratuitement l’heure en direct de ${esc(cName)}, la météo °C et un bouton Radio Live sur votre site web, forum ou blog en copiant ce code HTML :`
-            : `Display ${esc(cName)}’s live local clock, °C weather, and 1-click City Radio on your blog, travel guide, or community website — 100% free, zero ads:`}
+            ? `Affichez gratuitement l’heure en direct de ${esc(cName)}, la météo °C et un bouton Radio Live sur Notion, WordPress ou votre blog en copiant ce code HTML :`
+            : `Display ${esc(cName)}’s live local clock, °C weather, and 1-click City Radio on Notion, WordPress, or any website — 100% free, zero ads:`}
         </p>
         <textarea class="embed-code" rows="3" readonly id="embedCodeBox">${esc(embedSnippet)}</textarea>
         <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
@@ -531,7 +607,7 @@ function buildCityPage(city, lang, cities, elements, stations) {
             📋 ${isFr ? 'Copier le Code HTML' : 'Copy Embed HTML'}
           </button>
           <a class="pill" href="${prefix}widget.html?city=${city.id}&lang=${lang}" target="_blank" rel="noopener">
-            👁️ ${isFr ? 'Aperçu du Widget en Direct ↗' : 'Preview Live Widget ↗'}
+            🧩 ${isFr ? 'Ouvrir le Studio Widget Notion ↗' : 'Open Notion Widget Studio ↗'}
           </a>
         </div>
       </section>
@@ -551,13 +627,13 @@ function buildCityPage(city, lang, cities, elements, stations) {
           ${otherCities.map((oc) => `
           <a class="city-link" href="${oc.id}.html">
             <span>${oc.flag}</span>
-            <span>${esc(isFr ? oc.name_fr : oc.name_en)} <small style="color:var(--muted);">(${oc.code})</small></span>
+            <span>${esc(isFr ? oc.name_fr : oc.name_en)} <small style="color:var(--muted);">(${seoCityCode(oc)})</small></span>
           </a>`).join('')}
         </div>
       </section>
     </main>
 
-    ${renderFooter(lang, prefix)}
+    ${renderFooter(lang, prefix, stations.length)}
   </div>
 
   ${INLINE_RADIO_PLAYER_JS}
@@ -671,7 +747,9 @@ function buildDirectoryPage(lang, cities, stationCount = 56) {
           <a class="btn-sec" href="../world-radio.html">📻 ${isFr ? `${stationCount} Radios en Direct` : `Stream ${stationCount} World Radios`}</a>
           <a class="btn-sec" href="../focus-tv.html">🌆 ${isFr ? 'Guide Focus TV 4D' : 'Focus TV Guide'}</a>
           <a class="btn-sec" href="../world-blitz.html">⚡ ${isFr ? 'World Blitz 60s' : 'World Blitz 60s'}</a>
-          <a class="btn-sec" href="../guess-the-city.html">🕵️ ${isFr ? 'Deviner la Ville' : 'Play Guess The City'}</a>
+          <a class="btn-sec" href="../travel-score.html">🗺️ ${isFr ? 'Mon Score Voyage /24' : 'My Travel Score /24'}</a>
+          <a class="btn-sec" href="../soul-city-quiz.html">🧠 ${isFr ? 'Quiz Ville Âme' : 'Soul City Quiz'}</a>
+          <a class="btn-sec" href="../city-versus.html">⚔️ ${isFr ? 'Comparatifs Villes' : 'City Comparisons'}</a>
         </div>
       </section>
 
@@ -683,14 +761,14 @@ function buildDirectoryPage(lang, cities, stationCount = 56) {
           <a class="city-link" href="${c.id}.html">
             <span style="font-size:1.35rem;">${c.flag}</span>
             <div>
-              <div>${esc(isFr ? c.name_fr : c.name_en)} <small style="color:var(--gold);">(${c.code})</small></div>
+              <div>${esc(isFr ? c.name_fr : c.name_en)} <small style="color:var(--gold);">(${seoCityCode(c)})</small></div>
               <small style="color:var(--muted);font-weight:500;">${esc(isFr ? c.country_fr : c.country_en)} • ${esc(c.rarity)}</small>
             </div>
           </a>`).join('')}
         </div>
       </section>`).join('')}
     </main>
-    ${renderFooter(lang, prefix)}
+    ${renderFooter(lang, prefix, stationCount)}
   </div>
 </body>
 </html>`;
@@ -1094,21 +1172,41 @@ function buildBoardingPassHubPage(lang, cities) {
   const prefix = isFr ? '../' : '';
 
   const title = isFr
-    ? '🎫 Générateur de Billet d’Embarquement 4D & Passeport Story 9:16 Gratuit | REMO World'
-    : '🎫 Free 4D Virtual Boarding Pass & Story Generator (9:16 PNG) | REMO World';
+    ? '🎫 Générateur de Billet d’Embarquement 4D Panoramique (Story 9:16 Gratuit) | REMO World'
+    : '🎫 Free 4D Panoramic Dual-City Boarding Pass Generator (9:16 Story PNG) | REMO World';
   const desc = isFr
-    ? 'Créez et téléchargez gratuitement un Billet d’Embarquement holographique 4D (format Story 9:16 TikTok, Instagram & WhatsApp) entre Montréal, Paris, Chișinău, Tokyo, New York et 24 villes.'
-    : 'Generate and download a free 9:16 holographic 4D Boarding Pass & Citizen Passport for TikTok, Instagram Stories, and WhatsApp between Montréal, Paris, Chișinău, Tokyo, NYC & 24 cities.';
+    ? 'Créez et téléchargez gratuitement un Billet d’Embarquement 4D Première Classe avec panoramique des 2 villes, avion réel, horaires live et durée de vol (format Story 9:16 TikTok, Instagram & WhatsApp).'
+    : 'Generate and download a free First-Class 9:16 4D Boarding Pass featuring real dual-city skyline split art, photorealistic jetliner emblem, live local clocks, and flight duration across 24 world cities.';
 
   const jsonLd = {
     '@context': 'https://schema.org',
-    '@type': 'WebApplication',
-    'name': 'REMO 4D Boarding Pass & Citizen Passport Generator',
-    'url': canonical,
-    'applicationCategory': 'DesignApplication',
-    'operatingSystem': 'All',
-    'offers': { '@type': 'Offer', 'price': '0', 'priceCurrency': 'USD' },
-    'description': desc
+    '@graph': [
+      {
+        '@type': 'WebApplication',
+        'name': 'REMO 4D Boarding Pass & Citizen Passport Generator',
+        'url': canonical,
+        'applicationCategory': 'DesignApplication',
+        'operatingSystem': 'All',
+        'inLanguage': ['en', 'fr'],
+        'offers': { '@type': 'Offer', 'price': '0', 'priceCurrency': 'USD' },
+        'description': desc
+      },
+      {
+        '@type': 'FAQPage',
+        'mainEntity': [
+          {
+            '@type': 'Question',
+            'name': isFr ? 'Le générateur de Billet d’Embarquement 4D est-il gratuit ?' : 'Is the 9:16 4D Boarding Pass generator completely free?',
+            'acceptedAnswer': {
+              '@type': 'Answer',
+              'text': isFr
+                ? 'Oui ! Choisissez n’importe quelle ville de départ et d’arrivée parmi nos 24 métropoles mondiales, personnalisez votre nom et votre ambiance, puis téléchargez votre Story 9:16 HD gratuitement.'
+                : 'Yes! Pick any departure and arrival city among our 24 world hubs, customize your passenger name and travel vibe, and download a crisp 9:16 PNG for Instagram, TikTok, or WhatsApp completely free.'
+            }
+          }
+        ]
+      }
+    ]
   };
 
   return `<!DOCTYPE html>
@@ -1133,23 +1231,24 @@ function buildBoardingPassHubPage(lang, cities) {
     ${renderTopbar(lang, prefix, altUrl)}
     <main>
       <section class="hero">
-        <div class="eyebrow">✈️ 9:16 HD STORY EXPORT • TIKTOK / INSTAGRAM / WHATSAPP</div>
-        <h1>${isFr ? '🎫 Générateur Gratuit de Billet de Vol 4D & Passeport Citoyen' : '🎫 Free 4D Holographic Boarding Pass & Story Ticket Maker'}</h1>
+        <div class="eyebrow">✈️ DUAL-CITY PANORAMIC SPLIT • 9:16 HD STORY EXPORT • TIKTOK / INSTAGRAM / WHATSAPP</div>
+        <h1>${isFr ? '🎫 Générateur Gratuit de Billet de Vol 4D Panoramique' : '🎫 Free 4D Dual-City Panoramic Boarding Pass & Story Ticket Maker'}</h1>
         <p class="lead">${esc(desc)}</p>
         <div class="cta-row">
           <a class="btn-primary" href="${prefix}index.html?open=boardingpass&lang=${lang}&from=seo">✈️ ${isFr ? 'Créer & Télécharger mon Billet 4D HD (Gratuit)' : 'Create & Download HD 9:16 Boarding Pass (Free)'}</a>
+          <a class="btn-sec" href="${isFr ? 'travel-score.html' : 'travel-score.html'}">🗺️ ${isFr ? 'Mon Score Voyage /24' : 'My Travel Score /24'}</a>
         </div>
       </section>
 
       <section class="card" style="margin-bottom:22px;">
-        <h2>🛫 ${isFr ? 'Itinéraires Populaires Prêts en 1 Clic' : 'Popular 1-Click Cyber Flight Routes'}</h2>
+        <h2>🛫 ${isFr ? 'Itinéraires Diaspora & Vols Mondiaux Prêts en 1 Clic' : 'Popular 1-Click Diaspora & World Flight Routes'}</h2>
         <div class="grid-3" style="margin-top:12px;">
-          <a class="city-link" href="${prefix}index.html?open=boardingpass&city=chisinau&lang=${lang}&from=seo">⚜️ MTL ✈️ 🇲🇩 KIV (Montréal → Chișinău)</a>
-          <a class="city-link" href="${prefix}index.html?open=boardingpass&city=tokyo&lang=${lang}&from=seo">🗼 PAR ✈️ 🏯 TYO (Paris → Tokyo)</a>
-          <a class="city-link" href="${prefix}index.html?open=boardingpass&city=london&lang=${lang}&from=seo">🗽 NYC ✈️ 🏰 LON (New York → London)</a>
-          <a class="city-link" href="${prefix}index.html?open=boardingpass&city=dubai&lang=${lang}&from=seo">🇷🇴 BUH ✈️ 🌆 DXB (Bucharest → Dubai)</a>
-          <a class="city-link" href="${prefix}index.html?open=boardingpass&city=paris&lang=${lang}&from=seo">⚜️ MTL ✈️ 🗼 PAR (Montréal → Paris)</a>
-          <a class="city-link" href="${prefix}index.html?open=boardingpass&city=miami&lang=${lang}&from=seo">☀️ BCN ✈️ 🌴 MIA (Barcelona → Miami)</a>
+          <a class="city-link" href="${prefix}index.html?open=boardingpass&dep=chisinau&arr=montreal&lang=${lang}&from=seo">🇲🇩 RMO ✈️ ⚜️ YUL (Chișinău → Montréal)</a>
+          <a class="city-link" href="${prefix}index.html?open=boardingpass&dep=bucharest&arr=london&lang=${lang}&from=seo">🇷🇴 OTP ✈️ 🇬🇧 LHR (${isFr ? 'Bucarest → Londres' : 'Bucharest → London'})</a>
+          <a class="city-link" href="${prefix}index.html?open=boardingpass&dep=bucharest&arr=paris&lang=${lang}&from=seo">🇷🇴 OTP ✈️ 🇫🇷 CDG (${isFr ? 'Bucarest → Paris' : 'Bucharest → Paris'})</a>
+          <a class="city-link" href="${prefix}index.html?open=boardingpass&dep=montreal&arr=paris&lang=${lang}&from=seo">⚜️ YUL ✈️ 🗼 CDG (Montréal → Paris)</a>
+          <a class="city-link" href="${prefix}index.html?open=boardingpass&dep=paris&arr=tokyo&lang=${lang}&from=seo">🗼 CDG ✈️ 🏯 HND (Paris → Tokyo)</a>
+          <a class="city-link" href="${prefix}index.html?open=boardingpass&dep=newyork&arr=london&lang=${lang}&from=seo">🗽 JFK ✈️ 🏰 LHR (${isFr ? 'New York → Londres' : 'New York → London'})</a>
         </div>
       </section>
 
@@ -1157,11 +1256,11 @@ function buildBoardingPassHubPage(lang, cities) {
         <h2>🌍 ${isFr ? 'Choisir Votre Ville de Destination' : 'Pick Your Destination City'}</h2>
         <div class="grid-3">
           ${cities.map((c) => `
-          <a class="city-link" href="cities/${c.id}.html">${c.flag} ${esc(isFr ? c.name_fr : c.name_en)} (${c.code})</a>`).join('')}
+          <a class="city-link" href="cities/${c.id}.html">${c.flag} ${esc(isFr ? c.name_fr : c.name_en)} (${seoCityCode(c)})</a>`).join('')}
         </div>
       </section>
     </main>
-    ${renderFooter(lang, prefix)}
+    ${renderFooter(lang, prefix, 56)}
   </div>
 </body>
 </html>`;
@@ -1263,7 +1362,7 @@ function buildFocusTvHubPage(lang, cities, stations) {
         </p>
         <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px;">
           <select id="ftvCitySel" onchange="updateVibe()" style="padding:10px 14px;border-radius:12px;background:#090d1f;color:#fff;border:1px solid rgba(255,255,255,0.2);font-weight:700;">
-            ${cities.map((c) => `<option value="${c.id}">${c.flag} ${esc(isFr ? c.name_fr : c.name_en)} (${c.code})</option>`).join('')}
+            ${cities.map((c) => `<option value="${c.id}">${c.flag} ${esc(isFr ? c.name_fr : c.name_en)} (${seoCityCode(c)})</option>`).join('')}
           </select>
           <label class="pill" style="cursor:pointer;"><input type="checkbox" value="rain" class="ftvFxChk" onchange="updateVibe()" checked> 🌧️ ${isFr ? 'Pluie' : 'Rain'}</label>
           <label class="pill" style="cursor:pointer;"><input type="checkbox" value="snow" class="ftvFxChk" onchange="updateVibe()"> ❄️ ${isFr ? 'Neige' : 'Snow'}</label>
@@ -1590,8 +1689,8 @@ function buildWorldBlitzHubPage(lang, cities) {
     var isFr = ${isFr ? 'true' : 'false'};
     var box = document.getElementById('blitzPracticeBox');
     var q = isFr
-      ? 'Indice Blitz #1 : Ville européenne célèbre pour ses caves souterraines de Cricova/Mileștii Mici, son Arc de Triomphe blanc et le code IATA KIV :'
-      : 'Blitz Clue #1: European capital famous for its white-stone City Gates, monumental underground wine cities, and IATA code KIV:';
+      ? 'Indice Blitz #1 : Ville européenne célèbre pour ses caves souterraines de Cricova/Mileștii Mici, son Arc de Triomphe blanc et le code IATA RMO :'
+      : 'Blitz Clue #1: European capital famous for its white-stone City Gates, monumental underground wine cities, and IATA code RMO:';
     var opts = ['Chișinău 🇲🇩', 'Lisbon 🇵🇹', 'Vienna 🇦🇹', 'Montreal ⚜️'];
     box.innerHTML = '<div style="font-weight:800;color:#e0f2fe;margin-bottom:10px;">' + q + '</div>' +
       '<div style="display:flex;gap:8px;flex-wrap:wrap;">' +
@@ -1721,6 +1820,570 @@ function buildWidgetHtml(cities, stations) {
 </html>`;
 }
 
+/* ── 6A. NEW High-Intent Viral Studio Hubs (Travel Score /24 & Soul City Quiz) + 12 Versus Comparison Pages ── */
+function buildTravelScoreHubPage(lang, cities) {
+  const isFr = lang === 'fr';
+  const enUrl = `${DOMAIN}/travel-score.html`;
+  const frUrl = `${DOMAIN}/fr/travel-score.html`;
+  const canonical = isFr ? frUrl : enUrl;
+  const altUrl = isFr ? '../travel-score.html' : 'fr/travel-score.html';
+  const prefix = isFr ? '../' : '';
+
+  const title = isFr
+    ? '🌍 Mon Score de Voyage (/24) — Combien de Villes du Monde Avez-Vous Visitées ? | REMO World'
+    : '🌍 My Travel Score (/24) — Free World Cities Visited Checklist & Story Map | REMO World';
+  const desc = isFr
+    ? 'Cochez les villes visitées parmi les 24 grandes métropoles mondiales (Paris, Montréal, Chișinău, Tokyo, New York, Rome, Dubaï...) et exportez votre carte Story 9:16 HD gratuitement.'
+    : 'Check off how many of 24 iconic world cities you have visited (Paris, Montréal, Chișinău, Tokyo, NYC, Rome, Dubai...) and download your free 9:16 HD Travel Score Story card.';
+
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'WebApplication',
+        'name': isFr ? 'REMO Score de Voyage /24 — Carte des Villes Visitées' : 'REMO My Travel Score /24 — World Cities Visited Checklist',
+        'url': canonical,
+        'applicationCategory': 'TravelApplication',
+        'operatingSystem': 'All',
+        'inLanguage': ['en', 'fr'],
+        'offers': { '@type': 'Offer', 'price': '0', 'priceCurrency': 'USD' },
+        'description': desc
+      },
+      {
+        '@type': 'BreadcrumbList',
+        'itemListElement': [
+          { '@type': 'ListItem', 'position': 1, 'name': 'REMO World', 'item': `${DOMAIN}/` },
+          { '@type': 'ListItem', 'position': 2, 'name': isFr ? 'Score de Voyage /24' : 'My Travel Score /24', 'item': canonical }
+        ]
+      },
+      {
+        '@type': 'FAQPage',
+        'mainEntity': [
+          {
+            '@type': 'Question',
+            'name': isFr ? 'Comment calculer mon Score de Voyage sur 24 villes ?' : 'How do I calculate my Travel Score out of 24 world cities?',
+            'acceptedAnswer': {
+              '@type': 'Answer',
+              'text': isFr
+                ? 'Cochez simplement les villes que vous avez déjà visitées dans la grille interactive ci-dessous ou dans le Studio REMO World pour découvrir votre rang d’explorateur et générer votre affiche 9:16 HD.'
+                : 'Tap every city you have visited in the interactive 24-city checklist below or launch the full REMO Studio to unlock your Explorer Tier and download a crisp 9:16 Story PNG for Instagram & TikTok.'
+            }
+          },
+          {
+            '@type': 'Question',
+            'name': isFr ? 'Faut-il créer un compte pour télécharger la carte Story 9:16 ?' : 'Do I need an account to export my 9:16 Travel Score Story?',
+            'acceptedAnswer': {
+              '@type': 'Answer',
+              'text': isFr
+                ? 'Non ! L’outil Mon Score de Voyage fonctionne gratuitement dans votre navigateur sur mobile et ordinateur, sans inscription obligatoire.'
+                : 'No sign-up required! My Travel Score works 100% free right in your mobile or desktop browser with instant HD PNG export.'
+            }
+          }
+        ]
+      }
+    ]
+  };
+
+  return `<!DOCTYPE html>
+<html lang="${lang}">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${esc(title)}</title>
+  <meta name="description" content="${esc(desc)}">
+  <meta name="robots" content="index, follow, max-image-preview:large">
+  <link rel="canonical" href="${canonical}">
+  <link rel="alternate" hreflang="en" href="${enUrl}">
+  <link rel="alternate" hreflang="fr" href="${frUrl}">
+  <link rel="alternate" hreflang="x-default" href="${enUrl}">
+  ${renderSocialMeta(title, desc, canonical)}
+  <link rel="icon" type="image/png" sizes="32x32" href="${prefix}img/favicon-32x32.png">
+  <script type="application/ld+json">${JSON.stringify(jsonLd)}</script>
+  <style>${SHARED_CSS}
+  .ts-btn{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:11px 13px;border-radius:13px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.12);color:#e2e8f0;font-weight:700;font-size:0.86rem;cursor:pointer;text-align:left;transition:0.15s}
+  .ts-btn.checked{background:linear-gradient(135deg,rgba(16,185,129,0.28),rgba(56,189,248,0.22));border-color:#fbbf24;color:#fff;box-shadow:0 0 14px rgba(251,191,36,0.22)}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    ${renderTopbar(lang, prefix, altUrl)}
+    <main>
+      <section class="hero">
+        <div class="eyebrow">🌍 24 WORLD CITIES CHECKLIST • FREE 9:16 STORY EXPORT • ZERO SIGN-UP</div>
+        <h1>${isFr ? '🌍 Mon Score de Voyage — Combien de Villes sur 24 Avez-Vous Visitées ?' : '🌍 My Travel Score — How Many of 24 World Cities Have You Visited?'}</h1>
+        <p class="lead">${esc(desc)}</p>
+        <div class="live-strip">
+          <div class="kpi"><small>${isFr ? 'Votre Score Live' : 'Your Live Score'}</small><b id="tsScoreVal">0 / 24 (0%)</b></div>
+          <div class="kpi"><small>${isFr ? 'Rang Voyageur' : 'Traveler Tier'}</small><b id="tsTierVal">${isFr ? '🌱 Rêveur du Monde' : '🌱 World Dreamer'}</b></div>
+        </div>
+        <div class="cta-row">
+          <a class="btn-primary" href="${prefix}index.html?open=travelmap&lang=${lang}&from=seo">🎨 ${isFr ? 'Générer ma Carte Story 9:16 HD (Gratuit)' : 'Generate My HD 9:16 Story Card (Free)'}</a>
+          <a class="btn-sec" href="${isFr ? 'soul-city-quiz.html' : 'soul-city-quiz.html'}">🧠 ${isFr ? 'Quiz : Quelle Ville Vous Correspond ?' : 'Take the Soul City Quiz'}</a>
+          <a class="btn-sec" href="${isFr ? 'boarding-pass.html' : 'boarding-pass.html'}">🎫 ${isFr ? 'Créer un Billet d’Avion 4D' : 'Create a 4D Boarding Pass'}</a>
+        </div>
+      </section>
+
+      <section class="card" style="margin-bottom:22px;border-color:rgba(251,191,36,0.38);">
+        <h2>✈️ ${isFr ? 'Cochez Vos Villes Visitées Instantanément (24 Métropoles)' : 'Tap Every City You Have Visited (Instant 24-City Counter)'}</h2>
+        <div class="grid-3" id="tsGrid" style="margin-top:12px;">
+          ${cities.map((c) => `
+          <button type="button" class="ts-btn" data-cid="${c.id}" onclick="togTsCity(this)">
+            <span>${c.flag} ${esc(isFr ? c.name_fr : c.name_en)}</span>
+            <span class="ts-mark">○</span>
+          </button>`).join('')}
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>🏙️ ${isFr ? 'Explorer les Guides des 24 Villes' : 'Explore Live Guides for All 24 Cities'}</h2>
+        <div class="grid-3">
+          ${cities.map((c) => `<a class="city-link" href="cities/${c.id}.html">${c.flag} ${esc(isFr ? c.name_fr : c.name_en)} <small style="color:var(--muted);">(${seoCityCode(c)})</small></a>`).join('')}
+        </div>
+      </section>
+    </main>
+    ${renderFooter(lang, prefix, 56)}
+  </div>
+  <script>
+  (function(){
+    var isFr = ${isFr ? 'true' : 'false'};
+    var picked = new Set();
+    try {
+      var saved = JSON.parse(localStorage.getItem('remo_travel_score_visited') || '[]');
+      if (Array.isArray(saved)) saved.forEach(function(id){ picked.add(id); });
+    } catch(e){}
+    function sync(){
+      document.querySelectorAll('.ts-btn').forEach(function(b){
+        var on = picked.has(b.getAttribute('data-cid'));
+        b.classList.toggle('checked', on);
+        b.querySelector('.ts-mark').textContent = on ? '✓' : '○';
+      });
+      var n = picked.size, pct = Math.round((n / 24) * 100);
+      document.getElementById('tsScoreVal').textContent = n + ' / 24 (' + pct + '%)';
+      var tier = n >= 18 ? (isFr ? '👑 Légende Planétaire' : '👑 Planet Legend')
+        : n >= 10 ? (isFr ? '✈️ Grand Globetrotter' : '✈️ Global Jetsetter')
+        : n >= 4 ? (isFr ? '🧭 Explorateur Urbain' : '🧭 Urban Explorer')
+        : (isFr ? '🌱 Rêveur du Monde' : '🌱 World Dreamer');
+      document.getElementById('tsTierVal').textContent = tier;
+      try { localStorage.setItem('remo_travel_score_visited', JSON.stringify(Array.from(picked))); } catch(e){}
+    }
+    window.togTsCity = function(btn){
+      var id = btn.getAttribute('data-cid');
+      if (picked.has(id)) picked.delete(id); else picked.add(id);
+      sync();
+    };
+    sync();
+  })();
+  </script>
+</body>
+</html>`;
+}
+
+function buildSoulCityQuizHubPage(lang, cities) {
+  const isFr = lang === 'fr';
+  const enUrl = `${DOMAIN}/soul-city-quiz.html`;
+  const frUrl = `${DOMAIN}/fr/soul-city-quiz.html`;
+  const canonical = isFr ? frUrl : enUrl;
+  const altUrl = isFr ? '../soul-city-quiz.html' : 'fr/soul-city-quiz.html';
+  const prefix = isFr ? '../' : '';
+
+  const title = isFr
+    ? '🧠 Quiz : Quelle Ville du Monde Correspond à Votre Âme ? (Test Gratuit + Story 9:16) | REMO World'
+    : '🧠 Which World City Matches Your Soul? Free Personality Quiz & 9:16 Result Card | REMO World';
+  const desc = isFr
+    ? 'Répondez à 5 questions rapides pour découvrir laquelle des 24 métropoles mondiales correspond vraiment à votre personnalité (Tokyo, Paris, Montréal, Chișinău, Rome, Dubaï...) et téléchargez votre certificat Story 9:16.'
+    : 'Answer 5 fast personality questions to discover which of 24 iconic world cities truly matches your soul (Tokyo, Paris, Montréal, Chișinău, Rome, Dubai...) and download your 9:16 HD Soul City certificate.';
+
+  const archetypes = isFr
+    ? [
+        { icon: '⚡', title: 'Futuriste Néon', desc: 'Attiré par l’énergie nocturne, la tech et les skylines lumineuses.', cities: 'Tokyo • Séoul • New York • Dubaï' },
+        { icon: '🎨', title: 'Flâneur Romantique', desc: 'Amoureux de l’architecture, des cafés littéraires et de la gastronomie.', cities: 'Paris • Rome • Lisbonne • Amsterdam' },
+        { icon: '☀️', title: 'Explorateur Solaire', desc: 'Guidé par l’océan, les couchers de soleil dorés et la musique live.', cities: 'Barcelone • Miami • Rio • Sydney' },
+        { icon: '🌿', title: 'Connaisseur Patrimoine', desc: 'Sensible à l’authenticité, aux parcs verdoyants et aux traditions chaleureuses.', cities: 'Chișinău • Bucarest • Istanbul • Le Caire' },
+        { icon: '⌚', title: 'Stratège Alpin & Créatif', desc: 'Équilibre entre raffinement, sécurité, innovation et qualité de vie.', cities: 'Montréal • Genève • Monaco • Singapour' },
+        { icon: '🎧', title: 'Créateur Nocturne', desc: 'Porté par les festivals, la musique indépendante et les grandes métropoles.', cities: 'Berlin • Londres • Toronto • Los Angeles' }
+      ]
+    : [
+        { icon: '⚡', title: 'Neon Futurist', desc: 'Drawn to midnight skylines, frontier technology, and electric city energy.', cities: 'Tokyo • Seoul • New York • Dubai' },
+        { icon: '🎨', title: 'Romantic Flâneur', desc: 'Inspired by historic boulevards, artisan cafés, and timeless gastronomy.', cities: 'Paris • Rome • Lisbon • Amsterdam' },
+        { icon: '☀️', title: 'Solar Explorer', desc: 'Energized by ocean breezes, sunlit promenades, and vibrant nightlife.', cities: 'Barcelona • Miami • Rio • Sydney' },
+        { icon: '🌿', title: 'Heritage Connoisseur', desc: 'Values green boulevards, deep cultural roots, wine heritage, and warmth.', cities: 'Chișinău • Bucharest • Istanbul • Cairo' },
+        { icon: '⌚', title: 'Alpine & Coastal Strategist', desc: 'Seeks precision elegance, bilingual creativity, and elevated living.', cities: 'Montréal • Geneva • Monaco • Singapore' },
+        { icon: '🎧', title: 'Night-Owl Creator', desc: 'Thrives on music scenes, indie art, cinema, and cosmopolitan festivals.', cities: 'Berlin • London • Toronto • Los Angeles' }
+      ];
+
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'WebApplication',
+        'name': isFr ? 'Quiz Ville de Votre Âme — REMO World' : 'REMO World Soul City Personality Quiz',
+        'url': canonical,
+        'applicationCategory': 'EntertainmentApplication',
+        'operatingSystem': 'All',
+        'inLanguage': ['en', 'fr'],
+        'offers': { '@type': 'Offer', 'price': '0', 'priceCurrency': 'USD' },
+        'description': desc
+      },
+      {
+        '@type': 'BreadcrumbList',
+        'itemListElement': [
+          { '@type': 'ListItem', 'position': 1, 'name': 'REMO World', 'item': `${DOMAIN}/` },
+          { '@type': 'ListItem', 'position': 2, 'name': isFr ? 'Quiz Ville Âme' : 'Soul City Quiz', 'item': canonical }
+        ]
+      },
+      {
+        '@type': 'FAQPage',
+        'mainEntity': [
+          {
+            '@type': 'Question',
+            'name': isFr ? 'Comment fonctionne le Quiz Ville de Votre Âme REMO World ?' : 'How does the REMO World Soul City Quiz match my personality?',
+            'acceptedAnswer': {
+              '@type': 'Answer',
+              'text': isFr
+                ? 'En 5 questions rapides sur votre climat idéal, votre rythme de vie, votre musique et votre cuisine préférée, notre algorithme calcule votre compatibilité parmi 24 villes et génère un certificat Story 9:16 HD.'
+                : 'Across 5 quick questions about your ideal climate, rhythm, aesthetic, and food culture, the quiz matches you to 1 of 24 global cities and generates a shareable 9:16 HD Soul City certificate.'
+            }
+          }
+        ]
+      }
+    ]
+  };
+
+  return `<!DOCTYPE html>
+<html lang="${lang}">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${esc(title)}</title>
+  <meta name="description" content="${esc(desc)}">
+  <meta name="robots" content="index, follow, max-image-preview:large">
+  <link rel="canonical" href="${canonical}">
+  <link rel="alternate" hreflang="en" href="${enUrl}">
+  <link rel="alternate" hreflang="fr" href="${frUrl}">
+  <link rel="alternate" hreflang="x-default" href="${enUrl}">
+  ${renderSocialMeta(title, desc, canonical)}
+  <link rel="icon" type="image/png" sizes="32x32" href="${prefix}img/favicon-32x32.png">
+  <script type="application/ld+json">${JSON.stringify(jsonLd)}</script>
+  <style>${SHARED_CSS}</style>
+</head>
+<body>
+  <div class="wrap">
+    ${renderTopbar(lang, prefix, altUrl)}
+    <main>
+      <section class="hero">
+        <div class="eyebrow">🧠 5-QUESTION PERSONALITY TEST • 24 WORLD CITIES • 9:16 CERTIFICATE</div>
+        <h1>${isFr ? '🧠 Quelle Ville du Monde Correspond Vraiment à Votre Âme ?' : '🧠 Which World City Matches Your Soul? Take the 30-Second Quiz'}</h1>
+        <p class="lead">${esc(desc)}</p>
+        <div class="cta-row">
+          <a class="btn-primary" href="${prefix}index.html?open=soulcity&lang=${lang}&from=seo">✨ ${isFr ? 'Lancer le Test Maintenant (30 Secondes • Gratuit)' : 'Start the Soul City Quiz Now (30s • Free)'}</a>
+          <a class="btn-sec" href="${isFr ? 'travel-score.html' : 'travel-score.html'}">🌍 ${isFr ? 'Mon Score Voyage /24' : 'My Travel Score /24'}</a>
+          <a class="btn-sec" href="${isFr ? 'city-versus.html' : 'city-versus.html'}">⚔️ ${isFr ? 'Comparer 2 Villes' : 'Compare Any 2 Cities'}</a>
+        </div>
+      </section>
+
+      <section class="card" style="margin-bottom:22px;">
+        <h2>✨ ${isFr ? 'Les 6 Archétypes Urbains du Test' : 'The 6 Urban Soul Archetypes'}</h2>
+        <div class="grid-3" style="margin-top:12px;">
+          ${archetypes.map((a) => `
+          <div style="padding:14px;border-radius:14px;background:rgba(255,255,255,0.035);border:1px solid rgba(255,255,255,0.1);">
+            <div style="font-size:1.35rem;margin-bottom:4px;">${a.icon}</div>
+            <strong style="color:var(--gold);display:block;margin-bottom:4px;">${esc(a.title)}</strong>
+            <p style="font-size:0.83rem;color:#cbd5e1;margin-bottom:8px;">${esc(a.desc)}</p>
+            <div style="font-size:0.74rem;color:#7dd3fc;font-weight:700;">${esc(a.cities)}</div>
+          </div>`).join('')}
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>🌍 ${isFr ? 'Les 24 Résultats Possibles sur REMO World' : 'All 24 Possible Soul City Matches'}</h2>
+        <div class="grid-3">
+          ${cities.map((c) => `<a class="city-link" href="cities/${c.id}.html">${c.flag} ${esc(isFr ? c.name_fr : c.name_en)}</a>`).join('')}
+        </div>
+      </section>
+    </main>
+    ${renderFooter(lang, prefix, 56)}
+  </div>
+</body>
+</html>`;
+}
+
+function buildVersusPairPage(duel, lang, cities, stations) {
+  const isFr = lang === 'fr';
+  const cityA = cities.find((c) => c.id === duel.a);
+  const cityB = cities.find((c) => c.id === duel.b);
+  if (!cityA || !cityB) throw new Error(`Missing city for duel ${duel.slug}`);
+
+  const nameA = isFr ? cityA.name_fr : cityA.name_en;
+  const nameB = isFr ? cityB.name_fr : cityB.name_en;
+  const countryA = isFr ? cityA.country_fr : cityA.country_en;
+  const countryB = isFr ? cityB.country_fr : cityB.country_en;
+  const iataA = seoCityIata(cityA);
+  const iataB = seoCityIata(cityB);
+  const tzA = CITY_TIMEZONES[cityA.id] || 'UTC';
+  const tzB = CITY_TIMEZONES[cityB.id] || 'UTC';
+  const distKm = haversineKm(cityA.lat, cityA.lng, cityB.lat, cityB.lng);
+  const distMi = Math.round(distKm * 0.621371);
+  const flightEst = estimateFlightTime(distKm);
+  const stA = getStationsForCity(cityA, stations)[0];
+  const stB = getStationsForCity(cityB, stations)[0];
+  const extraA = SEO_CITY_EXTRA[cityA.id];
+  const extraB = SEO_CITY_EXTRA[cityB.id];
+
+  const enUrl = `${DOMAIN}/versus/${duel.slug}.html`;
+  const frUrl = `${DOMAIN}/fr/versus/${duel.slug}.html`;
+  const canonical = isFr ? frUrl : enUrl;
+  const altUrl = isFr ? `../../versus/${duel.slug}.html` : `../fr/versus/${duel.slug}.html`;
+  const prefix = isFr ? '../../' : '../';
+
+  const title = isFr
+    ? `⚔️ ${nameA} vs ${nameB} (2026) — Comparatif, Distance, Temps de Vol, Météo & Vote Live | REMO World`
+    : `⚔️ ${nameA} vs ${nameB} (2026) — Which City Wins? Distance, Flight Time, Ratings & Live Vote | REMO World`;
+  const desc = isFr
+    ? `Comparez ${nameA} (${countryA}) et ${nameB} (${countryB}) en direct : ${distKm.toLocaleString('en-US')} km (${flightEst} de vol), culture, vie nocturne, tech, gastronomie, météo live et radio gratuite.`
+    : `Compare ${nameA} (${countryA}) vs ${nameB} (${countryB}) side-by-side: ${distKm.toLocaleString('en-US')} km apart (${flightEst} flight), culture, nightlife, tech & food scores, live weather, and free city radio.`;
+
+  const totalA = cityA.stats.culture + cityA.stats.nightlife + cityA.stats.tech + cityA.stats.gastronomy;
+  const totalB = cityB.stats.culture + cityB.stats.nightlife + cityB.stats.tech + cityB.stats.gastronomy;
+  const overallWinner = totalA >= totalB ? nameA : nameB;
+
+  const faqs = isFr
+    ? [
+        {
+          q: `Quelle est la distance et le temps de vol entre ${nameA} et ${nameB} ?`,
+          a: `La distance à vol d’oiseau entre ${nameA} (${iataA}) et ${nameB} (${iataB}) est d’environ ${distKm.toLocaleString('en-US')} km (${distMi.toLocaleString('en-US')} miles), soit un temps de vol direct estimé à ${flightEst}.`
+        },
+        {
+          q: `${nameA} ou ${nameB} : quelle ville est la meilleure en 2026 ?`,
+          a: `${duel.verdict_fr} Selon l’indice urbain REMO 4D, ${overallWinner} mène légèrement au score global (${Math.max(totalA, totalB)}/400 vs ${Math.min(totalA, totalB)}/400), mais le classement final dépend des votes citoyens en direct !`
+        },
+        {
+          q: `Puis-je créer un Billet d’Embarquement 4D ${iataA} → ${iataB} gratuitement ?`,
+          a: `Oui ! Cliquez sur le bouton « Billet 4D ${iataA} → ${iataB} » sur cette page pour générer une Story 9:16 HD gratuite combinant les skylines réelles de ${nameA} et ${nameB}.`
+        }
+      ]
+    : [
+        {
+          q: `How far apart are ${nameA} and ${nameB}, and how long is the flight?`,
+          a: `The direct geodesic distance between ${nameA} (${iataA}) and ${nameB} (${iataB}) is approximately ${distKm.toLocaleString('en-US')} km (${distMi.toLocaleString('en-US')} miles), with an estimated direct jet flight time of ${flightEst}.`
+        },
+        {
+          q: `${nameA} vs ${nameB}: Which city is better to visit in 2026?`,
+          a: `${duel.verdict_en} On REMO World’s 4D Urban Pulse index, ${overallWinner} edges ahead overall (${Math.max(totalA, totalB)}/400 vs ${Math.min(totalA, totalB)}/400), while live citizen votes decide the weekly World City Cup crown.`
+        },
+        {
+          q: `Can I create a free ${iataA} to ${iataB} 4D Boarding Pass Story?`,
+          a: `Yes! Tap the "4D Boarding Pass ${iataA} → ${iataB}" button above to generate a free 9:16 panoramic boarding pass displaying both ${nameA} and ${nameB} with live clocks and flight duration.`
+        }
+      ];
+
+  const ogImg = `${DOMAIN}/img/cities/${cityA.id}.jpg`;
+
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'WebPage',
+        '@id': canonical,
+        'url': canonical,
+        'name': title,
+        'description': desc,
+        'image': ogImg,
+        'inLanguage': lang,
+        'isPartOf': { '@id': `${DOMAIN}/#website` }
+      },
+      {
+        '@type': 'BreadcrumbList',
+        'itemListElement': [
+          { '@type': 'ListItem', 'position': 1, 'name': 'REMO World', 'item': `${DOMAIN}/` },
+          { '@type': 'ListItem', 'position': 2, 'name': isFr ? 'Duels de Villes' : 'City Duels', 'item': isFr ? `${DOMAIN}/fr/city-versus.html` : `${DOMAIN}/city-versus.html` },
+          { '@type': 'ListItem', 'position': 3, 'name': `${nameA} vs ${nameB}`, 'item': canonical }
+        ]
+      },
+      {
+        '@type': 'FAQPage',
+        'mainEntity': faqs.map((f) => ({
+          '@type': 'Question',
+          'name': f.q,
+          'acceptedAnswer': { '@type': 'Answer', 'text': f.a }
+        }))
+      }
+    ]
+  };
+
+  const metrics = [
+    { key: 'culture', lbl: isFr ? '🎭 Culture & Patrimoine' : '🎭 Culture & Heritage' },
+    { key: 'nightlife', lbl: isFr ? '🌙 Vie Nocturne & Énergie' : '🌙 Nightlife & Energy' },
+    { key: 'tech', lbl: isFr ? '⚡ Innovation & Tech' : '⚡ Tech & Innovation' },
+    { key: 'gastronomy', lbl: isFr ? '🍽️ Gastronomie' : '🍽️ Gastronomy & Street Food' }
+  ];
+
+  const otherDuels = SEO_VERSUS_DUELS.filter((d) => d.slug !== duel.slug);
+
+  return `<!DOCTYPE html>
+<html lang="${lang}">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${esc(title)}</title>
+  <meta name="description" content="${esc(desc)}">
+  <meta name="robots" content="index, follow, max-image-preview:large">
+  <link rel="canonical" href="${canonical}">
+  <link rel="alternate" hreflang="en" href="${enUrl}">
+  <link rel="alternate" hreflang="fr" href="${frUrl}">
+  <link rel="alternate" hreflang="x-default" href="${enUrl}">
+  ${renderSocialMeta(title, desc, canonical, ogImg, 800, 500)}
+  <link rel="icon" type="image/png" sizes="32x32" href="${prefix}img/favicon-32x32.png">
+  <script type="application/ld+json">${JSON.stringify(jsonLd)}</script>
+  <style>${SHARED_CSS}</style>
+</head>
+<body>
+  <div class="wrap">
+    ${renderTopbar(lang, prefix, altUrl)}
+    <main>
+      <section class="hero">
+        <div class="eyebrow">⚔️ 2026 WORLD CITY DUEL • ${esc(isFr ? duel.theme_fr : duel.theme_en)}</div>
+        <h1>${cityA.flag} ${esc(nameA)} vs ${cityB.flag} ${esc(nameB)} — ${isFr ? 'Comparatif Complet & Vote Live' : 'Head-to-Head Comparison & Live Vote'}</h1>
+        <p class="lead">${esc(isFr ? duel.verdict_fr : duel.verdict_en)}</p>
+
+        <div class="live-strip">
+          <div class="kpi"><small>${isFr ? 'Distance Directe' : 'Direct Distance'}</small><b>📏 ${distKm.toLocaleString('en-US')} km (${distMi.toLocaleString('en-US')} mi)</b></div>
+          <div class="kpi"><small>${isFr ? 'Temps de Vol Estimé' : 'Est. Jet Flight'}</small><b>✈️ ${flightEst}</b></div>
+          <div class="kpi"><small>${esc(nameA)} (${esc(iataA)})</small><b id="vsLiveA">--:-- • --°C</b></div>
+          <div class="kpi"><small>${esc(nameB)} (${esc(iataB)})</small><b id="vsLiveB">--:-- • --°C</b></div>
+        </div>
+
+        <div class="vs-split">
+          <figure class="vs-photo-card">
+            <img src="${prefix}img/cities/${cityA.id}.jpg" alt="${esc(nameA)} (${esc(countryA)}) skyline — REMO World" width="800" height="500" loading="eager">
+            <figcaption class="vs-photo-meta">
+              <strong>${cityA.flag} ${esc(nameA)} (${esc(iataA)})</strong>
+              <a class="pill" href="../cities/${cityA.id}.html">${isFr ? 'Guide Ville →' : 'City Guide →'}</a>
+            </figcaption>
+          </figure>
+          <figure class="vs-photo-card">
+            <img src="${prefix}img/cities/${cityB.id}.jpg" alt="${esc(nameB)} (${esc(countryB)}) skyline — REMO World" width="800" height="500" loading="eager">
+            <figcaption class="vs-photo-meta">
+              <strong>${cityB.flag} ${esc(nameB)} (${esc(iataB)})</strong>
+              <a class="pill" href="../cities/${cityB.id}.html">${isFr ? 'Guide Ville →' : 'City Guide →'}</a>
+            </figcaption>
+          </figure>
+        </div>
+
+        <div class="cta-row">
+          <a class="btn-primary" href="${prefix}index.html?open=boardingpass&dep=${cityA.id}&arr=${cityB.id}&lang=${lang}&from=seo">
+            🎫 ${isFr ? `Billet 4D ${esc(iataA)} ✈️ ${esc(iataB)} (Story 9:16)` : `4D Boarding Pass ${esc(iataA)} ✈️ ${esc(iataB)} (9:16 Story)`}
+          </a>
+          <a class="btn-sec" href="../city-versus.html">🗳️ ${isFr ? 'Voter en Direct (+10 🪙)' : 'Vote Live in City Duels (+10 🪙)'}</a>
+          <a class="btn-sec" href="${prefix}?tv=${cityA.id}&lang=${lang}&from=seo">📺 ${isFr ? `Focus TV ${esc(nameA)}` : `${esc(nameA)} Focus TV`}</a>
+          <a class="btn-sec" href="${prefix}?tv=${cityB.id}&lang=${lang}&from=seo">📺 ${isFr ? `Focus TV ${esc(nameB)}` : `${esc(nameB)} Focus TV`}</a>
+        </div>
+      </section>
+
+      <section class="card" style="margin-bottom:22px;">
+        <h2>📊 ${isFr ? `Match des Scores 4D : ${esc(nameA)} (${totalA}/400) vs ${esc(nameB)} (${totalB}/400)` : `4D Urban Pulse Scoreboard: ${esc(nameA)} (${totalA}/400) vs ${esc(nameB)} (${totalB}/400)`}</h2>
+        <div class="grid-2" style="margin-top:12px;margin-bottom:0;">
+          ${metrics.map((m) => {
+            const va = cityA.stats[m.key];
+            const vb = cityB.stats[m.key];
+            const badge = va > vb ? `${cityA.flag} ${nameA}` : vb > va ? `${cityB.flag} ${nameB}` : (isFr ? 'Égalité' : 'Tie');
+            return `<div style="padding:12px 14px;border-radius:14px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.09);">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                <strong style="color:#fff;font-size:0.9rem;">${m.lbl}</strong>
+                <span class="pill" style="padding:2px 9px;font-size:0.72rem;color:#fde047;">🏆 ${esc(badge)}</span>
+              </div>
+              <div class="stat-row"><span>${cityA.flag} ${esc(nameA)}</span><b>${va}/100</b></div>
+              <div class="bar"><i style="width:${va}%"></i></div>
+              <div class="stat-row"><span>${cityB.flag} ${esc(nameB)}</span><b>${vb}/100</b></div>
+              <div class="bar" style="margin-bottom:0;"><i style="width:${vb}%"></i></div>
+            </div>`;
+          }).join('')}
+        </div>
+      </section>
+
+      <div class="grid-2">
+        <section class="card">
+          <h2>${cityA.flag} ${esc(nameA)} — ${isFr ? 'Radio Live & Faits Clés' : 'Live Radio & Key Highlights'}</h2>
+          ${stA ? `<div class="radio-item">
+            <div>
+              <strong style="color:#fff;font-size:0.9rem;">${stA.icon} ${esc(stA.name)}</strong>
+              <div style="font-size:0.76rem;color:var(--muted);">${esc(isFr ? stA.desc_fr : stA.desc_en)}</div>
+            </div>
+            <button type="button" class="radio-btn" data-seo-rbtn="1"
+              data-play-lbl="▶️ ${isFr ? 'Écouter' : 'Listen'}"
+              data-stop-lbl="⏸️ Pause"
+              onclick="playSeoStream('${esc(stA.id)}','${esc(stA.streamUrl)}','${esc(stA.fallbackUrl || '')}',this)">
+              ▶️ ${isFr ? 'Écouter' : 'Listen'}
+            </button>
+          </div>` : ''}
+          ${extraA ? `<ul class="fact-list">${(isFr ? extraA.facts_fr : extraA.facts_en).slice(0, 2).map((f, i) => `<li><span class="fact-num">${i + 1}</span><span>${esc(f)}</span></li>`).join('')}</ul>` : ''}
+        </section>
+
+        <section class="card">
+          <h2>${cityB.flag} ${esc(nameB)} — ${isFr ? 'Radio Live & Faits Clés' : 'Live Radio & Key Highlights'}</h2>
+          ${stB ? `<div class="radio-item">
+            <div>
+              <strong style="color:#fff;font-size:0.9rem;">${stB.icon} ${esc(stB.name)}</strong>
+              <div style="font-size:0.76rem;color:var(--muted);">${esc(isFr ? stB.desc_fr : stB.desc_en)}</div>
+            </div>
+            <button type="button" class="radio-btn" data-seo-rbtn="1"
+              data-play-lbl="▶️ ${isFr ? 'Écouter' : 'Listen'}"
+              data-stop-lbl="⏸️ Pause"
+              onclick="playSeoStream('${esc(stB.id)}','${esc(stB.streamUrl)}','${esc(stB.fallbackUrl || '')}',this)">
+              ▶️ ${isFr ? 'Écouter' : 'Listen'}
+            </button>
+          </div>` : ''}
+          ${extraB ? `<ul class="fact-list">${(isFr ? extraB.facts_fr : extraB.facts_en).slice(0, 2).map((f, i) => `<li><span class="fact-num">${i + 1}</span><span>${esc(f)}</span></li>`).join('')}</ul>` : ''}
+        </section>
+      </div>
+
+      <section class="card" style="margin-bottom:22px;">
+        <h2>❓ ${isFr ? `Questions Fréquentes : ${esc(nameA)} vs ${esc(nameB)}` : `Frequently Asked Questions: ${esc(nameA)} vs ${esc(nameB)}`}</h2>
+        ${faqs.map((f, i) => `
+        <details class="faq" ${i === 0 ? 'open' : ''}>
+          <summary>${esc(f.q)}</summary>
+          <p>${esc(f.a)}</p>
+        </details>`).join('')}
+      </section>
+
+      <section class="card">
+        <h2>⚔️ ${isFr ? 'Autres Comparatifs de Villes Populaires (2026)' : 'Explore More 2026 World City Comparisons'}</h2>
+        <div class="grid-3">
+          ${otherDuels.map((od) => {
+            const ca = cities.find((c) => c.id === od.a);
+            const cb = cities.find((c) => c.id === od.b);
+            return `<a class="city-link" href="${od.slug}.html">${ca.flag} ${esc(isFr ? ca.name_fr : ca.name_en)} vs ${cb.flag} ${esc(isFr ? cb.name_fr : cb.name_en)}</a>`;
+          }).join('')}
+        </div>
+      </section>
+    </main>
+    ${renderFooter(lang, prefix, stations.length)}
+  </div>
+  ${INLINE_RADIO_PLAYER_JS}
+  <script>
+  (function(){
+    var loc = '${isFr ? 'fr-FR' : 'en-GB'}';
+    var tA = '', tB = '';
+    function fmtTime(tz){
+      try { return new Intl.DateTimeFormat(loc, { timeZone: tz, hour: '2-digit', minute: '2-digit' }).format(new Date()); }
+      catch(e){ return '--:--'; }
+    }
+    function renderLive(){
+      document.getElementById('vsLiveA').textContent = fmtTime(${JSON.stringify(tzA)}) + (tA ? ' • ' + tA : '');
+      document.getElementById('vsLiveB').textContent = fmtTime(${JSON.stringify(tzB)}) + (tB ? ' • ' + tB : '');
+    }
+    renderLive(); setInterval(renderLive, 15000);
+    fetch('https://api.open-meteo.com/v1/forecast?latitude=${cityA.lat}&longitude=${cityA.lng}&current_weather=true')
+      .then(function(r){ return r.json(); })
+      .then(function(d){ if(d && d.current_weather){ tA = Math.round(d.current_weather.temperature) + '°C'; renderLive(); } }).catch(function(){});
+    fetch('https://api.open-meteo.com/v1/forecast?latitude=${cityB.lat}&longitude=${cityB.lng}&current_weather=true')
+      .then(function(r){ return r.json(); })
+      .then(function(d){ if(d && d.current_weather){ tB = Math.round(d.current_weather.temperature) + '°C'; renderLive(); } }).catch(function(){});
+  })();
+  </script>
+</body>
+</html>`;
+}
+
 /* ── 6B. Build French Root Hub Page (/fr/index.html) to eliminate /fr/ 404 & hreflang conflict ── */
 function buildFrenchHomePage(cities, stations) {
   const canonical = `${DOMAIN}/fr/`;
@@ -1779,8 +2442,15 @@ function buildFrenchHomePage(cities, stations) {
             <a class="city-link" href="world-radio.html">📻 Radio Mondiale Gratuite — ${stations.length} Stations (${cities.length}/${cities.length} Villes)</a>
             <a class="city-link" href="world-ranking.html">🏆 Classement Mondial des 24 Villes 2026</a>
             <a class="city-link" href="city-versus.html">⚔️ Comparateur &amp; Duels de Villes (Montréal vs Paris…)</a>
+            <a class="city-link" href="versus/montreal-vs-paris.html">⚜️ Montréal vs 🗼 Paris — Comparatif Complet 2026</a>
+            <a class="city-link" href="versus/chisinau-vs-bucharest.html">🇲🇩 Chișinău vs 🇷🇴 Bucarest — Comparatif Complet 2026</a>
+            <a class="city-link" href="travel-score.html">🌍 Mon Score de Voyage (/24) — Carte Story 9:16</a>
+            <a class="city-link" href="soul-city-quiz.html">🧠 Quiz : Quelle Ville Correspond à Votre Âme ?</a>
             <a class="city-link" href="guess-the-city.html">🕵️ Jeu Photo : Deviner la Ville en Direct</a>
             <a class="city-link" href="boarding-pass.html">🎫 Générateur de Billet d’Embarquement 4D (Stories 9:16)</a>
+            <a class="city-link" href="../widget.html">🧩 Studio Widget Ville Live pour Notion &amp; Blogs</a>
+            <a class="city-link" href="odyssey.html">🧭 REMO Odyssey — Jeu Officiel 4D &amp; Duels 1v1</a>
+            <a class="city-link" href="ambassadors.html">🤝 Programme Officiel des Ambassadeurs Villes</a>
             <a class="city-link" href="cities/index.html">🌍 Annuaire Complet des 24 Métropoles Connectées</a>
           </div>
         </section>
@@ -1802,10 +2472,10 @@ function buildFrenchHomePage(cities, stations) {
 </html>`;
 }
 
-/* ── 7. Build Sitemap.xml (All Canonical Bilingual URLs + hreflang) & Robots.txt ── */
+/* ── 7. Build Sitemap.xml (All Canonical Bilingual URLs + hreflang + Google Images) & Robots.txt ── */
 function buildSitemapXml(cities) {
   const pairs = [
-    { en: `${DOMAIN}/`, fr: `${DOMAIN}/fr/`, prio: '1.0', freq: 'daily' },
+    { en: `${DOMAIN}/`, fr: `${DOMAIN}/fr/`, prio: '1.0', freq: 'daily', imgs: [{ loc: `${DOMAIN}/img/remo_og_cover.jpg`, title: 'REMO World — 4D World Cities, 56 Live Radios & Focus TV' }] },
     { en: `${DOMAIN}/focus-tv.html`, fr: `${DOMAIN}/fr/focus-tv.html`, prio: '0.96', freq: 'daily' },
     { en: `${DOMAIN}/study-room.html`, fr: `${DOMAIN}/fr/study-room.html`, prio: '0.94', freq: 'daily' },
     { en: `${DOMAIN}/world-blitz.html`, fr: `${DOMAIN}/fr/world-blitz.html`, prio: '0.94', freq: 'daily' },
@@ -1813,16 +2483,44 @@ function buildSitemapXml(cities) {
     { en: `${DOMAIN}/city-versus.html`, fr: `${DOMAIN}/fr/city-versus.html`, prio: '0.95', freq: 'daily' },
     { en: `${DOMAIN}/cities/index.html`, fr: `${DOMAIN}/fr/cities/index.html`, prio: '0.95', freq: 'daily' },
     { en: `${DOMAIN}/world-radio.html`, fr: `${DOMAIN}/fr/world-radio.html`, prio: '0.95', freq: 'daily' },
+    { en: `${DOMAIN}/travel-score.html`, fr: `${DOMAIN}/fr/travel-score.html`, prio: '0.93', freq: 'weekly' },
+    { en: `${DOMAIN}/soul-city-quiz.html`, fr: `${DOMAIN}/fr/soul-city-quiz.html`, prio: '0.93', freq: 'weekly' },
+    { en: `${DOMAIN}/odyssey.html`, fr: `${DOMAIN}/fr/odyssey.html`, prio: '0.92', freq: 'weekly', imgs: [{ loc: `${DOMAIN}/img/remo_odyssey_og_cover.jpg`, title: 'REMO ODYSSEY — Official 4D World Game' }] },
     { en: `${DOMAIN}/guess-the-city.html`, fr: `${DOMAIN}/fr/guess-the-city.html`, prio: '0.90', freq: 'weekly' },
-    { en: `${DOMAIN}/boarding-pass.html`, fr: `${DOMAIN}/fr/boarding-pass.html`, prio: '0.88', freq: 'weekly' }
+    { en: `${DOMAIN}/boarding-pass.html`, fr: `${DOMAIN}/fr/boarding-pass.html`, prio: '0.90', freq: 'weekly' },
+    { en: `${DOMAIN}/ambassadors.html`, fr: `${DOMAIN}/fr/ambassadors.html`, prio: '0.86', freq: 'weekly' },
+    { en: `${DOMAIN}/widget.html`, fr: `${DOMAIN}/widget.html`, prio: '0.88', freq: 'weekly', single: true }
   ];
 
   cities.forEach((c) => {
+    const imgLoc = `${DOMAIN}/img/cities/${c.id}.jpg`;
     pairs.push({
       en: `${DOMAIN}/cities/${c.id}.html`,
       fr: `${DOMAIN}/fr/cities/${c.id}.html`,
-      prio: '0.85',
-      freq: 'weekly'
+      prio: '0.86',
+      freq: 'weekly',
+      imgs: [{ loc: imgLoc, title: `${c.name_en} (${c.country_en}) — 1910 vs 2026 & Live 4D City Hub` }],
+      imgsFr: [{ loc: imgLoc, title: `${c.name_fr} (${c.country_fr}) — 1910 vs 2026 & Hub Ville 4D` }]
+    });
+  });
+
+  SEO_VERSUS_DUELS.forEach((d) => {
+    const ca = cities.find((c) => c.id === d.a);
+    const cb = cities.find((c) => c.id === d.b);
+    if (!ca || !cb) return;
+    pairs.push({
+      en: `${DOMAIN}/versus/${d.slug}.html`,
+      fr: `${DOMAIN}/fr/versus/${d.slug}.html`,
+      prio: '0.84',
+      freq: 'weekly',
+      imgs: [
+        { loc: `${DOMAIN}/img/cities/${ca.id}.jpg`, title: `${ca.name_en} vs ${cb.name_en} — ${ca.name_en}` },
+        { loc: `${DOMAIN}/img/cities/${cb.id}.jpg`, title: `${ca.name_en} vs ${cb.name_en} — ${cb.name_en}` }
+      ],
+      imgsFr: [
+        { loc: `${DOMAIN}/img/cities/${ca.id}.jpg`, title: `${ca.name_fr} vs ${cb.name_fr} — ${ca.name_fr}` },
+        { loc: `${DOMAIN}/img/cities/${cb.id}.jpg`, title: `${ca.name_fr} vs ${cb.name_fr} — ${cb.name_fr}` }
+      ]
     });
   });
 
@@ -1831,8 +2529,25 @@ function buildSitemapXml(cities) {
     { en: `${DOMAIN}/terms.html`, fr: `${DOMAIN}/fr/terms.html`, prio: '0.60', freq: 'monthly' }
   );
 
+  function renderImgTags(list) {
+    if (!list || !list.length) return '';
+    return '\n' + list.map((im) => `    <image:image>
+      <image:loc>${im.loc}</image:loc>
+      <image:title>${esc(im.title)}</image:title>
+    </image:image>`).join('\n');
+  }
+
   const urlNodes = [];
   pairs.forEach((p) => {
+    if (p.single) {
+      urlNodes.push(`  <url>
+    <loc>${p.en}</loc>
+    <lastmod>${TODAY}</lastmod>
+    <changefreq>${p.freq}</changefreq>
+    <priority>${p.prio}</priority>${renderImgTags(p.imgs)}
+  </url>`);
+      return;
+    }
     urlNodes.push(`  <url>
     <loc>${p.en}</loc>
     <lastmod>${TODAY}</lastmod>
@@ -1840,7 +2555,7 @@ function buildSitemapXml(cities) {
     <priority>${p.prio}</priority>
     <xhtml:link rel="alternate" hreflang="en" href="${p.en}"/>
     <xhtml:link rel="alternate" hreflang="fr" href="${p.fr}"/>
-    <xhtml:link rel="alternate" hreflang="x-default" href="${p.en}"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="${p.en}"/>${renderImgTags(p.imgs)}
   </url>`);
     if (p.fr !== p.en) {
       urlNodes.push(`  <url>
@@ -1850,14 +2565,15 @@ function buildSitemapXml(cities) {
     <priority>${p.prio}</priority>
     <xhtml:link rel="alternate" hreflang="en" href="${p.en}"/>
     <xhtml:link rel="alternate" hreflang="fr" href="${p.fr}"/>
-    <xhtml:link rel="alternate" hreflang="x-default" href="${p.en}"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="${p.en}"/>${renderImgTags(p.imgsFr || p.imgs)}
   </url>`);
     }
   });
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
-        xmlns:xhtml="http://www.w3.org/1999/xhtml">
+        xmlns:xhtml="http://www.w3.org/1999/xhtml"
+        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
 ${urlNodes.join('\n')}
 </urlset>
 `;
@@ -1896,21 +2612,33 @@ Sitemap: ${DOMAIN}/sitemap.xml
 function buildLlmsFiles(cities, stations) {
   const llmsShort = `# REMO World (${DOMAIN})
 
-> REMO World is a free bilingual (English & French) 4D Focus TV City Window, Synced Lofi Study Room platform, 4D City Social Network, Live World Radio Player (${stations.length} ad-free global & Lofi stations across 24/24 cities), Daily World Blitz 60s Geography Trivia with 1v1 Friend Duels, Guess My City photo game, and 9:16 Virtual Boarding Pass Generator connecting 24 world cities in real time.
+> REMO World is a free bilingual (English & French) 4D World Cities platform combining 4D Focus TV Ambient City Windows, Synced Pomodoro Lofi Study Rooms, ${stations.length} ad-free live World City Radio stations across 24 metropolises, 1910 vs 2026 historical city Time-Warp comparisons, a 30-Second Daily City Challenge, Daily World Blitz 60s trivia with 1v1 duels, My Travel Score (/24) checklist, Soul City personality quiz, Dual-City First-Class 4D Boarding Pass generator, and a free embeddable Notion & Blog Live City Widget Studio.
 
-## Key Free Features (Zero Sign-Up Required to Explore)
-- [REMO World Live Social App](${DOMAIN}/): Real-time cross-city social feed, live City Wars, Citizen Passports, and collectible 4D City Cards.
+## Key Free Features & Studios (Zero Sign-Up Required to Explore)
+- [REMO World Live Social App](${DOMAIN}/): Real-time cross-city social feed, 1910 vs 2026 Before/After visual moments, 30s Daily City Challenge (\`?open=daily\`), live City Wars, Citizen Passports, and collectible 4D City Cards.
 - [4D Focus TV — Ambient City Windows & Zen Clock](${DOMAIN}/focus-tv.html): Fullscreen 4D Focus TV window with rain/snow/neon/fireplace FX, Fly Random teleportation, Live Rain/Night city filters, Custom Vibe Links (\`?tv=city&fx=rain\`), and Minimal Zen Desk Clock mode.
 - [Synced Study Together Rooms](${DOMAIN}/study-room.html): Shareable Focus Together Room URLs (\`?tv=tokyo&fx=rain&room=study42\`) with synchronized Pomodoro sessions and ad-free Lofi radio.
+- [My Travel Score (/24) World Checklist](${DOMAIN}/travel-score.html): Interactive 24-city visited checklist with Explorer Tiers and free 9:16 HD Story PNG export (\`?open=travelmap\`).
+- [Soul City Personality Quiz](${DOMAIN}/soul-city-quiz.html): 5-question personality quiz matching visitors to 1 of 24 world cities with 6 archetypes and a 9:16 HD Soul City certificate (\`?open=soulcity\`).
+- [4D Panoramic Dual-City Boarding Pass Generator](${DOMAIN}/boarding-pass.html): Create & download First-Class 9:16 Story Boarding Passes with dual-city skylines, jetliner artwork, live clocks, and flight time (\`?open=boardingpass&dep=chisinau&arr=montreal\`).
+- [Free Notion & Blog Live City Widget Studio](${DOMAIN}/widget.html): Embed a live world city clock, Open-Meteo real-time °C weather, and 1-click local radio badge into Notion or any HTML site (24 cities × 4 neon themes × EN/FR).
 - [Daily World Blitz 60s & 1v1 Duels](${DOMAIN}/world-blitz.html): 5 daily world cities solved in 60 seconds with shareable Wordle-style result cards and URL-encoded 1v1 challenge links (\`?open=blitz&vs=...\`).
-- [Free Live World Cities Radio (${stations.length} Stations)](${DOMAIN}/world-radio.html): Stream live radio from Paris, Montréal, Chișinău (8 live stations), Bucharest, New York, London, Tokyo, Seoul, Berlin, Dubai, Lisbon, Amsterdam, Sydney, Rio, Singapore & Cairo + Lofi, Jazz & Synthwave.
+- [REMO Odyssey Official 4D World Runner](${DOMAIN}/odyssey.html): Browser action & hover-coin game across 24 real city skylines with live weather surges and 1v1 Ghost duels.
+- [Free Live World Cities Radio (${stations.length} Stations)](${DOMAIN}/world-radio.html): Stream live radio from Paris, Montréal, Chișinău (RMO — 8 live stations), Bucharest (OTP), New York, London, Tokyo, Seoul, Berlin, Dubai, Lisbon, Amsterdam, Sydney, Rio, Singapore & Cairo + Lofi, Jazz & Synthwave.
 - [Guess The City Photo Game](${DOMAIN}/guess-the-city.html): Free browser geography & skyline photo guessing game created by real citizens worldwide.
-- [4D Holographic Boarding Pass Generator](${DOMAIN}/boarding-pass.html): Create & download 9:16 Story Boarding Passes between any two world cities for TikTok, Instagram & WhatsApp.
-- [Top 24 World Cities Live Ranking & Duels](${DOMAIN}/world-ranking.html): Real-time city standings and interactive city-vs-city comparison tool ([City Versus](${DOMAIN}/city-versus.html)).
-- [All 24 Connected World Cities Directory](${DOMAIN}/cities/index.html): Live local time, weather, radio streams & urban stats for every Edition-1 metropolis.
+- [Top 24 World Cities Live Ranking & City Comparisons](${DOMAIN}/world-ranking.html): Real-time city standings, interactive [City Versus Duels](${DOMAIN}/city-versus.html), and 12 dedicated head-to-head city comparison guides.
+- [Official REMO City Ambassadors Program](${DOMAIN}/ambassadors.html): Founding program for city creators and Study With Me streamers.
+- [All 24 Connected World Cities Directory](${DOMAIN}/cities/index.html): Live local time, weather, 1910 vs 2026 history, verified facts, radio streams & urban stats for every Edition-1 metropolis.
+
+## 12 Head-to-Head City Comparison Guides (EN & FR)
+${SEO_VERSUS_DUELS.map((d) => {
+  const ca = cities.find((c) => c.id === d.a);
+  const cb = cities.find((c) => c.id === d.b);
+  return `- [${ca.flag} ${ca.name_en} vs ${cb.flag} ${cb.name_en}](${DOMAIN}/versus/${d.slug}.html) | [Français](${DOMAIN}/fr/versus/${d.slug}.html)`;
+}).join('\n')}
 
 ## Edition-1 Connected Cities (EN & FR)
-${cities.map((c) => `- [${c.flag} ${c.name_en} (${c.country_en})](${DOMAIN}/cities/${c.id}.html) | [Version Française](${DOMAIN}/fr/cities/${c.id}.html)`).join('\n')}
+${cities.map((c) => `- [${c.flag} ${c.name_en} (${c.country_en}, ${seoCityIata(c)})](${DOMAIN}/cities/${c.id}.html) | [Version Française](${DOMAIN}/fr/cities/${c.id}.html)`).join('\n')}
 
 ## Languages
 - English: ${DOMAIN}/
@@ -1923,14 +2651,19 @@ ${cities.map((c) => `- [${c.flag} ${c.name_en} (${c.country_en})](${DOMAIN}/citi
 ## Complete Radio Directory (${stations.length} Live Streams)
 ${stations.map((s) => `- **${s.name}** (${s.badge}): ${s.desc_en} / ${s.desc_fr}`).join('\n')}
 
-## Detailed City Profiles (${cities.length} Cities)
-${cities.map((c) => `### ${c.flag} ${c.name_en} / ${c.name_fr} (${c.code}) — ${c.country_en}
+## Detailed City Profiles (${cities.length} Cities — 1910 vs 2026 & Facts)
+${cities.map((c) => {
+  const ex = SEO_CITY_EXTRA[c.id];
+  return `### ${c.flag} ${c.name_en} / ${c.name_fr} (${seoCityIata(c)}) — ${c.country_en}
 - Tagline (EN): ${c.tagline_en}
 - Tagline (FR): ${c.tagline_fr}
 - Summary: ${c.desc_en}
+${ex ? `- 1910 vs 2026 Evolution: ${ex.history_en}
+- Verified Facts: ${ex.facts_en.join(' | ')}` : ''}
 - Rarity: ${c.rarity} | Element: ${c.element}
 - Urban Ratings: Culture ${c.stats.culture}/100, Nightlife ${c.stats.nightlife}/100, Tech ${c.stats.tech}/100, Gastronomy ${c.stats.gastronomy}/100
-- Direct Hub: ${DOMAIN}/cities/${c.id}.html`).join('\n\n')}
+- Direct Hub: ${DOMAIN}/cities/${c.id}.html`;
+}).join('\n\n')}
 `;
 
   return { llmsShort, llmsFull };
@@ -1941,13 +2674,22 @@ function main() {
   const { cities, elements, stations } = loadCitiesAndStations();
   ensureDir(path.join(ROOT, 'cities'));
   ensureDir(path.join(ROOT, 'fr', 'cities'));
+  ensureDir(path.join(ROOT, 'versus'));
+  ensureDir(path.join(ROOT, 'fr', 'versus'));
 
   let generatedCount = 0;
 
-  // 48 City Pages (24 EN + 24 FR)
+  // 48 Enriched City Pages (24 EN + 24 FR)
   cities.forEach((city) => {
     fs.writeFileSync(path.join(ROOT, 'cities', `${city.id}.html`), buildCityPage(city, 'en', cities, elements, stations), 'utf8');
     fs.writeFileSync(path.join(ROOT, 'fr', 'cities', `${city.id}.html`), buildCityPage(city, 'fr', cities, elements, stations), 'utf8');
+    generatedCount += 2;
+  });
+
+  // 24 City-vs-City Comparison Guides (12 EN + 12 FR)
+  SEO_VERSUS_DUELS.forEach((duel) => {
+    fs.writeFileSync(path.join(ROOT, 'versus', `${duel.slug}.html`), buildVersusPairPage(duel, 'en', cities, stations), 'utf8');
+    fs.writeFileSync(path.join(ROOT, 'fr', 'versus', `${duel.slug}.html`), buildVersusPairPage(duel, 'fr', cities, stations), 'utf8');
     generatedCount += 2;
   });
 
@@ -1960,7 +2702,7 @@ function main() {
   fs.writeFileSync(path.join(ROOT, 'fr', 'cities', 'index.html'), buildDirectoryPage('fr', cities, stations.length), 'utf8');
   generatedCount += 2;
 
-  // 12 High-Intent Feature Hub Pages (6 EN + 6 FR)
+  // 16 High-Intent Feature & Viral Studio Hub Pages (8 EN + 8 FR)
   fs.writeFileSync(path.join(ROOT, 'focus-tv.html'), buildFocusTvHubPage('en', cities, stations), 'utf8');
   fs.writeFileSync(path.join(ROOT, 'fr', 'focus-tv.html'), buildFocusTvHubPage('fr', cities, stations), 'utf8');
   fs.writeFileSync(path.join(ROOT, 'study-room.html'), buildStudyRoomHubPage('en', cities, stations), 'utf8');
@@ -1973,17 +2715,20 @@ function main() {
   fs.writeFileSync(path.join(ROOT, 'fr', 'guess-the-city.html'), buildGuessCityHubPage('fr', cities), 'utf8');
   fs.writeFileSync(path.join(ROOT, 'boarding-pass.html'), buildBoardingPassHubPage('en', cities), 'utf8');
   fs.writeFileSync(path.join(ROOT, 'fr', 'boarding-pass.html'), buildBoardingPassHubPage('fr', cities), 'utf8');
-  generatedCount += 12;
+  fs.writeFileSync(path.join(ROOT, 'travel-score.html'), buildTravelScoreHubPage('en', cities), 'utf8');
+  fs.writeFileSync(path.join(ROOT, 'fr', 'travel-score.html'), buildTravelScoreHubPage('fr', cities), 'utf8');
+  fs.writeFileSync(path.join(ROOT, 'soul-city-quiz.html'), buildSoulCityQuizHubPage('en', cities), 'utf8');
+  fs.writeFileSync(path.join(ROOT, 'fr', 'soul-city-quiz.html'), buildSoulCityQuizHubPage('fr', cities), 'utf8');
+  generatedCount += 16;
 
   // Clean up deprecated beat-maker static pages if present
   [path.join(ROOT, 'beat-maker.html'), path.join(ROOT, 'fr', 'beat-maker.html')].forEach((p) => {
     try { if (fs.existsSync(p)) fs.unlinkSync(p); } catch (e) {}
   });
 
-  // Embeddable Backlink Widget
-  fs.writeFileSync(path.join(ROOT, 'widget.html'), buildWidgetHtml(cities, stations), 'utf8');
+  // Note: widget.html is maintained separately as the standalone Visual Notion Embed Studio (do not overwrite!)
 
-  // Sitemap, Robots, LLMs & IndexNow Key
+  // Sitemap (Google Images + hreflang), Robots, LLMs & IndexNow Key
   fs.writeFileSync(path.join(ROOT, 'sitemap.xml'), buildSitemapXml(cities), 'utf8');
   fs.writeFileSync(path.join(ROOT, 'robots.txt'), buildRobotsTxt(), 'utf8');
   const { llmsShort, llmsFull } = buildLlmsFiles(cities, stations);
@@ -1991,7 +2736,7 @@ function main() {
   fs.writeFileSync(path.join(ROOT, 'llms-full.txt'), llmsFull, 'utf8');
   fs.writeFileSync(path.join(ROOT, `${INDEXNOW_KEY}.txt`), INDEXNOW_KEY, 'utf8');
 
-  console.log(`✓ Generated ${generatedCount} static SEO pages + widget.html + sitemap.xml + robots.txt + llms.txt + IndexNow key!`);
+  console.log(`✓ Generated ${generatedCount} static SEO pages + Google Images sitemap.xml + robots.txt + llms.txt/llms-full.txt (${TODAY})!`);
 }
 
 main();

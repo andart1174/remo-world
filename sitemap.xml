@@ -1,27 +1,36 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
-        xmlns:xhtml="http://www.w3.org/1999/xhtml">
+        xmlns:xhtml="http://www.w3.org/1999/xhtml"
+        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
   <url>
     <loc>https://remoworld.com/</loc>
-    <lastmod>2026-11-12</lastmod>
+    <lastmod>2026-11-26</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/"/>
     <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/"/>
+    <image:image>
+      <image:loc>https://remoworld.com/img/remo_og_cover.jpg</image:loc>
+      <image:title>REMO World — 4D World Cities, 56 Live Radios &amp; Focus TV</image:title>
+    </image:image>
   </url>
   <url>
     <loc>https://remoworld.com/fr/</loc>
-    <lastmod>2026-11-12</lastmod>
+    <lastmod>2026-11-26</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/"/>
     <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/"/>
+    <image:image>
+      <image:loc>https://remoworld.com/img/remo_og_cover.jpg</image:loc>
+      <image:title>REMO World — 4D World Cities, 56 Live Radios &amp; Focus TV</image:title>
+    </image:image>
   </url>
   <url>
     <loc>https://remoworld.com/focus-tv.html</loc>
-    <lastmod>2026-11-12</lastmod>
+    <lastmod>2026-11-26</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.96</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/focus-tv.html"/>
@@ -30,7 +39,7 @@
   </url>
   <url>
     <loc>https://remoworld.com/fr/focus-tv.html</loc>
-    <lastmod>2026-11-12</lastmod>
+    <lastmod>2026-11-26</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.96</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/focus-tv.html"/>
@@ -39,7 +48,7 @@
   </url>
   <url>
     <loc>https://remoworld.com/study-room.html</loc>
-    <lastmod>2026-11-12</lastmod>
+    <lastmod>2026-11-26</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.94</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/study-room.html"/>
@@ -48,7 +57,7 @@
   </url>
   <url>
     <loc>https://remoworld.com/fr/study-room.html</loc>
-    <lastmod>2026-11-12</lastmod>
+    <lastmod>2026-11-26</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.94</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/study-room.html"/>
@@ -57,7 +66,7 @@
   </url>
   <url>
     <loc>https://remoworld.com/world-blitz.html</loc>
-    <lastmod>2026-11-12</lastmod>
+    <lastmod>2026-11-26</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.94</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/world-blitz.html"/>
@@ -66,7 +75,7 @@
   </url>
   <url>
     <loc>https://remoworld.com/fr/world-blitz.html</loc>
-    <lastmod>2026-11-12</lastmod>
+    <lastmod>2026-11-26</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.94</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/world-blitz.html"/>
@@ -75,7 +84,7 @@
   </url>
   <url>
     <loc>https://remoworld.com/world-ranking.html</loc>
-    <lastmod>2026-11-12</lastmod>
+    <lastmod>2026-11-26</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.95</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/world-ranking.html"/>
@@ -84,7 +93,7 @@
   </url>
   <url>
     <loc>https://remoworld.com/fr/world-ranking.html</loc>
-    <lastmod>2026-11-12</lastmod>
+    <lastmod>2026-11-26</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.95</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/world-ranking.html"/>
@@ -93,7 +102,7 @@
   </url>
   <url>
     <loc>https://remoworld.com/city-versus.html</loc>
-    <lastmod>2026-11-12</lastmod>
+    <lastmod>2026-11-26</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.95</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/city-versus.html"/>
@@ -102,7 +111,7 @@
   </url>
   <url>
     <loc>https://remoworld.com/fr/city-versus.html</loc>
-    <lastmod>2026-11-12</lastmod>
+    <lastmod>2026-11-26</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.95</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/city-versus.html"/>
@@ -111,7 +120,7 @@
   </url>
   <url>
     <loc>https://remoworld.com/cities/index.html</loc>
-    <lastmod>2026-11-12</lastmod>
+    <lastmod>2026-11-26</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.95</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/cities/index.html"/>
@@ -120,7 +129,7 @@
   </url>
   <url>
     <loc>https://remoworld.com/fr/cities/index.html</loc>
-    <lastmod>2026-11-12</lastmod>
+    <lastmod>2026-11-26</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.95</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/cities/index.html"/>
@@ -129,7 +138,7 @@
   </url>
   <url>
     <loc>https://remoworld.com/world-radio.html</loc>
-    <lastmod>2026-11-12</lastmod>
+    <lastmod>2026-11-26</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.95</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/world-radio.html"/>
@@ -138,7 +147,7 @@
   </url>
   <url>
     <loc>https://remoworld.com/fr/world-radio.html</loc>
-    <lastmod>2026-11-12</lastmod>
+    <lastmod>2026-11-26</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.95</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/world-radio.html"/>
@@ -146,8 +155,70 @@
     <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/world-radio.html"/>
   </url>
   <url>
+    <loc>https://remoworld.com/travel-score.html</loc>
+    <lastmod>2026-11-26</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.93</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/travel-score.html"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/travel-score.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/travel-score.html"/>
+  </url>
+  <url>
+    <loc>https://remoworld.com/fr/travel-score.html</loc>
+    <lastmod>2026-11-26</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.93</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/travel-score.html"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/travel-score.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/travel-score.html"/>
+  </url>
+  <url>
+    <loc>https://remoworld.com/soul-city-quiz.html</loc>
+    <lastmod>2026-11-26</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.93</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/soul-city-quiz.html"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/soul-city-quiz.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/soul-city-quiz.html"/>
+  </url>
+  <url>
+    <loc>https://remoworld.com/fr/soul-city-quiz.html</loc>
+    <lastmod>2026-11-26</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.93</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/soul-city-quiz.html"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/soul-city-quiz.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/soul-city-quiz.html"/>
+  </url>
+  <url>
+    <loc>https://remoworld.com/odyssey.html</loc>
+    <lastmod>2026-11-26</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.92</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/odyssey.html"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/odyssey.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/odyssey.html"/>
+    <image:image>
+      <image:loc>https://remoworld.com/img/remo_odyssey_og_cover.jpg</image:loc>
+      <image:title>REMO ODYSSEY — Official 4D World Game</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://remoworld.com/fr/odyssey.html</loc>
+    <lastmod>2026-11-26</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.92</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/odyssey.html"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/odyssey.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/odyssey.html"/>
+    <image:image>
+      <image:loc>https://remoworld.com/img/remo_odyssey_og_cover.jpg</image:loc>
+      <image:title>REMO ODYSSEY — Official 4D World Game</image:title>
+    </image:image>
+  </url>
+  <url>
     <loc>https://remoworld.com/guess-the-city.html</loc>
-    <lastmod>2026-11-12</lastmod>
+    <lastmod>2026-11-26</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.90</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/guess-the-city.html"/>
@@ -156,7 +227,7 @@
   </url>
   <url>
     <loc>https://remoworld.com/fr/guess-the-city.html</loc>
-    <lastmod>2026-11-12</lastmod>
+    <lastmod>2026-11-26</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.90</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/guess-the-city.html"/>
@@ -165,457 +236,1081 @@
   </url>
   <url>
     <loc>https://remoworld.com/boarding-pass.html</loc>
-    <lastmod>2026-11-12</lastmod>
+    <lastmod>2026-11-26</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.88</priority>
+    <priority>0.90</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/boarding-pass.html"/>
     <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/boarding-pass.html"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/boarding-pass.html"/>
   </url>
   <url>
     <loc>https://remoworld.com/fr/boarding-pass.html</loc>
-    <lastmod>2026-11-12</lastmod>
+    <lastmod>2026-11-26</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.88</priority>
+    <priority>0.90</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/boarding-pass.html"/>
     <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/boarding-pass.html"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/boarding-pass.html"/>
   </url>
   <url>
-    <loc>https://remoworld.com/cities/montreal.html</loc>
-    <lastmod>2026-11-12</lastmod>
+    <loc>https://remoworld.com/ambassadors.html</loc>
+    <lastmod>2026-11-26</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.85</priority>
+    <priority>0.86</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/ambassadors.html"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/ambassadors.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/ambassadors.html"/>
+  </url>
+  <url>
+    <loc>https://remoworld.com/fr/ambassadors.html</loc>
+    <lastmod>2026-11-26</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.86</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/ambassadors.html"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/ambassadors.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/ambassadors.html"/>
+  </url>
+  <url>
+    <loc>https://remoworld.com/widget.html</loc>
+    <lastmod>2026-11-26</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.88</priority>
+  </url>
+  <url>
+    <loc>https://remoworld.com/cities/montreal.html</loc>
+    <lastmod>2026-11-26</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.86</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/cities/montreal.html"/>
     <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/cities/montreal.html"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/cities/montreal.html"/>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/montreal.jpg</image:loc>
+      <image:title>Montréal (Canada) — 1910 vs 2026 &amp; Live 4D City Hub</image:title>
+    </image:image>
   </url>
   <url>
     <loc>https://remoworld.com/fr/cities/montreal.html</loc>
-    <lastmod>2026-11-12</lastmod>
+    <lastmod>2026-11-26</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.85</priority>
+    <priority>0.86</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/cities/montreal.html"/>
     <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/cities/montreal.html"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/cities/montreal.html"/>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/montreal.jpg</image:loc>
+      <image:title>Montréal (Canada) — 1910 vs 2026 &amp; Hub Ville 4D</image:title>
+    </image:image>
   </url>
   <url>
     <loc>https://remoworld.com/cities/paris.html</loc>
-    <lastmod>2026-11-12</lastmod>
+    <lastmod>2026-11-26</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.85</priority>
+    <priority>0.86</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/cities/paris.html"/>
     <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/cities/paris.html"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/cities/paris.html"/>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/paris.jpg</image:loc>
+      <image:title>Paris (France) — 1910 vs 2026 &amp; Live 4D City Hub</image:title>
+    </image:image>
   </url>
   <url>
     <loc>https://remoworld.com/fr/cities/paris.html</loc>
-    <lastmod>2026-11-12</lastmod>
+    <lastmod>2026-11-26</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.85</priority>
+    <priority>0.86</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/cities/paris.html"/>
     <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/cities/paris.html"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/cities/paris.html"/>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/paris.jpg</image:loc>
+      <image:title>Paris (France) — 1910 vs 2026 &amp; Hub Ville 4D</image:title>
+    </image:image>
   </url>
   <url>
     <loc>https://remoworld.com/cities/chisinau.html</loc>
-    <lastmod>2026-11-12</lastmod>
+    <lastmod>2026-11-26</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.85</priority>
+    <priority>0.86</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/cities/chisinau.html"/>
     <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/cities/chisinau.html"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/cities/chisinau.html"/>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/chisinau.jpg</image:loc>
+      <image:title>Chișinău (Moldova) — 1910 vs 2026 &amp; Live 4D City Hub</image:title>
+    </image:image>
   </url>
   <url>
     <loc>https://remoworld.com/fr/cities/chisinau.html</loc>
-    <lastmod>2026-11-12</lastmod>
+    <lastmod>2026-11-26</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.85</priority>
+    <priority>0.86</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/cities/chisinau.html"/>
     <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/cities/chisinau.html"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/cities/chisinau.html"/>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/chisinau.jpg</image:loc>
+      <image:title>Chișinău (Moldavie) — 1910 vs 2026 &amp; Hub Ville 4D</image:title>
+    </image:image>
   </url>
   <url>
     <loc>https://remoworld.com/cities/bucharest.html</loc>
-    <lastmod>2026-11-12</lastmod>
+    <lastmod>2026-11-26</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.85</priority>
+    <priority>0.86</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/cities/bucharest.html"/>
     <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/cities/bucharest.html"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/cities/bucharest.html"/>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/bucharest.jpg</image:loc>
+      <image:title>Bucharest (Romania) — 1910 vs 2026 &amp; Live 4D City Hub</image:title>
+    </image:image>
   </url>
   <url>
     <loc>https://remoworld.com/fr/cities/bucharest.html</loc>
-    <lastmod>2026-11-12</lastmod>
+    <lastmod>2026-11-26</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.85</priority>
+    <priority>0.86</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/cities/bucharest.html"/>
     <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/cities/bucharest.html"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/cities/bucharest.html"/>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/bucharest.jpg</image:loc>
+      <image:title>Bucarest (Roumanie) — 1910 vs 2026 &amp; Hub Ville 4D</image:title>
+    </image:image>
   </url>
   <url>
     <loc>https://remoworld.com/cities/newyork.html</loc>
-    <lastmod>2026-11-12</lastmod>
+    <lastmod>2026-11-26</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.85</priority>
+    <priority>0.86</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/cities/newyork.html"/>
     <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/cities/newyork.html"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/cities/newyork.html"/>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/newyork.jpg</image:loc>
+      <image:title>New York (United States) — 1910 vs 2026 &amp; Live 4D City Hub</image:title>
+    </image:image>
   </url>
   <url>
     <loc>https://remoworld.com/fr/cities/newyork.html</loc>
-    <lastmod>2026-11-12</lastmod>
+    <lastmod>2026-11-26</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.85</priority>
+    <priority>0.86</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/cities/newyork.html"/>
     <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/cities/newyork.html"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/cities/newyork.html"/>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/newyork.jpg</image:loc>
+      <image:title>New York (États-Unis) — 1910 vs 2026 &amp; Hub Ville 4D</image:title>
+    </image:image>
   </url>
   <url>
     <loc>https://remoworld.com/cities/tokyo.html</loc>
-    <lastmod>2026-11-12</lastmod>
+    <lastmod>2026-11-26</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.85</priority>
+    <priority>0.86</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/cities/tokyo.html"/>
     <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/cities/tokyo.html"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/cities/tokyo.html"/>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/tokyo.jpg</image:loc>
+      <image:title>Tokyo (Japan) — 1910 vs 2026 &amp; Live 4D City Hub</image:title>
+    </image:image>
   </url>
   <url>
     <loc>https://remoworld.com/fr/cities/tokyo.html</loc>
-    <lastmod>2026-11-12</lastmod>
+    <lastmod>2026-11-26</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.85</priority>
+    <priority>0.86</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/cities/tokyo.html"/>
     <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/cities/tokyo.html"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/cities/tokyo.html"/>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/tokyo.jpg</image:loc>
+      <image:title>Tokyo (Japon) — 1910 vs 2026 &amp; Hub Ville 4D</image:title>
+    </image:image>
   </url>
   <url>
     <loc>https://remoworld.com/cities/london.html</loc>
-    <lastmod>2026-11-12</lastmod>
+    <lastmod>2026-11-26</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.85</priority>
+    <priority>0.86</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/cities/london.html"/>
     <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/cities/london.html"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/cities/london.html"/>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/london.jpg</image:loc>
+      <image:title>London (United Kingdom) — 1910 vs 2026 &amp; Live 4D City Hub</image:title>
+    </image:image>
   </url>
   <url>
     <loc>https://remoworld.com/fr/cities/london.html</loc>
-    <lastmod>2026-11-12</lastmod>
+    <lastmod>2026-11-26</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.85</priority>
+    <priority>0.86</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/cities/london.html"/>
     <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/cities/london.html"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/cities/london.html"/>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/london.jpg</image:loc>
+      <image:title>Londres (Royaume-Uni) — 1910 vs 2026 &amp; Hub Ville 4D</image:title>
+    </image:image>
   </url>
   <url>
     <loc>https://remoworld.com/cities/dubai.html</loc>
-    <lastmod>2026-11-12</lastmod>
+    <lastmod>2026-11-26</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.85</priority>
+    <priority>0.86</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/cities/dubai.html"/>
     <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/cities/dubai.html"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/cities/dubai.html"/>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/dubai.jpg</image:loc>
+      <image:title>Dubai (UAE) — 1910 vs 2026 &amp; Live 4D City Hub</image:title>
+    </image:image>
   </url>
   <url>
     <loc>https://remoworld.com/fr/cities/dubai.html</loc>
-    <lastmod>2026-11-12</lastmod>
+    <lastmod>2026-11-26</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.85</priority>
+    <priority>0.86</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/cities/dubai.html"/>
     <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/cities/dubai.html"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/cities/dubai.html"/>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/dubai.jpg</image:loc>
+      <image:title>Dubaï (Émirats Arabes Unis) — 1910 vs 2026 &amp; Hub Ville 4D</image:title>
+    </image:image>
   </url>
   <url>
     <loc>https://remoworld.com/cities/miami.html</loc>
-    <lastmod>2026-11-12</lastmod>
+    <lastmod>2026-11-26</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.85</priority>
+    <priority>0.86</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/cities/miami.html"/>
     <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/cities/miami.html"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/cities/miami.html"/>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/miami.jpg</image:loc>
+      <image:title>Miami (United States) — 1910 vs 2026 &amp; Live 4D City Hub</image:title>
+    </image:image>
   </url>
   <url>
     <loc>https://remoworld.com/fr/cities/miami.html</loc>
-    <lastmod>2026-11-12</lastmod>
+    <lastmod>2026-11-26</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.85</priority>
+    <priority>0.86</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/cities/miami.html"/>
     <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/cities/miami.html"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/cities/miami.html"/>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/miami.jpg</image:loc>
+      <image:title>Miami (États-Unis) — 1910 vs 2026 &amp; Hub Ville 4D</image:title>
+    </image:image>
   </url>
   <url>
     <loc>https://remoworld.com/cities/barcelona.html</loc>
-    <lastmod>2026-11-12</lastmod>
+    <lastmod>2026-11-26</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.85</priority>
+    <priority>0.86</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/cities/barcelona.html"/>
     <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/cities/barcelona.html"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/cities/barcelona.html"/>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/barcelona.jpg</image:loc>
+      <image:title>Barcelona (Spain) — 1910 vs 2026 &amp; Live 4D City Hub</image:title>
+    </image:image>
   </url>
   <url>
     <loc>https://remoworld.com/fr/cities/barcelona.html</loc>
-    <lastmod>2026-11-12</lastmod>
+    <lastmod>2026-11-26</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.85</priority>
+    <priority>0.86</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/cities/barcelona.html"/>
     <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/cities/barcelona.html"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/cities/barcelona.html"/>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/barcelona.jpg</image:loc>
+      <image:title>Barcelone (Espagne) — 1910 vs 2026 &amp; Hub Ville 4D</image:title>
+    </image:image>
   </url>
   <url>
     <loc>https://remoworld.com/cities/rome.html</loc>
-    <lastmod>2026-11-12</lastmod>
+    <lastmod>2026-11-26</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.85</priority>
+    <priority>0.86</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/cities/rome.html"/>
     <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/cities/rome.html"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/cities/rome.html"/>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/rome.jpg</image:loc>
+      <image:title>Rome (Italy) — 1910 vs 2026 &amp; Live 4D City Hub</image:title>
+    </image:image>
   </url>
   <url>
     <loc>https://remoworld.com/fr/cities/rome.html</loc>
-    <lastmod>2026-11-12</lastmod>
+    <lastmod>2026-11-26</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.85</priority>
+    <priority>0.86</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/cities/rome.html"/>
     <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/cities/rome.html"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/cities/rome.html"/>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/rome.jpg</image:loc>
+      <image:title>Rome (Italie) — 1910 vs 2026 &amp; Hub Ville 4D</image:title>
+    </image:image>
   </url>
   <url>
     <loc>https://remoworld.com/cities/toronto.html</loc>
-    <lastmod>2026-11-12</lastmod>
+    <lastmod>2026-11-26</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.85</priority>
+    <priority>0.86</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/cities/toronto.html"/>
     <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/cities/toronto.html"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/cities/toronto.html"/>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/toronto.jpg</image:loc>
+      <image:title>Toronto (Canada) — 1910 vs 2026 &amp; Live 4D City Hub</image:title>
+    </image:image>
   </url>
   <url>
     <loc>https://remoworld.com/fr/cities/toronto.html</loc>
-    <lastmod>2026-11-12</lastmod>
+    <lastmod>2026-11-26</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.85</priority>
+    <priority>0.86</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/cities/toronto.html"/>
     <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/cities/toronto.html"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/cities/toronto.html"/>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/toronto.jpg</image:loc>
+      <image:title>Toronto (Canada) — 1910 vs 2026 &amp; Hub Ville 4D</image:title>
+    </image:image>
   </url>
   <url>
     <loc>https://remoworld.com/cities/monaco.html</loc>
-    <lastmod>2026-11-12</lastmod>
+    <lastmod>2026-11-26</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.85</priority>
+    <priority>0.86</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/cities/monaco.html"/>
     <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/cities/monaco.html"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/cities/monaco.html"/>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/monaco.jpg</image:loc>
+      <image:title>Monaco (Monaco) — 1910 vs 2026 &amp; Live 4D City Hub</image:title>
+    </image:image>
   </url>
   <url>
     <loc>https://remoworld.com/fr/cities/monaco.html</loc>
-    <lastmod>2026-11-12</lastmod>
+    <lastmod>2026-11-26</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.85</priority>
+    <priority>0.86</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/cities/monaco.html"/>
     <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/cities/monaco.html"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/cities/monaco.html"/>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/monaco.jpg</image:loc>
+      <image:title>Monaco (Monaco) — 1910 vs 2026 &amp; Hub Ville 4D</image:title>
+    </image:image>
   </url>
   <url>
     <loc>https://remoworld.com/cities/losangeles.html</loc>
-    <lastmod>2026-11-12</lastmod>
+    <lastmod>2026-11-26</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.85</priority>
+    <priority>0.86</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/cities/losangeles.html"/>
     <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/cities/losangeles.html"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/cities/losangeles.html"/>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/losangeles.jpg</image:loc>
+      <image:title>Los Angeles (United States) — 1910 vs 2026 &amp; Live 4D City Hub</image:title>
+    </image:image>
   </url>
   <url>
     <loc>https://remoworld.com/fr/cities/losangeles.html</loc>
-    <lastmod>2026-11-12</lastmod>
+    <lastmod>2026-11-26</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.85</priority>
+    <priority>0.86</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/cities/losangeles.html"/>
     <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/cities/losangeles.html"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/cities/losangeles.html"/>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/losangeles.jpg</image:loc>
+      <image:title>Los Angeles (États-Unis) — 1910 vs 2026 &amp; Hub Ville 4D</image:title>
+    </image:image>
   </url>
   <url>
     <loc>https://remoworld.com/cities/seoul.html</loc>
-    <lastmod>2026-11-12</lastmod>
+    <lastmod>2026-11-26</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.85</priority>
+    <priority>0.86</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/cities/seoul.html"/>
     <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/cities/seoul.html"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/cities/seoul.html"/>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/seoul.jpg</image:loc>
+      <image:title>Seoul (South Korea) — 1910 vs 2026 &amp; Live 4D City Hub</image:title>
+    </image:image>
   </url>
   <url>
     <loc>https://remoworld.com/fr/cities/seoul.html</loc>
-    <lastmod>2026-11-12</lastmod>
+    <lastmod>2026-11-26</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.85</priority>
+    <priority>0.86</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/cities/seoul.html"/>
     <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/cities/seoul.html"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/cities/seoul.html"/>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/seoul.jpg</image:loc>
+      <image:title>Séoul (Corée du Sud) — 1910 vs 2026 &amp; Hub Ville 4D</image:title>
+    </image:image>
   </url>
   <url>
     <loc>https://remoworld.com/cities/geneva.html</loc>
-    <lastmod>2026-11-12</lastmod>
+    <lastmod>2026-11-26</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.85</priority>
+    <priority>0.86</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/cities/geneva.html"/>
     <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/cities/geneva.html"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/cities/geneva.html"/>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/geneva.jpg</image:loc>
+      <image:title>Geneva (Switzerland) — 1910 vs 2026 &amp; Live 4D City Hub</image:title>
+    </image:image>
   </url>
   <url>
     <loc>https://remoworld.com/fr/cities/geneva.html</loc>
-    <lastmod>2026-11-12</lastmod>
+    <lastmod>2026-11-26</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.85</priority>
+    <priority>0.86</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/cities/geneva.html"/>
     <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/cities/geneva.html"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/cities/geneva.html"/>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/geneva.jpg</image:loc>
+      <image:title>Genève (Suisse) — 1910 vs 2026 &amp; Hub Ville 4D</image:title>
+    </image:image>
   </url>
   <url>
     <loc>https://remoworld.com/cities/singapore.html</loc>
-    <lastmod>2026-11-12</lastmod>
+    <lastmod>2026-11-26</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.85</priority>
+    <priority>0.86</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/cities/singapore.html"/>
     <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/cities/singapore.html"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/cities/singapore.html"/>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/singapore.jpg</image:loc>
+      <image:title>Singapore (Singapore) — 1910 vs 2026 &amp; Live 4D City Hub</image:title>
+    </image:image>
   </url>
   <url>
     <loc>https://remoworld.com/fr/cities/singapore.html</loc>
-    <lastmod>2026-11-12</lastmod>
+    <lastmod>2026-11-26</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.85</priority>
+    <priority>0.86</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/cities/singapore.html"/>
     <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/cities/singapore.html"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/cities/singapore.html"/>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/singapore.jpg</image:loc>
+      <image:title>Singapour (Singapour) — 1910 vs 2026 &amp; Hub Ville 4D</image:title>
+    </image:image>
   </url>
   <url>
     <loc>https://remoworld.com/cities/sydney.html</loc>
-    <lastmod>2026-11-12</lastmod>
+    <lastmod>2026-11-26</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.85</priority>
+    <priority>0.86</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/cities/sydney.html"/>
     <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/cities/sydney.html"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/cities/sydney.html"/>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/sydney.jpg</image:loc>
+      <image:title>Sydney (Australia) — 1910 vs 2026 &amp; Live 4D City Hub</image:title>
+    </image:image>
   </url>
   <url>
     <loc>https://remoworld.com/fr/cities/sydney.html</loc>
-    <lastmod>2026-11-12</lastmod>
+    <lastmod>2026-11-26</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.85</priority>
+    <priority>0.86</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/cities/sydney.html"/>
     <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/cities/sydney.html"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/cities/sydney.html"/>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/sydney.jpg</image:loc>
+      <image:title>Sydney (Australie) — 1910 vs 2026 &amp; Hub Ville 4D</image:title>
+    </image:image>
   </url>
   <url>
     <loc>https://remoworld.com/cities/rio.html</loc>
-    <lastmod>2026-11-12</lastmod>
+    <lastmod>2026-11-26</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.85</priority>
+    <priority>0.86</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/cities/rio.html"/>
     <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/cities/rio.html"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/cities/rio.html"/>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/rio.jpg</image:loc>
+      <image:title>Rio de Janeiro (Brazil) — 1910 vs 2026 &amp; Live 4D City Hub</image:title>
+    </image:image>
   </url>
   <url>
     <loc>https://remoworld.com/fr/cities/rio.html</loc>
-    <lastmod>2026-11-12</lastmod>
+    <lastmod>2026-11-26</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.85</priority>
+    <priority>0.86</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/cities/rio.html"/>
     <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/cities/rio.html"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/cities/rio.html"/>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/rio.jpg</image:loc>
+      <image:title>Rio de Janeiro (Brésil) — 1910 vs 2026 &amp; Hub Ville 4D</image:title>
+    </image:image>
   </url>
   <url>
     <loc>https://remoworld.com/cities/istanbul.html</loc>
-    <lastmod>2026-11-12</lastmod>
+    <lastmod>2026-11-26</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.85</priority>
+    <priority>0.86</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/cities/istanbul.html"/>
     <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/cities/istanbul.html"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/cities/istanbul.html"/>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/istanbul.jpg</image:loc>
+      <image:title>Istanbul (Türkiye) — 1910 vs 2026 &amp; Live 4D City Hub</image:title>
+    </image:image>
   </url>
   <url>
     <loc>https://remoworld.com/fr/cities/istanbul.html</loc>
-    <lastmod>2026-11-12</lastmod>
+    <lastmod>2026-11-26</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.85</priority>
+    <priority>0.86</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/cities/istanbul.html"/>
     <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/cities/istanbul.html"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/cities/istanbul.html"/>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/istanbul.jpg</image:loc>
+      <image:title>Istanbul (Turquie) — 1910 vs 2026 &amp; Hub Ville 4D</image:title>
+    </image:image>
   </url>
   <url>
     <loc>https://remoworld.com/cities/berlin.html</loc>
-    <lastmod>2026-11-12</lastmod>
+    <lastmod>2026-11-26</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.85</priority>
+    <priority>0.86</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/cities/berlin.html"/>
     <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/cities/berlin.html"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/cities/berlin.html"/>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/berlin.jpg</image:loc>
+      <image:title>Berlin (Germany) — 1910 vs 2026 &amp; Live 4D City Hub</image:title>
+    </image:image>
   </url>
   <url>
     <loc>https://remoworld.com/fr/cities/berlin.html</loc>
-    <lastmod>2026-11-12</lastmod>
+    <lastmod>2026-11-26</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.85</priority>
+    <priority>0.86</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/cities/berlin.html"/>
     <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/cities/berlin.html"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/cities/berlin.html"/>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/berlin.jpg</image:loc>
+      <image:title>Berlin (Allemagne) — 1910 vs 2026 &amp; Hub Ville 4D</image:title>
+    </image:image>
   </url>
   <url>
     <loc>https://remoworld.com/cities/amsterdam.html</loc>
-    <lastmod>2026-11-12</lastmod>
+    <lastmod>2026-11-26</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.85</priority>
+    <priority>0.86</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/cities/amsterdam.html"/>
     <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/cities/amsterdam.html"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/cities/amsterdam.html"/>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/amsterdam.jpg</image:loc>
+      <image:title>Amsterdam (Netherlands) — 1910 vs 2026 &amp; Live 4D City Hub</image:title>
+    </image:image>
   </url>
   <url>
     <loc>https://remoworld.com/fr/cities/amsterdam.html</loc>
-    <lastmod>2026-11-12</lastmod>
+    <lastmod>2026-11-26</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.85</priority>
+    <priority>0.86</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/cities/amsterdam.html"/>
     <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/cities/amsterdam.html"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/cities/amsterdam.html"/>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/amsterdam.jpg</image:loc>
+      <image:title>Amsterdam (Pays-Bas) — 1910 vs 2026 &amp; Hub Ville 4D</image:title>
+    </image:image>
   </url>
   <url>
     <loc>https://remoworld.com/cities/lisbon.html</loc>
-    <lastmod>2026-11-12</lastmod>
+    <lastmod>2026-11-26</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.85</priority>
+    <priority>0.86</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/cities/lisbon.html"/>
     <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/cities/lisbon.html"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/cities/lisbon.html"/>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/lisbon.jpg</image:loc>
+      <image:title>Lisbon (Portugal) — 1910 vs 2026 &amp; Live 4D City Hub</image:title>
+    </image:image>
   </url>
   <url>
     <loc>https://remoworld.com/fr/cities/lisbon.html</loc>
-    <lastmod>2026-11-12</lastmod>
+    <lastmod>2026-11-26</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.85</priority>
+    <priority>0.86</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/cities/lisbon.html"/>
     <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/cities/lisbon.html"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/cities/lisbon.html"/>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/lisbon.jpg</image:loc>
+      <image:title>Lisbonne (Portugal) — 1910 vs 2026 &amp; Hub Ville 4D</image:title>
+    </image:image>
   </url>
   <url>
     <loc>https://remoworld.com/cities/cairo.html</loc>
-    <lastmod>2026-11-12</lastmod>
+    <lastmod>2026-11-26</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.85</priority>
+    <priority>0.86</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/cities/cairo.html"/>
     <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/cities/cairo.html"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/cities/cairo.html"/>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/cairo.jpg</image:loc>
+      <image:title>Cairo (Egypt) — 1910 vs 2026 &amp; Live 4D City Hub</image:title>
+    </image:image>
   </url>
   <url>
     <loc>https://remoworld.com/fr/cities/cairo.html</loc>
-    <lastmod>2026-11-12</lastmod>
+    <lastmod>2026-11-26</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.85</priority>
+    <priority>0.86</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/cities/cairo.html"/>
     <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/cities/cairo.html"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/cities/cairo.html"/>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/cairo.jpg</image:loc>
+      <image:title>Le Caire (Égypte) — 1910 vs 2026 &amp; Hub Ville 4D</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://remoworld.com/versus/montreal-vs-paris.html</loc>
+    <lastmod>2026-11-26</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.84</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/versus/montreal-vs-paris.html"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/versus/montreal-vs-paris.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/versus/montreal-vs-paris.html"/>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/montreal.jpg</image:loc>
+      <image:title>Montréal vs Paris — Montréal</image:title>
+    </image:image>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/paris.jpg</image:loc>
+      <image:title>Montréal vs Paris — Paris</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://remoworld.com/fr/versus/montreal-vs-paris.html</loc>
+    <lastmod>2026-11-26</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.84</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/versus/montreal-vs-paris.html"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/versus/montreal-vs-paris.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/versus/montreal-vs-paris.html"/>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/montreal.jpg</image:loc>
+      <image:title>Montréal vs Paris — Montréal</image:title>
+    </image:image>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/paris.jpg</image:loc>
+      <image:title>Montréal vs Paris — Paris</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://remoworld.com/versus/chisinau-vs-bucharest.html</loc>
+    <lastmod>2026-11-26</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.84</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/versus/chisinau-vs-bucharest.html"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/versus/chisinau-vs-bucharest.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/versus/chisinau-vs-bucharest.html"/>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/chisinau.jpg</image:loc>
+      <image:title>Chișinău vs Bucharest — Chișinău</image:title>
+    </image:image>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/bucharest.jpg</image:loc>
+      <image:title>Chișinău vs Bucharest — Bucharest</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://remoworld.com/fr/versus/chisinau-vs-bucharest.html</loc>
+    <lastmod>2026-11-26</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.84</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/versus/chisinau-vs-bucharest.html"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/versus/chisinau-vs-bucharest.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/versus/chisinau-vs-bucharest.html"/>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/chisinau.jpg</image:loc>
+      <image:title>Chișinău vs Bucarest — Chișinău</image:title>
+    </image:image>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/bucharest.jpg</image:loc>
+      <image:title>Chișinău vs Bucarest — Bucarest</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://remoworld.com/versus/newyork-vs-london.html</loc>
+    <lastmod>2026-11-26</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.84</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/versus/newyork-vs-london.html"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/versus/newyork-vs-london.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/versus/newyork-vs-london.html"/>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/newyork.jpg</image:loc>
+      <image:title>New York vs London — New York</image:title>
+    </image:image>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/london.jpg</image:loc>
+      <image:title>New York vs London — London</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://remoworld.com/fr/versus/newyork-vs-london.html</loc>
+    <lastmod>2026-11-26</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.84</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/versus/newyork-vs-london.html"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/versus/newyork-vs-london.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/versus/newyork-vs-london.html"/>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/newyork.jpg</image:loc>
+      <image:title>New York vs Londres — New York</image:title>
+    </image:image>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/london.jpg</image:loc>
+      <image:title>New York vs Londres — Londres</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://remoworld.com/versus/tokyo-vs-seoul.html</loc>
+    <lastmod>2026-11-26</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.84</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/versus/tokyo-vs-seoul.html"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/versus/tokyo-vs-seoul.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/versus/tokyo-vs-seoul.html"/>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/tokyo.jpg</image:loc>
+      <image:title>Tokyo vs Seoul — Tokyo</image:title>
+    </image:image>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/seoul.jpg</image:loc>
+      <image:title>Tokyo vs Seoul — Seoul</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://remoworld.com/fr/versus/tokyo-vs-seoul.html</loc>
+    <lastmod>2026-11-26</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.84</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/versus/tokyo-vs-seoul.html"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/versus/tokyo-vs-seoul.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/versus/tokyo-vs-seoul.html"/>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/tokyo.jpg</image:loc>
+      <image:title>Tokyo vs Séoul — Tokyo</image:title>
+    </image:image>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/seoul.jpg</image:loc>
+      <image:title>Tokyo vs Séoul — Séoul</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://remoworld.com/versus/barcelona-vs-rome.html</loc>
+    <lastmod>2026-11-26</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.84</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/versus/barcelona-vs-rome.html"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/versus/barcelona-vs-rome.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/versus/barcelona-vs-rome.html"/>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/barcelona.jpg</image:loc>
+      <image:title>Barcelona vs Rome — Barcelona</image:title>
+    </image:image>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/rome.jpg</image:loc>
+      <image:title>Barcelona vs Rome — Rome</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://remoworld.com/fr/versus/barcelona-vs-rome.html</loc>
+    <lastmod>2026-11-26</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.84</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/versus/barcelona-vs-rome.html"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/versus/barcelona-vs-rome.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/versus/barcelona-vs-rome.html"/>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/barcelona.jpg</image:loc>
+      <image:title>Barcelone vs Rome — Barcelone</image:title>
+    </image:image>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/rome.jpg</image:loc>
+      <image:title>Barcelone vs Rome — Rome</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://remoworld.com/versus/miami-vs-dubai.html</loc>
+    <lastmod>2026-11-26</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.84</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/versus/miami-vs-dubai.html"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/versus/miami-vs-dubai.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/versus/miami-vs-dubai.html"/>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/miami.jpg</image:loc>
+      <image:title>Miami vs Dubai — Miami</image:title>
+    </image:image>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/dubai.jpg</image:loc>
+      <image:title>Miami vs Dubai — Dubai</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://remoworld.com/fr/versus/miami-vs-dubai.html</loc>
+    <lastmod>2026-11-26</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.84</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/versus/miami-vs-dubai.html"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/versus/miami-vs-dubai.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/versus/miami-vs-dubai.html"/>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/miami.jpg</image:loc>
+      <image:title>Miami vs Dubaï — Miami</image:title>
+    </image:image>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/dubai.jpg</image:loc>
+      <image:title>Miami vs Dubaï — Dubaï</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://remoworld.com/versus/toronto-vs-losangeles.html</loc>
+    <lastmod>2026-11-26</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.84</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/versus/toronto-vs-losangeles.html"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/versus/toronto-vs-losangeles.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/versus/toronto-vs-losangeles.html"/>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/toronto.jpg</image:loc>
+      <image:title>Toronto vs Los Angeles — Toronto</image:title>
+    </image:image>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/losangeles.jpg</image:loc>
+      <image:title>Toronto vs Los Angeles — Los Angeles</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://remoworld.com/fr/versus/toronto-vs-losangeles.html</loc>
+    <lastmod>2026-11-26</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.84</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/versus/toronto-vs-losangeles.html"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/versus/toronto-vs-losangeles.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/versus/toronto-vs-losangeles.html"/>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/toronto.jpg</image:loc>
+      <image:title>Toronto vs Los Angeles — Toronto</image:title>
+    </image:image>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/losangeles.jpg</image:loc>
+      <image:title>Toronto vs Los Angeles — Los Angeles</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://remoworld.com/versus/berlin-vs-amsterdam.html</loc>
+    <lastmod>2026-11-26</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.84</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/versus/berlin-vs-amsterdam.html"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/versus/berlin-vs-amsterdam.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/versus/berlin-vs-amsterdam.html"/>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/berlin.jpg</image:loc>
+      <image:title>Berlin vs Amsterdam — Berlin</image:title>
+    </image:image>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/amsterdam.jpg</image:loc>
+      <image:title>Berlin vs Amsterdam — Amsterdam</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://remoworld.com/fr/versus/berlin-vs-amsterdam.html</loc>
+    <lastmod>2026-11-26</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.84</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/versus/berlin-vs-amsterdam.html"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/versus/berlin-vs-amsterdam.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/versus/berlin-vs-amsterdam.html"/>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/berlin.jpg</image:loc>
+      <image:title>Berlin vs Amsterdam — Berlin</image:title>
+    </image:image>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/amsterdam.jpg</image:loc>
+      <image:title>Berlin vs Amsterdam — Amsterdam</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://remoworld.com/versus/lisbon-vs-istanbul.html</loc>
+    <lastmod>2026-11-26</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.84</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/versus/lisbon-vs-istanbul.html"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/versus/lisbon-vs-istanbul.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/versus/lisbon-vs-istanbul.html"/>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/lisbon.jpg</image:loc>
+      <image:title>Lisbon vs Istanbul — Lisbon</image:title>
+    </image:image>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/istanbul.jpg</image:loc>
+      <image:title>Lisbon vs Istanbul — Istanbul</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://remoworld.com/fr/versus/lisbon-vs-istanbul.html</loc>
+    <lastmod>2026-11-26</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.84</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/versus/lisbon-vs-istanbul.html"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/versus/lisbon-vs-istanbul.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/versus/lisbon-vs-istanbul.html"/>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/lisbon.jpg</image:loc>
+      <image:title>Lisbonne vs Istanbul — Lisbonne</image:title>
+    </image:image>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/istanbul.jpg</image:loc>
+      <image:title>Lisbonne vs Istanbul — Istanbul</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://remoworld.com/versus/monaco-vs-geneva.html</loc>
+    <lastmod>2026-11-26</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.84</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/versus/monaco-vs-geneva.html"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/versus/monaco-vs-geneva.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/versus/monaco-vs-geneva.html"/>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/monaco.jpg</image:loc>
+      <image:title>Monaco vs Geneva — Monaco</image:title>
+    </image:image>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/geneva.jpg</image:loc>
+      <image:title>Monaco vs Geneva — Geneva</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://remoworld.com/fr/versus/monaco-vs-geneva.html</loc>
+    <lastmod>2026-11-26</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.84</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/versus/monaco-vs-geneva.html"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/versus/monaco-vs-geneva.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/versus/monaco-vs-geneva.html"/>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/monaco.jpg</image:loc>
+      <image:title>Monaco vs Genève — Monaco</image:title>
+    </image:image>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/geneva.jpg</image:loc>
+      <image:title>Monaco vs Genève — Genève</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://remoworld.com/versus/sydney-vs-singapore.html</loc>
+    <lastmod>2026-11-26</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.84</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/versus/sydney-vs-singapore.html"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/versus/sydney-vs-singapore.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/versus/sydney-vs-singapore.html"/>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/sydney.jpg</image:loc>
+      <image:title>Sydney vs Singapore — Sydney</image:title>
+    </image:image>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/singapore.jpg</image:loc>
+      <image:title>Sydney vs Singapore — Singapore</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://remoworld.com/fr/versus/sydney-vs-singapore.html</loc>
+    <lastmod>2026-11-26</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.84</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/versus/sydney-vs-singapore.html"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/versus/sydney-vs-singapore.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/versus/sydney-vs-singapore.html"/>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/sydney.jpg</image:loc>
+      <image:title>Sydney vs Singapour — Sydney</image:title>
+    </image:image>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/singapore.jpg</image:loc>
+      <image:title>Sydney vs Singapour — Singapour</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://remoworld.com/versus/rio-vs-cairo.html</loc>
+    <lastmod>2026-11-26</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.84</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/versus/rio-vs-cairo.html"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/versus/rio-vs-cairo.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/versus/rio-vs-cairo.html"/>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/rio.jpg</image:loc>
+      <image:title>Rio de Janeiro vs Cairo — Rio de Janeiro</image:title>
+    </image:image>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/cairo.jpg</image:loc>
+      <image:title>Rio de Janeiro vs Cairo — Cairo</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://remoworld.com/fr/versus/rio-vs-cairo.html</loc>
+    <lastmod>2026-11-26</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.84</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/versus/rio-vs-cairo.html"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://remoworld.com/fr/versus/rio-vs-cairo.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://remoworld.com/versus/rio-vs-cairo.html"/>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/rio.jpg</image:loc>
+      <image:title>Rio de Janeiro vs Le Caire — Rio de Janeiro</image:title>
+    </image:image>
+    <image:image>
+      <image:loc>https://remoworld.com/img/cities/cairo.jpg</image:loc>
+      <image:title>Rio de Janeiro vs Le Caire — Le Caire</image:title>
+    </image:image>
   </url>
   <url>
     <loc>https://remoworld.com/privacy.html</loc>
-    <lastmod>2026-11-12</lastmod>
+    <lastmod>2026-11-26</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.60</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/privacy.html"/>
@@ -624,7 +1319,7 @@
   </url>
   <url>
     <loc>https://remoworld.com/fr/privacy.html</loc>
-    <lastmod>2026-11-12</lastmod>
+    <lastmod>2026-11-26</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.60</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/privacy.html"/>
@@ -633,7 +1328,7 @@
   </url>
   <url>
     <loc>https://remoworld.com/terms.html</loc>
-    <lastmod>2026-11-12</lastmod>
+    <lastmod>2026-11-26</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.60</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/terms.html"/>
@@ -642,7 +1337,7 @@
   </url>
   <url>
     <loc>https://remoworld.com/fr/terms.html</loc>
-    <lastmod>2026-11-12</lastmod>
+    <lastmod>2026-11-26</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.60</priority>
     <xhtml:link rel="alternate" hreflang="en" href="https://remoworld.com/terms.html"/>
