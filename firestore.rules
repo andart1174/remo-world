@@ -105,6 +105,25 @@ service cloud.firestore {
         isUidMatch(resource.data.authorId) ||
         isAdmin()
       );
+
+      // Scalable Subcollections for high-volume viral likes & comments (Etapa 2 / v173+)
+      match /likes/{likeUid} {
+        allow read: if true;
+        allow create, delete: if isAdmin() || (isNotBanned() && isUidMatch(likeUid));
+        allow update: if false;
+      }
+      match /comments/{commentId} {
+        allow read: if true;
+        allow create: if isAdmin() || (
+          isNotBanned() &&
+          isSafeId(commentId) &&
+          isUidMatch(request.resource.data.uid) &&
+          request.resource.data.text is string &&
+          request.resource.data.text.size() <= 1200
+        );
+        allow update: if isAdmin();
+        allow delete: if isAdmin() || (isAuthenticated() && isUidMatch(resource.data.uid));
+      }
     }
 
     // 1A. Private HTML Mini-App Vault & Server Economy Security Claims (Zero Public Read/Write!)

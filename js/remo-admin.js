@@ -3678,6 +3678,70 @@ async function adminDeskPublishPost() {
   }
 }
 
+async function adminRefreshCloudFeedAndUsers() {
+  const btn = document.getElementById('admRefreshCloudBtn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Actualisation...'; }
+  try {
+    if (typeof REMO_STORE.refreshAllCloudFeed === 'function') {
+      await REMO_STORE.refreshAllCloudFeed(30);
+    }
+    if (typeof REMO_STORE.refreshCloudUsersDirectory === 'function') {
+      await REMO_STORE.refreshCloudUsersDirectory(200, true);
+    }
+    refreshAllAdminPanels();
+    admToast('✅ Flux Cloud & Citoyens actualisés !');
+  } catch (e) {
+    admToast('⚠️ Erreur actualisation Cloud: ' + (e && e.message ? e.message : e));
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '🔄 Actualiser Cloud'; }
+  }
+}
+
+async function adminMigrateLegacyBase64Images() {
+  const lang = REMO_I18N.getLang();
+  const btn = document.getElementById('admMigrateBase64Btn');
+  const box = document.getElementById('admBase64MigrateStatus');
+  if (!REMO_STORE.isCurrentUserAdmin()) {
+    admToast(lang === 'fr' ? '🔒 Connexion Admin Firebase requise.' : '🔒 Firebase Admin authentication required.');
+    return;
+  }
+  const msg = lang === 'fr'
+    ? 'Migrer toutes les anciennes images Base64 de Firestore vers Firebase Storage (WebP compressé) ?\nCette opération est sûre, sans perte visuelle, et réduit drastiquement la RAM et les lectures Firestore.'
+    : 'Migrate all legacy Base64 images in Firestore posts to Firebase Storage (compressed WebP)?\nThis is safe, lossless in layout, and dramatically reduces RAM and Firestore read bandwidth.';
+  if (!confirm(msg)) return;
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Migration en cours...'; }
+  if (box) {
+    box.style.display = 'block';
+    box.textContent = lang === 'fr' ? '⏳ Analyse des publications Firestore en cours...' : '⏳ Scanning Firestore posts for legacy Base64 images...';
+  }
+  try {
+    if (typeof REMO_STORE.migrateLegacyBase64PostsToStorage !== 'function') {
+      throw new Error('migrateLegacyBase64PostsToStorage unavailable');
+    }
+    const res = await REMO_STORE.migrateLegacyBase64PostsToStorage((prog) => {
+      if (box && prog) {
+        const mb = (Number(prog.savedBytes || 0) / (1024 * 1024)).toFixed(2);
+        box.textContent = `⚡ Scanned ${prog.scannedPosts} posts · Migrated ${prog.migratedImages} images across ${prog.migratedPosts} posts · Saved ${mb} MB in Firestore...`;
+      }
+    });
+    const mbSaved = (Number(res.savedBytes || 0) / (1024 * 1024)).toFixed(2);
+    const summary = res.migratedImages > 0
+      ? `✅ Migration terminée ! ${res.migratedImages} images migrées (${res.migratedPosts}/${res.scannedPosts} posts) · ${mbSaved} Mo libérés de Firestore${res.errors ? ` (${res.errors} erreurs)` : ''}.`
+      : `✅ Tout est déjà propre ! ${res.scannedPosts} posts analysés — 0 image Base64 restante dans Firestore.`;
+    if (box) box.textContent = summary;
+    admToast(summary);
+    refreshAllAdminPanels();
+  } catch (err) {
+    const errTxt = '❌ Migration Base64 échouée: ' + (err && err.message ? err.message : String(err));
+    if (box) box.textContent = errTxt;
+    admToast(errTxt);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '⚡ Migrer Images Base64 → Storage WebP'; }
+  }
+}
+
+window.adminRefreshCloudFeedAndUsers = adminRefreshCloudFeedAndUsers;
+window.adminMigrateLegacyBase64Images = adminMigrateLegacyBase64Images;
 window.setAdminDeskSchedulePreset = setAdminDeskSchedulePreset;
 window.onAdminDeskTypeChange = onAdminDeskTypeChange;
 window.onAdminDeskCityChange = onAdminDeskCityChange;

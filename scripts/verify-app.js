@@ -418,6 +418,52 @@ async function runStoreSimulations() {
   assert.ok(comms.includes('function activateExternalVideoFacade('), 'YouTube/Vimeo click-to-play facade must exist');
   assert.ok(cssSrc.includes('#view-feed.active .post-media-wrap img.carousel-slide-img'), 'Mobile carousel contain rule must match #view-feed.active specificity');
 
+  // 6E. Verify v173 Etapa 2 scalability: WebP Storage-first, .get() pagination (no broadcast onSnapshot storms), atomic interactions & Base64 migrator
+  assert.ok(storeSrc.includes('supportsCanvasWebp') && storeSrc.includes('public, max-age=31536000, immutable'), 'Image uploader must support WebP + immutable 1-year Cache-Control');
+  assert.ok(!storeSrc.includes("collection('remo_posts').orderBy('createdAt', 'desc').limit(40).onSnapshot("), 'Must not keep live top-40 posts broadcast onSnapshot listener');
+  assert.ok(!storeSrc.includes("collection('remo_users').limit(250).onSnapshot("), 'Must not keep live 250-user directory broadcast onSnapshot listener');
+  assert.ok(typeof STORE.fetchInitialCloudPostsPage === 'function' && typeof STORE.checkForNewerCloudPosts === 'function', 'Paginated .get() feed & delta checker must exist');
+  assert.ok(typeof STORE.refreshCloudUsersDirectory === 'function' && typeof STORE.refreshCloudStories === 'function', 'One-shot .get() users directory & stories fetchers must exist');
+  assert.ok(typeof STORE._ensurePostMediaOffloadedToStorage === 'function' && typeof STORE.migrateLegacyBase64PostsToStorage === 'function', 'Auto-offload guard & Admin Base64->WebP migrator must exist');
+  const fsRulesSrc = read('firestore.rules');
+  assert.ok(fsRulesSrc.includes('match /likes/{likeUid}') && fsRulesSrc.includes('match /comments/{commentId}'), 'firestore.rules must define scalable likes & comments subcollections');
+
+  // Simulate atomic likes, comments & tips via FieldValue.arrayUnion / arrayRemove / increment
+  const atomicUpdates = [];
+  const origFb = sb.firebase;
+  sb.firebase = {
+    firestore: {
+      FieldValue: {
+        arrayUnion: (v) => ({ __op: 'arrayUnion', v }),
+        arrayRemove: (v) => ({ __op: 'arrayRemove', v }),
+        increment: (n) => ({ __op: 'increment', n })
+      }
+    }
+  };
+  STORE.fbAuth = { currentUser: { uid: 'cit1' } };
+  STORE.fbDb = {
+    collection: (col) => ({
+      doc: (id) => ({
+        update: async (patch) => { atomicUpdates.push({ col, id, patch }); },
+        set: async () => { throw new Error('Atomic interaction must NOT overwrite full post via .set()'); }
+      })
+    })
+  };
+  const likeRes = await STORE.togglePostLikeInCloud('post_atom_1', 'u_fb_cit1', true);
+  assert.strictEqual(likeRes.ok, true, 'togglePostLikeInCloud must succeed');
+  assert.strictEqual(likeRes.atomic, true, 'togglePostLikeInCloud must use atomic FieldValue.arrayUnion');
+  const cmtRes = await STORE.addPostCommentInCloud('post_atom_1', { id: 'c_1', uid: 'u_fb_cit1', text: 'Super!', authorAvatar: 'data:image/jpeg;base64,' + 'A'.repeat(6000) }, 25);
+  assert.strictEqual(cmtRes.ok && cmtRes.atomic, true, 'addPostCommentInCloud must use atomic update');
+  const tipRes = await STORE.addPostTipInCloud('post_atom_1', 50);
+  assert.strictEqual(tipRes.ok && tipRes.atomic, true, 'addPostTipInCloud must use atomic FieldValue.increment');
+  assert.strictEqual(atomicUpdates.length, 3, 'All 3 interactions must emit targeted .update() patches');
+  assert.strictEqual(atomicUpdates[0].patch.likes.__op, 'arrayUnion');
+  assert.strictEqual(atomicUpdates[1].patch.comments.__op, 'arrayUnion');
+  assert.strictEqual(atomicUpdates[1].patch.comments.v.authorAvatar, '', 'Oversized base64 comment avatars must be stripped before Firestore write');
+  assert.strictEqual(atomicUpdates[1].patch.tipsTotal.__op, 'increment');
+  assert.strictEqual(atomicUpdates[2].patch.tipsTotal.n, 50);
+  sb.firebase = origFb;
+
   // 6. Verify startFirestoreSync queries remo_users WITHOUT orderBy('lastSeenAt') that excludes legacy docs
   const usersQueryMatch = storeSrc.match(/this\.fbDb\.collection\('remo_users'\)([^\n;]+)/);
   assert.ok(usersQueryMatch, 'Must find remo_users query in js/remo-store.js');

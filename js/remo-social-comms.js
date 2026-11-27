@@ -3526,8 +3526,25 @@ function scrollFeedToTop() {
   } else {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
+  if (typeof renderSocialFeed === 'function') {
+    renderSocialFeed('', false);
+  }
 }
 window.scrollFeedToTop = scrollFeedToTop;
+
+if (typeof window !== 'undefined' && !window._remoNewPostsListenerBound) {
+  window._remoNewPostsListenerBound = true;
+  window.addEventListener('remo:newpostsarrived', (ev) => {
+    const cnt = Number(ev?.detail?.count || 0);
+    if (cnt <= 0) return;
+    const grid = document.getElementById('remoPostsGrid');
+    const scrollPos = _isMobileGridScrollActive() && grid ? grid.scrollTop : (window.scrollY || document.documentElement.scrollTop || 0);
+    if (scrollPos > 260) {
+      _feedNewTopArrivedCount += cnt;
+      _syncFeedBackToTopPill();
+    }
+  });
+}
 
 function _syncFeedBackToTopPill() {
   const viewFeed = document.getElementById('view-feed');
@@ -3537,8 +3554,9 @@ function _syncFeedBackToTopPill() {
   const grid = document.getElementById('remoPostsGrid');
   const scrollPos = _isMobileGridScrollActive() && grid ? grid.scrollTop : (window.scrollY || document.documentElement.scrollTop || 0);
   const threshold = window.innerWidth <= 860 ? 1100 : 1400;
-  const stageHiddenUnlessNew = isDesktopFeedStageActive() && _feedNewTopArrivedCount <= 0;
-  const shouldShow = Boolean(isActiveView && !stageHiddenUnlessNew && scrollPos > threshold && (window._renderedFeedPostIds || []).length > 4);
+  const hasNew = _feedNewTopArrivedCount > 0;
+  const stageHiddenUnlessNew = isDesktopFeedStageActive() && !hasNew;
+  const shouldShow = Boolean(isActiveView && !stageHiddenUnlessNew && (hasNew || scrollPos > threshold) && (window._renderedFeedPostIds || []).length > 2);
 
   if (!shouldShow) {
     if (pill) pill.style.display = 'none';
@@ -3552,7 +3570,6 @@ function _syncFeedBackToTopPill() {
     pill.onclick = scrollFeedToTop;
     document.body.appendChild(pill);
   }
-  const hasNew = _feedNewTopArrivedCount > 0;
   pill.classList.toggle('has-new', hasNew);
   pill.textContent = hasNew ? REMO_I18N.t('feed_new_posts_pill') : REMO_I18N.t('feed_back_to_top');
   pill.style.display = 'inline-flex';
@@ -3735,8 +3752,8 @@ async function triggerInfiniteFeedLoad(forceNextBatch = false) {
       const useFilteredQuery = (currentFeedCityFilter !== 'all' || ['html', 'mystery', 'videos', 'photos', 'duets', 'my_city'].includes(currentFeedMode))
         && typeof REMO_STORE.loadFilteredCloudPosts === 'function';
       const fetched = useFilteredQuery
-        ? await REMO_STORE.loadFilteredCloudPosts({ cityId: currentFeedCityFilter, mode: currentFeedMode, myCity: curU?.homeCity }, 25)
-        : await REMO_STORE.loadOlderCloudPosts(30);
+        ? await REMO_STORE.loadFilteredCloudPosts({ cityId: currentFeedCityFilter, mode: currentFeedMode, myCity: curU?.homeCity }, 20)
+        : await REMO_STORE.loadOlderCloudPosts(20);
       if (fetched) {
         const latestPosts = getFilteredSortedFeedPosts(qStr);
         if (_feedVisibleLimit < latestPosts.length) {
@@ -4022,7 +4039,8 @@ function toggleLikePost(postId) {
   if (!p) return;
   p.likes = p.likes || [];
   const idx = p.likes.indexOf(u.uid);
-  if (idx >= 0) {
+  const isAddingLike = idx < 0;
+  if (!isAddingLike) {
     p.likes.splice(idx, 1);
   } else {
     p.likes.push(u.uid);
@@ -4042,7 +4060,10 @@ function toggleLikePost(postId) {
       });
     }
   }
-  REMO_STORE.syncPostToCloud(p).then((res) => {
+  const likeSyncPromise = (typeof REMO_STORE.togglePostLikeInCloud === 'function')
+    ? REMO_STORE.togglePostLikeInCloud(p.id, u.uid, isAddingLike, p)
+    : REMO_STORE.syncPostToCloud(p);
+  likeSyncPromise.then((res) => {
     if (res && !res.ok && p._cloudSyncError) {
       rerenderSinglePostCard(p.id);
     }
@@ -4125,7 +4146,11 @@ function tipPostAuthor(postId) {
       text: lang === 'fr' ? `vous a offert un pourboire de +${amt} 🪙 !` : `tipped you +${amt} 🪙!`
     });
   }
-  REMO_STORE.syncPostToCloud(p);
+  if (typeof REMO_STORE.addPostTipInCloud === 'function') {
+    REMO_STORE.addPostTipInCloud(p.id, amt, p);
+  } else {
+    REMO_STORE.syncPostToCloud(p);
+  }
   REMO_STORE.save(true, 'tip');
   spawnRemoCoinsFX(8);
   syncHeaderAndSidebars();
@@ -4536,11 +4561,12 @@ function submitPostComment() {
 
   const [flexCardCityId, flexCardRarity] = flexRaw ? flexRaw.split('|') : ['', ''];
   p.comments = p.comments || [];
-  p.comments.push({
-    id: 'c_' + Date.now(),
+  const safeCommentAvatar = (u.avatarUrl && String(u.avatarUrl).startsWith('data:') && u.avatarUrl.length > 4096) ? '' : (u.avatarUrl || '');
+  const newCommentObj = {
+    id: 'c_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
     uid: u.uid,
     author: u.name,
-    authorAvatar: u.avatarUrl || '',
+    authorAvatar: safeCommentAvatar,
     cityId: u.homeCity,
     text: txt,
     voiceUrl: pendingCommentVoiceKey || '',
@@ -4548,7 +4574,8 @@ function submitPostComment() {
     flexCardCityId: flexCardCityId || '',
     flexCardRarity: flexCardRarity || '',
     createdAt: Date.now()
-  });
+  };
+  p.comments.push(newCommentObj);
 
   if (p.uid && p.uid !== u.uid) {
     const cmtPreview = txt ? (txt.length > 50 ? txt.slice(0, 47) + '...' : txt) : (pendingCommentVoiceKey ? '🎤 Voice' : 'Super-Comment');
@@ -4568,11 +4595,15 @@ function submitPostComment() {
   const tipSel = document.getElementById('commentSuperTipSel');
   if (tipSel) tipSel.value = '0';
   pendingCommentVoiceKey = '';
-  REMO_STORE.syncPostToCloud(p);
+  if (typeof REMO_STORE.addPostCommentInCloud === 'function') {
+    REMO_STORE.addPostCommentInCloud(p.id, newCommentObj, tipAmt, p);
+  } else {
+    REMO_STORE.syncPostToCloud(p);
+  }
   REMO_STORE.save(true, 'comment');
   syncHeaderAndSidebars();
   openCommentsModal(activeCommentPostId);
-  renderSocialFeed();
+  rerenderSinglePostCard(p.id);
 }
 
 /* ── 3B. INTERACTIVE FEED POWER-UPS: HTML CODE, REMIX, CAROUSEL, SLIDER, POLLS & CAPSULES ── */
@@ -10970,7 +11001,7 @@ window.updateAuthHeaderUI = syncHeaderAndSidebars;
 
 /* ── Lazy On-Demand Feature Engine Loader (Removes 377 KB from initial boot!) ── */
 const _remoEnginePromises = Object.create(null);
-const REMO_ASSET_VER = '172';
+const REMO_ASSET_VER = '173';
 
 function loadRemoEngineScript(srcRel) {
   if (_remoEnginePromises[srcRel]) return _remoEnginePromises[srcRel];
@@ -11688,7 +11719,7 @@ function ensureInlineAdminStudioLoaded(onReady) {
   }
   _remoAdminInlineLoading = true;
   const s = document.createElement('script');
-  s.src = 'js/remo-admin-inline.js?v=172';
+  s.src = 'js/remo-admin-inline.js?v=173';
   s.async = true;
   s.onload = () => {
     _remoAdminInlineLoading = false;

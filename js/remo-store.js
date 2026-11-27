@@ -644,10 +644,30 @@ const RemoMediaDB = {
   }
 };
 
-/* ── 2B-2. High-Performance Mobile Client Image Compressor & Cloud Uploader ── */
-async function compressImageFileToDataUrl(fileOrBlob, maxDim = 1080, quality = 0.76) {
+/* ── 2B-2. High-Performance WebP-First Client Image Compressor & Cloud Storage Uploader (v173) ── */
+let _remoCanvasWebpSupport = null;
+function supportsCanvasWebp() {
+  if (_remoCanvasWebpSupport !== null) return _remoCanvasWebpSupport;
+  try {
+    if (typeof document === 'undefined') {
+      _remoCanvasWebpSupport = false;
+      return false;
+    }
+    const c = document.createElement('canvas');
+    c.width = 2;
+    c.height = 2;
+    _remoCanvasWebpSupport = c.toDataURL('image/webp', 0.8).startsWith('data:image/webp');
+  } catch (e) {
+    _remoCanvasWebpSupport = false;
+  }
+  return _remoCanvasWebpSupport;
+}
+
+async function compressImageFileToDataUrl(fileOrBlob, maxDim = 1080, quality = 0.78, preferWebp = true) {
   return new Promise((resolve) => {
     if (!fileOrBlob) return resolve('');
+    const useWebp = Boolean(preferWebp && supportsCanvasWebp());
+    const outMime = useWebp ? 'image/webp' : 'image/jpeg';
 
     const doCompressImg = (srcUrl) => {
       const img = new Image();
@@ -668,15 +688,24 @@ async function compressImageFileToDataUrl(fileOrBlob, maxDim = 1080, quality = 0
         canvas.height = h;
         const ctx = canvas.getContext('2d');
         ctx.drawImage(img, 0, 0, w, h);
-        const dataUrl = canvas.toDataURL('image/jpeg', quality);
-        resolve(dataUrl);
+        let dataUrl = '';
+        try {
+          dataUrl = canvas.toDataURL(outMime, quality);
+        } catch (e) {}
+        if (!dataUrl || (useWebp && !dataUrl.startsWith('data:image/webp'))) {
+          try { dataUrl = canvas.toDataURL('image/jpeg', quality); } catch (e) {}
+        }
+        resolve(dataUrl || srcUrl || '');
       };
       img.onerror = () => resolve(srcUrl || '');
       img.src = srcUrl;
     };
 
     if (typeof fileOrBlob === 'string' && fileOrBlob.startsWith('data:image')) {
-      if (fileOrBlob.length < 180000) return resolve(fileOrBlob);
+      // Only skip re-encoding if already a compact WebP under 65 KB and caller didn't tighten dims
+      if (fileOrBlob.startsWith('data:image/webp') && fileOrBlob.length < 65000 && maxDim >= 960) {
+        return resolve(fileOrBlob);
+      }
       return doCompressImg(fileOrBlob);
     }
 
@@ -687,41 +716,73 @@ async function compressImageFileToDataUrl(fileOrBlob, maxDim = 1080, quality = 0
   });
 }
 
+function _dataUrlToBlobFast(dataUrl) {
+  try {
+    const parts = String(dataUrl || '').split(',');
+    if (parts.length < 2) return null;
+    const mimeMatch = parts[0].match(/data:([^;]+);base64/i);
+    const mime = mimeMatch ? mimeMatch[1] : 'image/webp';
+    const bin = atob(parts[1]);
+    const len = bin.length;
+    const arr = new Uint8Array(len);
+    for (let i = 0; i < len; i++) arr[i] = bin.charCodeAt(i);
+    return new Blob([arr], { type: mime });
+  } catch (e) {
+    return null;
+  }
+}
+
 async function uploadMediaToCloudOrDataUrl(blobOrFile, folder = 'posts', opts = {}) {
   if (!blobOrFile) return '';
   const isImage = (blobOrFile.type && blobOrFile.type.startsWith('image/')) || (typeof blobOrFile === 'string' && blobOrFile.startsWith('data:image'));
 
   if (isImage) {
     const maxDim = Number(opts.maxDim || 1080);
-    const quality = Number(opts.quality || 0.76);
-    const inlineLimit = Number(opts.inlineMaxChars || 28000);
-    let dataUrl = await compressImageFileToDataUrl(blobOrFile, maxDim, quality);
+    const quality = Number(opts.quality || 0.78);
+    const preferWebp = opts.preferWebp !== false;
+    let dataUrl = await compressImageFileToDataUrl(blobOrFile, maxDim, quality, preferWebp);
 
     const fbU = (typeof firebase !== 'undefined' && firebase.auth) ? firebase.auth().currentUser : null;
     const hasFbAuth = Boolean(fbU);
-    if (hasFbAuth && typeof firebase.storage === 'function' && (!dataUrl || dataUrl.length >= inlineLimit || opts.forceCloud)) {
-      try {
+    if (hasFbAuth && typeof firebase.storage === 'function' && dataUrl) {
+      const isWebpOut = dataUrl.startsWith('data:image/webp');
+      const ext = isWebpOut ? 'webp' : 'jpg';
+      const contentType = isWebpOut ? 'image/webp' : 'image/jpeg';
+      const filePrefix = opts.filePrefix ? `${String(opts.filePrefix).replace(/[^a-zA-Z0-9_-]/g, '')}_` : '';
+      const uploadOnce = async () => {
         const storage = firebase.storage();
-        const ref = storage.ref().child(`remo_${folder}/${Date.now()}_${Math.random().toString(36).slice(2, 7)}.jpg`);
-        const res = await fetch(dataUrl);
-        const b = await res.blob();
+        const ref = storage.ref().child(`remo_${folder}/${filePrefix}${Date.now()}_${Math.random().toString(36).slice(2, 7)}.${ext}`);
+        let b = _dataUrlToBlobFast(dataUrl);
+        if (!b) {
+          const res = await fetch(dataUrl);
+          b = await res.blob();
+        }
         const snap = await ref.put(b, {
-          contentType: 'image/jpeg',
+          contentType,
+          cacheControl: 'public, max-age=31536000, immutable',
           customMetadata: { uid: String(fbU.uid || '') }
         });
-        const downloadUrl = await snap.ref.getDownloadURL();
-        if (downloadUrl) return downloadUrl;
-      } catch (err) {
-        console.warn('Firebase storage image upload notice (falling back to compact JPEG):', err.code || err.message);
+        return snap.ref.getDownloadURL();
+      };
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          const downloadUrl = await uploadOnce();
+          if (downloadUrl) return downloadUrl;
+        } catch (err) {
+          if (attempt === 1) {
+            console.warn('Firebase storage image upload notice (falling back to compact WebP/JPEG):', err.code || err.message);
+          }
+        }
       }
+      if (opts.requireCloud) return '';
     }
 
-    // Fallback when unauthenticated / offline / Storage blocked: tighten JPEG size so document stays well under Firestore 1MB limit
-    if (dataUrl && dataUrl.length > inlineLimit) {
-      dataUrl = await compressImageFileToDataUrl(dataUrl, 820, 0.62);
+    // Tight offline/fallback compression so emergency inline previews never bloat Firestore/RAM
+    if (dataUrl && dataUrl.length > 55000) {
+      dataUrl = await compressImageFileToDataUrl(dataUrl, 720, 0.60, true);
     }
-    if (dataUrl && dataUrl.length > 160000) {
-      dataUrl = await compressImageFileToDataUrl(dataUrl, 600, 0.50);
+    if (dataUrl && dataUrl.length > 85000) {
+      dataUrl = await compressImageFileToDataUrl(dataUrl, 540, 0.48, true);
     }
     return dataUrl;
   }
@@ -3775,7 +3836,7 @@ const REMO_STORE = {
         if (typeof document !== 'undefined' && !document.hidden) {
           this.pingMyPresence(false);
         }
-      }, 60000);
+      }, 90000);
       document.addEventListener('visibilitychange', () => {
         if (!document.hidden) this.pingMyPresence(true);
       });
@@ -5971,6 +6032,34 @@ const REMO_STORE = {
           }, () => {})
       );
     }
+    // Single-document live listener ONLY for the signed-in user's own profile (coins, role, ban, badges)
+    if (myUid) {
+      this._privUnsubs.push(
+        this.fbDb.collection('remo_users').doc(myUid)
+          .onSnapshot((doc) => {
+            if (!doc || !doc.exists || doc.metadata?.hasPendingWrites) return;
+            const d = doc.data();
+            if (!d) return;
+            d.uid = d.uid || doc.id;
+            const u = this.getCurrentUser();
+            if (!u || u.uid !== d.uid) return;
+            const prevSig = `${u.coins || 0}|${u.lifetimeCoins || 0}|${u.role || ''}|${u.banned ? 1 : 0}|${u.verified ? 1 : 0}|${u.equippedFrame || ''}|${u.equippedTitleId || ''}|${u.avatarUrl || ''}`;
+            if (typeof d.coins === 'number') u.coins = d.coins;
+            if (typeof d.lifetimeCoins === 'number') u.lifetimeCoins = d.lifetimeCoins;
+            if (d.role) u.role = d.role;
+            if (typeof d.banned === 'boolean') u.banned = d.banned;
+            if (typeof d.verified === 'boolean') u.verified = d.verified;
+            if (d.equippedFrame !== undefined) u.equippedFrame = d.equippedFrame;
+            if (d.equippedTitleId !== undefined) u.equippedTitleId = d.equippedTitleId;
+            if (d.avatarUrl) u.avatarUrl = d.avatarUrl;
+            const nextSig = `${u.coins || 0}|${u.lifetimeCoins || 0}|${u.role || ''}|${u.banned ? 1 : 0}|${u.verified ? 1 : 0}|${u.equippedFrame || ''}|${u.equippedTitleId || ''}|${u.avatarUrl || ''}`;
+            if (prevSig !== nextSig) {
+              this.save(false, 'cloud_self_user');
+              window.dispatchEvent(new CustomEvent('remo:stateupdate', { detail: { reason: 'cloud_users' } }));
+            }
+          }, () => {})
+      );
+    }
   },
 
   startFirestoreSync() {
@@ -6174,12 +6263,12 @@ const REMO_STORE = {
         window.dispatchEvent(new CustomEvent('remo:stateupdate', { detail: { reason: visualChanged ? 'cloud_users_visual' : 'cloud_users' } }));
       };
 
-      this.fbDb.collection('remo_users').limit(250).onSnapshot(handleUsersSnap, (err) => {
-        console.warn('Firestore remo_users sync notice:', err.message);
-      });
+      this._handleUsersSnap = handleUsersSnap;
+      this.refreshCloudUsersDirectory(150, true);
 
-      // 1B. Sync & Watch LIVE CITIZEN PRESENCE (Capped at 50 most recent for 100k+ user scalability)
+      // 1B. Sync & Watch LIVE CITIZEN PRESENCE (Capped at 50, throttled UI render & paused in hidden tabs)
       this.pingMyPresence(true);
+      let _lastPresenceUiRenderTs = 0;
       this.fbDb.collection('remo_presence').orderBy('lastSeenAt', 'desc').limit(50).onSnapshot((snap) => {
         if (!snap) return;
         if (!this.presenceCache) this.presenceCache = new Map();
@@ -6189,6 +6278,10 @@ const REMO_STORE = {
             this.presenceCache.set(p.uid, p);
           }
         });
+        if (typeof document !== 'undefined' && document.hidden) return;
+        const nowP = Date.now();
+        if (nowP - _lastPresenceUiRenderTs < 15000) return;
+        _lastPresenceUiRenderTs = nowP;
         if (typeof renderLivePresenceStrip === 'function') {
           renderLivePresenceStrip();
         }
@@ -6224,90 +6317,33 @@ const REMO_STORE = {
         console.log('Firestore public settings watch status:', err.message);
       });
 
-      // 3. Sync & Watch SOCIAL POSTS in Real Time with Ordered Cursor Pagination (Supports 10,000+ posts)
+      // 3. Scalable Paginated SOCIAL POSTS (.get() cursor pages + visible-tab delta checks — Zero O(N) onSnapshot broadcast storms!)
       this._ensureCloudPostPaginationState();
       this.hasMoreCloudPosts = true;
       this.loadingOlderCloudPosts = false;
       this._postsLastCursorDoc = null;
+      this._newestCloudPostTs = 0;
 
-      let isInitialTopSnap = true;
-      this.fbDb.collection('remo_posts').orderBy('createdAt', 'desc').limit(40).onSnapshot((snap) => {
-        if (!snap) return;
-        const incomingIds = new Set();
-        let minTopCreatedAt = Infinity;
-        let lastDoc = null;
+      this.fetchInitialCloudPostsPage(18);
 
-        snap.forEach((doc) => {
-          lastDoc = doc;
-          const cp = doc.data();
-          if (!cp || !cp.id) return;
-          if (this._shouldPurgeCloudPost(cp)) {
-            this.fbDb.collection('remo_posts').doc(cp.id).delete().catch(() => {});
-            return;
+      // Gentle visible-tab-only delta check every 60s for truly NEW posts (0 reads when tab is hidden, 0 broadcast storms on likes!)
+      if (!this._cloudDeltaTimerStarted && typeof window !== 'undefined') {
+        this._cloudDeltaTimerStarted = true;
+        this._lastVisibleFeedCheckTs = Date.now();
+        setInterval(() => {
+          if (typeof document !== 'undefined' && document.hidden) return;
+          this.checkForNewerCloudPosts();
+        }, 60000);
+        document.addEventListener('visibilitychange', () => {
+          if (!document.hidden && (Date.now() - (this._lastVisibleFeedCheckTs || 0) > 90000)) {
+            this._lastVisibleFeedCheckTs = Date.now();
+            this.checkForNewerCloudPosts();
           }
-          incomingIds.add(cp.id);
-          const cTs = Number(cp.createdAt || 0);
-          if (cTs > 0 && cTs < minTopCreatedAt) minTopCreatedAt = cTs;
-          this._cloudLiveTopPostsMap.set(cp.id, cp);
         });
+      }
 
-        // Reconcile items that left the live top-40 window (archive if pushed older, drop if deleted)
-        for (const [prevId, prevPost] of Array.from(this._cloudLiveTopPostsMap.entries())) {
-          if (!incomingIds.has(prevId)) {
-            this._cloudLiveTopPostsMap.delete(prevId);
-            const prevTs = Number(prevPost?.createdAt || 0);
-            const pushedBeyondTop40 = snap.docs.length >= 40 && minTopCreatedAt < Infinity && prevTs <= minTopCreatedAt;
-            if (pushedBeyondTop40 && !this.deletedPostIds?.has(prevId)) {
-              this._olderCloudPostsMap.set(prevId, prevPost);
-            }
-          }
-        }
-
-        if (!this._postsLastCursorDoc) {
-          this._postsLastCursorDoc = lastDoc;
-          this.hasMoreCloudPosts = snap.docs.length >= 40;
-        }
-
-        this._rebuildStatePostsFromCloudMaps(isInitialTopSnap);
-        isInitialTopSnap = false;
-      }, (err) => {
-        console.warn('Firestore remo_posts sync notice:', err.message);
-      });
-
-      // 3A-Pin & 3A-Boost: Always keep official Pinned & active 24h Boosted posts synced regardless of age
-      const syncSubsetListener = (query, targetMap, isBoostMap) => {
-        query.onSnapshot((snap) => {
-          if (!snap) return;
-          const seenIds = new Set();
-          snap.forEach((doc) => {
-            const cp = doc.data();
-            if (!cp || !cp.id || this._shouldPurgeCloudPost(cp)) return;
-            seenIds.add(cp.id);
-            targetMap.set(cp.id, cp);
-          });
-          for (const oldId of Array.from(targetMap.keys())) {
-            if (!seenIds.has(oldId)) {
-              targetMap.delete(oldId);
-              if (isBoostMap && this._olderCloudPostsMap.has(oldId)) {
-                const cached = this._olderCloudPostsMap.get(oldId);
-                if (cached) {
-                  const ageMs = Date.now() - Number(cached.boostedUpdatedAt || cached.boostedAt || 0);
-                  if (ageMs > 60000) cached.boosted = false;
-                }
-              }
-            }
-          }
-          this._rebuildStatePostsFromCloudMaps(true);
-        }, (err) => {
-          console.warn('Firestore priority posts notice:', err.message);
-        });
-      };
-
-      syncSubsetListener(this.fbDb.collection('remo_posts').where('pinned', '==', true).limit(15), this._cloudPinnedPostsMap, false);
-      syncSubsetListener(this.fbDb.collection('remo_posts').where('boosted', '==', true).limit(25), this._cloudBoostedPostsMap, true);
-
-      // 3B. Sync & Watch ALL 24H STORIES in Real Time across all devices (Dedicated Collection: remo_stories)
-      this.fbDb.collection('remo_stories').limit(60).onSnapshot((snap) => {
+      // 3B. Sync 24H STORIES via one-shot .get() (Refreshable on modal open / publish — Zero idle snapshot fan-out)
+      this._handleStoriesSnap = (snap) => {
         if (!snap) return;
         const nowStoryTs = Date.now();
         const legacyStoryIds = new Set(['st_1', 'st_2', 'st_3', 'st_4']);
@@ -6372,9 +6408,8 @@ const REMO_STORE = {
           const activeId = typeof _activeStoryViewerId !== 'undefined' ? _activeStoryViewerId : '';
           renderStoriesModalStripAndStage(activeId);
         }
-      }, (err) => {
-        console.warn('Firestore remo_stories sync notice:', err.message);
-      });
+      };
+      this.refreshCloudStories();
 
       // 4. Ecosystem Live State (City Scores, Live Duels, Settings, World Bottles, Auctions & GeoVaults)
       const docRef = this.fbDb.collection('remo_ecosystem').doc('live_state');
@@ -6989,7 +7024,143 @@ const REMO_STORE = {
     }
   },
 
-  async loadOlderCloudPosts(batchSize = 30) {
+  async refreshCloudUsersDirectory(limitCount = 150, force = false) {
+    if (!this.fbDb) return false;
+    const now = Date.now();
+    if (!force && this._lastUsersDirFetchTs && (now - this._lastUsersDirFetchTs < 180000)) {
+      return false;
+    }
+    this._lastUsersDirFetchTs = now;
+    try {
+      const snap = await this.fbDb.collection('remo_users').limit(limitCount).get();
+      if (snap && typeof this._handleUsersSnap === 'function') {
+        this._handleUsersSnap(snap);
+        return true;
+      }
+    } catch (err) {
+      console.warn('Firestore remo_users directory fetch notice:', err.message);
+    }
+    return false;
+  },
+
+  async refreshCloudStories() {
+    if (!this.fbDb) return false;
+    try {
+      const snap = await this.fbDb.collection('remo_stories').limit(60).get();
+      if (snap && typeof this._handleStoriesSnap === 'function') {
+        this._handleStoriesSnap(snap);
+        return true;
+      }
+    } catch (err) {
+      console.warn('Firestore remo_stories fetch notice:', err.message);
+    }
+    return false;
+  },
+
+  async fetchInitialCloudPostsPage(pageSize = 18) {
+    this._ensureCloudPostPaginationState();
+    if (!this.fbDb || this._initialPostsFetchInFlight) return false;
+    this._initialPostsFetchInFlight = true;
+    try {
+      const [mainSnap, pinSnap, boostSnap] = await Promise.all([
+        this.fbDb.collection('remo_posts').orderBy('createdAt', 'desc').limit(pageSize).get(),
+        this.fbDb.collection('remo_posts').where('pinned', '==', true).limit(10).get().catch(() => null),
+        this.fbDb.collection('remo_posts').where('boosted', '==', true).limit(15).get().catch(() => null)
+      ]);
+      let lastDoc = null;
+      let maxTs = Number(this._newestCloudPostTs || 0);
+      if (mainSnap) {
+        this._cloudLiveTopPostsMap.clear();
+        mainSnap.forEach((doc) => {
+          lastDoc = doc;
+          const cp = doc.data();
+          if (!cp || !cp.id) return;
+          if (this._shouldPurgeCloudPost(cp)) {
+            this.fbDb.collection('remo_posts').doc(cp.id).delete().catch(() => {});
+            return;
+          }
+          const cTs = Number(cp.createdAt || 0);
+          if (cTs > maxTs) maxTs = cTs;
+          this._cloudLiveTopPostsMap.set(cp.id, cp);
+        });
+        this._postsLastCursorDoc = lastDoc;
+        this.hasMoreCloudPosts = mainSnap.docs.length >= pageSize;
+      }
+      if (pinSnap) {
+        this._cloudPinnedPostsMap.clear();
+        pinSnap.forEach((doc) => {
+          const cp = doc.data();
+          if (cp && cp.id && !this._shouldPurgeCloudPost(cp)) {
+            this._cloudPinnedPostsMap.set(cp.id, cp);
+          }
+        });
+      }
+      if (boostSnap) {
+        this._cloudBoostedPostsMap.clear();
+        boostSnap.forEach((doc) => {
+          const cp = doc.data();
+          if (cp && cp.id && !this._shouldPurgeCloudPost(cp)) {
+            this._cloudBoostedPostsMap.set(cp.id, cp);
+          }
+        });
+      }
+      if (maxTs > 0) this._newestCloudPostTs = maxTs;
+      this._rebuildStatePostsFromCloudMaps(true);
+      return true;
+    } catch (err) {
+      console.warn('Firestore initial posts page notice:', err.message);
+      return false;
+    } finally {
+      this._initialPostsFetchInFlight = false;
+    }
+  },
+
+  async refreshAllCloudFeed(pageSize = 18) {
+    this._ensureCloudPostPaginationState();
+    this._postsLastCursorDoc = null;
+    this.hasMoreCloudPosts = true;
+    return this.fetchInitialCloudPostsPage(pageSize);
+  },
+
+  async checkForNewerCloudPosts(opts = {}) {
+    this._ensureCloudPostPaginationState();
+    if (!this.fbDb || this._checkingNewerCloudPosts || !this._newestCloudPostTs) return 0;
+    if (!opts.force && typeof document !== 'undefined' && document.hidden) return 0;
+    this._checkingNewerCloudPosts = true;
+    this._lastVisibleFeedCheckTs = Date.now();
+    try {
+      const snap = await this.fbDb.collection('remo_posts')
+        .where('createdAt', '>', this._newestCloudPostTs)
+        .orderBy('createdAt', 'desc')
+        .limit(15)
+        .get();
+      if (!snap || snap.empty) return 0;
+      let addedCount = 0;
+      let maxTs = this._newestCloudPostTs;
+      snap.forEach((doc) => {
+        const cp = doc.data();
+        if (!cp || !cp.id || this._shouldPurgeCloudPost(cp)) return;
+        const cTs = Number(cp.createdAt || 0);
+        if (cTs > maxTs) maxTs = cTs;
+        if (!this._cloudLiveTopPostsMap.has(cp.id)) addedCount++;
+        this._cloudLiveTopPostsMap.set(cp.id, cp);
+      });
+      if (maxTs > this._newestCloudPostTs) this._newestCloudPostTs = maxTs;
+      if (addedCount > 0) {
+        this._rebuildStatePostsFromCloudMaps(false);
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('remo:newpostsarrived', { detail: { count: addedCount } }));
+        }
+      }
+      return addedCount;
+    } catch (err) {
+      return 0;
+    } finally {
+      this._checkingNewerCloudPosts = false;
+    }
+  },
+
+  async loadOlderCloudPosts(batchSize = 20) {
     this._ensureCloudPostPaginationState();
     if (!this.fbDb || this.loadingOlderCloudPosts || !this.hasMoreCloudPosts || !this._postsLastCursorDoc) {
       return false;
@@ -7161,6 +7332,74 @@ const REMO_STORE = {
     return (u && (u.authorUid || u.uid)) || '';
   },
 
+  async _ensurePostMediaOffloadedToStorage(cleanPost, livePostRef = null) {
+    if (!cleanPost || typeof uploadMediaToCloudOrDataUrl !== 'function') return 0;
+    const fbU = (typeof firebase !== 'undefined' && firebase && firebase.auth) ? firebase.auth().currentUser : null;
+    if (!fbU || typeof firebase.storage !== 'function') return 0;
+    let offloaded = 0;
+    const isBigDataImg = (v, minChars = 1200) => typeof v === 'string' && v.startsWith('data:image/') && v.length >= minChars;
+    try {
+      if (isBigDataImg(cleanPost.mediaUrl, 1200)) {
+        const url = await uploadMediaToCloudOrDataUrl(cleanPost.mediaUrl, 'posts', { maxDim: 1080, quality: 0.80, requireCloud: true, filePrefix: 'auto' });
+        if (url && url.startsWith('http')) {
+          cleanPost.mediaUrl = url;
+          if (livePostRef) livePostRef.mediaUrl = url;
+          offloaded++;
+        }
+      }
+      if (Array.isArray(cleanPost.mediaUrls) && cleanPost.mediaUrls.length > 0) {
+        let arrChanged = false;
+        for (let i = 0; i < cleanPost.mediaUrls.length; i++) {
+          const item = cleanPost.mediaUrls[i];
+          if (isBigDataImg(item, 1200)) {
+            const url = await uploadMediaToCloudOrDataUrl(item, 'posts', { maxDim: 1080, quality: 0.80, requireCloud: true, filePrefix: 'auto' });
+            if (url && url.startsWith('http')) {
+              cleanPost.mediaUrls[i] = url;
+              arrChanged = true;
+              offloaded++;
+            }
+          }
+        }
+        if (arrChanged && livePostRef && Array.isArray(livePostRef.mediaUrls)) {
+          livePostRef.mediaUrls = [...cleanPost.mediaUrls];
+        }
+        if (arrChanged && cleanPost.mediaUrls[0] && String(cleanPost.mediaUrls[0]).startsWith('http') && (!cleanPost.mediaUrl || isBigDataImg(cleanPost.mediaUrl, 100))) {
+          cleanPost.mediaUrl = cleanPost.mediaUrls[0];
+          if (livePostRef) livePostRef.mediaUrl = cleanPost.mediaUrls[0];
+        }
+      }
+      if (cleanPost.versus && typeof cleanPost.versus === 'object') {
+        if (isBigDataImg(cleanPost.versus.leftMedia, 1200)) {
+          const uL = await uploadMediaToCloudOrDataUrl(cleanPost.versus.leftMedia, 'posts', { maxDim: 960, quality: 0.78, requireCloud: true, filePrefix: 'duel' });
+          if (uL && uL.startsWith('http')) {
+            cleanPost.versus.leftMedia = uL;
+            if (livePostRef && livePostRef.versus) livePostRef.versus.leftMedia = uL;
+            offloaded++;
+          }
+        }
+        if (isBigDataImg(cleanPost.versus.rightMedia, 1200)) {
+          const uR = await uploadMediaToCloudOrDataUrl(cleanPost.versus.rightMedia, 'posts', { maxDim: 960, quality: 0.78, requireCloud: true, filePrefix: 'duel' });
+          if (uR && uR.startsWith('http')) {
+            cleanPost.versus.rightMedia = uR;
+            if (livePostRef && livePostRef.versus) livePostRef.versus.rightMedia = uR;
+            offloaded++;
+          }
+        }
+      }
+      if (isBigDataImg(cleanPost.authorAvatar, 24000)) {
+        const uAv = await uploadMediaToCloudOrDataUrl(cleanPost.authorAvatar, 'avatars', { maxDim: 256, quality: 0.80, requireCloud: true, filePrefix: 'av' });
+        if (uAv && uAv.startsWith('http')) {
+          cleanPost.authorAvatar = uAv;
+          if (livePostRef) livePostRef.authorAvatar = uAv;
+          offloaded++;
+        }
+      }
+    } catch (e) {
+      console.warn('Auto media offload notice:', e && e.message ? e.message : e);
+    }
+    return offloaded;
+  },
+
   async syncPostToCloud(post) {
     if (!this.fbDb || !post || !post.id || post.isShowcase) return { ok: true, skipped: true };
     try {
@@ -7187,6 +7426,8 @@ const REMO_STORE = {
       } else if (cleanPost.uid && !cleanPost.authorUid) {
         cleanPost.authorUid = cleanPost.uid;
       }
+      // Etapa 2: Never let large base64 images leak into Firestore when Storage is available
+      await this._ensurePostMediaOffloadedToStorage(cleanPost, post);
       const approxBytes = JSON.stringify(cleanPost).length;
       if (approxBytes > 950000) {
         const msg = `Document too large (${Math.round(approxBytes / 1024)} KB / max 950 KB)`;
@@ -7208,8 +7449,12 @@ const REMO_STORE = {
         }
       } catch (eU) {}
       this._flushLocalSave();
-      if (this._cloudLiveTopPostsMap && !this._cloudLiveTopPostsMap.has(post.id)) {
+      if (this._cloudLiveTopPostsMap) {
         this._cloudLiveTopPostsMap.set(post.id, cleanPost);
+      }
+      const pTs = Number(cleanPost.createdAt || 0);
+      if (pTs > Number(this._newestCloudPostTs || 0)) {
+        this._newestCloudPostTs = pTs;
       }
       return { ok: true };
     } catch (err) {
@@ -7221,6 +7466,198 @@ const REMO_STORE = {
       this._flushLocalSave();
       return { ok: false, code, message };
     }
+  },
+
+  async togglePostLikeInCloud(postId, uid, isAdding, postRef = null) {
+    if (!this.fbDb || !postId || !uid || (postRef && postRef.isShowcase)) return { ok: true, skipped: true };
+    const fbU = this.fbAuth && this.fbAuth.currentUser;
+    if (this.fbAuth && !fbU) return { ok: false, code: 'auth-not-signed-in' };
+    try {
+      const fv = typeof firebase !== 'undefined' && firebase && firebase.firestore && firebase.firestore.FieldValue;
+      if (fv && typeof fv.arrayUnion === 'function' && typeof fv.arrayRemove === 'function') {
+        await this.fbDb.collection('remo_posts').doc(postId).update({
+          likes: isAdding ? fv.arrayUnion(uid) : fv.arrayRemove(uid)
+        });
+        return { ok: true, atomic: true };
+      }
+      if (postRef) return this.syncPostToCloud(postRef);
+      return { ok: false, code: 'fieldvalue-unavailable' };
+    } catch (err) {
+      console.warn('Atomic post like notice:', err && (err.code || err.message));
+      return { ok: false, code: (err && err.code) || 'like-error', message: (err && err.message) || '' };
+    }
+  },
+
+  async addPostCommentInCloud(postId, commentObj, tipAmt = 0, postRef = null) {
+    if (!this.fbDb || !postId || !commentObj || (postRef && postRef.isShowcase)) return { ok: true, skipped: true };
+    const fbU = this.fbAuth && this.fbAuth.currentUser;
+    if (this.fbAuth && !fbU) return { ok: false, code: 'auth-not-signed-in' };
+    try {
+      const cleanComment = Object.assign({}, commentObj);
+      if (cleanComment.authorAvatar && String(cleanComment.authorAvatar).startsWith('data:') && cleanComment.authorAvatar.length > 4096) {
+        cleanComment.authorAvatar = '';
+      }
+      const fv = typeof firebase !== 'undefined' && firebase && firebase.firestore && firebase.firestore.FieldValue;
+      if (fv && typeof fv.arrayUnion === 'function') {
+        const patch = { comments: fv.arrayUnion(cleanComment) };
+        const cleanTip = Math.max(0, Math.min(1000, Math.floor(Number(tipAmt || 0))));
+        if (cleanTip > 0 && typeof fv.increment === 'function') {
+          patch.tipsTotal = fv.increment(cleanTip);
+        }
+        await this.fbDb.collection('remo_posts').doc(postId).update(patch);
+        return { ok: true, atomic: true };
+      }
+      if (postRef) return this.syncPostToCloud(postRef);
+      return { ok: false, code: 'fieldvalue-unavailable' };
+    } catch (err) {
+      console.warn('Atomic post comment notice:', err && (err.code || err.message));
+      return { ok: false, code: (err && err.code) || 'comment-error', message: (err && err.message) || '' };
+    }
+  },
+
+  async addPostTipInCloud(postId, tipAmt, postRef = null) {
+    if (!this.fbDb || !postId || (postRef && postRef.isShowcase)) return { ok: true, skipped: true };
+    const cleanTip = Math.max(0, Math.min(1000, Math.floor(Number(tipAmt || 0))));
+    if (!cleanTip) return { ok: true, skipped: true };
+    const fbU = this.fbAuth && this.fbAuth.currentUser;
+    if (this.fbAuth && !fbU) return { ok: false, code: 'auth-not-signed-in' };
+    try {
+      const fv = typeof firebase !== 'undefined' && firebase && firebase.firestore && firebase.firestore.FieldValue;
+      if (fv && typeof fv.increment === 'function') {
+        await this.fbDb.collection('remo_posts').doc(postId).update({
+          tipsTotal: fv.increment(cleanTip)
+        });
+        return { ok: true, atomic: true };
+      }
+      if (postRef) return this.syncPostToCloud(postRef);
+      return { ok: false, code: 'fieldvalue-unavailable' };
+    } catch (err) {
+      console.warn('Atomic post tip notice:', err && (err.code || err.message));
+      return { ok: false, code: (err && err.code) || 'tip-error', message: (err && err.message) || '' };
+    }
+  },
+
+  async migrateLegacyBase64PostsToStorage(onProgress = null) {
+    if (!this.fbDb) throw new Error('Firestore not initialized');
+    if (!this.isCurrentUserAdmin()) throw new Error('Admin authentication required');
+    const fbU = (typeof firebase !== 'undefined' && firebase && firebase.auth) ? firebase.auth().currentUser : null;
+    if (!fbU || typeof firebase.storage !== 'function') {
+      throw new Error('Firebase Auth & Storage required');
+    }
+    const stats = { scannedPosts: 0, migratedPosts: 0, migratedImages: 0, savedBytes: 0, errors: 0 };
+    const isDataImg = (v) => typeof v === 'string' && v.startsWith('data:image/') && v.length >= 1200;
+    let cursor = null;
+    const batchSize = 25;
+
+    while (true) {
+      let q = this.fbDb.collection('remo_posts').orderBy('createdAt', 'desc').limit(batchSize);
+      if (cursor) q = q.startAfter(cursor);
+      const snap = await q.get();
+      if (!snap || snap.empty) break;
+
+      for (const doc of snap.docs) {
+        cursor = doc;
+        const p = doc.data();
+        if (!p || !p.id) continue;
+        stats.scannedPosts++;
+        const patch = {};
+        let docMigratedImgs = 0;
+
+        try {
+          if (isDataImg(p.mediaUrl)) {
+            const origLen = p.mediaUrl.length;
+            const url = await uploadMediaToCloudOrDataUrl(p.mediaUrl, 'posts', { maxDim: 1080, quality: 0.80, requireCloud: true, filePrefix: 'mig' });
+            if (url && url.startsWith('http')) {
+              patch.mediaUrl = url;
+              stats.savedBytes += Math.max(0, origLen - url.length);
+              docMigratedImgs++;
+            }
+          }
+          if (Array.isArray(p.mediaUrls) && p.mediaUrls.some(isDataImg)) {
+            const nextArr = [...p.mediaUrls];
+            let arrChanged = false;
+            for (let i = 0; i < nextArr.length; i++) {
+              if (isDataImg(nextArr[i])) {
+                const origLen = nextArr[i].length;
+                const url = await uploadMediaToCloudOrDataUrl(nextArr[i], 'posts', { maxDim: 1080, quality: 0.80, requireCloud: true, filePrefix: 'mig' });
+                if (url && url.startsWith('http')) {
+                  nextArr[i] = url;
+                  arrChanged = true;
+                  stats.savedBytes += Math.max(0, origLen - url.length);
+                  docMigratedImgs++;
+                }
+              }
+            }
+            if (arrChanged) {
+              patch.mediaUrls = nextArr;
+              if (!patch.mediaUrl && nextArr[0] && String(nextArr[0]).startsWith('http') && (!p.mediaUrl || isDataImg(p.mediaUrl))) {
+                patch.mediaUrl = nextArr[0];
+              }
+            }
+          }
+          if (p.versus && typeof p.versus === 'object' && (isDataImg(p.versus.leftMedia) || isDataImg(p.versus.rightMedia))) {
+            const nextVersus = Object.assign({}, p.versus);
+            let vChanged = false;
+            if (isDataImg(nextVersus.leftMedia)) {
+              const origLen = nextVersus.leftMedia.length;
+              const uL = await uploadMediaToCloudOrDataUrl(nextVersus.leftMedia, 'posts', { maxDim: 960, quality: 0.78, requireCloud: true, filePrefix: 'migd' });
+              if (uL && uL.startsWith('http')) {
+                nextVersus.leftMedia = uL;
+                vChanged = true;
+                stats.savedBytes += Math.max(0, origLen - uL.length);
+                docMigratedImgs++;
+              }
+            }
+            if (isDataImg(nextVersus.rightMedia)) {
+              const origLen = nextVersus.rightMedia.length;
+              const uR = await uploadMediaToCloudOrDataUrl(nextVersus.rightMedia, 'posts', { maxDim: 960, quality: 0.78, requireCloud: true, filePrefix: 'migd' });
+              if (uR && uR.startsWith('http')) {
+                nextVersus.rightMedia = uR;
+                vChanged = true;
+                stats.savedBytes += Math.max(0, origLen - uR.length);
+                docMigratedImgs++;
+              }
+            }
+            if (vChanged) patch.versus = nextVersus;
+          }
+          if (isDataImg(p.authorAvatar) && p.authorAvatar.length >= 24000) {
+            const origLen = p.authorAvatar.length;
+            const uAv = await uploadMediaToCloudOrDataUrl(p.authorAvatar, 'avatars', { maxDim: 256, quality: 0.80, requireCloud: true, filePrefix: 'migav' });
+            if (uAv && uAv.startsWith('http')) {
+              patch.authorAvatar = uAv;
+              stats.savedBytes += Math.max(0, origLen - uAv.length);
+              docMigratedImgs++;
+            }
+          }
+
+          if (docMigratedImgs > 0 && Object.keys(patch).length > 0) {
+            await this.fbDb.collection('remo_posts').doc(doc.id).update(patch);
+            stats.migratedPosts++;
+            stats.migratedImages += docMigratedImgs;
+            const localP = (this.state.posts || []).find((x) => x && x.id === p.id);
+            if (localP) Object.assign(localP, patch);
+            if (this._cloudLiveTopPostsMap && this._cloudLiveTopPostsMap.has(p.id)) {
+              Object.assign(this._cloudLiveTopPostsMap.get(p.id), patch);
+            }
+          }
+        } catch (err) {
+          stats.errors++;
+          console.warn('Legacy post Base64 migrate error on', p.id, err && err.message ? err.message : err);
+        }
+
+        if (typeof onProgress === 'function') {
+          try { onProgress(Object.assign({}, stats)); } catch (e) {}
+        }
+      }
+
+      if (snap.docs.length < batchSize) break;
+    }
+
+    if (stats.migratedPosts > 0) {
+      this._flushLocalSave();
+      window.dispatchEvent(new CustomEvent('remo:stateupdate', { detail: { reason: 'cloud_posts' } }));
+    }
+    return stats;
   },
 
   syncStoryToCloud(story) {
