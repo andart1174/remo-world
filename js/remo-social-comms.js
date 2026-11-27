@@ -2556,8 +2556,11 @@ function renderSinglePostCardHtml(p, lang, u, isAdm) {
          </div>`
       : '';
 
+    const isCarouselPost = Boolean(p.mediaType === 'carousel' && Array.isArray(p.mediaUrls) && p.mediaUrls.length > 1);
+    const isVideoLinkPost = Boolean(p.mediaType === 'video_link' || p.externalUrl);
+
     return `
-      <article id="post_card_${p.id}" class="post-card ${isPostBoostActive(p) || p.pinned || sealed ? 'boosted' : ''} ${p.mediaType === 'html_app' ? 'is-html-app' : ''} ${p.mediaType === 'city_versus' ? 'is-city-versus' : ''} ${p.mediaType === 'before_after' ? 'is-before-after' : ''}" ${interactiveNoTilt ? '' : 'onmousemove="applyHoloTilt(event, this)" onmouseleave="resetHoloTilt(this)"'}>
+      <article id="post_card_${p.id}" class="post-card ${isPostBoostActive(p) || p.pinned || sealed ? 'boosted' : ''} ${p.mediaType === 'html_app' ? 'is-html-app' : ''} ${p.mediaType === 'city_versus' ? 'is-city-versus' : ''} ${p.mediaType === 'before_after' ? 'is-before-after' : ''} ${isCarouselPost ? 'is-carousel' : ''} ${isVideoLinkPost ? 'is-video-link' : ''}" ${interactiveNoTilt ? '' : 'onmousemove="applyHoloTilt(event, this)" onmouseleave="resetHoloTilt(this)"'}>
         <div class="post-head">
           <div style="display:flex;align-items:center;gap:6px;min-width:0;flex:1;">
             <div class="post-author" style="cursor:pointer;min-width:0;" onclick="${p.isShowcase ? `openFocusTvModal('${escapeJsSingleArg(city.id)}')` : `openCitizenProfileModal('${escapeJsSingleArg(p.uid || '')}', '${escapeJsSingleArg(p.authorName || '')}')`}" title="🪪 @${escapeHtmlStr(p.authorName)}">
@@ -3608,8 +3611,8 @@ function _pauseOffscreenFeedVideos() {
   // 1. Pause & release heavy buffers on far-offscreen videos, restore when scrolled back near viewport
   grid.querySelectorAll('video').forEach((v) => {
     const r = v.getBoundingClientRect();
-    const farOffscreen = (r.bottom < -vh * 3.8 || r.top > vh * 3.8);
-    if (r.bottom < -vh * 1.2 || r.top > vh * 2.2) {
+    const farOffscreen = (r.bottom < -vh * 2.4 || r.top > vh * 2.6);
+    if (r.bottom < -vh * 1.1 || r.top > vh * 1.8) {
       if (!v.paused) {
         try { v.pause(); } catch (e) {}
       }
@@ -3618,9 +3621,17 @@ function _pauseOffscreenFeedVideos() {
         v.removeAttribute('src');
         try { v.load(); } catch (e) {}
       }
-    } else if (v.dataset.deferredSrc && !v.getAttribute('src') && r.bottom >= -vh * 2.6 && r.top <= vh * 2.6) {
+    } else if (v.dataset.deferredSrc && !v.getAttribute('src') && r.bottom >= -vh * 2.0 && r.top <= vh * 2.2) {
       v.src = v.dataset.deferredSrc;
       delete v.dataset.deferredSrc;
+    }
+  });
+
+  // 1B. Unmount offscreen active YouTube/Vimeo iframes back to lightweight poster facade to free Chromium renderer RAM
+  grid.querySelectorAll('.ext-video-facade[data-ext-active="1"]').forEach((fac) => {
+    const r = fac.getBoundingClientRect();
+    if (r.bottom < -vh * 1.6 || r.top > vh * 1.8) {
+      if (typeof restoreExternalVideoFacade === 'function') restoreExternalVideoFacade(fac);
     }
   });
 
@@ -3629,14 +3640,14 @@ function _pauseOffscreenFeedVideos() {
     const r = fr.getBoundingClientRect();
     const pid = fr.getAttribute('data-post-id') || '';
     if (!pid) return;
-    if (r.bottom < -vh * 2.2 || r.top > vh * 2.2) {
+    if (r.bottom < -vh * 1.8 || r.top > vh * 1.8) {
       if (fr.hasAttribute('srcdoc') || (fr.getAttribute('src') && fr.getAttribute('src') !== 'about:blank')) {
         fr.dataset.suspendedHtmlPid = pid;
         fr.removeAttribute('srcdoc');
         fr.setAttribute('src', 'about:blank');
         fr.removeAttribute('data-vault-hydrated');
       }
-    } else if (fr.dataset.suspendedHtmlPid && r.bottom >= -vh * 1.8 && r.top <= vh * 1.8) {
+    } else if (fr.dataset.suspendedHtmlPid && r.bottom >= -vh * 1.5 && r.top <= vh * 1.5) {
       const post = findFeedPostById(fr.dataset.suspendedHtmlPid);
       delete fr.dataset.suspendedHtmlPid;
       if (post && typeof hydrateHtmlVaultFrame === 'function') {
@@ -3646,19 +3657,19 @@ function _pauseOffscreenFeedVideos() {
     }
   });
 
-  // 3. Lightweight DOM windowing for 48+ cards (archives cards scrolled far above fold without shifting scrollTop)
+  // 3. Lightweight DOM windowing for 20+ cards (archives cards scrolled far above fold without shifting scrollTop)
   if (typeof isDesktopFeedStageActive === 'function' && isDesktopFeedStageActive()) return;
   const cards = Array.from(grid.children).filter((el) =>
     el.id && el.id.startsWith('post_card_') && (el.classList.contains('post-card') || el.classList.contains('post-card-archived-stub'))
   );
-  if (cards.length <= 48) return;
+  if (cards.length <= 20) return;
   const lang = REMO_I18N.getLang();
   const u = REMO_STORE.getCurrentUser();
   const isAdm = REMO_STORE.isAdminUnlocked();
 
   cards.forEach((card) => {
     const r = card.getBoundingClientRect();
-    if (card.classList.contains('post-card') && r.bottom < -vh * 4.5 && r.height > 120) {
+    if (card.classList.contains('post-card') && r.bottom < -vh * 2.8 && r.height > 120) {
       const pid = card.id.slice('post_card_'.length);
       const h = Math.round(r.height);
       const stub = document.createElement('div');
@@ -3668,7 +3679,7 @@ function _pauseOffscreenFeedVideos() {
       stub.style.height = h + 'px';
       stub.style.minHeight = h + 'px';
       card.replaceWith(stub);
-    } else if (card.classList.contains('post-card-archived-stub') && r.bottom >= -vh * 3.0 && r.top <= vh * 3.0) {
+    } else if (card.classList.contains('post-card-archived-stub') && r.bottom >= -vh * 2.0 && r.top <= vh * 2.4) {
       const pid = card.getAttribute('data-archived-post-id');
       const post = pid ? findFeedPostById(pid) : null;
       if (post) {
@@ -3975,6 +3986,11 @@ function setFeedMode(mode, chipEl) {
 
   document.querySelectorAll('#feedModeChips .fchip, .more-feed-chips-subrow .fchip').forEach((b) => b.classList.remove('active'));
   if (chipEl) chipEl.classList.add('active');
+  if (mode === 'html' && typeof ensureRemoEngineLoaded === 'function' && !window.REMO_LIVE_DISCOVERY_APPS) {
+    ensureRemoEngineLoaded('live_apps').then(() => {
+      if (typeof syncLiveAppsSubbarUI === 'function') syncLiveAppsSubbarUI();
+    });
+  }
   renderSocialFeed();
 }
 
@@ -7910,6 +7926,40 @@ function parseExternalVideoUrl(rawUrl) {
   }
 }
 
+function restoreExternalVideoFacade(facEl) {
+  if (!facEl || facEl.dataset.extActive !== '1') return;
+  const saved = facEl._savedFacadeHtml;
+  facEl.dataset.extActive = '0';
+  if (saved) {
+    facEl.innerHTML = saved;
+  } else {
+    const ifr = facEl.querySelector('iframe');
+    if (ifr) {
+      ifr.src = 'about:blank';
+      ifr.remove();
+    }
+  }
+}
+window.restoreExternalVideoFacade = restoreExternalVideoFacade;
+
+function activateExternalVideoFacade(facEl, ev) {
+  if (ev) ev.stopPropagation();
+  if (!facEl || facEl.dataset.extActive === '1') return;
+  const embedUrl = facEl.getAttribute('data-embed-url') || '';
+  const host = facEl.getAttribute('data-embed-host') || 'Video';
+  if (!embedUrl) return;
+  // Enforce max 1 live YouTube/Vimeo iframe process at a time to prevent Chromium OOM
+  document.querySelectorAll('.ext-video-facade[data-ext-active="1"]').forEach((other) => {
+    if (other !== facEl) restoreExternalVideoFacade(other);
+  });
+  facEl._savedFacadeHtml = facEl.innerHTML;
+  facEl.dataset.extActive = '1';
+  const sep = embedUrl.includes('?') ? '&' : '?';
+  const liveSrc = `${embedUrl}${sep}autoplay=1`;
+  facEl.innerHTML = `<iframe class="ext-video-live-iframe" src="${escapeHtmlStr(liveSrc)}" title="${escapeHtmlStr(host)} Video" style="position:absolute;inset:0;width:100%;height:100%;border:none;" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>`;
+}
+window.activateExternalVideoFacade = activateExternalVideoFacade;
+
 function renderExternalVideoOrLinkStage(rawUrl, city, lang, captionText = '') {
   const info = parseExternalVideoUrl(rawUrl);
   const safeUrl = escapeHtmlStr(rawUrl || '');
@@ -7917,7 +7967,7 @@ function renderExternalVideoOrLinkStage(rawUrl, city, lang, captionText = '') {
 
   if (!info) {
     return `
-      <div style="width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;background:radial-gradient(circle at 50% 25%,#1e1b4b,#050816);text-align:center;">
+      <div class="ext-video-stage" style="width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;background:radial-gradient(circle at 50% 25%,#1e1b4b,#050816);text-align:center;">
         <div style="font-size:2.4rem;margin-bottom:8px;">🔗</div>
         <a href="${safeUrl}" target="_blank" rel="noopener noreferrer" class="btn-cyber" style="text-decoration:none;">${openLbl}</a>
       </div>
@@ -7925,14 +7975,20 @@ function renderExternalVideoOrLinkStage(rawUrl, city, lang, captionText = '') {
   }
 
   if (info.kind === 'youtube' || info.kind === 'vimeo') {
+    const thumbUrl = info.kind === 'youtube' && info.id ? `https://i.ytimg.com/vi/${encodeURIComponent(info.id)}/hqdefault.jpg` : '';
+    const playLbl = lang === 'fr' ? `Lire la vidéo ${info.host}` : `Play ${info.host} Video`;
     return `
-      <div style="width:100%;height:100%;display:flex;flex-direction:column;background:#050816;border-radius:12px;overflow:hidden;">
-        <div style="position:relative;width:100%;flex:1;min-height:240px;">
-          <iframe src="${escapeHtmlStr(info.embedUrl)}" title="${escapeHtmlStr(info.host)} Video" style="position:absolute;inset:0;width:100%;height:100%;border:none;" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen loading="lazy"></iframe>
+      <div class="ext-video-stage" style="width:100%;height:100%;display:flex;flex-direction:column;background:#050816;border-radius:12px;overflow:hidden;">
+        <div class="ext-video-facade" data-embed-url="${escapeHtmlStr(info.embedUrl)}" data-embed-host="${escapeHtmlStr(info.host)}" onclick="activateExternalVideoFacade(this, event)" role="button" tabindex="0" aria-label="${escapeHtmlStr(playLbl)}" style="position:relative;width:100%;flex:1;min-height:140px;cursor:pointer;overflow:hidden;background:radial-gradient(circle at 50% 35%,#1e293b,#050816);">
+          ${thumbUrl ? `<img src="${escapeHtmlStr(thumbUrl)}" alt="${escapeHtmlStr(captionText || (info.host + ' Video'))}" loading="lazy" decoding="async" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;">` : ''}
+          <div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(5,8,22,0.16) 0%,rgba(5,8,22,0.06) 45%,rgba(5,8,22,0.52) 100%);pointer-events:none;"></div>
+          <div class="ext-video-play-btn" aria-hidden="true">
+            <svg viewBox="0 0 68 48" width="60" height="42"><path d="M66.52 7.74c-.78-2.93-2.49-5.41-5.42-6.19C55.79.13 34 0 34 0S12.21.13 6.9 1.55c-2.93.78-4.63 3.26-5.42 6.19C.06 13.05 0 24 0 24s.06 10.95 1.48 16.26c.78 2.93 2.49 5.41 5.42 6.19C12.21 47.87 34 48 34 48s21.79-.13 27.1-1.55c2.93-.78 4.64-3.26 5.42-6.19C67.94 34.95 68 24 68 24s-.06-10.95-1.48-16.26z" fill="${info.kind === 'youtube' ? '#ff0000' : '#0ea5e9'}" fill-opacity="0.92"></path><path d="M45 24 27 14v20" fill="#fff"></path></svg>
+          </div>
         </div>
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 12px;background:rgba(15,23,42,0.95);border-top:1px solid rgba(56,189,248,0.25);font-size:0.74rem;">
+        <div class="ext-video-bar" style="display:flex;justify-content:space-between;align-items:center;padding:6px 12px;background:rgba(15,23,42,0.95);border-top:1px solid rgba(56,189,248,0.25);font-size:0.74rem;flex-shrink:0;">
           <span style="color:#38bdf8;font-weight:800;">▶️ ${escapeHtmlStr(info.host)} · ${city ? `${city.flag} ${getCityName(city, lang)}` : 'REMO'}</span>
-          <a href="${safeUrl}" target="_blank" rel="noopener noreferrer" style="color:#fde047;font-weight:800;text-decoration:none;">${openLbl}</a>
+          <a href="${safeUrl}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()" style="color:#fde047;font-weight:800;text-decoration:none;">${openLbl}</a>
         </div>
       </div>
     `;
@@ -10912,9 +10968,9 @@ async function userSignOutAction(reopenAuthModal = false) {
 }
 window.updateAuthHeaderUI = syncHeaderAndSidebars;
 
-/* ── Lazy On-Demand Feature Engine Loader (Removes 368 KB from initial boot!) ── */
+/* ── Lazy On-Demand Feature Engine Loader (Removes 377 KB from initial boot!) ── */
 const _remoEnginePromises = Object.create(null);
-const REMO_ASSET_VER = '165';
+const REMO_ASSET_VER = '172';
 
 function loadRemoEngineScript(srcRel) {
   if (_remoEnginePromises[srcRel]) return _remoEnginePromises[srcRel];
@@ -10986,22 +11042,8 @@ if (typeof window.openRemoRadioModal !== 'function') {
 }
 
 function scheduleIdleEnginePrefetch() {
-  try {
-    const conn = navigator && navigator.connection;
-    if (conn && (conn.saveData || /2g/i.test(conn.effectiveType || ''))) return;
-  } catch (e) {}
-  const run = () => {
-    loadRemoEngineScript('js/remo-live-apps.js');
-    setTimeout(() => {
-      loadRemoEngineScript('js/remo-radio-engine.js').then(() => loadRemoEngineScript('js/remo-focus-tv.js'));
-    }, 1000);
-    setTimeout(() => loadRemoEngineScript('js/remo-world-blitz.js'), 2000);
-  };
-  if (typeof requestIdleCallback === 'function') {
-    setTimeout(() => requestIdleCallback(run, { timeout: 5000 }), 2200);
-  } else {
-    setTimeout(run, 3000);
-  }
+  // v172: Strictly load secondary engines (Radio, Focus TV, World Blitz, Live Apps) on demand
+  // instead of eagerly downloading & parsing ~377 KB of idle scripts on every page boot.
 }
 
 function toggleHeaderRadio() {
@@ -11553,6 +11595,7 @@ window.addEventListener('remo:langchange', () => {
 
 let _remoStateBurstTimer = null;
 let _remoStateBurstPending = false;
+let _remoStateBurstNeedsFeed = false;
 function flushCoalescedStateRefresh(reason) {
   syncHeaderAndSidebars();
 
@@ -11579,6 +11622,7 @@ function flushCoalescedStateRefresh(reason) {
   }
   if (reason === 'cloud_users') {
     if (typeof renderLivePresenceStrip === 'function') renderLivePresenceStrip();
+    if (currentRemoView === 'passport' && typeof renderPassportView === 'function') renderPassportView();
     return;
   }
   const singlePostOrNonFeedReasons = new Set([
@@ -11610,14 +11654,18 @@ window.addEventListener('remo:stateupdate', (ev) => {
   const reason = ev && ev.detail ? ev.detail.reason : '';
   // Coalesce burst cloud snapshot updates during initial boot so the feed & header render ONCE instead of 8x
   if (reason && (reason.startsWith('cloud_') || reason === 'presence' || reason === 'public_settings')) {
+    if (reason !== 'cloud_users' && reason !== 'cloud_dms' && reason !== 'presence') {
+      _remoStateBurstNeedsFeed = true;
+    }
     _remoStateBurstPending = reason;
     if (!_remoStateBurstTimer) {
       _remoStateBurstTimer = setTimeout(() => {
-        const lastReason = _remoStateBurstPending || reason;
+        const lastReason = _remoStateBurstNeedsFeed ? 'cloud_posts' : (_remoStateBurstPending || reason);
         _remoStateBurstTimer = null;
         _remoStateBurstPending = false;
+        _remoStateBurstNeedsFeed = false;
         flushCoalescedStateRefresh(lastReason);
-      }, 120);
+      }, 150);
     }
     return;
   }
@@ -11640,7 +11688,7 @@ function ensureInlineAdminStudioLoaded(onReady) {
   }
   _remoAdminInlineLoading = true;
   const s = document.createElement('script');
-  s.src = 'js/remo-admin-inline.js?v=171';
+  s.src = 'js/remo-admin-inline.js?v=172';
   s.async = true;
   s.onload = () => {
     _remoAdminInlineLoading = false;
@@ -14234,6 +14282,9 @@ async function fetchAdminHtmlSourceFromVault(post) {
 async function hydrateHtmlVaultFrame(iframeEl, post) {
   if (!iframeEl || !post || !isHtmlAppPost(post)) return;
   if (iframeEl.getAttribute('data-vault-hydrated') === '1' && !iframeEl.getAttribute('data-vault-pending')) return;
+  if (!window.REMO_LIVE_DISCOVERY_APPS && typeof ensureRemoEngineLoaded === 'function') {
+    ensureRemoEngineLoaded('live_apps');
+  }
   iframeEl.removeAttribute('data-vault-pending');
   iframeEl.setAttribute('data-vault-hydrated', 'loading');
   const lang = REMO_I18N.getLang();

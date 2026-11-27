@@ -3,13 +3,13 @@
    Offline Shell Caching + Native Push & Incoming Call Notifications
    ════════════════════════════════════════════════════════════════════ */
 
-const CACHE_NAME = 'remo-pwa-v171';
+const CACHE_NAME = 'remo-pwa-v172';
 const CORE_ASSETS = [
   './',
   './index.html',
   './manifest.json',
   './favicon.ico',
-  './css/remo-core.css?v=171',
+  './css/remo-core.css?v=172',
   './img/remo_icon_192.png',
   './img/apple-touch-icon.png',
   './img/remo_brand_coin.png',
@@ -17,13 +17,13 @@ const CORE_ASSETS = [
   './img/favicon-64x64.png',
   './img/remo_coin_front.png',
   './img/remo_coin_back_base.png',
-  './js/remo-i18n.js?v=171',
-  './js/remo-cities-data.js?v=171',
-  './js/remo-store.js?v=171',
-  './js/remo-card-engine.js?v=171',
-  './js/remo-radar-arena.js?v=171',
-  './js/remo-social-comms.js?v=171',
-  './js/remo-viral-studios.js?v=171'
+  './js/remo-i18n.js?v=172',
+  './js/remo-cities-data.js?v=172',
+  './js/remo-store.js?v=172',
+  './js/remo-card-engine.js?v=172',
+  './js/remo-radar-arena.js?v=172',
+  './js/remo-social-comms.js?v=172',
+  './js/remo-viral-studios.js?v=172'
 ];
 
 self.addEventListener('install', (event) => {

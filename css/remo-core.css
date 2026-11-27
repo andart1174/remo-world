@@ -12133,18 +12133,111 @@ select.remo-input option {
   font-family: monospace;
 }
 
-/* 5. v169: Clean Carousel Uncropped Framing (4:5, 1:1, 9:16 slides stay 100% visible) */
+/* 5. v172: Compact Balanced Grid Cards (Desktop), Click-to-Play Video Facade & Clean Uncropped Mobile/Desktop Framing */
+.ext-video-play-btn {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  filter: drop-shadow(0 6px 18px rgba(0, 0, 0, 0.72));
+  transition: transform 0.18s ease;
+}
+.ext-video-facade:hover .ext-video-play-btn {
+  transform: translate(-50%, -50%) scale(1.1);
+}
+
 .post-media-wrap img.carousel-slide-img {
   object-fit: contain !important;
   background: radial-gradient(circle at center, #0d152a, #050816);
 }
-@media (min-width: 769px) {
-  .post-media-wrap:has(.carousel-slide-img) {
-    aspect-ratio: 4 / 4.4;
-    max-height: 520px;
+
+@media (min-width: 861px) {
+  body:not(.desktop-stage-active) .posts-grid {
+    grid-template-columns: repeat(auto-fill, minmax(305px, 1fr));
+    gap: 16px;
+    max-width: 1160px;
   }
-  .post-media-wrap:has(.carousel-slide-img) img.carousel-slide-img {
-    max-height: 520px;
+  body:not(.desktop-stage-active) .post-head {
+    padding: 10px 12px;
+  }
+  body:not(.desktop-stage-active) .post-body {
+    padding: 10px 12px 12px;
+    gap: 7px;
+  }
+  body:not(.desktop-stage-active) .post-caption {
+    font-size: 0.84rem;
+    line-height: 1.42;
+  }
+  body:not(.desktop-stage-active) .post-media-wrap {
+    aspect-ratio: 4 / 3;
+    max-height: 310px;
+  }
+  body:not(.desktop-stage-active) .post-media-wrap img,
+  body:not(.desktop-stage-active) .post-media-wrap video {
+    max-height: 310px;
+  }
+  body:not(.desktop-stage-active) .post-card.is-carousel .post-media-wrap {
+    aspect-ratio: 1 / 1;
+    max-height: 360px;
+  }
+  body:not(.desktop-stage-active) .post-card.is-carousel .post-media-wrap img.carousel-slide-img {
+    max-height: 360px;
+  }
+  body:not(.desktop-stage-active) .post-card.is-video-link .post-media-wrap {
+    aspect-ratio: 16 / 10;
+    max-height: 260px;
+  }
+  body:not(.desktop-stage-active) .post-card.is-html-app .post-media-wrap {
+    height: clamp(360px, calc(100dvh - 280px), 480px) !important;
+    max-height: 480px !important;
+  }
+}
+
+@media (max-width: 860px) {
+  #view-feed.active .post-media-wrap img.carousel-slide-img {
+    object-fit: contain !important;
+    background: transparent !important;
+  }
+  body:not(.mobile-feed-classic) #view-feed.active .post-card.is-carousel .post-media-wrap {
+    padding: 86px 0 112px !important;
+    background: radial-gradient(circle at center, #0d152a, #030612) !important;
+    box-sizing: border-box !important;
+  }
+  body:not(.mobile-feed-classic) #view-feed.active .post-card.is-carousel .carousel-dots {
+    bottom: 8px !important;
+  }
+  body:not(.mobile-feed-classic) #view-feed.active .post-card.is-carousel .carousel-count-pill,
+  body:not(.mobile-feed-classic) #view-feed.active .post-card.is-carousel .post-badges-top,
+  body:not(.mobile-feed-classic) #view-feed.active .post-card.is-video-link .post-badges-top {
+    top: 8px !important;
+  }
+  body:not(.mobile-feed-classic) #view-feed.active .post-card.is-video-link .post-media-wrap {
+    padding: 88px 10px 220px !important;
+    background: radial-gradient(circle at center, #0c142c, #030612) !important;
+    box-sizing: border-box !important;
+  }
+  body:not(.mobile-feed-classic) #view-feed.active .post-card.is-video-link .post-face-front {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+  body:not(.mobile-feed-classic) #view-feed.active .post-card.is-video-link .ext-video-stage {
+    width: 100% !important;
+    height: auto !important;
+    border-radius: 14px !important;
+    border: 1px solid rgba(56, 189, 248, 0.35);
+    box-shadow: 0 14px 36px rgba(0, 0, 0, 0.72);
+  }
+  body:not(.mobile-feed-classic) #view-feed.active .post-card.is-video-link .ext-video-facade {
+    aspect-ratio: 16 / 9 !important;
+    flex: 0 0 auto !important;
+    min-height: 0 !important;
+    height: auto !important;
+  }
+  body.mobile-feed-classic #view-feed.active .post-card.is-video-link .post-media-wrap {
+    aspect-ratio: 16 / 10 !important;
+    max-height: 280px !important;
   }
 }
 

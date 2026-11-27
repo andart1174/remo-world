@@ -2712,7 +2712,7 @@ const REMO_STORE = {
       delete this.state.settings.adminPin;
       delete this.state.settings.adminPinHash;
     }
-    this.save(false);
+    this.save(false, 'init');
     this.initFirebaseIfConfigured();
 
     // Listen to live cross-tab broadcasts (Admin Office <-> Social Network)
@@ -3150,19 +3150,25 @@ const REMO_STORE = {
       }
     });
     if (!stripHeavySyncedMedia) return selected;
-    return selected.map((p, idx) => {
-      if (!p || p._cloudSyncPending || p._cloudSyncError || idx < 3) return p;
+    return selected.map((p) => {
+      if (!p || p._cloudSyncPending || p._cloudSyncError) return p;
       const copy = Object.assign({}, p);
-      if (typeof copy.mediaUrl === 'string' && copy.mediaUrl.startsWith('data:') && copy.mediaUrl.length > 40000) {
+      if (typeof copy.mediaUrl === 'string' && copy.mediaUrl.startsWith('data:') && copy.mediaUrl.length > 24000) {
         copy.mediaUrl = '';
       }
       if (Array.isArray(copy.mediaUrls)) {
-        copy.mediaUrls = copy.mediaUrls.map((u) => (typeof u === 'string' && u.startsWith('data:') && u.length > 40000) ? '' : u);
+        copy.mediaUrls = copy.mediaUrls.map((u) => (typeof u === 'string' && u.startsWith('data:') && u.length > 24000) ? '' : u);
+      }
+      if (typeof copy.htmlCode === 'string' && copy.htmlCode.length > 24000) {
+        copy.htmlCode = '';
+      }
+      if (typeof copy.vaultPayload === 'string' && copy.vaultPayload.length > 24000) {
+        copy.vaultPayload = '';
       }
       if (copy.versus) {
         const v = Object.assign({}, copy.versus);
-        if (typeof v.leftMedia === 'string' && v.leftMedia.startsWith('data:') && v.leftMedia.length > 40000) v.leftMedia = '';
-        if (typeof v.rightMedia === 'string' && v.rightMedia.startsWith('data:') && v.rightMedia.length > 40000) v.rightMedia = '';
+        if (typeof v.leftMedia === 'string' && v.leftMedia.startsWith('data:') && v.leftMedia.length > 24000) v.leftMedia = '';
+        if (typeof v.rightMedia === 'string' && v.rightMedia.startsWith('data:') && v.rightMedia.length > 24000) v.rightMedia = '';
         copy.versus = v;
       }
       return copy;
@@ -3172,7 +3178,7 @@ const REMO_STORE = {
   _flushLocalSave() {
     try {
       const toPersist = Object.assign({}, this.state);
-      toPersist.posts = this._prunePostsForLocalSave(80, false);
+      toPersist.posts = this._prunePostsForLocalSave(80, true);
       localStorage.setItem(this.KEY, JSON.stringify(toPersist));
     } catch (e) {
       console.warn('LocalStorage quota limit reached, trimming stale local cache (preserving recent & unsynced posts):', e);
@@ -3235,7 +3241,8 @@ const REMO_STORE = {
     if (reason && (reason.startsWith('auction') || reason === 'update')) {
       this.backupAuctionsToStorage();
     }
-    if (this.fbDb && reason !== 'cloud_sync' && reason !== 'cloud_live_update') {
+    const isNonWritableSyncReason = !reason || reason === 'init' || reason === 'private_email_sync' || reason.startsWith('cloud_');
+    if (this.fbDb && !isNonWritableSyncReason) {
       this.syncToFirestore(reason);
     }
     if (broadcast && REMO_LIVE_BUS) {
@@ -6164,15 +6171,7 @@ const REMO_STORE = {
           }
         } catch (e) {}
         this.save(false, 'cloud_users_sync');
-        window.dispatchEvent(new CustomEvent('remo:stateupdate', { detail: { reason: 'cloud_users' } }));
-        if (this.isAdminUnlocked() && this.isCurrentUserAdmin() && typeof refreshAllAdminPanels === 'function') refreshAllAdminPanels();
-        if (typeof syncHeaderAndSidebars === 'function') syncHeaderAndSidebars();
-        if (typeof renderPassportView === 'function') renderPassportView();
-        if (visualChanged && typeof renderSocialFeed === 'function') renderSocialFeed();
-        if (typeof renderDirectMessagesView === 'function' && typeof currentRemoView !== 'undefined' && currentRemoView === 'messages') {
-          renderDirectMessagesView();
-        }
-        if (typeof renderLivePresenceStrip === 'function') renderLivePresenceStrip();
+        window.dispatchEvent(new CustomEvent('remo:stateupdate', { detail: { reason: visualChanged ? 'cloud_users_visual' : 'cloud_users' } }));
       };
 
       this.fbDb.collection('remo_users').limit(250).onSnapshot(handleUsersSnap, (err) => {
@@ -6202,7 +6201,7 @@ const REMO_STORE = {
 
       // 2C. Watch Admin-Protected Public Config (Announcements, Rewards, Daily Pulse, Happy Hour)
       this.fbDb.collection('remo_public_settings').doc('config').onSnapshot((snap) => {
-        if (!snap || !snap.exists) return;
+        if (!snap || !snap.exists || snap.metadata?.hasPendingWrites) return;
         const cfgData = snap.data();
         if (!cfgData || typeof cfgData !== 'object') return;
         const safePublic = Object.assign({}, this.state.settings || {});
@@ -6211,6 +6210,10 @@ const REMO_STORE = {
         });
         delete safePublic.adminPin;
         delete safePublic.adminPinHash;
+        let pubSig = '';
+        try { pubSig = JSON.stringify(safePublic); } catch (e) {}
+        if (pubSig && this._lastPublicSettingsSig === pubSig) return;
+        this._lastPublicSettingsSig = pubSig;
         this.state.settings = safePublic;
         if (Array.isArray(cfgData.vipShopItems) && cfgData.vipShopItems.length > 0) {
           this.state.vipShopItems = cfgData.vipShopItems;
@@ -6548,7 +6551,6 @@ const REMO_STORE = {
             localOd.updatedAt = Math.max(cloudUpdated, effResetAt);
           }
 
-          this._flushLocalSave();
           const cloudDelMap = (cOd.deletedEntries && typeof cOd.deletedEntries === 'object') ? cOd.deletedEntries : {};
           const localHasNewerTombstone = Object.keys(mergedDeleted).some((k) => Number(mergedDeleted[k] || 0) > Number(cloudDelMap[k] || 0));
           if (localResetAt > cloudResetAt || localHasNewerTombstone) {
@@ -6983,13 +6985,7 @@ const REMO_STORE = {
     this.save(false, 'cloud_posts_sync');
     if (hasContentChanged) {
       window.dispatchEvent(new CustomEvent('remo:stateupdate', { detail: { reason: 'cloud_posts' } }));
-      if (typeof renderSocialFeed === 'function' && (typeof currentRemoView === 'undefined' || currentRemoView === 'feed')) {
-        renderSocialFeed();
-      }
       if (typeof updateUnreadBadges === 'function') updateUnreadBadges();
-      if (typeof refreshAllAdminPanels === 'function') {
-        refreshAllAdminPanels();
-      }
     }
   },
 

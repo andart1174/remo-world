@@ -405,6 +405,19 @@ async function runStoreSimulations() {
   assert.strictEqual(ls['remo_avatar_u_admin_founder'], adminAvatar20k, '20KB Admin avatar must survive QuotaExceededError inside _flushLocalSave()');
   assert.strictEqual(ls['remo_avatar_u_other_999'], undefined, 'Stale >48KB third-party avatar should be evicted before current/founder avatar');
 
+  // 6D. Verify v172 Firestore loop guard, YouTube Lite Facade & mobile carousel specificity
+  let cloudSyncCalls = 0;
+  const origSyncToFs = STORE.syncToFirestore;
+  STORE.syncToFirestore = function () { cloudSyncCalls++; };
+  STORE.fbDb = {};
+  ['cloud_settings', 'cloud_users_sync', 'cloud_posts_sync', 'cloud_stories_sync', 'cloud_dms', 'cloud_notifs', 'cloud_tickets', 'private_email_sync', 'init'].forEach((r) => {
+    STORE.save(false, r);
+  });
+  STORE.syncToFirestore = origSyncToFs;
+  assert.strictEqual(cloudSyncCalls, 0, 'Cloud-originated save() reasons must NEVER re-trigger syncToFirestore()!');
+  assert.ok(comms.includes('function activateExternalVideoFacade('), 'YouTube/Vimeo click-to-play facade must exist');
+  assert.ok(cssSrc.includes('#view-feed.active .post-media-wrap img.carousel-slide-img'), 'Mobile carousel contain rule must match #view-feed.active specificity');
+
   // 6. Verify startFirestoreSync queries remo_users WITHOUT orderBy('lastSeenAt') that excludes legacy docs
   const usersQueryMatch = storeSrc.match(/this\.fbDb\.collection\('remo_users'\)([^\n;]+)/);
   assert.ok(usersQueryMatch, 'Must find remo_users query in js/remo-store.js');
